@@ -1,0 +1,33 @@
+# /etc/conf.d/aokchaind: config file for /etc/init.d/aokchaind
+
+# Config file location
+#AOKCHAIND_CONFIGFILE="/etc/aokchain/aokchain.conf"
+
+# What directory to write pidfile to?  (created and owned by $AOKCHAIND_USER)
+#AOKCHAIND_PIDDIR="/var/run/aokchaind"
+
+# What filename to give the pidfile
+#AOKCHAIND_PIDFILE="${AOKCHAIND_PIDDIR}/aokchaind.pid"
+
+# Where to write aokchaind data (be mindful that the blockchain is large)
+#AOKCHAIND_DATADIR="/var/lib/aokchaind"
+
+# User and group to own aokchaind process
+#AOKCHAIND_USER="aokchain"
+#AOKCHAIND_GROUP="aokchain"
+
+# Path to aokchaind executable
+#AOKCHAIND_BIN="/usr/bin/aokchaind"
+
+# Nice value to run aokchaind under
+#AOKCHAIND_NICE=0
+
+# Additional options (avoid -conf and -datadir, use flags above)
+#AOKCHAIND_OPTS=""
+
+# The timeout in seconds OpenRC will wait for aokchaind to terminate
+# after a SIGTERM has been raised.
+# Note that this will be mapped as argument to start-stop-daemon's
+# '--retry' option, which means you can specify a retry schedule
+# here. For more information see man 8 start-stop-daemon.
+AOKCHAIND_SIGTERM_TIMEOUT=60

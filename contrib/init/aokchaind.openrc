@@ -1,0 +1,92 @@
+#!/sbin/openrc-run
+
+# backward compatibility for existing gentoo layout 
+#
+if [ -d "/var/lib/aokchain/.aokchain" ]; then
+	AOKCHAIND_DEFAULT_DATADIR="/var/lib/aokchain/.aokchain"
+else
+	AOKCHAIND_DEFAULT_DATADIR="/var/lib/aokchaind"
+fi
+
+AOKCHAIND_CONFIGFILE=${AOKCHAIND_CONFIGFILE:-/etc/aokchain/aokchain.conf}
+AOKCHAIND_PIDDIR=${AOKCHAIND_PIDDIR:-/var/run/aokchaind}
+AOKCHAIND_PIDFILE=${AOKCHAIND_PIDFILE:-${AOKCHAIND_PIDDIR}/aokchaind.pid}
+AOKCHAIND_DATADIR=${AOKCHAIND_DATADIR:-${AOKCHAIND_DEFAULT_DATADIR}}
+AOKCHAIND_USER=${AOKCHAIND_USER:-${AOKCHAIN_USER:-aokchain}}
+AOKCHAIND_GROUP=${AOKCHAIND_GROUP:-aokchain}
+AOKCHAIND_BIN=${AOKCHAIND_BIN:-/usr/bin/aokchaind}
+AOKCHAIND_NICE=${AOKCHAIND_NICE:-${NICELEVEL:-0}}
+AOKCHAIND_OPTS="${AOKCHAIND_OPTS:-${AOKCHAIN_OPTS}}"
+
+name="AokChain Core Daemon"
+description="AokChain cryptocurrency P2P network daemon"
+
+command="/usr/bin/aokchaind"
+command_args="-pid=\"${AOKCHAIND_PIDFILE}\" \
+		-conf=\"${AOKCHAIND_CONFIGFILE}\" \
+		-datadir=\"${AOKCHAIND_DATADIR}\" \
+		-daemon \
+		${AOKCHAIND_OPTS}"
+
+required_files="${AOKCHAIND_CONFIGFILE}"
+start_stop_daemon_args="-u ${AOKCHAIND_USER} \
+			-N ${AOKCHAIND_NICE} -w 2000"
+pidfile="${AOKCHAIND_PIDFILE}"
+
+# The retry schedule to use when stopping the daemon. Could be either
+# a timeout in seconds or multiple signal/timeout pairs (like
+# "SIGKILL/180 SIGTERM/300")
+retry="${AOKCHAIND_SIGTERM_TIMEOUT}"
+
+depend() {
+	need localmount net
+}
+
+# verify
+# 1) that the datadir exists and is writable (or create it)
+# 2) that a directory for the pid exists and is writable
+# 3) ownership and permissions on the config file
+start_pre() {
+	checkpath \
+	-d \
+	--mode 0750 \
+	--owner "${AOKCHAIND_USER}:${AOKCHAIND_GROUP}" \
+	"${AOKCHAIND_DATADIR}"
+
+	checkpath \
+	-d \
+	--mode 0755 \
+	--owner "${AOKCHAIND_USER}:${AOKCHAIND_GROUP}" \
+	"${AOKCHAIND_PIDDIR}"
+
+	checkpath -f \
+	-o ${AOKCHAIND_USER}:${AOKCHAIND_GROUP} \
+	-m 0660 \
+	${AOKCHAIND_CONFIGFILE}
+
+	checkconfig || return 1
+}
+
+checkconfig()
+{
+	if ! grep -qs '^rpcpassword=' "${AOKCHAIND_CONFIGFILE}" ; then
+		eerror ""
+		eerror "ERROR: You must set a secure rpcpassword to run aokchaind."
+		eerror "The setting must appear in ${AOKCHAIND_CONFIGFILE}"
+		eerror ""
+		eerror "This password is security critical to securing wallets "
+		eerror "and must not be the same as the rpcuser setting."
+		eerror "You can generate a suitable random password using the following "
+		eerror "command from the shell:"
+		eerror ""
+		eerror "bash -c 'tr -dc a-zA-Z0-9 < /dev/urandom | head -c32 && echo'"
+		eerror ""
+		eerror "It is recommended that you also set alertnotify so you are "
+		eerror "notified of problems:"
+		eerror ""
+		eerror "ie: alertnotify=echo %%s | mail -s \"AokChain Alert\"" \
+			"admin@foo.com"
+		eerror ""
+		return 1
+	fi
+}
