@@ -176,7 +176,7 @@
         <translation>Подтвердите шифрование кошелька</translation>
     </message>
     <message>
-        <source>Warning: If you encrypt your wallet and lose your passphrase, you will &lt;b&gt;LOSE ALL OF YOUR AOKCHAINS&lt;/b&gt;!</source>
+        <source>Warning: If you encrypt your wallet and lose your passphrase, you will &lt;b&gt;LOSE ALL OF YOUR AOK&lt;/b&gt;!</source>
         <translation>Внимание: если вы зашифруете ваш кошелек и потеряете ваш пароль, то вы &lt;b&gt;ПОТЕРЯЕТЕ ВСЕ ВАШИ БИТКОЙНЫ&lt;/b&gt;!</translation>
     </message>
     <message>
@@ -189,7 +189,7 @@
     </message>
     <message>
         <source>Your wallet is now encrypted. Remember that encrypting your wallet cannot fully protect your aokchains from being stolen by malware infecting your computer.</source>
-        <translation>Ваш кошелек теперь зашифрован. Помните, что шифрование вашего кошелька не может полностью защитить ваши биткойны от кражи вредоносным ПО.</translation>
+        <translation>Ваш кошелек теперь зашифрован. Помните, что шифрование вашего кошелька не может полностью защитить ваши AOKы от кражи вредоносным ПО.</translation>
     </message>
     <message>
         <source>IMPORTANT: Any previous backups you have made of your wallet file should be replaced with the newly generated, encrypted wallet file. For security reasons, previous backups of the unencrypted wallet file will become useless as soon as you start using the new, encrypted wallet.</source>
@@ -343,7 +343,7 @@
     </message>
     <message>
         <source>Send coins to a AokChain address</source>
-        <translation>Послать средства на биткойн адрес</translation>
+        <translation>Послать средства на AOK адрес</translation>
     </message>
     <message>
         <source>Backup wallet to another location</source>
@@ -427,7 +427,7 @@
     </message>
     <message>
         <source>Open a aokchain: URI or payment request</source>
-        <translation>Открыть биткойн: URI или запрос платежа</translation>
+        <translation>Открыть AOK: URI или запрос платежа</translation>
     </message>
     <message>
         <source>&amp;Command-line options</source>
@@ -1183,7 +1183,7 @@
     </message>
     <message>
         <source>Connect to the AokChain network through a separate SOCKS5 proxy for Tor hidden services.</source>
-        <translation>Соединяться к Биткоин-сети через отдельные SOCKS5 прокси через Tor hidden services:</translation>
+        <translation>Соединяться к AOK-сети через отдельные SOCKS5 прокси через Tor hidden services:</translation>
     </message>
     <message>
         <source>&amp;Window</source>
@@ -1499,7 +1499,7 @@
     </message>
     <message>
         <source>Enter a AokChain address (e.g. %1)</source>
-        <translation>Введите биткоин-адрес (напр. %1)</translation>
+        <translation>Введите AOK-адрес (напр. %1)</translation>
     </message>
     <message>
         <source>%1 d</source>
@@ -2232,7 +2232,7 @@ Note:  Since the fee is calculated on a per-byte basis, a fee of "100 satoshis p
     </message>
     <message>
         <source>When there is less transaction volume than space in the blocks, miners as well as relaying nodes may enforce a minimum fee. Paying only this minimum fee is just fine, but be aware that this can result in a never confirming transaction once there is more demand for aokchain transactions than the network can process.</source>
-        <translation>Когда объем транзакций меньше, чем пространство в блоках, майнеры, а также ретранслирующие узлы могут устанавливать минимальную плату. Платить только эту минимальную комиссию - это хорошо, но имейте в виду, что это может привести к тому, что транзакция никогда не будет подтверждена, если будет больше биткойн-транзакций, чем может обработать сеть.</translation>
+        <translation>Когда объем транзакций меньше, чем пространство в блоках, майнеры, а также ретранслирующие узлы могут устанавливать минимальную плату. Платить только эту минимальную комиссию - это хорошо, но имейте в виду, что это может привести к тому, что транзакция никогда не будет подтверждена, если будет больше AOK-транзакций, чем может обработать сеть.</translation>
     </message>
     <message>
         <source>A too low fee might result in a never confirming transaction (read the tooltip)</source>
@@ -2439,7 +2439,7 @@ Note:  Since the fee is calculated on a per-byte basis, a fee of "100 satoshis p
     </message>
     <message>
         <source>The fee will be deducted from the amount being sent. The recipient will receive less aokchains than you enter in the amount field. If multiple recipients are selected, the fee is split equally.</source>
-        <translation>С отправляемой суммы будет удержана комиссия. Получателю придёт меньше биткоинов, чем вы вводите в поле количества. Если выбрано несколько получателей, комиссия распределяется поровну.</translation>
+        <translation>С отправляемой суммы будет удержана комиссия. Получателю придёт меньше AOK, чем вы вводите в поле количества. Если выбрано несколько получателей, комиссия распределяется поровну.</translation>
     </message>
     <message>
         <source>S&amp;ubtract fee from amount</source>
@@ -2512,7 +2512,7 @@ Note:  Since the fee is calculated on a per-byte basis, a fee of "100 satoshis p
     </message>
     <message>
         <source>You can sign messages/agreements with your addresses to prove you can receive aokchains sent to them. Be careful not to sign anything vague or random, as phishing attacks may try to trick you into signing your identity over to them. Only sign fully-detailed statements you agree to.</source>
-        <translation>Вы можете подписывать сообщения/соглашения своими адресами, чтобы доказать свою возможность получать биткоины на них. Будьте осторожны, не подписывайте что-то неопределённое или случайное, так как фишинговые атаки могут обманным путём заставить вас подписать нежелательные сообщения. Подписывайте только те сообщения, с которыми вы согласны вплоть до мелочей.</translation>
+        <translation>Вы можете подписывать сообщения/соглашения своими адресами, чтобы доказать свою возможность получать AOK на них. Будьте осторожны, не подписывайте что-то неопределённое или случайное, так как фишинговые атаки могут обманным путём заставить вас подписать нежелательные сообщения. Подписывайте только те сообщения, с которыми вы согласны вплоть до мелочей.</translation>
     </message>
     <message>
         <source>The AokChain address to sign the message with</source>

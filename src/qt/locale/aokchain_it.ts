@@ -176,7 +176,7 @@
         <translation>Conferma la cifratura del portafoglio</translation>
     </message>
     <message>
-        <source>Warning: If you encrypt your wallet and lose your passphrase, you will &lt;b&gt;LOSE ALL OF YOUR AOKCHAINS&lt;/b&gt;!</source>
+        <source>Warning: If you encrypt your wallet and lose your passphrase, you will &lt;b&gt;LOSE ALL OF YOUR AOK&lt;/b&gt;!</source>
         <translation>Attenzione: Se si cifra il portamonete e si perde la passphrase &lt;b&gt;TUTTI I PROPRI AOKCHAIN ANDRANNO PERSI&lt;/b&gt;!</translation>
     </message>
     <message>

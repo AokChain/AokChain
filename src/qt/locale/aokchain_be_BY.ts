@@ -67,11 +67,11 @@
     </message>
     <message>
         <source>These are your AokChain addresses for sending payments. Always check the amount and the receiving address before sending coins.</source>
-        <translation>Тут знаходзяцца Біткойн-адрасы для высылання плацяжоў. Заўсёды спраўджвайце колькасць і адрас прызначэння перад здзяйсненнем транзакцыі.</translation>
+        <translation>Тут знаходзяцца AOK-адрасы для высылання плацяжоў. Заўсёды спраўджвайце колькасць і адрас прызначэння перад здзяйсненнем транзакцыі.</translation>
     </message>
     <message>
         <source>These are your AokChain addresses for receiving payments. It is recommended to use a new receiving address for each transaction.</source>
-        <translation>Тут знаходзяцца Біткойн-адрасы для прымання плацяжоў. Пажадана выкарыстоўваць новы адрас для кожнай транзакцыі.</translation>
+        <translation>Тут знаходзяцца AOK-адрасы для прымання плацяжоў. Пажадана выкарыстоўваць новы адрас для кожнай транзакцыі.</translation>
     </message>
     <message>
         <source>&amp;Copy Address</source>
@@ -172,7 +172,7 @@
         <translation>Пацвердзіце шыфраванне гаманца</translation>
     </message>
     <message>
-        <source>Warning: If you encrypt your wallet and lose your passphrase, you will &lt;b&gt;LOSE ALL OF YOUR AOKCHAINS&lt;/b&gt;!</source>
+        <source>Warning: If you encrypt your wallet and lose your passphrase, you will &lt;b&gt;LOSE ALL OF YOUR AOK&lt;/b&gt;!</source>
         <translation>Увага: калі вы зашыфруеце свой гаманец і страціце парольную фразу, то &lt;b&gt;СТРАЦІЦЕ ЎСЕ СВАЕ БІТКОЙНЫ&lt;/b&gt;!</translation>
     </message>
     <message>
@@ -291,7 +291,7 @@
     </message>
     <message>
         <source>Send coins to a AokChain address</source>
-        <translation>Даслаць манеты на Біткойн-адрас</translation>
+        <translation>Даслаць манеты на AOK-адрас</translation>
     </message>
     <message>
         <source>Backup wallet to another location</source>
@@ -315,7 +315,7 @@
     </message>
     <message>
         <source>AokChain</source>
-        <translation>Біткойн</translation>
+        <translation>AOK</translation>
     </message>
     <message>
         <source>&amp;Send</source>
@@ -339,11 +339,11 @@
     </message>
     <message>
         <source>Sign messages with your AokChain addresses to prove you own them</source>
-        <translation>Падпісаць паведамленне з дапамогай Біткойн-адраса каб даказаць, што яно належыць вам</translation>
+        <translation>Падпісаць паведамленне з дапамогай AOK-адраса каб даказаць, што яно належыць вам</translation>
     </message>
     <message>
         <source>Verify messages to ensure they were signed with specified AokChain addresses</source>
-        <translation>Спраўдзіць паведамленне з дапамогай Біткойн-адраса каб даказаць, што яно належыць вам</translation>
+        <translation>Спраўдзіць паведамленне з дапамогай AOK-адраса каб даказаць, што яно належыць вам</translation>
     </message>
     <message>
         <source>&amp;File</source>
@@ -359,7 +359,7 @@
     </message>
     <message>
         <source>Request payments (generates QR codes and aokchain: URIs)</source>
-        <translation>Запатрабаваць плацёж (генеруецца QR-код для біткойн URI)</translation>
+        <translation>Запатрабаваць плацёж (генеруецца QR-код для AOK URI)</translation>
     </message>
     <message>
         <source>Show the list of used sending addresses and labels</source>
@@ -371,7 +371,7 @@
     </message>
     <message>
         <source>Open a aokchain: URI or payment request</source>
-        <translation>Адкрыць біткойн: URI ці запыт плацяжу</translation>
+        <translation>Адкрыць AOK: URI ці запыт плацяжу</translation>
     </message>
     <message>
         <source>&amp;Command-line options</source>
@@ -644,7 +644,7 @@
     </message>
     <message>
         <source>AokChain</source>
-        <translation>Біткойн</translation>
+        <translation>AOK</translation>
     </message>
     <message>
         <source>Error</source>

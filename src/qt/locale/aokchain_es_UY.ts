@@ -176,8 +176,8 @@
         <translation>Confirmar encriptación de billetera</translation>
     </message>
     <message>
-        <source>Warning: If you encrypt your wallet and lose your passphrase, you will &lt;b&gt;LOSE ALL OF YOUR AOKCHAINS&lt;/b&gt;!</source>
-        <translation>Atención: Si encriptas tu billetera y pierdes tu contraseña, vas a &lt;b&gt;PERDER TODOS TUS AOKCHAINS&lt;/b&gt;!</translation>
+        <source>Warning: If you encrypt your wallet and lose your passphrase, you will &lt;b&gt;LOSE ALL OF YOUR AOK&lt;/b&gt;!</source>
+        <translation>Atención: Si encriptas tu billetera y pierdes tu contraseña, vas a &lt;b&gt;PERDER TODOS TUS AOK&lt;/b&gt;!</translation>
     </message>
     <message>
         <source>Are you sure you wish to encrypt your wallet?</source>
