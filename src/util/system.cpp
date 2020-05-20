@@ -391,6 +391,15 @@ bool ArgsManager::ParseParameters(int argc, const char* const argv[], std::strin
             val = key.substr(is_index + 1);
             key.erase(is_index);
         }
+
+#ifdef MAC_OSX
+        // At the first time when a user gets the "App downloaded from the
+        // internet" warning, and clicks the Open button, macOS passes
+        // a unique process serial number (PSN) as -psn_... command-line
+        // argument, which we filter out.
+        if (key.substr(0, 5) == "-psn_") continue;
+#endif
+
 #ifdef WIN32
         std::transform(key.begin(), key.end(), key.begin(), ToLower);
         if (key[0] == '/')

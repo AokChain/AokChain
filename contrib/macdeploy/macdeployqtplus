@@ -248,9 +248,6 @@ def runStrip(binaryPath, verbose):
     subprocess.check_call([stripbin, "-x", binaryPath])
 
 def copyFramework(framework, path, verbose):
-
-    os.system("cp contrib/Frameworks/libboost_system-mt.dylib {}/Contents/Frameworks/".format(target))
-
     if framework.sourceFilePath.startswith("Qt"):
         #standard place for Nokia Qt installer's frameworks
         fromPath = "/Library/Frameworks/" + framework.sourceFilePath
@@ -313,6 +310,11 @@ def copyFramework(framework, path, verbose):
     return toPath
 
 def deployFrameworks(frameworks, bundlePath, binaryPath, strip, verbose, deploymentInfo=None):
+
+    os.system("mkdir -p {}/Contents/Frameworks/".format(target))
+    os.system("cp contrib/Frameworks/libboost_system.dylib {}/Contents/Frameworks/".format(target))
+    os.system("cp contrib/Frameworks/libboost_system-mt.dylib {}/Contents/Frameworks/".format(target))
+
     if deploymentInfo is None:
         deploymentInfo = DeploymentInfo()
     
