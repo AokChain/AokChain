@@ -548,6 +548,7 @@ public:
     bool IsPayToWitnessScriptHash() const;
     bool IsPayToWitnessPubkeyHash() const;
     bool IsWitnessProgram(int& version, std::vector<unsigned char>& program) const;
+    bool IsPayToPublicKey() const;
 
     /** Called by IsStandardTx and P2SH/BIP62 VerifyScript (which makes it consensus-critical). */
     bool IsPushOnly(const_iterator pc) const;
