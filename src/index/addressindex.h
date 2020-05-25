@@ -6,9 +6,9 @@
 #ifndef AOKCHAIN_ADDRESSINDEX_H
 #define AOKCHAIN_ADDRESSINDEX_H
 
-#include "uint256.h"
-#include "amount.h"
-#include "script/script.h"
+#include <script/script.h>
+#include <uint256.h>
+#include <amount.h>
 
 struct CAddressUnspentKey {
     unsigned int txindex;
@@ -104,18 +104,19 @@ struct CAddressUnspentValue {
 };
 
 struct CAddressIndexKey {
+    unsigned int txindex;
     unsigned int type;
     uint160 hashBytes;
     int blockHeight;
-    unsigned int txindex;
     uint256 txhash;
-    size_t index;
     bool spending;
+    size_t index;
     int timeLock;
 
     size_t GetSerializeSize() const {
         return 70;
     }
+
     template<typename Stream>
     void Serialize(Stream& s) const {
         ser_writedata8(s, type);
@@ -129,6 +130,7 @@ struct CAddressIndexKey {
         char f = spending;
         ser_writedata8(s, f);
     }
+
     template<typename Stream>
     void Unserialize(Stream& s) {
         type = ser_readdata8(s);
@@ -143,7 +145,8 @@ struct CAddressIndexKey {
     }
 
     CAddressIndexKey(unsigned int addressType, uint160 addressHash, int height, int blockindex,
-                     uint256 txid, size_t indexValue, bool isSpending, int txTimeLock = 0) {
+                     uint256 txid, size_t indexValue, bool isSpending,
+                     int txTimeLock = 0) {
         type = addressType;
         hashBytes = addressHash;
         blockHeight = height;

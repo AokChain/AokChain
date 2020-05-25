@@ -10,7 +10,6 @@
 #include <chainparams.h>
 #include <clientversion.h>
 #include <compat.h>
-#include <fs.h>
 #include <interfaces/chain.h>
 #include <rpc/server.h>
 #include <init.h>

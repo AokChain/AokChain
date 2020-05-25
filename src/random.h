@@ -34,7 +34,6 @@
  *   that fast seeding includes, but additionally:
  *   - OS entropy (/dev/urandom, getrandom(), ...). The application will terminate if
  *     this entropy source fails.
- *   - Bytes from OpenSSL's RNG (which itself may be seeded from various sources)
  *   - Another high-precision timestamp (indirectly committing to a benchmark of all the
  *     previous sources).
  *   These entropy sources are slower, but designed to make sure the RNG state contains
@@ -43,6 +42,7 @@
  * - RandAddSeedSleep() seeds everything that fast seeding includes, but additionally:
  *   - A high-precision timestamp before and after sleeping 1ms.
  *   - (On Windows) Once every 10 minutes, performance monitoring data from the OS.
+ *   - Once every minute, strengthen the entropy for 10 ms using repeated SHA512.
  *   These just exploit the fact the system is idle to improve the quality of the RNG
  *   slightly.
  *
@@ -50,7 +50,7 @@
  * sources used in the 'slow' seeder are included, but also:
  * - 256 bits from the hardware RNG (rdseed or rdrand) when available.
  * - (On Windows) Performance monitoring data from the OS.
- * - (On Windows) Through OpenSSL, the screen contents.
+ * - Strengthen the entropy for 100 ms using repeated SHA512.
  *
  * When mixing in new entropy, H = SHA512(entropy || old_rng_state) is computed, and
  * (up to) the first 32 bytes of H are produced as output, while the last 32 bytes
@@ -81,11 +81,11 @@ uint256 GetRandHash() noexcept;
 void GetStrongRandBytes(unsigned char* buf, int num) noexcept;
 
 /**
- * Sleep for 1ms, gather entropy from various sources, and feed them to the PRNG state.
+ * Gather entropy from various expensive sources, and feed them to the PRNG state.
  *
  * Thread-safe.
  */
-void RandAddSeedSleep();
+void RandAddPeriodic();
 
 /**
  * Fast randomness source. This is seeded once with secure random data, but
@@ -111,7 +111,7 @@ private:
         if (requires_seed) {
             RandomSeed();
         }
-        rng.Output(bytebuf, sizeof(bytebuf));
+        rng.Keystream(bytebuf, sizeof(bytebuf));
         bytebuf_size = sizeof(bytebuf);
     }
 

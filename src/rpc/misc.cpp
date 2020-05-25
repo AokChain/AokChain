@@ -262,8 +262,15 @@ UniValue getaddressbalance(const JSONRPCRequest& request)
     for (std::vector<std::pair<CAddressIndexKey, CAmount> >::const_iterator it=addressIndex.begin(); it!=addressIndex.end(); it++) {
         CBlockIndex* pblockindex = chainActive[it->first.blockHeight];
 
-        if (it->second > 0)
-            received += it->second;
+        if (it->second > 0) {
+            if (pblockindex->IsProofOfStake() && it->first.txindex == 1) {
+                // Slightly hacky way to calculate PoS reward, but it works
+                // ToDo: Make it better
+                received += (GetBlockSubsidy(it->first.blockHeight, Params().GetConsensus()) / 2);
+            } else {
+                received += it->second;
+            }
+        }
 
         if (pblockindex->IsProofOfStake()) {
             if (it->first.txindex == 1 && ((chainActive.Height() - it->first.blockHeight) < COINSTAKE_MATURITY))
