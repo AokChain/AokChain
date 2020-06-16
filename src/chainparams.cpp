@@ -315,6 +315,8 @@ public:
         fRequireStandard = false;
         fMineBlocksOnDemand = true;
 
+        consensus.nLastPOWBlock = 1440 * 100;
+
         checkpointData = {
             {
 

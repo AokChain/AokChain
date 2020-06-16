@@ -370,14 +370,6 @@ UniValue getaddressutxos(const JSONRPCRequest& request)
         CBlockIndex* pblockindex = chainActive[it->second.blockHeight];
         bool valide = true;
 
-        if (pblockindex->IsProofOfStake()) {
-            if (it->first.txindex == 1 && ((chainActive.Height() - it->second.blockHeight) > COINSTAKE_MATURITY))
-                valide = false;
-        } else {
-            if (it->first.txindex == 0 && ((chainActive.Height() - it->second.blockHeight) > COINBASE_MATURITY))
-                valide = false;
-        }
-
         if (it->first.timeLock > ((int64_t)it->first.timeLock < LOCKTIME_THRESHOLD ? (int64_t)chainActive.Height() : (int64_t)chainActive.Tip()->GetMedianTimePast())) {
             valide = false;
         }

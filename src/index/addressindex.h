@@ -11,7 +11,7 @@
 #include <amount.h>
 
 struct CAddressUnspentKey {
-    unsigned int txindex;
+    // unsigned int txindex;
     unsigned int type;
     uint160 hashBytes;
     uint256 txhash;
@@ -19,7 +19,7 @@ struct CAddressUnspentKey {
     int timeLock;
 
     size_t GetSerializeSize() const {
-        return 65;
+        return 61;
     }
     template<typename Stream>
     void Serialize(Stream& s) const {
@@ -27,7 +27,6 @@ struct CAddressUnspentKey {
         hashBytes.Serialize(s);
         txhash.Serialize(s);
         ser_writedata32(s, index);
-        ser_writedata32be(s, txindex);
         ser_writedata32be(s, timeLock);
     }
     template<typename Stream>
@@ -36,17 +35,15 @@ struct CAddressUnspentKey {
         hashBytes.Unserialize(s);
         txhash.Unserialize(s);
         index = ser_readdata32(s);
-        txindex = ser_readdata32be(s);
         timeLock = ser_readdata32be(s);
     }
 
     CAddressUnspentKey(unsigned int addressType, uint160 addressHash, uint256 txid,
-        size_t indexValue, int blockindex, int txTimeLock = 0) {
+        size_t indexValue, int txTimeLock = 0) {
         type = addressType;
         hashBytes = addressHash;
         txhash = txid;
         index = indexValue;
-        txindex = blockindex;
         timeLock = txTimeLock;
     }
 
@@ -59,7 +56,6 @@ struct CAddressUnspentKey {
         hashBytes.SetNull();
         txhash.SetNull();
         index = 0;
-        txindex = 0;
         timeLock = 0;
     }
 };
