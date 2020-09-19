@@ -20,6 +20,7 @@
 #include "walletmodel.h"
 #include "tokenrecord.h"
 
+#include <QPainterPath>
 #include <QAbstractItemDelegate>
 #include <QPainter>
 #include <validation.h>

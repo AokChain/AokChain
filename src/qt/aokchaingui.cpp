@@ -567,8 +567,8 @@ void AokChainGUI::createToolBars()
         toolbar->setStyleSheet(
                 "QToolBar{background-color: #ffffff; border: 0px;}"
                 "QToolButton{transbackground-color: transparent; border: 0px; border-bottom: 3px solid white;}"
-                "QToolButton:checked{background-color: transparent; border: 0px; border-bottom: 3px solid #f44820;}"
-                "QToolButton:checked:hover{background-color: #f3f3f3; border: 0px; border-bottom: 3px solid #f44820;}"
+                "QToolButton:checked{background-color: #f3f3f3; border: 0px; border-bottom: 3px solid #116961;}"
+                "QToolButton:checked:hover{background-color: #f3f3f3; border: 0px; border-bottom: 3px solid #116961;}"
                 "QToolButton:hover{background-color: #f3f3f3; border: 0px; border-bottom: 3px solid #f3f3f3;}");
 
         toolbar->setContextMenuPolicy(Qt::PreventContextMenu);
