@@ -1,11 +1,13 @@
-#!/usr/bin/env python3
-# Copyright (c) 2012-2018 The AokChain Core developers
+#!/usr/bin/env python
+# Copyright (c) 2012-2016 The Bitcoin Core developers
+# Copyright (c) 2017 The AokChain Core developers
 # Distributed under the MIT software license, see the accompanying
 # file COPYING or http://www.opensource.org/licenses/mit-license.php.
 '''
 Extract _("...") strings for translation and convert to Qt stringdefs so that
 they can be picked up by Qt linguist.
 '''
+from __future__ import division,print_function,unicode_literals
 from subprocess import Popen, PIPE
 import operator
 import os
@@ -76,7 +78,10 @@ f.write("""
 #endif
 """)
 f.write('static const char UNUSED *aokchain_strings[] = {\n')
+f.write('QT_TRANSLATE_NOOP("aokchain-core", "%s"),\n' % (os.getenv('PACKAGE_NAME'),))
 f.write('QT_TRANSLATE_NOOP("aokchain-core", "%s"),\n' % (os.getenv('COPYRIGHT_HOLDERS'),))
+if os.getenv('COPYRIGHT_HOLDERS_SUBSTITUTION') != os.getenv('PACKAGE_NAME'):
+    f.write('QT_TRANSLATE_NOOP("aokchain-core", "%s"),\n' % (os.getenv('COPYRIGHT_HOLDERS_SUBSTITUTION'),))
 messages.sort(key=operator.itemgetter(0))
 for (msgid, msgstr) in messages:
     if msgid != EMPTY:

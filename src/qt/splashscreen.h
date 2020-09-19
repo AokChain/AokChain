@@ -1,21 +1,17 @@
-// Copyright (c) 2011-2018 The Bitcoin Core developers
+// Copyright (c) 2011-2016 The Bitcoin Core developers
+// Copyright (c) 2017-2019 The Raven Core developers
+// Copyright (c) 2020 The AokChain Core developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 #ifndef AOKCHAIN_QT_SPLASHSCREEN_H
 #define AOKCHAIN_QT_SPLASHSCREEN_H
 
-#include <QWidget>
+#include <functional>
+#include <QSplashScreen>
 
-#include <memory>
-
+class CWallet;
 class NetworkStyle;
-
-namespace interfaces {
-class Handler;
-class Node;
-class Wallet;
-};
 
 /** Class for the splashscreen with information of the running client.
  *
@@ -28,7 +24,7 @@ class SplashScreen : public QWidget
     Q_OBJECT
 
 public:
-    explicit SplashScreen(interfaces::Node& node, Qt::WindowFlags f, const NetworkStyle *networkStyle);
+    explicit SplashScreen(Qt::WindowFlags f, const NetworkStyle *networkStyle);
     ~SplashScreen();
 
 protected:
@@ -36,8 +32,8 @@ protected:
     void closeEvent(QCloseEvent *event);
 
 public Q_SLOTS:
-    /** Hide the splash screen window and schedule the splash screen object for deletion */
-    void finish();
+    /** Slot to call finish() method as it's not defined as slot */
+    void slotFinish(QWidget *mainWin);
 
     /** Show message and progress */
     void showMessage(const QString &message, int alignment, const QColor &color);
@@ -51,19 +47,14 @@ private:
     /** Disconnect core signals to splash screen */
     void unsubscribeFromCoreSignals();
     /** Connect wallet signals to splash screen */
-    void ConnectWallet(std::unique_ptr<interfaces::Wallet> wallet);
+    void ConnectWallet(CWallet*);
 
     QPixmap pixmap;
     QString curMessage;
     QColor curColor;
     int curAlignment;
 
-    interfaces::Node& m_node;
-    std::unique_ptr<interfaces::Handler> m_handler_init_message;
-    std::unique_ptr<interfaces::Handler> m_handler_show_progress;
-    std::unique_ptr<interfaces::Handler> m_handler_load_wallet;
-    std::list<std::unique_ptr<interfaces::Wallet>> m_connected_wallets;
-    std::list<std::unique_ptr<interfaces::Handler>> m_connected_wallet_handlers;
+    QList<CWallet*> connectedWallets;
 };
 
 #endif // AOKCHAIN_QT_SPLASHSCREEN_H

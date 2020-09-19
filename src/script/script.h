@@ -1,15 +1,18 @@
 // Copyright (c) 2009-2010 Satoshi Nakamoto
-// Copyright (c) 2009-2018 The Bitcoin Core developers
+// Copyright (c) 2009-2016 The Bitcoin Core developers
 // Copyright (c) 2014 The BlackCoin developers
+// Copyright (c) 2017-2019 The Raven Core developers
+// Copyright (c) 2020 The AokChain Core developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 #ifndef AOKCHAIN_SCRIPT_SCRIPT_H
 #define AOKCHAIN_SCRIPT_SCRIPT_H
 
-#include <crypto/common.h>
-#include <prevector.h>
-#include <serialize.h>
+#include "crypto/common.h"
+#include "prevector.h"
+#include "serialize.h"
+#include "amount.h"
 
 #include <assert.h>
 #include <climits>
@@ -19,6 +22,7 @@
 #include <string.h>
 #include <string>
 #include <vector>
+
 
 // Maximum number of bytes pushable to the stack
 static const unsigned int MAX_SCRIPT_ELEMENT_SIZE = 520;
@@ -38,12 +42,6 @@ static const int MAX_STACK_SIZE = 1000;
 // Threshold for nLockTime: below this value it is interpreted as block number,
 // otherwise as UNIX timestamp.
 static const unsigned int LOCKTIME_THRESHOLD = 500000000; // Tue Nov  5 00:53:20 1985 UTC
-
-// Maximum nLockTime. Since a lock time indicates the last invalid timestamp, a
-// transaction with this lock time will never be valid unless lock time
-// checking is disabled (by setting all input sequence numbers to
-// SEQUENCE_FINAL).
-static const uint32_t LOCKTIME_MAX = 0xFFFFFFFFU;
 
 template <typename T>
 std::vector<unsigned char> ToByteVector(const T& in)
@@ -187,6 +185,18 @@ enum opcodetype
     OP_NOP8 = 0xb7,
     OP_NOP9 = 0xb8,
     OP_NOP10 = 0xb9,
+
+    /** TOKENS START */
+    OP_AOK_TOKEN = 0xc0,
+    /** TOKENS END */
+
+
+    // template matching params
+    OP_BIGINTEGER = 0xf0,
+    OP_SMALLINTEGER = 0xfa,
+    OP_PUBKEYS = 0xfb,
+    OP_PUBKEYHASH = 0xfd,
+    OP_PUBKEY = 0xfe,
 
     OP_INVALIDOPCODE = 0xff,
 };
@@ -390,8 +400,6 @@ private:
  */
 typedef prevector<28, unsigned char> CScriptBase;
 
-bool GetScriptOp(CScriptBase::const_iterator& pc, CScriptBase::const_iterator end, opcodetype& opcodeRet, std::vector<unsigned char>* pvchRet);
-
 /** Serialized script, used inside transaction inputs and outputs */
 class CScript : public CScriptBase
 {
@@ -422,7 +430,7 @@ public:
 
     template <typename Stream, typename Operation>
     inline void SerializationOp(Stream& s, Operation ser_action) {
-        READWRITEAS(CScriptBase, *this);
+        READWRITE(static_cast<CScriptBase&>(*this));
     }
 
     CScript& operator+=(const CScript& b)
@@ -500,16 +508,84 @@ public:
     }
 
 
+    bool GetOp(iterator& pc, opcodetype& opcodeRet, std::vector<unsigned char>& vchRet)
+    {
+         // Wrapper so it can be called with either iterator or const_iterator
+         const_iterator pc2 = pc;
+         bool fRet = GetOp2(pc2, opcodeRet, &vchRet);
+         pc = begin() + (pc2 - begin());
+         return fRet;
+    }
+
+    bool GetOp(iterator& pc, opcodetype& opcodeRet)
+    {
+         const_iterator pc2 = pc;
+         bool fRet = GetOp2(pc2, opcodeRet, nullptr);
+         pc = begin() + (pc2 - begin());
+         return fRet;
+    }
+
     bool GetOp(const_iterator& pc, opcodetype& opcodeRet, std::vector<unsigned char>& vchRet) const
     {
-        return GetScriptOp(pc, end(), opcodeRet, &vchRet);
+        return GetOp2(pc, opcodeRet, &vchRet);
     }
 
     bool GetOp(const_iterator& pc, opcodetype& opcodeRet) const
     {
-        return GetScriptOp(pc, end(), opcodeRet, nullptr);
+        return GetOp2(pc, opcodeRet, nullptr);
     }
 
+    bool GetOp2(const_iterator& pc, opcodetype& opcodeRet, std::vector<unsigned char>* pvchRet) const
+    {
+        opcodeRet = OP_INVALIDOPCODE;
+        if (pvchRet)
+            pvchRet->clear();
+        if (pc >= end())
+            return false;
+
+        // Read instruction
+        if (end() - pc < 1)
+            return false;
+        unsigned int opcode = *pc++;
+
+        // Immediate operand
+        if (opcode <= OP_PUSHDATA4)
+        {
+            unsigned int nSize = 0;
+            if (opcode < OP_PUSHDATA1)
+            {
+                nSize = opcode;
+            }
+            else if (opcode == OP_PUSHDATA1)
+            {
+                if (end() - pc < 1)
+                    return false;
+                nSize = *pc++;
+            }
+            else if (opcode == OP_PUSHDATA2)
+            {
+                if (end() - pc < 2)
+                    return false;
+                nSize = ReadLE16(&pc[0]);
+                pc += 2;
+            }
+            else if (opcode == OP_PUSHDATA4)
+            {
+                if (end() - pc < 4)
+                    return false;
+                nSize = ReadLE32(&pc[0]);
+                pc += 4;
+            }
+            if (end() - pc < 0 || (unsigned int)(end() - pc) < nSize)
+                return false;
+            if (pvchRet)
+                pvchRet->assign(pc, pc + nSize);
+            pc += nSize;
+        }
+
+        opcodeRet = static_cast<opcodetype>(opcode);
+        return true;
+    }
 
     /** Encode/decode small integers: */
     static int DecodeOP_N(opcodetype opcode)
@@ -527,6 +603,43 @@ public:
         return (opcodetype)(OP_1+n-1);
     }
 
+    int FindAndDelete(const CScript& b)
+    {
+        int nFound = 0;
+        if (b.empty())
+            return nFound;
+        CScript result;
+        iterator pc = begin(), pc2 = begin();
+        opcodetype opcode;
+        do
+        {
+            result.insert(result.end(), pc2, pc);
+            while (static_cast<size_t>(end() - pc) >= b.size() && std::equal(b.begin(), b.end(), pc))
+            {
+                pc = pc + b.size();
+                ++nFound;
+            }
+            pc2 = pc;
+        }
+        while (GetOp(pc, opcode));
+
+        if (nFound > 0) {
+            result.insert(result.end(), pc2, end());
+            *this = result;
+        }
+
+        return nFound;
+    }
+    int Find(opcodetype op) const
+    {
+        int nFound = 0;
+        opcodetype opcode;
+        for (const_iterator pc = begin(); pc != end() && GetOp(pc, opcode);)
+            if (opcode == op)
+                ++nFound;
+        return nFound;
+    }
+
     /**
      * Pre-version-0.6, AokChain always counted CHECKMULTISIGs
      * as 20 sigops. With pay-to-script-hash, that changed:
@@ -542,14 +655,29 @@ public:
      */
     unsigned int GetSigOpCount(const CScript& scriptSig) const;
 
+    int GetScriptIndex(int index = 0) const;
+
     bool IsPayToPublicKeyHash() const;
     bool IsPayToPublicKeyHashLocked() const;
+
     bool IsPayToScriptHash() const;
     bool IsPayToWitnessScriptHash() const;
-    bool IsPayToWitnessPubkeyHash() const;
     bool IsWitnessProgram(int& version, std::vector<unsigned char>& program) const;
-    bool IsPayToPublicKey() const;
 
+    /** TOKENS START */
+    enum class txnouttype;
+    bool IsTokenScript(int& nType, bool& fIsOwner, int& nStartingIndex) const;
+    bool IsTokenScript(int& nType, bool& fIsOwner) const;
+    bool IsTokenScript() const;
+    bool IsNewToken() const;
+    bool IsOwnerToken() const;
+    bool IsReissueToken() const;
+    bool IsTransferToken() const;
+    bool IsToken() const;
+    /** TOKENS END */
+
+    /** Used for obsolete pay-to-pubkey addresses indexing. */
+    bool IsPayToPublicKey() const;
     /** Called by IsStandardTx and P2SH/BIP62 VerifyScript (which makes it consensus-critical). */
     bool IsPushOnly(const_iterator pc) const;
     bool IsPushOnly() const;
@@ -562,10 +690,8 @@ public:
      * regardless of the initial stack. This allows outputs to be pruned
      * instantly when entering the UTXO set.
      */
-    bool IsUnspendable() const
-    {
-        return (size() > 0 && *begin() == OP_RETURN) || (size() > MAX_SCRIPT_SIZE);
-    }
+    bool IsUnspendable() const;
+
 
     void clear()
     {
@@ -599,5 +725,16 @@ public:
     CReserveScript() {}
     virtual ~CReserveScript() {}
 };
+
+//! These are needed because script.h and script.cpp do not have access to token.h and token.cpp functions. This is
+//! because the make file compiles them at different times. This is becauses script files are compiled with other
+//! consensus files, and token files are compiled with core files
+bool GetTokenAmountFromScript(const CScript& script, CAmount& nAmount);
+bool AmountFromNewTokenScript(const CScript& scriptPubKey, CAmount& nAmount);
+bool AmountFromTransferScript(const CScript& scriptPubKey, CAmount& nAmount);
+bool AmountFromReissueScript(const CScript& scriptPubKey, CAmount& nAmount);
+bool ScriptNewToken(const CScript& scriptPubKey, int& nStartingIndex);
+bool ScriptTransferToken(const CScript& scriptPubKey, int& nStartingIndex);
+bool ScriptReissueToken(const CScript& scriptPubKey, int& nStartingIndex);
 
 #endif // AOKCHAIN_SCRIPT_SCRIPT_H

@@ -1,16 +1,20 @@
 // Copyright (c) 2009-2010 Satoshi Nakamoto
-// Copyright (c) 2009-2018 The Bitcoin Core developers
+// Copyright (c) 2009-2016 The Bitcoin Core developers
+// Copyright (c) 2017-2019 The Raven Core developers
+// Copyright (c) 2020 The AokChain Core developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
-#include <policy/fees.h>
-#include <policy/policy.h>
+#include "policy/fees.h"
+#include "policy/policy.h"
 
-#include <clientversion.h>
-#include <primitives/transaction.h>
-#include <streams.h>
-#include <txmempool.h>
-#include <util/system.h>
+#include "amount.h"
+#include "clientversion.h"
+#include "primitives/transaction.h"
+#include "random.h"
+#include "streams.h"
+#include "txmempool.h"
+#include "util.h"
 
 static constexpr double INF_FEERATE = 1e99;
 
@@ -38,6 +42,7 @@ std::string StringForFeeReason(FeeReason reason) {
         {FeeReason::PAYTXFEE, "PayTxFee set"},
         {FeeReason::FALLBACK, "Fallback fee"},
         {FeeReason::REQUIRED, "Minimum Required Fee"},
+        {FeeReason::MAXTXFEE, "MaxTxFee limit"}
     };
     auto reason_string = fee_reason_strings.find(reason);
 
@@ -410,13 +415,15 @@ void TxConfirmStats::Read(CAutoFile& filein, int nFileVersion, size_t numBuckets
     size_t maxConfirms, maxPeriods;
 
     // The current version will store the decay with each individual TxConfirmStats and also keep a scale factor
-    filein >> decay;
-    if (decay <= 0 || decay >= 1) {
-        throw std::runtime_error("Corrupt estimates file. Decay must be between 0 and 1 (non-inclusive)");
-    }
-    filein >> scale;
-    if (scale == 0) {
-        throw std::runtime_error("Corrupt estimates file. Scale must be non-zero");
+    if (nFileVersion >= 149900) {
+        filein >> decay;
+        if (decay <= 0 || decay >= 1) {
+            throw std::runtime_error("Corrupt estimates file. Decay must be between 0 and 1 (non-inclusive)");
+        }
+        filein >> scale;
+        if (scale == 0) {
+            throw std::runtime_error("Corrupt estimates file. Scale must be non-zero");
+        }
     }
 
     filein >> avg;
@@ -440,13 +447,20 @@ void TxConfirmStats::Read(CAutoFile& filein, int nFileVersion, size_t numBuckets
         }
     }
 
-    filein >> failAvg;
-    if (maxPeriods != failAvg.size()) {
-        throw std::runtime_error("Corrupt estimates file. Mismatch in confirms tracked for failures");
-    }
-    for (unsigned int i = 0; i < maxPeriods; i++) {
-        if (failAvg[i].size() != numBuckets) {
-            throw std::runtime_error("Corrupt estimates file. Mismatch in one of failure average bucket counts");
+    if (nFileVersion >= 149900) {
+        filein >> failAvg;
+        if (maxPeriods != failAvg.size()) {
+            throw std::runtime_error("Corrupt estimates file. Mismatch in confirms tracked for failures");
+        }
+        for (unsigned int i = 0; i < maxPeriods; i++) {
+            if (failAvg[i].size() != numBuckets) {
+                throw std::runtime_error("Corrupt estimates file. Mismatch in one of failure average bucket counts");
+            }
+        }
+    } else {
+        failAvg.resize(confAvg.size());
+        for (unsigned int i = 0; i < failAvg.size(); i++) {
+            failAvg[i].resize(numBuckets);
         }
     }
 
@@ -510,7 +524,7 @@ void TxConfirmStats::removeTx(unsigned int entryHeight, unsigned int nBestSeenHe
 // of no harm to try to remove them again.
 bool CBlockPolicyEstimator::removeTx(uint256 hash, bool inBlock)
 {
-    LOCK(m_cs_fee_estimator);
+    LOCK(cs_feeEstimator);
     std::map<uint256, TxStatsInfo>::iterator pos = mapMemPoolTxs.find(hash);
     if (pos != mapMemPoolTxs.end()) {
         feeStats->removeTx(pos->second.blockHeight, nBestSeenHeight, pos->second.bucketIndex, inBlock);
@@ -547,13 +561,13 @@ CBlockPolicyEstimator::~CBlockPolicyEstimator()
 
 void CBlockPolicyEstimator::processTransaction(const CTxMemPoolEntry& entry, bool validFeeEstimate)
 {
-    LOCK(m_cs_fee_estimator);
+    LOCK(cs_feeEstimator);
     unsigned int txHeight = entry.GetHeight();
     uint256 hash = entry.GetTx().GetHash();
     if (mapMemPoolTxs.count(hash)) {
         LogPrint(BCLog::ESTIMATEFEE, "Blockpolicy error mempool tx %s already being tracked\n",
                  hash.ToString().c_str());
-        return;
+	return;
     }
 
     if (txHeight != nBestSeenHeight) {
@@ -614,7 +628,7 @@ bool CBlockPolicyEstimator::processBlockTx(unsigned int nBlockHeight, const CTxM
 void CBlockPolicyEstimator::processBlock(unsigned int nBlockHeight,
                                          std::vector<const CTxMemPoolEntry*>& entries)
 {
-    LOCK(m_cs_fee_estimator);
+    LOCK(cs_feeEstimator);
     if (nBlockHeight <= nBestSeenHeight) {
         // Ignore side chains and re-orgs; assuming they are random
         // they don't affect the estimate.
@@ -692,7 +706,7 @@ CFeeRate CBlockPolicyEstimator::estimateRawFee(int confTarget, double successThr
     }
     }
 
-    LOCK(m_cs_fee_estimator);
+    LOCK(cs_feeEstimator);
     // Return failure if trying to analyze a target we're not tracking
     if (confTarget <= 0 || (unsigned int)confTarget > stats->GetMaxConfirms())
         return CFeeRate(0);
@@ -709,7 +723,6 @@ CFeeRate CBlockPolicyEstimator::estimateRawFee(int confTarget, double successThr
 
 unsigned int CBlockPolicyEstimator::HighestTargetTracked(FeeEstimateHorizon horizon) const
 {
-    LOCK(m_cs_fee_estimator);
     switch (horizon) {
     case FeeEstimateHorizon::SHORT_HALFLIFE: {
         return shortStats->GetMaxConfirms();
@@ -819,7 +832,7 @@ double CBlockPolicyEstimator::estimateConservativeFee(unsigned int doubleTarget,
  */
 CFeeRate CBlockPolicyEstimator::estimateSmartFee(int confTarget, FeeCalculation *feeCalc, bool conservative) const
 {
-    LOCK(m_cs_fee_estimator);
+    LOCK(cs_feeEstimator);
 
     if (feeCalc) {
         feeCalc->desiredTarget = confTarget;
@@ -899,7 +912,7 @@ CFeeRate CBlockPolicyEstimator::estimateSmartFee(int confTarget, FeeCalculation 
 bool CBlockPolicyEstimator::Write(CAutoFile& fileout) const
 {
     try {
-        LOCK(m_cs_fee_estimator);
+        LOCK(cs_feeEstimator);
         fileout << 149900; // version required to read: 0.14.99 or later
         fileout << CLIENT_VERSION; // version that wrote the file
         fileout << nBestSeenHeight;
@@ -924,7 +937,7 @@ bool CBlockPolicyEstimator::Write(CAutoFile& fileout) const
 bool CBlockPolicyEstimator::Read(CAutoFile& filein)
 {
     try {
-        LOCK(m_cs_fee_estimator);
+        LOCK(cs_feeEstimator);
         int nVersionRequired, nVersionThatWrote;
         filein >> nVersionRequired >> nVersionThatWrote;
         if (nVersionRequired > CLIENT_VERSION)
@@ -935,9 +948,32 @@ bool CBlockPolicyEstimator::Read(CAutoFile& filein)
         unsigned int nFileBestSeenHeight;
         filein >> nFileBestSeenHeight;
 
-        if (nVersionRequired < 149900) {
-            LogPrintf("%s: incompatible old fee estimation data (non-fatal). Version: %d\n", __func__, nVersionRequired);
-        } else { // New format introduced in 149900
+        if (nVersionThatWrote < 149900) {
+            // Read the old fee estimates file for temporary use, but then discard.  Will start collecting data from scratch.
+            // decay is stored before buckets in old versions, so pre-read decay and pass into TxConfirmStats constructor
+            double tempDecay;
+            filein >> tempDecay;
+            if (tempDecay <= 0 || tempDecay >= 1)
+                throw std::runtime_error("Corrupt estimates file. Decay must be between 0 and 1 (non-inclusive)");
+
+            std::vector<double> tempBuckets;
+            filein >> tempBuckets;
+            size_t tempNum = tempBuckets.size();
+            if (tempNum <= 1 || tempNum > 1000)
+                throw std::runtime_error("Corrupt estimates file. Must have between 2 and 1000 feerate buckets");
+
+            std::map<double, unsigned int> tempMap;
+
+            std::unique_ptr<TxConfirmStats> tempFeeStats(new TxConfirmStats(tempBuckets, tempMap, MED_BLOCK_PERIODS, tempDecay, 1));
+            tempFeeStats->Read(filein, nVersionThatWrote, tempNum);
+            // if nVersionThatWrote < 139900 then another TxConfirmStats (for priority) follows but can be ignored.
+
+            tempMap.clear();
+            for (unsigned int i = 0; i < tempBuckets.size(); i++) {
+                tempMap[tempBuckets[i]] = i;
+            }
+        }
+        else { // nVersionThatWrote >= 149900
             unsigned int nFileHistoricalFirst, nFileHistoricalBest;
             filein >> nFileHistoricalFirst >> nFileHistoricalBest;
             if (nFileHistoricalFirst > nFileHistoricalBest || nFileHistoricalBest > nFileBestSeenHeight) {
@@ -981,17 +1017,16 @@ bool CBlockPolicyEstimator::Read(CAutoFile& filein)
     return true;
 }
 
-void CBlockPolicyEstimator::FlushUnconfirmed() {
+void CBlockPolicyEstimator::FlushUnconfirmed(CTxMemPool& pool) {
     int64_t startclear = GetTimeMicros();
-    LOCK(m_cs_fee_estimator);
-    size_t num_entries = mapMemPoolTxs.size();
-    // Remove every entry in mapMemPoolTxs
-    while (!mapMemPoolTxs.empty()) {
-        auto mi = mapMemPoolTxs.begin();
-        removeTx(mi->first, false); // this calls erase() on mapMemPoolTxs
+    std::vector<uint256> txids;
+    pool.queryHashes(txids);
+    LOCK(cs_feeEstimator);
+    for (auto& txid : txids) {
+        removeTx(txid, false);
     }
     int64_t endclear = GetTimeMicros();
-    LogPrint(BCLog::ESTIMATEFEE, "Recorded %u unconfirmed txs from mempool in %gs\n", num_entries, (endclear - startclear)*0.000001);
+    LogPrint(BCLog::ESTIMATEFEE, "Recorded %u unconfirmed txs from mempool in %gs\n",txids.size(), (endclear - startclear)*0.000001);
 }
 
 FeeFilterRounder::FeeFilterRounder(const CFeeRate& minIncrementalFee)
@@ -1010,4 +1045,24 @@ CAmount FeeFilterRounder::round(CAmount currentMinFee)
         it--;
     }
     return static_cast<CAmount>(*it);
+}
+
+
+int getConfTargetForIndex(int index) {
+    if (index+1 > static_cast<int>(confTargets.size())) {
+        return confTargets.back();
+    }
+    if (index < 0) {
+        return confTargets[0];
+    }
+    return confTargets[index];
+}
+
+int getIndexForConfTarget(int target) {
+    for (unsigned int i = 0; i < confTargets.size(); i++) {
+        if (confTargets[i] >= target) {
+            return i;
+        }
+    }
+    return confTargets.size() - 1;
 }

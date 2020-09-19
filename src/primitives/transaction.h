@@ -1,6 +1,8 @@
 // Copyright (c) 2009-2010 Satoshi Nakamoto
-// Copyright (c) 2009-2018 The Bitcoin Core developers
+// Copyright (c) 2009-2016 The Bitcoin Core developers
 // Copyright (c) 2014 The BlackCoin developers
+// Copyright (c) 2017-2019 The Raven Core developers
+// Copyright (c) 2020 The AokChain Core developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -8,14 +10,16 @@
 #define AOKCHAIN_PRIMITIVES_TRANSACTION_H
 
 #include <stdint.h>
-#include <amount.h>
-#include <script/script.h>
-#include <serialize.h>
-#include <uint256.h>
+#include "amount.h"
+#include "script/script.h"
+#include "serialize.h"
+#include "uint256.h"
 
 #include <iostream>
 
 static const int SERIALIZE_TRANSACTION_NO_WITNESS = 0x40000000;
+
+class CCoinsViewCache;
 
 /** An outpoint - a combination of a transaction hash and an index n into its vout */
 class COutPoint
@@ -24,9 +28,7 @@ public:
     uint256 hash;
     uint32_t n;
 
-    static constexpr uint32_t NULL_INDEX = std::numeric_limits<uint32_t>::max();
-
-    COutPoint(): n(NULL_INDEX) { }
+    COutPoint(): n((uint32_t) -1) { }
     COutPoint(const uint256& hashIn, uint32_t nIn): hash(hashIn), n(nIn) { }
 
     ADD_SERIALIZE_METHODS;
@@ -37,8 +39,8 @@ public:
         READWRITE(n);
     }
 
-    void SetNull() { hash.SetNull(); n = NULL_INDEX; }
-    bool IsNull() const { return (hash.IsNull() && n == NULL_INDEX); }
+    void SetNull() { hash.SetNull(); n = (uint32_t) -1; }
+    bool IsNull() const { return (hash.IsNull() && n == (uint32_t) -1); }
 
     friend bool operator<(const COutPoint& a, const COutPoint& b)
     {
@@ -69,7 +71,7 @@ public:
     COutPoint prevout;
     CScript scriptSig;
     uint32_t nSequence;
-    CScriptWitness scriptWitness; //!< Only serialized through CTransaction
+    CScriptWitness scriptWitness; //! Only serialized through CTransaction
 
     /* Setting nSequence to this value for every input in a transaction
      * disables nLockTime. */
@@ -78,7 +80,7 @@ public:
     /* Below flags apply in the context of BIP 68*/
     /* If this flag set, CTxIn::nSequence is NOT interpreted as a
      * relative lock-time. */
-    static const uint32_t SEQUENCE_LOCKTIME_DISABLE_FLAG = (1U << 31);
+    static const uint32_t SEQUENCE_LOCKTIME_DISABLE_FLAG = (1 << 31);
 
     /* If CTxIn::nSequence encodes a relative lock-time and this flag
      * is set, the relative lock-time has units of 512 seconds,
@@ -160,16 +162,16 @@ public:
         scriptPubKey.clear();
     }
 
-    void SetEmpty()
-    {
-        nValue = 0;
-        scriptPubKey.clear();
-    }
-
     bool IsUnspendable() const
     {
         return IsEmpty() ||
                  (scriptPubKey.size() > 0 && *scriptPubKey.begin() == OP_RETURN);
+    }
+
+    void SetEmpty()
+    {
+        nValue = 0;
+        scriptPubKey.clear();
     }
 
     bool IsEmpty() const
@@ -218,7 +220,6 @@ struct CMutableTransaction;
 template<typename Stream, typename TxType>
 inline void UnserializeTransaction(TxType& tx, Stream& s) {
     const bool fAllowWitness = !(s.GetVersion() & SERIALIZE_TRANSACTION_NO_WITNESS);
-
     s >> tx.nVersion;
     s >> tx.nTime;
     unsigned char flags = 0;
@@ -243,10 +244,6 @@ inline void UnserializeTransaction(TxType& tx, Stream& s) {
         for (size_t i = 0; i < tx.vin.size(); i++) {
             s >> tx.vin[i].scriptWitness.stack;
         }
-        if (!tx.HasWitness()) {
-            /* It's illegal to encode witnesses when all witness stacks are empty. */
-            throw std::ios_base::failure("Superfluous witness record");
-        }
     }
     if (flags) {
         /* Unknown flag in the serialization */
@@ -258,7 +255,6 @@ inline void UnserializeTransaction(TxType& tx, Stream& s) {
 template<typename Stream, typename TxType>
 inline void SerializeTransaction(const TxType& tx, Stream& s) {
     const bool fAllowWitness = !(s.GetVersion() & SERIALIZE_TRANSACTION_NO_WITNESS);
-
     s << tx.nVersion;
     s << tx.nTime;
     unsigned char flags = 0;
@@ -315,17 +311,15 @@ public:
 private:
     /** Memory only. */
     const uint256 hash;
-    const uint256 m_witness_hash;
 
     uint256 ComputeHash() const;
-    uint256 ComputeWitnessHash() const;
 
 public:
     /** Construct a CTransaction that qualifies as IsNull() */
     CTransaction();
 
     /** Convert a CMutableTransaction into a CTransaction. */
-    explicit CTransaction(const CMutableTransaction &tx);
+    CTransaction(const CMutableTransaction &tx);
     CTransaction(CMutableTransaction &&tx);
 
     template <typename Stream>
@@ -342,13 +336,26 @@ public:
         return vin.empty() && vout.empty();
     }
 
-    const uint256& GetHash() const { return hash; }
-    const uint256& GetWitnessHash() const { return m_witness_hash; };
+    const uint256& GetHash() const {
+        return hash;
+    }
+
+    // Compute a hash that includes both transaction and witness data
+    uint256 GetWitnessHash() const;
 
     // Return sum of txouts.
     CAmount GetValueOut() const;
     // GetValueIn() is a method on CCoinsViewCache, because
     // inputs must be known to compute value in.
+
+    /** TOKENS START */
+    bool IsNewToken() const;
+    bool VerifyNewToken(std::string& strError) const;
+    bool IsNewUniqueToken() const;
+    bool VerifyNewUniqueToken(std::string& strError) const;
+    bool IsReissueToken() const;
+    bool VerifyReissueToken(std::string& strError) const;
+    /** TOKENS END */
 
     /**
      * Get the total transaction size in bytes, including witness data.
@@ -423,6 +430,11 @@ struct CMutableTransaction
      * fly, as opposed to GetHash() in CTransaction, which uses a cached result.
      */
     uint256 GetHash() const;
+
+    friend bool operator==(const CMutableTransaction& a, const CMutableTransaction& b)
+    {
+        return a.GetHash() == b.GetHash();
+    }
 
     bool HasWitness() const
     {

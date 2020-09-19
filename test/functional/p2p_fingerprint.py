@@ -1,28 +1,32 @@
 #!/usr/bin/env python3
+# Copyright (c) 2017 The Bitcoin Core developers
 # Copyright (c) 2017-2018 The AokChain Core developers
 # Distributed under the MIT software license, see the accompanying
 # file COPYING or http://www.opensource.org/licenses/mit-license.php.
 """Test various fingerprinting protections.
 
-If a stale block more than a month old or its header are requested by a peer,
+If an stale block more than a month old or its header are requested by a peer,
 the node should pretend that it does not have it to avoid fingerprinting.
 """
 
 import time
 
 from test_framework.blocktools import (create_block, create_coinbase)
-from test_framework.messages import CInv
 from test_framework.mininode import (
-    P2PInterface,
+    CInv,
+    NetworkThread,
+    NodeConn,
+    NodeConnCB,
     msg_headers,
     msg_block,
     msg_getdata,
     msg_getheaders,
+    wait_until,
 )
 from test_framework.test_framework import AokChainTestFramework
 from test_framework.util import (
     assert_equal,
-    wait_until,
+    p2p_port,
 )
 
 class P2PFingerprintTest(AokChainTestFramework):
@@ -74,13 +78,20 @@ class P2PFingerprintTest(AokChainTestFramework):
     # This does not currently test that stale blocks timestamped within the
     # last month but that have over a month's worth of work are also withheld.
     def run_test(self):
-        node0 = self.nodes[0].add_p2p_connection(P2PInterface())
+        node0 = NodeConnCB()
+
+        connections = []
+        connections.append(NodeConn('127.0.0.1', p2p_port(0), self.nodes[0], node0))
+        node0.add_connection(connections[0])
+
+        NetworkThread().start()
+        node0.wait_for_verack()
 
         # Set node time to 60 days ago
-        self.nodes[0].setmocktime(int(time.time()) - 60 * 24 * 60 * 60)
+        self.nodes[0].setmocktime(int(time.time()) - 60 * 24 * 60 * 6)
 
         # Generating a chain of 10 blocks
-        block_hashes = self.nodes[0].generatetoaddress(10, self.nodes[0].get_deterministic_priv_key().address)
+        block_hashes = self.nodes[0].generate(nblocks=10)
 
         # Create longer chain starting 2 blocks before current tip
         height = len(block_hashes) - 2
@@ -111,7 +122,7 @@ class P2PFingerprintTest(AokChainTestFramework):
 
         # Longest chain is extended so stale is much older than chain tip
         self.nodes[0].setmocktime(0)
-        tip = self.nodes[0].generatetoaddress(1, self.nodes[0].get_deterministic_priv_key().address)[0]
+        tip = self.nodes[0].generate(nblocks=1)[0]
         assert_equal(self.nodes[0].getblockcount(), 14)
 
         # Send getdata & getheaders to refresh last received getheader message

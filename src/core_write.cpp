@@ -1,29 +1,49 @@
-// Copyright (c) 2009-2018 The Bitcoin Core developers
+// Copyright (c) 2009-2016 The Bitcoin Core developers
+// Copyright (c) 2017-2019 The Raven Core developers
+// Copyright (c) 2020 The AokChain Core developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
-#include <core_io.h>
+#include "core_io.h"
 
-#include <consensus/consensus.h>
-#include <consensus/validation.h>
-#include <key_io.h>
-#include <script/script.h>
-#include <script/standard.h>
-#include <serialize.h>
-#include <streams.h>
+#include "base58.h"
+#include "consensus/consensus.h"
+#include "consensus/validation.h"
+#include "script/script.h"
+#include "script/standard.h"
+#include "serialize.h"
+#include "streams.h"
 #include <univalue.h>
-#include <util/system.h>
-#include <util/moneystr.h>
-#include <util/strencodings.h>
+#include <iomanip>
+#include "util.h"
+#include "utilmoneystr.h"
+#include "utilstrencodings.h"
+#include "tokens/tokens.h"
 
-UniValue ValueFromAmount(const CAmount& amount)
+std::string ValueFromAmountString(const CAmount& amount, const int8_t units)
 {
     bool sign = amount < 0;
     int64_t n_abs = (sign ? -amount : amount);
     int64_t quotient = n_abs / COIN;
     int64_t remainder = n_abs % COIN;
-    return UniValue(UniValue::VNUM,
-            strprintf("%s%d.%08d", sign ? "-" : "", quotient, remainder));
+    remainder = remainder / pow(10, 8 - units);
+
+    if (units == 0 && remainder == 0) {
+        return strprintf("%s%d", sign ? "-" : "", quotient);
+    }
+    else {
+        return strprintf("%s%d.%0" + std::to_string(units) + "d", sign ? "-" : "", quotient, remainder);
+    }
+}
+
+UniValue ValueFromAmount(const CAmount& amount, const int8_t units)
+{
+    return UniValue(UniValue::VNUM, ValueFromAmountString(amount, units));
+}
+
+UniValue ValueFromAmount(const CAmount& amount)
+{
+    return ValueFromAmount(amount, 8);
 }
 
 std::string FormatScript(const CScript& script)
@@ -34,7 +54,7 @@ std::string FormatScript(const CScript& script)
     while (it != script.end()) {
         CScript::const_iterator it2 = it;
         std::vector<unsigned char> vch;
-        if (script.GetOp(it, op, vch)) {
+        if (script.GetOp2(it, op, &vch)) {
             if (op == OP_0) {
                 ret += "0 ";
                 continue;
@@ -69,13 +89,6 @@ const std::map<unsigned char, std::string> mapSigHashTypes = {
     {static_cast<unsigned char>(SIGHASH_SINGLE), std::string("SINGLE")},
     {static_cast<unsigned char>(SIGHASH_SINGLE|SIGHASH_ANYONECANPAY), std::string("SINGLE|ANYONECANPAY")},
 };
-
-std::string SighashToStr(unsigned char sighash_type)
-{
-    const auto& it = mapSigHashTypes.find(sighash_type);
-    if (it == mapSigHashTypes.end()) return "";
-    return it->second;
-}
 
 /**
  * Create the assembly string representation of a CScript object.
@@ -128,26 +141,35 @@ std::string ScriptToAsmStr(const CScript& script, const bool fAttemptSighashDeco
     return str;
 }
 
+std::vector<std::string> ScriptToAsmVector(const CScript& script, const bool fAttemptSighashDecode)
+{
+    std::vector<std::string> result;
+    opcodetype opcode;
+    std::vector<unsigned char> vch;
+    CScript::const_iterator pc = script.begin();
+    while (pc < script.end()) {
+        if (!script.GetOp(pc, opcode, vch)) {
+            result.push_back("[error]");
+            return result;
+        }
+        if (0 <= opcode && opcode <= OP_PUSHDATA4) {
+            if (vch.size() <= static_cast<std::vector<unsigned char>::size_type>(4)) {
+                result.push_back(strprintf("%d", CScriptNum(vch, false).getint()));
+            } else {
+                result.push_back(HexStr(vch));
+            }
+        } else {
+            result.push_back(GetOpName(opcode));
+        }
+    }
+    return result;
+}
+
 std::string EncodeHexTx(const CTransaction& tx, const int serializeFlags)
 {
     CDataStream ssTx(SER_NETWORK, PROTOCOL_VERSION | serializeFlags);
     ssTx << tx;
     return HexStr(ssTx.begin(), ssTx.end());
-}
-
-void ScriptToUniv(const CScript& script, UniValue& out, bool include_address)
-{
-    out.pushKV("asm", ScriptToAsmStr(script));
-    out.pushKV("hex", HexStr(script.begin(), script.end()));
-
-    std::vector<std::vector<unsigned char>> solns;
-    txnouttype type = Solver(script, solns);
-    out.pushKV("type", GetTxnOutputType(type));
-
-    CTxDestination address;
-    if (include_address && ExtractDestination(script, address)) {
-        out.pushKV("address", EncodeDestination(address));
-    }
 }
 
 void ScriptPubKeyToUniv(const CScript& scriptPubKey,
@@ -169,6 +191,56 @@ void ScriptPubKeyToUniv(const CScript& scriptPubKey,
     out.pushKV("reqSigs", nRequired);
     out.pushKV("type", GetTxnOutputType(type));
 
+    /** TOKENS START */
+    if (type == TX_NEW_TOKEN || type == TX_TRANSFER_TOKEN || type == TX_REISSUE_TOKEN) {
+        UniValue tokenInfo(UniValue::VOBJ);
+
+        std::string name;
+        CAmount amount;
+        std::string _tokenAddress;
+        uint32_t nTokenLockTime;
+
+        if (GetTokenInfoFromScript(scriptPubKey, name, amount, nTokenLockTime)) {
+            tokenInfo.pushKV("name", name);
+            tokenInfo.pushKV("amount", ValueFromAmount(amount));
+            tokenInfo.pushKV("token_lock_time", (int)nTokenLockTime);
+
+            switch (type) {
+                case TX_NEW_TOKEN:
+                    if (IsTokenNameAnOwner(name)) {
+                        // pwnd n00b
+                    } else {
+                        CNewToken token;
+                        if (TokenFromScript(scriptPubKey, token, _tokenAddress)) {
+                            tokenInfo.pushKV("units", token.units);
+                            tokenInfo.pushKV("reissuable", token.nReissuable > 0 ? true : false);
+                            if (token.nHasIPFS > 0) {
+                                tokenInfo.pushKV("ipfs_hash", EncodeIPFS(token.strIPFSHash));
+                            }
+                        }
+                    }
+                    break;
+                case TX_TRANSFER_TOKEN:
+                    break;
+                case TX_REISSUE_TOKEN:
+                    CReissueToken token;
+                    if (ReissueTokenFromScript(scriptPubKey, token, _tokenAddress)) {
+                        if (token.nUnits >= 0) {
+                            tokenInfo.pushKV("units", token.nUnits);
+                        }
+                        tokenInfo.pushKV("reissuable", token.nReissuable > 0 ? true : false);
+                        if (!token.strIPFSHash.empty()) {
+                            tokenInfo.pushKV("ipfs_hash", EncodeIPFS(token.strIPFSHash));
+                        }
+                    }
+                    break;
+            }
+        }
+
+        out.pushKV("token", tokenInfo);
+    }
+     /** TOKENS END */
+
     UniValue a(UniValue::VARR);
     for (const CTxDestination& addr : addresses) {
         a.push_back(EncodeDestination(addr));
@@ -182,9 +254,8 @@ void TxToUniv(const CTransaction& tx, const uint256& hashBlock, UniValue& entry,
     entry.pushKV("hash", tx.GetWitnessHash().GetHex());
     entry.pushKV("version", tx.nVersion);
     entry.pushKV("timestamp", (int64_t)tx.nTime);
-    entry.pushKV("size", (int)::GetSerializeSize(tx, PROTOCOL_VERSION));
+    entry.pushKV("size", (int)::GetSerializeSize(tx, SER_NETWORK, PROTOCOL_VERSION));
     entry.pushKV("vsize", (GetTransactionWeight(tx) + WITNESS_SCALE_FACTOR - 1) / WITNESS_SCALE_FACTOR);
-    entry.pushKV("weight", GetTransactionWeight(tx));
     entry.pushKV("locktime", (int64_t)tx.nLockTime);
 
     UniValue vin(UniValue::VARR);
@@ -233,6 +304,6 @@ void TxToUniv(const CTransaction& tx, const uint256& hashBlock, UniValue& entry,
         entry.pushKV("blockhash", hashBlock.GetHex());
 
     if (include_hex) {
-        entry.pushKV("hex", EncodeHexTx(tx, serialize_flags)); // The hex-encoded transaction. Used the name "hex" to be consistent with the verbose output of "getrawtransaction".
+        entry.pushKV("hex", EncodeHexTx(tx, serialize_flags)); // the hex-encoded transaction. used the name "hex" to be consistent with the verbose output of "getrawtransaction".
     }
 }

@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
-# Copyright (c) 2015-2018 The AokChain Core developers
+# Copyright (c) 2015-2016 The Bitcoin Core developers
+# Copyright (c) 2017 The AokChain Core developers
 # Distributed under the MIT software license, see the accompanying
 # file COPYING or http://www.opensource.org/licenses/mit-license.php.
 """Test p2p mempool message.
@@ -8,10 +9,9 @@ Test that nodes are disconnected if they send mempool messages when bloom
 filters are not enabled.
 """
 
-from test_framework.messages import msg_mempool
-from test_framework.mininode import P2PInterface
+from test_framework.mininode import *
 from test_framework.test_framework import AokChainTestFramework
-from test_framework.util import assert_equal
+from test_framework.util import *
 
 class P2PMempoolTests(AokChainTestFramework):
     def set_test_params(self):
@@ -20,15 +20,19 @@ class P2PMempoolTests(AokChainTestFramework):
         self.extra_args = [["-peerbloomfilters=0"]]
 
     def run_test(self):
-        # Add a p2p connection
-        self.nodes[0].add_p2p_connection(P2PInterface())
+        #connect a mininode
+        aTestNode = NodeConnCB()
+        node = NodeConn('127.0.0.1', p2p_port(0), self.nodes[0], aTestNode)
+        aTestNode.add_connection(node)
+        NetworkThread().start()
+        aTestNode.wait_for_verack()
 
         #request mempool
-        self.nodes[0].p2p.send_message(msg_mempool())
-        self.nodes[0].p2p.wait_for_disconnect()
+        aTestNode.send_message(msg_mempool())
+        aTestNode.wait_for_disconnect()
 
         #mininode must be disconnected at this point
         assert_equal(len(self.nodes[0].getpeerinfo()), 0)
-
+    
 if __name__ == '__main__':
     P2PMempoolTests().main()

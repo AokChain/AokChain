@@ -1,47 +1,46 @@
 #!/usr/bin/env python3
-# Copyright (c) 2015-2018 The AokChain Core developers
+# Copyright (c) 2015-2016 The Bitcoin Core developers
+# Copyright (c) 2017-2018 The AokChain Core developers
 # Distributed under the MIT software license, see the accompanying
 # file COPYING or http://www.opensource.org/licenses/mit-license.php.
 """Test behavior of -maxuploadtarget.
 
 * Verify that getdata requests for old blocks (>1week) are dropped
 if uploadtarget has been reached.
-* Verify that getdata requests for recent blocks are respected even
+* Verify that getdata requests for recent blocks are respecteved even
 if uploadtarget has been reached.
 * Verify that the upload counters are reset after 24 hours.
 """
 from collections import defaultdict
 import time
 
-from test_framework.messages import CInv, msg_getdata
-from test_framework.mininode import P2PInterface
+from pprint import *
+from test_framework.mininode import *
 from test_framework.test_framework import AokChainTestFramework
-from test_framework.util import assert_equal, mine_large_block
+from test_framework.util import *
 
-class TestP2PConn(P2PInterface):
+class TestNode(NodeConnCB):
     def __init__(self):
         super().__init__()
         self.block_receive_map = defaultdict(int)
 
-    def on_inv(self, message):
+    def on_inv(self, conn, message):
         pass
 
-    def on_block(self, message):
+    def on_block(self, conn, message):
         message.block.calc_sha256()
         self.block_receive_map[message.block.sha256] += 1
 
 class MaxUploadTest(AokChainTestFramework):
-
+ 
     def set_test_params(self):
         self.setup_clean_chain = True
         self.num_nodes = 1
-        self.extra_args = [["-maxuploadtarget=800"]]
+        self.maxuploadtarget = 11200
+        self.extra_args = [["-maxuploadtarget=%s" % self.maxuploadtarget, "-blockmaxsize=999000"]]
 
         # Cache for utxos, as the listunspent may take a long time later in the test
         self.utxo_cache = []
-
-    def skip_test_if_missing_module(self):
-        self.skip_if_no_wallet()
 
     def run_test(self):
         # Before we connect anything, we first set the time on the node
@@ -53,13 +52,21 @@ class MaxUploadTest(AokChainTestFramework):
         # Generate some old blocks
         self.nodes[0].generate(130)
 
-        # p2p_conns[0] will only request old blocks
-        # p2p_conns[1] will only request new blocks
-        # p2p_conns[2] will test resetting the counters
-        p2p_conns = []
+        # test_nodes[0] will only request old blocks
+        # test_nodes[1] will only request new blocks
+        # test_nodes[2] will test resetting the counters
+        test_nodes = []
+        connections = []
 
-        for _ in range(3):
-            p2p_conns.append(self.nodes[0].add_p2p_connection(TestP2PConn()))
+        for i in range(3):
+            test_nodes.append(TestNode())
+            connections.append(NodeConn('127.0.0.1', p2p_port(0), self.nodes[0], test_nodes[i]))
+            test_nodes[i].add_connection(connections[i])
+
+        NetworkThread().start() # Start up network handling in another thread
+        [x.wait_for_verack() for x in test_nodes]
+
+        # Test logic begins here
 
         # Now mine a big block
         mine_large_block(self.nodes[0], self.utxo_cache)
@@ -79,48 +86,51 @@ class MaxUploadTest(AokChainTestFramework):
         big_new_block = self.nodes[0].getbestblockhash()
         big_new_block = int(big_new_block, 16)
 
-        # p2p_conns[0] will test what happens if we just keep requesting the
+        # test_nodes[0] will test what happens if we just keep requesting the
         # the same big old block too many times (expect: disconnect)
 
         getdata_request = msg_getdata()
         getdata_request.inv.append(CInv(2, big_old_block))
 
-        max_bytes_per_day = 800*1024*1024
-        daily_buffer = 144 * 4000000
+        block_rate_minutes = 1
+        blocks_per_day = 24 * 60 / block_rate_minutes
+        max_block_serialized_size = 8000000  # This is MAX_BLOCK_SERIALIZED_SIZE_RIP2
+        max_bytes_per_day = self.maxuploadtarget*1024*1024
+        daily_buffer = blocks_per_day * max_block_serialized_size
         max_bytes_available = max_bytes_per_day - daily_buffer
         success_count = max_bytes_available // old_block_size
 
-        # 576MB will be reserved for relaying new blocks, so expect this to
-        # succeed for ~235 tries.
-        for i in range(success_count):
-            p2p_conns[0].send_message(getdata_request)
-            p2p_conns[0].sync_with_ping()
-            assert_equal(p2p_conns[0].block_receive_map[big_old_block], i+1)
+        # 224051200B will be reserved for relaying new blocks, so expect this to
+        # succeed for ~236 tries.
+        for i in range(int(success_count)):
+            test_nodes[0].send_message(getdata_request)
+            test_nodes[0].sync_with_ping()
+            assert_equal(test_nodes[0].block_receive_map[big_old_block], i+1)
 
         assert_equal(len(self.nodes[0].getpeerinfo()), 3)
-        # At most a couple more tries should succeed (depending on how long
+        # At most a couple more tries should succeed (depending on how long 
         # the test has been running so far).
         for i in range(3):
-            p2p_conns[0].send_message(getdata_request)
-        p2p_conns[0].wait_for_disconnect()
+            test_nodes[0].send_message(getdata_request)
+        test_nodes[0].wait_for_disconnect()
         assert_equal(len(self.nodes[0].getpeerinfo()), 2)
         self.log.info("Peer 0 disconnected after downloading old block too many times")
 
-        # Requesting the current block on p2p_conns[1] should succeed indefinitely,
+        # Requesting the current block on test_nodes[1] should succeed indefinitely,
         # even when over the max upload target.
-        # We'll try 800 times
+        # We'll try lots of times
         getdata_request.inv = [CInv(2, big_new_block)]
-        for i in range(800):
-            p2p_conns[1].send_message(getdata_request)
-            p2p_conns[1].sync_with_ping()
-            assert_equal(p2p_conns[1].block_receive_map[big_new_block], i+1)
+        for i in range(500):
+            test_nodes[1].send_message(getdata_request)
+            test_nodes[1].sync_with_ping()
+            assert_equal(test_nodes[1].block_receive_map[big_new_block], i+1)
 
         self.log.info("Peer 1 able to repeatedly download new block")
 
-        # But if p2p_conns[1] tries for an old block, it gets disconnected too.
+        # But if test_nodes[1] tries for an old block, it gets disconnected too.
         getdata_request.inv = [CInv(2, big_old_block)]
-        p2p_conns[1].send_message(getdata_request)
-        p2p_conns[1].wait_for_disconnect()
+        test_nodes[1].send_message(getdata_request)
+        test_nodes[1].wait_for_disconnect()
         assert_equal(len(self.nodes[0].getpeerinfo()), 1)
 
         self.log.info("Peer 1 disconnected after trying to download old block")
@@ -128,34 +138,39 @@ class MaxUploadTest(AokChainTestFramework):
         self.log.info("Advancing system time on node to clear counters...")
 
         # If we advance the time by 24 hours, then the counters should reset,
-        # and p2p_conns[2] should be able to retrieve the old block.
+        # and test_nodes[2] should be able to retrieve the old block.
         self.nodes[0].setmocktime(int(time.time()))
-        p2p_conns[2].sync_with_ping()
-        p2p_conns[2].send_message(getdata_request)
-        p2p_conns[2].sync_with_ping()
-        assert_equal(p2p_conns[2].block_receive_map[big_old_block], 1)
+        test_nodes[2].sync_with_ping()
+        test_nodes[2].send_message(getdata_request)
+        test_nodes[2].sync_with_ping()
+        assert_equal(test_nodes[2].block_receive_map[big_old_block], 1)
 
         self.log.info("Peer 2 able to download old block")
 
-        self.nodes[0].disconnect_p2ps()
+        [c.disconnect_node() for c in connections]
 
         #stop and start node 0 with 1MB maxuploadtarget, whitelist 127.0.0.1
         self.log.info("Restarting nodes with -whitelist=127.0.0.1")
         self.stop_node(0)
-        self.start_node(0, ["-whitelist=127.0.0.1", "-maxuploadtarget=1"])
+        self.start_node(0, ["-whitelist=127.0.0.1", "-maxuploadtarget=1", "-blockmaxsize=999000"])
 
-        # Reconnect to self.nodes[0]
-        self.nodes[0].add_p2p_connection(TestP2PConn())
+        #recreate/reconnect a test node
+        test_nodes = [TestNode()]
+        connections = [NodeConn('127.0.0.1', p2p_port(0), self.nodes[0], test_nodes[0])]
+        test_nodes[0].add_connection(connections[0])
+
+        NetworkThread().start() # Start up network handling in another thread
+        test_nodes[0].wait_for_verack()
 
         #retrieve 20 blocks which should be enough to break the 1MB limit
         getdata_request.inv = [CInv(2, big_new_block)]
         for i in range(20):
-            self.nodes[0].p2p.send_message(getdata_request)
-            self.nodes[0].p2p.sync_with_ping()
-            assert_equal(self.nodes[0].p2p.block_receive_map[big_new_block], i+1)
+            test_nodes[0].send_message(getdata_request)
+            test_nodes[0].sync_with_ping()
+            assert_equal(test_nodes[0].block_receive_map[big_new_block], i+1)
 
         getdata_request.inv = [CInv(2, big_old_block)]
-        self.nodes[0].p2p.send_and_ping(getdata_request)
+        test_nodes[0].send_and_ping(getdata_request)
         assert_equal(len(self.nodes[0].getpeerinfo()), 1) #node is still connected because of the whitelist
 
         self.log.info("Peer still connected after trying to download old block (whitelisted)")

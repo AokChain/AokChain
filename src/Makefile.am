@@ -1,13 +1,13 @@
 # Copyright (c) 2013-2016 The Bitcoin Core developers
+# Copyright (c) 2017 The AokChain Core developers
 # Distributed under the MIT software license, see the accompanying
 # file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 DIST_SUBDIRS = secp256k1 univalue
 
-AM_LDFLAGS = $(PTHREAD_CFLAGS) $(LIBTOOL_LDFLAGS) $(HARDENED_LDFLAGS) $(GPROF_LDFLAGS) $(SANITIZER_LDFLAGS)
-AM_CXXFLAGS = $(DEBUG_CXXFLAGS) $(HARDENED_CXXFLAGS) $(WARN_CXXFLAGS) $(NOWARN_CXXFLAGS) $(ERROR_CXXFLAGS) $(GPROF_CXXFLAGS) $(SANITIZER_CXXFLAGS)
-AM_CPPFLAGS = $(DEBUG_CPPFLAGS) $(HARDENED_CPPFLAGS)
-AM_LIBTOOLFLAGS = --preserve-dup-deps
+AM_LDFLAGS = $(PTHREAD_CFLAGS) $(LIBTOOL_LDFLAGS) $(HARDENED_LDFLAGS)
+AM_CXXFLAGS = $(HARDENED_CXXFLAGS) $(ERROR_CXXFLAGS)
+AM_CPPFLAGS = $(HARDENED_CPPFLAGS)
 EXTRA_LIBRARIES =
 
 if EMBEDDED_UNIVALUE
@@ -19,7 +19,7 @@ else
 LIBUNIVALUE = $(UNIVALUE_LIBS)
 endif
 
-AOKCHAIN_INCLUDES=-I$(builddir) $(BDB_CPPFLAGS) $(BOOST_CPPFLAGS) $(LEVELDB_CPPFLAGS) $(CRYPTO_CFLAGS) $(SSL_CFLAGS)
+AOKCHAIN_INCLUDES=-I$(builddir) -I$(builddir)/obj $(BDB_CPPFLAGS) $(BOOST_CPPFLAGS) $(LEVELDB_CPPFLAGS) $(CRYPTO_CFLAGS) $(SSL_CFLAGS)
 
 AOKCHAIN_INCLUDES += -I$(srcdir)/secp256k1/include
 AOKCHAIN_INCLUDES += $(UNIVALUE_CFLAGS)
@@ -29,7 +29,7 @@ LIBAOKCHAIN_COMMON=libaokchain_common.a
 LIBAOKCHAIN_CONSENSUS=libaokchain_consensus.a
 LIBAOKCHAIN_CLI=libaokchain_cli.a
 LIBAOKCHAIN_UTIL=libaokchain_util.a
-LIBAOKCHAIN_CRYPTO_BASE=crypto/libaokchain_crypto_base.a
+LIBAOKCHAIN_CRYPTO=crypto/libaokchain_crypto.a
 LIBAOKCHAINQT=qt/libaokchainqt.a
 LIBSECP256K1=secp256k1/libsecp256k1.la
 
@@ -41,24 +41,9 @@ LIBAOKCHAINCONSENSUS=libaokchainconsensus.la
 endif
 if ENABLE_WALLET
 LIBAOKCHAIN_WALLET=libaokchain_wallet.a
-LIBAOKCHAIN_WALLET_TOOL=libaokchain_wallet_tool.a
 endif
 
-LIBAOKCHAIN_CRYPTO= $(LIBAOKCHAIN_CRYPTO_BASE)
-if ENABLE_SSE41
-LIBAOKCHAIN_CRYPTO_SSE41 = crypto/libaokchain_crypto_sse41.a
-LIBAOKCHAIN_CRYPTO += $(LIBAOKCHAIN_CRYPTO_SSE41)
-endif
-if ENABLE_AVX2
-LIBAOKCHAIN_CRYPTO_AVX2 = crypto/libaokchain_crypto_avx2.a
-LIBAOKCHAIN_CRYPTO += $(LIBAOKCHAIN_CRYPTO_AVX2)
-endif
-if ENABLE_SHANI
-LIBAOKCHAIN_CRYPTO_SHANI = crypto/libaokchain_crypto_shani.a
-LIBAOKCHAIN_CRYPTO += $(LIBAOKCHAIN_CRYPTO_SHANI)
-endif
-
-$(LIBSECP256K1): $(wildcard secp256k1/src/*.h) $(wildcard secp256k1/src/*.c) $(wildcard secp256k1/include/*)
+$(LIBSECP256K1): $(wildcard secp256k1/src/*) $(wildcard secp256k1/include/*)
 	$(AM_V_at)$(MAKE) $(AM_MAKEFLAGS) -C $(@D) $(@F)
 
 # Make is not made aware of per-object dependencies to avoid limiting building parallelization
@@ -71,7 +56,6 @@ EXTRA_LIBRARIES += \
   $(LIBAOKCHAIN_SERVER) \
   $(LIBAOKCHAIN_CLI) \
   $(LIBAOKCHAIN_WALLET) \
-  $(LIBAOKCHAIN_WALLET_TOOL) \
   $(LIBAOKCHAIN_ZMQ)
 
 lib_LTLIBRARIES = $(LIBAOKCHAINCONSENSUS)
@@ -88,13 +72,9 @@ endif
 if BUILD_AOKCHAIN_CLI
   bin_PROGRAMS += aokchain-cli
 endif
+
 if BUILD_AOKCHAIN_TX
   bin_PROGRAMS += aokchain-tx
-endif
-if ENABLE_WALLET
-if BUILD_AOKCHAIN_WALLET
-  bin_PROGRAMS += aokchain-wallet
-endif
 endif
 
 .PHONY: FORCE check-symbols check-security
@@ -102,13 +82,13 @@ endif
 AOKCHAIN_CORE_H = \
   addrdb.h \
   addrman.h \
-  attributes.h \
-  banman.h \
+  banned.h \
+  tokens/tokens.h \
+  tokens/tokendb.h \
+  tokens/tokentypes.h \
   base58.h \
-  bech32.h \
   bloom.h \
   blockencodings.h \
-  blockfilter.h \
   chain.h \
   chainparams.h \
   chainparamsbase.h \
@@ -118,7 +98,6 @@ AOKCHAIN_CORE_H = \
   clientversion.h \
   coins.h \
   compat.h \
-  compat/assumptions.h \
   compat/byteswap.h \
   compat/endian.h \
   compat/sanity.h \
@@ -131,23 +110,15 @@ AOKCHAIN_CORE_H = \
   fs.h \
   httprpc.h \
   httpserver.h \
-  index/base.h \
-  index/txindex.h \
   index/addressindex.h \
   index/spentindex.h \
   index/timestampindex.h \
   indirectmap.h \
   init.h \
-  interfaces/chain.h \
-  interfaces/handler.h \
-  interfaces/node.h \
-  interfaces/wallet.h \
   key.h \
-  key_io.h \
   keystore.h \
   dbwrapper.h \
   limitedmap.h \
-  logging.h \
   memusage.h \
   merkleblock.h \
   miner.h \
@@ -156,10 +127,7 @@ AOKCHAIN_CORE_H = \
   netaddress.h \
   netbase.h \
   netmessagemaker.h \
-  node/transaction.h \
   noui.h \
-  optional.h \
-  outputtype.h \
   policy/feerate.h \
   policy/fees.h \
   policy/policy.h \
@@ -167,7 +135,6 @@ AOKCHAIN_CORE_H = \
   pos.h \
   pow.h \
   protocol.h \
-  psbt.h \
   random.h \
   reverse_iterator.h \
   reverselock.h \
@@ -175,17 +142,14 @@ AOKCHAIN_CORE_H = \
   rpc/client.h \
   rpc/mining.h \
   rpc/protocol.h \
+  rpc/safemode.h \
   rpc/server.h \
-  rpc/rawtransaction.h \
   rpc/register.h \
-  rpc/util.h \
   scheduler.h \
-  script/descriptor.h \
-  script/ismine.h \
   script/sigcache.h \
   script/sign.h \
   script/standard.h \
-  shutdown.h \
+  script/ismine.h \
   streams.h \
   support/allocators/secure.h \
   support/allocators/zeroafterfree.h \
@@ -201,35 +165,27 @@ AOKCHAIN_CORE_H = \
   txmempool.h \
   ui_interface.h \
   undo.h \
-  util/bip32.h \
-  util/bytevectorhash.h \
-  util/system.h \
-  util/memory.h \
-  util/moneystr.h \
-  util/time.h \
+  util.h \
+  utilmoneystr.h \
+  utiltime.h \
   validation.h \
   validationinterface.h \
   versionbits.h \
-  versionbitsinfo.h \
   walletinitinterface.h \
   wallet/coincontrol.h \
   wallet/crypter.h \
   wallet/db.h \
   wallet/feebumper.h \
   wallet/fees.h \
-  wallet/psbtwallet.h \
   wallet/rpcwallet.h \
   wallet/wallet.h \
   wallet/walletdb.h \
-  wallet/wallettool.h \
   wallet/walletutil.h \
-  wallet/coinselection.h \
   warnings.h \
   zmq/zmqabstractnotifier.h \
   zmq/zmqconfig.h\
   zmq/zmqnotificationinterface.h \
-  zmq/zmqpublishnotifier.h \
-  zmq/zmqrpc.h
+  zmq/zmqpublishnotifier.h
 
 
 obj/build.h: FORCE
@@ -244,44 +200,41 @@ libaokchain_server_a_CXXFLAGS = $(AM_CXXFLAGS) $(PIE_FLAGS)
 libaokchain_server_a_SOURCES = \
   addrdb.cpp \
   addrman.cpp \
-  banman.cpp \
+  banned.cpp \
   bloom.cpp \
   blockencodings.cpp \
-  blockfilter.cpp \
   chain.cpp \
   checkpoints.cpp \
+  consensus/consensus.cpp \
   consensus/tx_verify.cpp \
   httprpc.cpp \
   httpserver.cpp \
-  index/base.cpp \
-  index/txindex.cpp \
-  interfaces/chain.cpp \
-  interfaces/handler.cpp \
-  interfaces/node.cpp \
   init.cpp \
   dbwrapper.cpp \
   merkleblock.cpp \
   miner.cpp \
   net.cpp \
   net_processing.cpp \
-  node/transaction.cpp \
   noui.cpp \
-  outputtype.cpp \
+  tokens/tokens.cpp \
+  tokens/tokendb.cpp \
+  tokens/tokentypes.cpp \
   policy/fees.cpp \
   policy/policy.cpp \
   policy/rbf.cpp \
   pos.cpp \
   pow.cpp \
   rest.cpp \
+  rpc/tokens.cpp \
   rpc/blockchain.cpp \
   rpc/mining.cpp \
   rpc/misc.cpp \
   rpc/net.cpp \
   rpc/rawtransaction.cpp \
+  rpc/safemode.cpp \
   rpc/server.cpp \
-  rpc/util.cpp \
   script/sigcache.cpp \
-  shutdown.cpp \
+  script/ismine.cpp \
   timedata.cpp \
   torcontrol.cpp \
   txdb.cpp \
@@ -292,18 +245,13 @@ libaokchain_server_a_SOURCES = \
   versionbits.cpp \
   $(AOKCHAIN_CORE_H)
 
-if !ENABLE_WALLET
-libaokchain_server_a_SOURCES += dummywallet.cpp
-endif
-
 if ENABLE_ZMQ
 libaokchain_zmq_a_CPPFLAGS = $(AOKCHAIN_INCLUDES) $(ZMQ_CFLAGS)
 libaokchain_zmq_a_CXXFLAGS = $(AM_CXXFLAGS) $(PIE_FLAGS)
 libaokchain_zmq_a_SOURCES = \
   zmq/zmqabstractnotifier.cpp \
   zmq/zmqnotificationinterface.cpp \
-  zmq/zmqpublishnotifier.cpp \
-  zmq/zmqrpc.cpp
+  zmq/zmqpublishnotifier.cpp
 endif
 
 
@@ -312,32 +260,22 @@ endif
 libaokchain_wallet_a_CPPFLAGS = $(AM_CPPFLAGS) $(AOKCHAIN_INCLUDES)
 libaokchain_wallet_a_CXXFLAGS = $(AM_CXXFLAGS) $(PIE_FLAGS)
 libaokchain_wallet_a_SOURCES = \
-  interfaces/wallet.cpp \
-  wallet/coincontrol.cpp \
   wallet/crypter.cpp \
   wallet/db.cpp \
   wallet/feebumper.cpp \
   wallet/fees.cpp \
   wallet/init.cpp \
-  wallet/psbtwallet.cpp \
   wallet/rpcdump.cpp \
   wallet/rpcwallet.cpp \
   wallet/wallet.cpp \
   wallet/walletdb.cpp \
   wallet/walletutil.cpp \
-  wallet/coinselection.cpp \
-  $(AOKCHAIN_CORE_H)
-
-libaokchain_wallet_tool_a_CPPFLAGS = $(AM_CPPFLAGS) $(AOKCHAIN_INCLUDES)
-libaokchain_wallet_tool_a_CXXFLAGS = $(AM_CXXFLAGS) $(PIE_FLAGS)
-libaokchain_wallet_tool_a_SOURCES = \
-  wallet/wallettool.cpp \
   $(AOKCHAIN_CORE_H)
 
 # crypto primitives library
-crypto_libaokchain_crypto_base_a_CPPFLAGS = $(AM_CPPFLAGS)
-crypto_libaokchain_crypto_base_a_CXXFLAGS = $(AM_CXXFLAGS) $(PIE_FLAGS)
-crypto_libaokchain_crypto_base_a_SOURCES = \
+crypto_libaokchain_crypto_a_CPPFLAGS = $(AM_CPPFLAGS)
+crypto_libaokchain_crypto_a_CXXFLAGS = $(AM_CXXFLAGS) $(PIE_FLAGS)
+crypto_libaokchain_crypto_a_SOURCES = \
   crypto/aes.cpp \
   crypto/aes.h \
   crypto/chacha20.h \
@@ -353,35 +291,17 @@ crypto_libaokchain_crypto_base_a_SOURCES = \
   crypto/sha1.h \
   crypto/sha256.cpp \
   crypto/sha256.h \
+  crypto/sha512.h \
+  crypto/sph_types.h \
   crypto/sha512.cpp \
   crypto/sha512.h \
-  crypto/siphash.cpp \
-  crypto/siphash.h \
   crypto/sph_types.h \
   crypto/blake2b.c \
   crypto/blake2b.h
 
 if USE_ASM
-crypto_libaokchain_crypto_base_a_SOURCES += crypto/sha256_sse4.cpp
+crypto_libaokchain_crypto_a_SOURCES += crypto/sha256_sse4.cpp
 endif
-
-crypto_libaokchain_crypto_sse41_a_CXXFLAGS = $(AM_CXXFLAGS) $(PIE_FLAGS)
-crypto_libaokchain_crypto_sse41_a_CPPFLAGS = $(AM_CPPFLAGS)
-crypto_libaokchain_crypto_sse41_a_CXXFLAGS += $(SSE41_CXXFLAGS)
-crypto_libaokchain_crypto_sse41_a_CPPFLAGS += -DENABLE_SSE41
-crypto_libaokchain_crypto_sse41_a_SOURCES = crypto/sha256_sse41.cpp
-
-crypto_libaokchain_crypto_avx2_a_CXXFLAGS = $(AM_CXXFLAGS) $(PIE_FLAGS)
-crypto_libaokchain_crypto_avx2_a_CPPFLAGS = $(AM_CPPFLAGS)
-crypto_libaokchain_crypto_avx2_a_CXXFLAGS += $(AVX2_CXXFLAGS)
-crypto_libaokchain_crypto_avx2_a_CPPFLAGS += -DENABLE_AVX2
-crypto_libaokchain_crypto_avx2_a_SOURCES = crypto/sha256_avx2.cpp
-
-crypto_libaokchain_crypto_shani_a_CXXFLAGS = $(AM_CXXFLAGS) $(PIE_FLAGS)
-crypto_libaokchain_crypto_shani_a_CPPFLAGS = $(AM_CPPFLAGS)
-crypto_libaokchain_crypto_shani_a_CXXFLAGS += $(SHANI_CXXFLAGS)
-crypto_libaokchain_crypto_shani_a_CPPFLAGS += -DENABLE_SHANI
-crypto_libaokchain_crypto_shani_a_SOURCES = crypto/sha256_shani.cpp
 
 # consensus: shared between all executables that validate any consensus rules.
 libaokchain_consensus_a_CPPFLAGS = $(AM_CPPFLAGS) $(AOKCHAIN_INCLUDES)
@@ -411,12 +331,13 @@ libaokchain_consensus_a_SOURCES = \
   script/script_error.cpp \
   script/script_error.h \
   serialize.h \
-  span.h \
+  support/cleanse.h \
+  support/cleanse.cpp \
   tinyformat.h \
   uint256.cpp \
   uint256.h \
-  util/strencodings.cpp \
-  util/strencodings.h \
+  utilstrencodings.cpp \
+  utilstrencodings.h \
   version.h
 
 # common: shared between aokchaind, and aokchain-qt and non-server tools
@@ -424,26 +345,20 @@ libaokchain_common_a_CPPFLAGS = $(AM_CPPFLAGS) $(AOKCHAIN_INCLUDES)
 libaokchain_common_a_CXXFLAGS = $(AM_CXXFLAGS) $(PIE_FLAGS)
 libaokchain_common_a_SOURCES = \
   base58.cpp \
-  bech32.cpp \
   chainparams.cpp \
   coins.cpp \
   compressor.cpp \
   core_read.cpp \
   core_write.cpp \
   key.cpp \
-  key_io.cpp \
   keystore.cpp \
   netaddress.cpp \
   netbase.cpp \
   policy/feerate.cpp \
-  psbt.cpp \
   protocol.cpp \
   scheduler.cpp \
-  script/descriptor.cpp \
-  script/ismine.cpp \
   script/sign.cpp \
   script/standard.cpp \
-  versionbitsinfo.cpp \
   warnings.cpp \
   $(AOKCHAIN_CORE_H)
 
@@ -460,18 +375,15 @@ libaokchain_util_a_SOURCES = \
   compat/glibcxx_sanity.cpp \
   compat/strnlen.cpp \
   fs.cpp \
-  logging.cpp \
   random.cpp \
   rpc/protocol.cpp \
   support/cleanse.cpp \
   sync.cpp \
   threadinterrupt.cpp \
-  util/bip32.cpp \
-  util/bytevectorhash.cpp \
-  util/system.cpp \
-  util/moneystr.cpp \
-  util/strencodings.cpp \
-  util/time.cpp \
+  util.cpp \
+  utilmoneystr.cpp \
+  utilstrencodings.cpp \
+  utiltime.cpp \
   $(AOKCHAIN_CORE_H)
 
 if GLIBC_BACK_COMPAT
@@ -501,11 +413,10 @@ endif
 
 aokchaind_LDADD = \
   $(LIBAOKCHAIN_SERVER) \
-  $(LIBAOKCHAIN_WALLET) \
-  $(LIBAOKCHAIN_SERVER) \
   $(LIBAOKCHAIN_COMMON) \
   $(LIBUNIVALUE) \
   $(LIBAOKCHAIN_UTIL) \
+  $(LIBAOKCHAIN_WALLET) \
   $(LIBAOKCHAIN_ZMQ) \
   $(LIBAOKCHAIN_CONSENSUS) \
   $(LIBAOKCHAIN_CRYPTO) \
@@ -514,7 +425,7 @@ aokchaind_LDADD = \
   $(LIBMEMENV) \
   $(LIBSECP256K1)
 
-aokchaind_LDADD += $(BOOST_LIBS) $(BDB_LIBS) $(CRYPTO_LIBS) $(MINIUPNPC_LIBS) $(EVENT_PTHREADS_LIBS) $(EVENT_LIBS) $(ZMQ_LIBS)
+aokchaind_LDADD += $(BOOST_LIBS) $(BDB_LIBS) $(SSL_LIBS) $(CRYPTO_LIBS) $(MINIUPNPC_LIBS) $(EVENT_PTHREADS_LIBS) $(EVENT_LIBS) $(ZMQ_LIBS)
 
 # aokchain-cli binary #
 aokchain_cli_SOURCES = aokchain-cli.cpp
@@ -532,7 +443,7 @@ aokchain_cli_LDADD = \
   $(LIBAOKCHAIN_UTIL) \
   $(LIBAOKCHAIN_CRYPTO)
 
-aokchain_cli_LDADD += $(BOOST_LIBS) $(CRYPTO_LIBS) $(EVENT_LIBS)
+aokchain_cli_LDADD += $(BOOST_LIBS) $(SSL_LIBS) $(CRYPTO_LIBS) $(EVENT_LIBS)
 #
 
 # aokchain-tx binary #
@@ -556,36 +467,10 @@ aokchain_tx_LDADD = \
 aokchain_tx_LDADD += $(BOOST_LIBS) $(CRYPTO_LIBS)
 #
 
-# aokchain-wallet binary #
-aokchain_wallet_SOURCES = aokchain-wallet.cpp
-aokchain_wallet_CPPFLAGS = $(AM_CPPFLAGS) $(AOKCHAIN_INCLUDES)
-aokchain_wallet_CXXFLAGS = $(AM_CXXFLAGS) $(PIE_FLAGS)
-aokchain_wallet_LDFLAGS = $(RELDFLAGS) $(AM_LDFLAGS) $(LIBTOOL_APP_LDFLAGS)
-
-if TARGET_WINDOWS
-aokchain_wallet_SOURCES += aokchain-wallet-res.rc
-endif
-
-aokchain_wallet_LDADD = \
-  $(LIBAOKCHAIN_WALLET_TOOL) \
-  $(LIBAOKCHAIN_WALLET) \
-  $(LIBAOKCHAIN_SERVER) \
-  $(LIBAOKCHAIN_COMMON) \
-  $(LIBAOKCHAIN_CONSENSUS) \
-  $(LIBAOKCHAIN_UTIL) \
-  $(LIBAOKCHAIN_CRYPTO) \
-  $(LIBLEVELDB) \
-  $(LIBLEVELDB_SSE42) \
-  $(LIBMEMENV) \
-  $(LIBSECP256K1)
-
-aokchain_wallet_LDADD += $(BOOST_LIBS) $(BDB_LIBS) $(CRYPTO_LIBS) $(MINIUPNPC_LIBS)
-#
-
 # aokchainconsensus library #
 if BUILD_AOKCHAIN_LIBS
 include_HEADERS = script/aokchainconsensus.h
-libaokchainconsensus_la_SOURCES = $(crypto_libaokchain_crypto_base_a_SOURCES) $(libaokchain_consensus_a_SOURCES)
+libaokchainconsensus_la_SOURCES = $(crypto_libaokchain_crypto_a_SOURCES) $(libaokchain_consensus_a_SOURCES)
 
 if GLIBC_BACK_COMPAT
   libaokchainconsensus_la_SOURCES += compat/glibc_compat.cpp
@@ -646,20 +531,18 @@ clean-local:
 check-symbols: $(bin_PROGRAMS)
 if GLIBC_BACK_COMPAT
 	@echo "Checking glibc back compat..."
-	$(AM_V_at) READELF=$(READELF) CPPFILT=$(CPPFILT) $(top_srcdir)/contrib/devtools/symbol-check.py $(bin_PROGRAMS)
+	$(AM_V_at) READELF=$(READELF) CPPFILT=$(CPPFILT) $(top_srcdir)/contrib/devtools/symbol-check.py < $(bin_PROGRAMS)
 endif
 
 check-security: $(bin_PROGRAMS)
 if HARDEN
 	@echo "Checking binary security..."
-	$(AM_V_at) READELF=$(READELF) OBJDUMP=$(OBJDUMP) $(top_srcdir)/contrib/devtools/security-check.py $(bin_PROGRAMS)
+	$(AM_V_at) READELF=$(READELF) OBJDUMP=$(OBJDUMP) $(top_srcdir)/contrib/devtools/security-check.py < $(bin_PROGRAMS)
 endif
 
-if ENABLE_BIP70
 %.pb.cc %.pb.h: %.proto
 	@test -f $(PROTOC)
 	$(AM_V_GEN) $(PROTOC) --cpp_out=$(@D) --proto_path=$(<D) $<
-endif
 
 if EMBEDDED_LEVELDB
 include Makefile.leveldb.include

@@ -1,16 +1,67 @@
 // Copyright (c) 2009-2010 Satoshi Nakamoto
-// Copyright (c) 2009-2018 The Bitcoin Core developers
+// Copyright (c) 2009-2016 The Bitcoin Core developers
 // Copyright (c) 2014 The BlackCoin developers
+// Copyright (c) 2017-2019 The Raven Core developers
+// Copyright (c) 2020 The AokChain Core developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
-#include <pow.h>
+#include "pow.h"
 
-#include <arith_uint256.h>
-#include <chain.h>
-#include <primitives/block.h>
-#include <uint256.h>
+#include "arith_uint256.h"
+#include "chain.h"
+#include "primitives/block.h"
+#include "uint256.h"
+#include "util.h"
+#include "validation.h"
+#include "chainparams.h"
+#include "tinyformat.h"
 
+unsigned int GetNextWorkRequired(const CBlockIndex* pindexLast, const CBlockHeader *pblock, const Consensus::Params& params)
+{
+    unsigned int nTargetLimit = UintToArith256(params.powLimit).GetCompact();
+
+    // Genesis block
+    if (pindexLast == NULL) {
+        return nTargetLimit;
+    }
+
+    const CBlockIndex* pindexPrev = pindexLast;
+    if (pindexPrev->pprev == NULL) {
+        return nTargetLimit; // first block
+    }
+
+    const CBlockIndex* pindexPrevPrev = pindexPrev->pprev;
+    if (pindexPrevPrev->pprev == NULL) {
+        return nTargetLimit; // second block
+    }
+
+    return CalculateNextTargetRequired(pindexPrev, pindexPrevPrev->GetBlockTime(), params);
+}
+
+unsigned int CalculateNextWorkRequired(const CBlockIndex* pindexLast, int64_t nFirstBlockTime, const Consensus::Params& params)
+{
+    // Limit adjustment step
+    int64_t nActualTimespan = pindexLast->GetBlockTime() - nFirstBlockTime;
+    if (nActualTimespan < params.nTargetTimespan/4)
+        nActualTimespan = params.nTargetTimespan/4;
+    if (nActualTimespan > params.nTargetTimespan*4)
+        nActualTimespan = params.nTargetTimespan*4;
+
+    // Retarget
+    const arith_uint256 bnPowLimit = UintToArith256(params.powLimit);
+    arith_uint256 bnNew;
+    bnNew.SetCompact(pindexLast->nBits);
+    bnNew *= nActualTimespan;
+    bnNew /= params.nTargetTimespan;
+
+    if (bnNew > bnPowLimit)
+        bnNew = bnPowLimit;
+
+    return bnNew.GetCompact();
+}
+
+/* Proof-of-Stake */
 static arith_uint256 GetTargetLimit(int64_t nTime, bool fProofOfStake, const Consensus::Params& params)
 {
     uint256 nLimit;
@@ -73,6 +124,7 @@ unsigned int CalculateNextTargetRequired(const CBlockIndex* pindexLast, int64_t 
 
     return bnNew.GetCompact();
 }
+/* Proof-of-Stake */
 
 bool CheckProofOfWork(uint256 hash, unsigned int nBits, const Consensus::Params& params)
 {

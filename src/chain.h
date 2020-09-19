@@ -1,17 +1,19 @@
 // Copyright (c) 2009-2010 Satoshi Nakamoto
-// Copyright (c) 2009-2018 The Bitcoin Core developers
+// Copyright (c) 2009-2016 The Bitcoin Core developers
 // Copyright (c) 2014 The BlackCoin developers
+// Copyright (c) 2017-2019 The Raven Core developers
+// Copyright (c) 2020 The AokChain Core developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 #ifndef AOKCHAIN_CHAIN_H
 #define AOKCHAIN_CHAIN_H
 
-#include <arith_uint256.h>
-#include <consensus/params.h>
-#include <primitives/block.h>
-#include <tinyformat.h>
-#include <uint256.h>
+#include "arith_uint256.h"
+#include "primitives/block.h"
+#include "pow.h"
+#include "tinyformat.h"
+#include "uint256.h"
 
 #include <vector>
 
@@ -19,7 +21,7 @@
  * Maximum amount of time that a block timestamp is allowed to exceed the
  * current network-adjusted time before the block will be accepted.
  */
-static constexpr int64_t MAX_FUTURE_BLOCK_TIME = 3 * 60; // 3 minutes
+static const int64_t MAX_FUTURE_BLOCK_TIME = 2 * 60 * 60;
 
 /**
  * Timestamp window used as a grace period by code that compares external
@@ -27,15 +29,7 @@ static constexpr int64_t MAX_FUTURE_BLOCK_TIME = 3 * 60; // 3 minutes
  * to block timestamps. This should be set at least as high as
  * MAX_FUTURE_BLOCK_TIME.
  */
-static constexpr int64_t TIMESTAMP_WINDOW = MAX_FUTURE_BLOCK_TIME;
-
-/**
- * Maximum gap between node time and block time used
- * for the "Catching up..." mode in GUI.
- *
- * Ref: https://github.com/aokchain/aokchain/pull/1026
- */
-static constexpr int64_t MAX_BLOCK_TIME_GAP = 90 * 60;
+static const int64_t TIMESTAMP_WINDOW = MAX_FUTURE_BLOCK_TIME;
 
 class CBlockFileInfo
 {
@@ -100,7 +94,7 @@ struct CDiskBlockPos
 
     template <typename Stream, typename Operation>
     inline void SerializationOp(Stream& s, Operation ser_action) {
-        READWRITE(VARINT(nFile, VarIntMode::NONNEGATIVE_SIGNED));
+        READWRITE(VARINT(nFile));
         READWRITE(VARINT(nPos));
     }
 
@@ -126,7 +120,7 @@ struct CDiskBlockPos
 
     std::string ToString() const
     {
-        return strprintf("CDiskBlockPos(nFile=%i, nPos=%i)", nFile, nPos);
+        return strprintf("CBlockDiskPos(nFile=%i, nPos=%i)", nFile, nPos);
     }
 
 };
@@ -311,15 +305,6 @@ public:
         return *phashBlock;
     }
 
-    /**
-     * Check whether this block's and all previous blocks' transactions have been
-     * downloaded (and stored to disk) at some point.
-     *
-     * Does not imply the transactions are consensus-valid (ConnectTip might fail)
-     * Does not imply the transactions are still stored on disk. (IsBlockPruned might return true)
-     */
-    bool HaveTxsDownloaded() const { return nChainTx != 0; }
-
     int64_t GetBlockTime() const
     {
         return (int64_t)nTime;
@@ -330,7 +315,7 @@ public:
         return (int64_t)nTimeMax;
     }
 
-    static constexpr int nMedianTimeSpan = 11;
+    enum { nMedianTimeSpan=11 };
 
     int64_t GetMedianTimePast() const
     {
@@ -353,17 +338,17 @@ public:
 
     bool IsProofOfWork() const
     {
-        return !IsProofOfStake();
+          return !IsProofOfStake();
     }
 
     bool IsProofOfStake() const
     {
-        return (nStatus & BLOCK_PROOF_OF_STAKE);
+         return (nStatus & BLOCK_PROOF_OF_STAKE);
     }
 
     void SetProofOfStake()
     {
-        nStatus |= BLOCK_PROOF_OF_STAKE;
+         nStatus |= BLOCK_PROOF_OF_STAKE;
     }
 
     std::string ToString() const
@@ -435,15 +420,15 @@ public:
     inline void SerializationOp(Stream& s, Operation ser_action) {
         int _nVersion = s.GetVersion();
         if (!(s.GetType() & SER_GETHASH))
-            READWRITE(VARINT(_nVersion, VarIntMode::NONNEGATIVE_SIGNED));
+            READWRITE(VARINT(_nVersion));
 
-        READWRITE(VARINT(nHeight, VarIntMode::NONNEGATIVE_SIGNED));
+        READWRITE(VARINT(nHeight));
         READWRITE(VARINT(nStatus));
         READWRITE(nStakeModifier);
         READWRITE(nHashBlock);
         READWRITE(VARINT(nTx));
         if (nStatus & (BLOCK_HAVE_DATA | BLOCK_HAVE_UNDO))
-            READWRITE(VARINT(nFile, VarIntMode::NONNEGATIVE_SIGNED));
+            READWRITE(VARINT(nFile));
         if (nStatus & BLOCK_HAVE_DATA)
             READWRITE(VARINT(nDataPos));
         if (nStatus & BLOCK_HAVE_UNDO)

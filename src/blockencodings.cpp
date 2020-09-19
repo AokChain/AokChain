@@ -1,18 +1,19 @@
-// Copyright (c) 2016-2018 The Bitcoin Core developers
+// Copyright (c) 2016 The Bitcoin Core developers
+// Copyright (c) 2017-2019 The Raven Core developers
+// Copyright (c) 2020 The AokChain Core developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
-#include <blockencodings.h>
-#include <consensus/consensus.h>
-#include <consensus/validation.h>
-#include <chainparams.h>
-#include <crypto/sha256.h>
-#include <crypto/siphash.h>
-#include <random.h>
-#include <streams.h>
-#include <txmempool.h>
-#include <validation.h>
-#include <util/system.h>
+#include "blockencodings.h"
+#include "consensus/consensus.h"
+#include "consensus/validation.h"
+#include "chainparams.h"
+#include "hash.h"
+#include "random.h"
+#include "streams.h"
+#include "txmempool.h"
+#include "validation.h"
+#include "util.h"
 
 #include <unordered_map>
 
@@ -49,7 +50,7 @@ uint64_t CBlockHeaderAndShortTxIDs::GetShortID(const uint256& txhash) const {
 ReadStatus PartiallyDownloadedBlock::InitData(const CBlockHeaderAndShortTxIDs& cmpctblock, const std::vector<std::pair<uint256, CTransactionRef>>& extra_txn) {
     if (cmpctblock.header.IsNull() || (cmpctblock.shorttxids.empty() && cmpctblock.prefilledtxn.empty()))
         return READ_STATUS_INVALID;
-    if (cmpctblock.shorttxids.size() + cmpctblock.prefilledtxn.size() > MAX_BLOCK_WEIGHT / MIN_SERIALIZABLE_TRANSACTION_WEIGHT)
+    if (cmpctblock.shorttxids.size() + cmpctblock.prefilledtxn.size() > GetMaxBlockWeight() / MIN_SERIALIZABLE_TRANSACTION_WEIGHT)
         return READ_STATUS_INVALID;
 
     assert(header.IsNull() && txn_available.empty());
@@ -164,7 +165,7 @@ ReadStatus PartiallyDownloadedBlock::InitData(const CBlockHeaderAndShortTxIDs& c
             break;
     }
 
-    LogPrint(BCLog::CMPCTBLOCK, "Initialized PartiallyDownloadedBlock for block %s using a cmpctblock of size %lu\n", cmpctblock.header.GetHash().ToString(), GetSerializeSize(cmpctblock, PROTOCOL_VERSION));
+    LogPrint(BCLog::CMPCTBLOCK, "Initialized PartiallyDownloadedBlock for block %s using a cmpctblock of size %lu\n", cmpctblock.header.GetBlockHash().ToString(), GetSerializeSize(cmpctblock, SER_NETWORK, PROTOCOL_VERSION));
 
     return READ_STATUS_OK;
 }
@@ -177,7 +178,7 @@ bool PartiallyDownloadedBlock::IsTxAvailable(size_t index) const {
 
 ReadStatus PartiallyDownloadedBlock::FillBlock(CBlock& block, const std::vector<CTransactionRef>& vtx_missing) {
     assert(!header.IsNull());
-    uint256 hash = header.GetHash();
+    uint256 hash = header.GetBlockHash();
     block = header;
     block.vchBlockSig = vchBlockSig;
     block.vtx.resize(txn_available.size());
@@ -200,7 +201,7 @@ ReadStatus PartiallyDownloadedBlock::FillBlock(CBlock& block, const std::vector<
         return READ_STATUS_INVALID;
 
     CValidationState state;
-    if (!CheckBlock(block, state, block.GetHash(), Params().GetConsensus())) {
+    if (!CheckBlock(block, state, block.GetBlockHash(), Params().GetConsensus())) {
         // TODO: We really want to just check merkle tree manually here,
         // but that is expensive, and CheckBlock caches a block's
         // "checked-status" (in the CBlock?). CBlock should be able to
@@ -218,4 +219,15 @@ ReadStatus PartiallyDownloadedBlock::FillBlock(CBlock& block, const std::vector<
     }
 
     return READ_STATUS_OK;
+}
+
+SerializedTokenData::SerializedTokenData(const CDatabasedTokenData &tokenData)
+{
+    name = tokenData.token.strName;
+    amount = tokenData.token.nAmount;
+    units = tokenData.token.units;
+    reissuable = tokenData.token.nReissuable;
+    hasIPFS = tokenData.token.nHasIPFS;
+    ipfs = tokenData.token.strIPFSHash;
+    nHeight = tokenData.nHeight;
 }

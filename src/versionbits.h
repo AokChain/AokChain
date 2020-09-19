@@ -1,34 +1,45 @@
-// Copyright (c) 2016-2018 The Bitcoin Core developers
+// Copyright (c) 2016 The Bitcoin Core developers
+// Copyright (c) 2017-2019 The Raven Core developers
+// Copyright (c) 2020 The AokChain Core developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
-#ifndef AOKCHAIN_VERSIONBITS_H
-#define AOKCHAIN_VERSIONBITS_H
+#ifndef AOKCHAIN_CONSENSUS_VERSIONBITS
+#define AOKCHAIN_CONSENSUS_VERSIONBITS
 
-#include <chain.h>
+#include "chain.h"
 #include <map>
 
 /** What block version to use for new blocks (pre versionbits) */
 static const int32_t VERSIONBITS_LAST_OLD_BLOCK_VERSION = 7;
 /** What bits to set in version for versionbits blocks */
 static const int32_t VERSIONBITS_TOP_BITS = 0x20000000UL;
+/** What bits to set in the version for versionbits blocks after tokens is active */
+static const int32_t VERSIONBITS_TOP_BITS_TOKENS = 0x30000000UL;
 /** What bitmask determines whether versionbits is in use */
 static const int32_t VERSIONBITS_TOP_MASK = 0xE0000000UL;
 /** Total bits available for versionbits */
 static const int32_t VERSIONBITS_NUM_BITS = 29;
 
-enum class ThresholdState {
-    DEFINED,
-    STARTED,
-    LOCKED_IN,
-    ACTIVE,
-    FAILED,
+enum ThresholdState {
+    THRESHOLD_DEFINED,
+    THRESHOLD_STARTED,
+    THRESHOLD_LOCKED_IN,
+    THRESHOLD_ACTIVE,
+    THRESHOLD_FAILED,
 };
 
 // A map that gives the state for blocks whose height is a multiple of Period().
 // The map is indexed by the block's parent, however, so all keys in the map
 // will either be nullptr or a block with (height + 1) % Period() == 0.
 typedef std::map<const CBlockIndex*, ThresholdState> ThresholdConditionCache;
+
+struct VBDeploymentInfo {
+    /** Deployment name */
+    const char *name;
+    /** Whether GBT clients can safely ignore this rule in simplified usage */
+    bool gbt_force;
+};
 
 struct BIP9Stats {
     int period;
@@ -37,6 +48,8 @@ struct BIP9Stats {
     int count;
     bool possible;
 };
+
+extern const struct VBDeploymentInfo VersionBitsDeploymentInfo[];
 
 /**
  * Abstract class that implements BIP9-style threshold logic, and caches results.
@@ -68,4 +81,4 @@ BIP9Stats VersionBitsStatistics(const CBlockIndex* pindexPrev, const Consensus::
 int VersionBitsStateSinceHeight(const CBlockIndex* pindexPrev, const Consensus::Params& params, Consensus::DeploymentPos pos, VersionBitsCache& cache);
 uint32_t VersionBitsMask(const Consensus::Params& params, Consensus::DeploymentPos pos);
 
-#endif // AOKCHAIN_VERSIONBITS_H
+#endif

@@ -1,9 +1,11 @@
-// Copyright (c) 2009-2018 The Bitcoin Core developers
+// Copyright (c) 2009-2014 The Bitcoin Core developers
+// Copyright (c) 2017-2019 The Raven Core developers
+// Copyright (c) 2020 The AokChain Core developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 #if defined(HAVE_CONFIG_H)
-#include <config/aokchain-config.h>
+#include "config/aokchain-config.h"
 #endif
 
 #include <cstddef>
@@ -67,8 +69,6 @@ __asm(".symver log2f_old,log2f@GLIBC_2.2.5");
 __asm(".symver log2f_old,log2f@GLIBC_2.4");
 #elif defined(__aarch64__)
 __asm(".symver log2f_old,log2f@GLIBC_2.17");
-#elif defined(__riscv)
-__asm(".symver log2f_old,log2f@GLIBC_2.27");
 #endif
 extern "C" float __wrap_log2f(float x)
 {

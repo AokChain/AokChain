@@ -1,5 +1,7 @@
 // Copyright (c) 2009-2010 Satoshi Nakamoto
-// Copyright (c) 2009-2018 The Bitcoin Core developers
+// Copyright (c) 2009-2016 The Bitcoin Core developers
+// Copyright (c) 2017-2019 The Raven Core developers
+// Copyright (c) 2020 The AokChain Core developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -7,10 +9,25 @@
 #define AOKCHAIN_COMPAT_H
 
 #if defined(HAVE_CONFIG_H)
-#include <config/aokchain-config.h>
+#include "config/aokchain-config.h"
+#endif
+
+#ifndef WIN32
+// PRIO_MAX is not defined on Solaris
+#ifndef PRIO_MAX
+#define PRIO_MAX 20
+#endif
+#define THREAD_PRIORITY_LOWEST          PRIO_MAX
+#define THREAD_PRIORITY_BELOW_NORMAL    2
+#define THREAD_PRIORITY_NORMAL          0
+#define THREAD_PRIORITY_ABOVE_NORMAL    (-2)
 #endif
 
 #ifdef WIN32
+#ifdef _WIN32_WINNT
+#undef _WIN32_WINNT
+#endif
+#define _WIN32_WINNT 0x0501
 #ifndef WIN32_LEAN_AND_MEAN
 #define WIN32_LEAN_AND_MEAN 1
 #endif
@@ -27,9 +44,8 @@
 #include <mswsock.h>
 #include <windows.h>
 #include <ws2tcpip.h>
-#include <stdint.h>
 #else
-#include <fcntl.h>
+#include <sys/fcntl.h>
 #include <sys/mman.h>
 #include <sys/select.h>
 #include <sys/socket.h>
@@ -46,7 +62,7 @@
 
 #ifndef WIN32
 typedef unsigned int SOCKET;
-#include <errno.h>
+#include "errno.h"
 #define WSAGetLastError()   errno
 #define WSAEINVAL           EINVAL
 #define WSAEALREADY         EALREADY
@@ -60,14 +76,19 @@ typedef unsigned int SOCKET;
 #define SOCKET_ERROR        -1
 #endif
 
-#ifndef WIN32
-// PRIO_MAX is not defined on Solaris
 #ifndef PRIO_MAX
 #define PRIO_MAX 20
 #endif
+#ifndef THREAD_PRIORITY_LOWEST
 #define THREAD_PRIORITY_LOWEST          PRIO_MAX
+#endif
+#ifndef THREAD_PRIORITY_BELOW_NORMAL
 #define THREAD_PRIORITY_BELOW_NORMAL    2
+#endif
+#ifndef THREAD_PRIORITY_NORMAL
 #define THREAD_PRIORITY_NORMAL          0
+#endif
+#ifndef THREAD_PRIORITY_ABOVE_NORMAL
 #define THREAD_PRIORITY_ABOVE_NORMAL    (-2)
 #endif
 
@@ -79,35 +100,13 @@ typedef unsigned int SOCKET;
 #else
 #define MAX_PATH            1024
 #endif
-#ifdef _MSC_VER
-#if !defined(ssize_t)
-#ifdef _WIN64
-typedef int64_t ssize_t;
-#else
-typedef int32_t ssize_t;
-#endif
-#endif
-#endif
 
 #if HAVE_DECL_STRNLEN == 0
 size_t strnlen( const char *start, size_t max_len);
 #endif // HAVE_DECL_STRNLEN
 
-#ifndef WIN32
-typedef void* sockopt_arg_type;
-#else
-typedef char* sockopt_arg_type;
-#endif
-
-// Note these both should work with the current usage of poll, but best to be safe
-// WIN32 poll is broken https://daniel.haxx.se/blog/2012/10/10/wsapoll-is-broken/
-// __APPLE__ poll is broke https://github.com/aokchain/aokchain/pull/14336#issuecomment-437384408
-#if defined(__linux__)
-#define USE_POLL
-#endif
-
 bool static inline IsSelectableSocket(const SOCKET& s) {
-#if defined(USE_POLL) || defined(WIN32)
+#ifdef WIN32
     return true;
 #else
     return (s < FD_SETSIZE);

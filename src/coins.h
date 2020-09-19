@@ -1,24 +1,28 @@
 // Copyright (c) 2009-2010 Satoshi Nakamoto
-// Copyright (c) 2009-2018 The Bitcoin Core developers
+// Copyright (c) 2009-2016 The Bitcoin Core developers
 // Copyright (c) 2014 The BlackCoin developers
+// Copyright (c) 2017-2019 The Raven Core developers
+// Copyright (c) 2020 The AokChain Core developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 #ifndef AOKCHAIN_COINS_H
 #define AOKCHAIN_COINS_H
 
-#include <primitives/transaction.h>
-#include <compressor.h>
-#include <core_memusage.h>
-#include <crypto/siphash.h>
-#include <memusage.h>
-#include <serialize.h>
-#include <uint256.h>
+#include "primitives/transaction.h"
+#include "compressor.h"
+#include "core_memusage.h"
+#include "hash.h"
+#include "memusage.h"
+#include "serialize.h"
+#include "uint256.h"
 
 #include <assert.h>
 #include <stdint.h>
 
 #include <unordered_map>
+#include <tokens/tokens.h>
+#include <tokens/tokendb.h>
 
 /**
  * A UTXO entry.
@@ -82,12 +86,16 @@ public:
         nHeight = code >> 2;
         fCoinBase = code & 1;
         fCoinStake = (code >> 1) & 1;
-        ::Unserialize(s, CTxOutCompressor(out));
+        ::Unserialize(s, REF(CTxOutCompressor(out)));
         ::Unserialize(s, nTime);
     }
 
     bool IsSpent() const {
         return out.IsNull();
+    }
+
+    bool IsToken() const {
+        return out.scriptPubKey.IsTokenScript();
     }
 
     size_t DynamicMemoryUsage() const {
@@ -217,7 +225,7 @@ class CCoinsViewCache : public CCoinsViewBacked
 protected:
     /**
      * Make mutable so that we can "fill the cache" even from Get-methods
-     * declared as "const".
+     * declared as "const".  
      */
     mutable uint256 hashBlock;
     mutable CCoinsMap cacheCoins;
@@ -273,7 +281,7 @@ public:
      * If no unspent output exists for the passed outpoint, this call
      * has no effect.
      */
-    bool SpendCoin(const COutPoint &outpoint, Coin* moveto = nullptr);
+    bool SpendCoin(const COutPoint &outpoint, Coin* moveto = nullptr, CTokensCache* tokensCache = nullptr);
 
     /**
      * Push the modifications applied to this cache to its base.
@@ -294,13 +302,13 @@ public:
     //! Calculate the size of the cache (in bytes)
     size_t DynamicMemoryUsage() const;
 
-    /**
+    /** 
      * Amount of aokchains coming in to a transaction
      * Note that lightweight clients may not know anything besides the hash of previous transactions,
      * so may not be able to calculate this.
      *
-     * @param[in] tx    transaction for which we are checking input total
-     * @return  Sum of value of all inputs (scriptSigs)
+     * @param[in] tx	transaction for which we are checking input total
+     * @return	Sum of value of all inputs (scriptSigs)
      */
     CAmount GetValueIn(const CTransaction& tx) const;
 
@@ -312,17 +320,17 @@ private:
 };
 
 //! Utility function to add all of a transaction's outputs to a cache.
-//! When check is false, this assumes that overwrites are only possible for coinbase transactions.
-//! When check is true, the underlying view may be queried to determine whether an addition is
-//! an overwrite.
+// When check is false, this assumes that overwrites are only possible for coinbase transactions.
+// When check is true, the underlying view may be queried to determine whether an addition is
+// an overwrite.
 // TODO: pass in a boolean to limit these possible overwrites to known
 // (pre-BIP34) cases.
-void AddCoins(CCoinsViewCache& cache, const CTransaction& tx, int nHeight, bool check = false);
+void AddCoins(CCoinsViewCache& cache, const CTransaction& tx, int nHeight, uint256 blockHash, bool check = false, CTokensCache* tokensCache = nullptr, std::pair<std::string, CBlockTokenUndo>* undoTokenData = nullptr);
 
 //! Utility function to find any unspent output with a given txid.
-//! This function can be quite expensive because in the event of a transaction
-//! which is not found in the cache, it can cause up to MAX_OUTPUTS_PER_BLOCK
-//! lookups to database, so it should be used with care.
+// This function can be quite expensive because in the event of a transaction
+// which is not found in the cache, it can cause up to MAX_OUTPUTS_PER_BLOCK
+// lookups to database, so it should be used with care.
 const Coin& AccessByTxid(const CCoinsViewCache& cache, const uint256& txid);
 
 #endif // AOKCHAIN_COINS_H

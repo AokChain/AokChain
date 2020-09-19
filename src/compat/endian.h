@@ -1,4 +1,6 @@
-// Copyright (c) 2014-2018 The Bitcoin Core developers
+// Copyright (c) 2014-2016 The Bitcoin Core developers
+// Copyright (c) 2017-2019 The Raven Core developers
+// Copyright (c) 2020 The AokChain Core developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -6,10 +8,10 @@
 #define AOKCHAIN_COMPAT_ENDIAN_H
 
 #if defined(HAVE_CONFIG_H)
-#include <config/aokchain-config.h>
+#include "config/aokchain-config.h"
 #endif
 
-#include <compat/byteswap.h>
+#include "compat/byteswap.h"
 
 #include <stdint.h>
 
@@ -18,51 +20,6 @@
 #elif defined(HAVE_SYS_ENDIAN_H)
 #include <sys/endian.h>
 #endif
-
-#ifndef HAVE_CONFIG_H
-// While not technically a supported configuration, defaulting to defining these
-// DECLs when we were compiled without autotools makes it easier for other build
-// systems to build things like libaokchainconsensus for strange targets.
-#ifdef htobe16
-#define HAVE_DECL_HTOBE16 1
-#endif
-#ifdef htole16
-#define HAVE_DECL_HTOLE16 1
-#endif
-#ifdef be16toh
-#define HAVE_DECL_BE16TOH 1
-#endif
-#ifdef le16toh
-#define HAVE_DECL_LE16TOH 1
-#endif
-
-#ifdef htobe32
-#define HAVE_DECL_HTOBE32 1
-#endif
-#ifdef htole32
-#define HAVE_DECL_HTOLE32 1
-#endif
-#ifdef be32toh
-#define HAVE_DECL_BE32TOH 1
-#endif
-#ifdef le32toh
-#define HAVE_DECL_LE32TOH 1
-#endif
-
-#ifdef htobe64
-#define HAVE_DECL_HTOBE64 1
-#endif
-#ifdef htole64
-#define HAVE_DECL_HTOLE64 1
-#endif
-#ifdef be64toh
-#define HAVE_DECL_BE64TOH 1
-#endif
-#ifdef le64toh
-#define HAVE_DECL_LE64TOH 1
-#endif
-
-#endif // HAVE_CONFIG_H
 
 #if defined(WORDS_BIGENDIAN)
 

@@ -1,4 +1,6 @@
-// Copyright (c) 2014-2018 The Bitcoin Core developers
+// Copyright (c) 2014-2016 The Bitcoin Core developers
+// Copyright (c) 2017-2019 The Raven Core developers
+// Copyright (c) 2020 The AokChain Core developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -10,11 +12,11 @@
 #include <stdint.h>
 #include <vector>
 
-static const int64_t DEFAULT_MAX_TIME_ADJUSTMENT = 90;
+static const int64_t DEFAULT_MAX_TIME_ADJUSTMENT = 70 * 60;
 
 class CNetAddr;
 
-/**
+/** 
  * Median filter over a stream of values.
  * Returns the median of the last N numbers
  */

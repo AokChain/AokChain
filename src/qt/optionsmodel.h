@@ -1,24 +1,19 @@
-// Copyright (c) 2011-2018 The Bitcoin Core developers
+// Copyright (c) 2011-2016 The Bitcoin Core developers
+// Copyright (c) 2017-2019 The Raven Core developers
+// Copyright (c) 2020 The AokChain Core developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 #ifndef AOKCHAIN_QT_OPTIONSMODEL_H
 #define AOKCHAIN_QT_OPTIONSMODEL_H
 
-#include <amount.h>
+#include "amount.h"
 
 #include <QAbstractListModel>
-
-namespace interfaces {
-class Node;
-}
 
 QT_BEGIN_NAMESPACE
 class QNetworkProxy;
 QT_END_NAMESPACE
-
-extern const char *DEFAULT_GUI_PROXY_HOST;
-static constexpr unsigned short DEFAULT_GUI_PROXY_PORT = 9050;
 
 /** Interface from Qt to configuration data structure for AokChain client.
    To Qt, the options are presented as a list with the different options
@@ -31,7 +26,7 @@ class OptionsModel : public QAbstractListModel
     Q_OBJECT
 
 public:
-    explicit OptionsModel(interfaces::Node& node, QObject *parent = nullptr, bool resetSettings = false);
+    explicit OptionsModel(QObject *parent = 0, bool resetSettings = false);
 
     enum OptionID {
         StartAtStartup,         // bool
@@ -50,11 +45,11 @@ public:
         Language,               // QString
         CoinControlFeatures,    // bool
         ThreadsScriptVerif,     // int
-        Prune,                  // bool
-        PruneSize,              // int
         DatabaseCache,          // int
         SpendZeroConfChange,    // bool
         Listen,                 // bool
+        CustomFeeFeatures,      // bool
+        DarkModeEnabled,        // bool
         OptionIDRowCount,
     };
 
@@ -75,16 +70,15 @@ public:
     QString getThirdPartyTxUrls() const { return strThirdPartyTxUrls; }
     bool getProxySettings(QNetworkProxy& proxy) const;
     bool getCoinControlFeatures() const { return fCoinControlFeatures; }
+    bool getCustomFeeFeatures() const { return fCustomFeeFeatures; }
+    bool getDarkModeEnabled() const { /* return fDarkModeEnabled; */ return false; }
     const QString& getOverriddenByCommandLine() { return strOverriddenByCommandLine; }
 
     /* Restart flag helper */
     void setRestartRequired(bool fRequired);
     bool isRestartRequired() const;
 
-    interfaces::Node& node() const { return m_node; }
-
 private:
-    interfaces::Node& m_node;
     /* Qt-only settings */
     bool fHideTrayIcon;
     bool fMinimizeToTray;
@@ -93,6 +87,10 @@ private:
     int nDisplayUnit;
     QString strThirdPartyTxUrls;
     bool fCoinControlFeatures;
+    /** TOKENS START*/
+    bool fCustomFeeFeatures;
+    bool fDarkModeEnabled;
+    /** TOKENS END*/
     /* settings that were overridden by command-line */
     QString strOverriddenByCommandLine;
 
@@ -104,6 +102,7 @@ private:
 Q_SIGNALS:
     void displayUnitChanged(int unit);
     void coinControlFeaturesChanged(bool);
+    void customFeeFeaturesChanged(bool);
     void hideTrayIconChanged(bool);
 };
 

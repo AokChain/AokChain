@@ -1,11 +1,12 @@
-// Copyright (c) 2015-2018 The Bitcoin Core developers
+// Copyright (c) 2015 The Bitcoin Core developers
+// Copyright (c) 2017-2019 The Raven Core developers
+// Copyright (c) 2020 The AokChain Core developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
-#include <zmq/zmqabstractnotifier.h>
-#include <util/system.h>
+#include "zmqabstractnotifier.h"
+#include "util.h"
 
-const int CZMQAbstractNotifier::DEFAULT_ZMQ_SNDHWM;
 
 CZMQAbstractNotifier::~CZMQAbstractNotifier()
 {

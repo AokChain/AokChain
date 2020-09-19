@@ -1,18 +1,20 @@
-// Copyright (c) 2015-2018 The Bitcoin Core developers
+// Copyright (c) 2015-2016 The Bitcoin Core developers
+// Copyright (c) 2017-2019 The Raven Core developers
+// Copyright (c) 2020 The AokChain Core developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 #ifndef AOKCHAIN_ZMQ_ZMQPUBLISHNOTIFIER_H
 #define AOKCHAIN_ZMQ_ZMQPUBLISHNOTIFIER_H
 
-#include <zmq/zmqabstractnotifier.h>
+#include "zmqabstractnotifier.h"
 
 class CBlockIndex;
 
 class CZMQAbstractPublishNotifier : public CZMQAbstractNotifier
 {
 private:
-    uint32_t nSequence {0U}; //!< upcounting per message sequence number
+    uint32_t nSequence; //!< upcounting per message sequence number
 
 public:
 

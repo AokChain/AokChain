@@ -1,18 +1,18 @@
 // Copyright (c) 2009-2010 Satoshi Nakamoto
-// Copyright (c) 2009-2018 The Bitcoin Core developers
+// Copyright (c) 2009-2016 The Bitcoin Core developers
+// Copyright (c) 2017-2019 The Raven Core developers
+// Copyright (c) 2020 The AokChain Core developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
-#include <protocol.h>
+#include "protocol.h"
 
-#include <util/system.h>
-#include <util/strencodings.h>
+#include "util.h"
+#include "utilstrencodings.h"
 
 #ifndef WIN32
 # include <arpa/inet.h>
 #endif
-
-static std::atomic<bool> g_initial_block_download_completed(false);
 
 namespace NetMsgType {
 const char *VERSION="version";
@@ -41,6 +41,9 @@ const char *SENDCMPCT="sendcmpct";
 const char *CMPCTBLOCK="cmpctblock";
 const char *GETBLOCKTXN="getblocktxn";
 const char *BLOCKTXN="blocktxn";
+const char *GETTOKENDATA="gettokendata";
+const char *TOKENDATA="tokendata";
+const char *TOKENNOTFOUND ="asstnotfound";
 } // namespace NetMsgType
 
 /** All known message types. Keep this in the same order as the list of
@@ -73,6 +76,9 @@ const static std::string allNetMessageTypes[] = {
     NetMsgType::CMPCTBLOCK,
     NetMsgType::GETBLOCKTXN,
     NetMsgType::BLOCKTXN,
+    NetMsgType::GETTOKENDATA,
+    NetMsgType::TOKENDATA,
+    NetMsgType::TOKENNOTFOUND
 };
 const static std::vector<std::string> allNetMessageTypesVec(allNetMessageTypes, allNetMessageTypes+ARRAYLEN(allNetMessageTypes));
 
@@ -128,17 +134,6 @@ bool CMessageHeader::IsValid(const MessageStartChars& pchMessageStartIn) const
     return true;
 }
 
-
-ServiceFlags GetDesirableServiceFlags(ServiceFlags services) {
-    if ((services & NODE_NETWORK_LIMITED) && g_initial_block_download_completed) {
-        return ServiceFlags(NODE_NETWORK_LIMITED | NODE_WITNESS);
-    }
-    return ServiceFlags(NODE_NETWORK | NODE_WITNESS);
-}
-
-void SetServiceFlagsIBDCache(bool state) {
-    g_initial_block_download_completed = state;
-}
 
 
 CAddress::CAddress() : CService()
@@ -201,3 +196,21 @@ const std::vector<std::string> &getAllNetMessageTypes()
 {
     return allNetMessageTypesVec;
 }
+
+CInvToken::CInvToken()
+{
+    name = "";
+}
+
+CInvToken::CInvToken(std::string strName) : name(strName){}
+
+bool operator<(const CInvToken& a, const CInvToken& b)
+{
+    return a.name < b.name;
+}
+
+std::string CInvToken::ToString() const
+{
+    return strprintf("%s %s", "CInvToken for token: ", name);
+}
+

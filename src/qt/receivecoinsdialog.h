@@ -1,11 +1,13 @@
-// Copyright (c) 2011-2018 The Bitcoin Core developers
+// Copyright (c) 2011-2016 The Bitcoin Core developers
+// Copyright (c) 2017-2019 The Raven Core developers
+// Copyright (c) 2020 The AokChain Core developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 #ifndef AOKCHAIN_QT_RECEIVECOINSDIALOG_H
 #define AOKCHAIN_QT_RECEIVECOINSDIALOG_H
 
-#include <qt/guiutil.h>
+#include "guiutil.h"
 
 #include <QDialog>
 #include <QHeaderView>
@@ -39,10 +41,12 @@ public:
         MINIMUM_COLUMN_WIDTH = 130
     };
 
-    explicit ReceiveCoinsDialog(const PlatformStyle *platformStyle, QWidget *parent = nullptr);
+    explicit ReceiveCoinsDialog(const PlatformStyle *platformStyle, QWidget *parent = 0);
     ~ReceiveCoinsDialog();
 
     void setModel(WalletModel *model);
+    void setupRequestFrame(const PlatformStyle *platformStyle);
+    void setupHistoryFrame(const PlatformStyle *platformStyle);
 
 public Q_SLOTS:
     void clear();

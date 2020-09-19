@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
-# Copyright (c) 2015-2018 The AokChain Core developers
+# Copyright (c) 2015-2016 The Bitcoin Core developers
+# Copyright (c) 2017-2018 The AokChain Core developers
 # Distributed under the MIT software license, see the accompanying
 # file COPYING or http://www.opensource.org/licenses/mit-license.php.
 """Test aokchaind with different proxy configuration.
@@ -44,7 +45,6 @@ RANGE_BEGIN = PORT_MIN + 2 * PORT_RANGE  # Start after p2p and rpc ports
 class ProxyTest(AokChainTestFramework):
     def set_test_params(self):
         self.num_nodes = 4
-        self.setup_clean_chain = True
 
     def setup_nodes(self):
         self.have_ipv6 = test_ipv6_local()
@@ -80,9 +80,9 @@ class ProxyTest(AokChainTestFramework):
         # Note: proxies are not used to connect to local nodes
         # this is because the proxy to use is based on CService.GetNetwork(), which return NET_UNROUTABLE for localhost
         args = [
-            ['-listen', '-proxy=%s:%i' % (self.conf1.addr),'-proxyrandomize=1'],
-            ['-listen', '-proxy=%s:%i' % (self.conf1.addr),'-onion=%s:%i' % (self.conf2.addr),'-proxyrandomize=0'],
-            ['-listen', '-proxy=%s:%i' % (self.conf2.addr),'-proxyrandomize=1'],
+            ['-listen', '-proxy=%s:%i' % (self.conf1.addr),'-proxyrandomize=1'], 
+            ['-listen', '-proxy=%s:%i' % (self.conf1.addr),'-onion=%s:%i' % (self.conf2.addr),'-proxyrandomize=0'], 
+            ['-listen', '-proxy=%s:%i' % (self.conf2.addr),'-proxyrandomize=1'], 
             []
             ]
         if self.have_ipv6:
@@ -121,11 +121,11 @@ class ProxyTest(AokChainTestFramework):
 
         if test_onion:
             # Test: outgoing onion connection through node
-            node.addnode("aokchainostk4e4re.onion:8333", "onetry")
+            node.addnode("bitcoinostk4e4re.onion:8333", "onetry")
             cmd = proxies[2].queue.get()
             assert(isinstance(cmd, Socks5Command))
             assert_equal(cmd.atyp, AddressType.DOMAINNAME)
-            assert_equal(cmd.addr, b"aokchainostk4e4re.onion")
+            assert_equal(cmd.addr, b"bitcoinostk4e4re.onion")
             assert_equal(cmd.port, 8333)
             if not auth:
                 assert_equal(cmd.username, None)
@@ -133,12 +133,12 @@ class ProxyTest(AokChainTestFramework):
             rv.append(cmd)
 
         # Test: outgoing DNS name connection through node
-        node.addnode("node.noumenon:8333", "onetry")
+        node.addnode("node.noumenon:8767", "onetry")
         cmd = proxies[3].queue.get()
         assert(isinstance(cmd, Socks5Command))
         assert_equal(cmd.atyp, AddressType.DOMAINNAME)
         assert_equal(cmd.addr, b"node.noumenon")
-        assert_equal(cmd.port, 8333)
+        assert_equal(cmd.port, 8767)
         if not auth:
             assert_equal(cmd.username, None)
             assert_equal(cmd.password, None)
@@ -147,6 +147,7 @@ class ProxyTest(AokChainTestFramework):
         return rv
 
     def run_test(self):
+
         # basic -proxy
         self.node_test(self.nodes[0], [self.serv1, self.serv1, self.serv1, self.serv1], False)
 
@@ -183,7 +184,7 @@ class ProxyTest(AokChainTestFramework):
         assert_equal(n1['onion']['proxy'], '%s:%i' % (self.conf2.addr))
         assert_equal(n1['onion']['proxy_randomize_credentials'], False)
         assert_equal(n1['onion']['reachable'], True)
-
+        
         n2 = networks_dict(self.nodes[2].getnetworkinfo())
         for net in ['ipv4','ipv6','onion']:
             assert_equal(n2[net]['proxy'], '%s:%i' % (self.conf2.addr))
@@ -199,3 +200,4 @@ class ProxyTest(AokChainTestFramework):
 
 if __name__ == '__main__':
     ProxyTest().main()
+

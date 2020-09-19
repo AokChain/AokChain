@@ -1,10 +1,12 @@
-// Copyright (c) 2014-2018 The Bitcoin Core developers
+// Copyright (c) 2014-2016 The Bitcoin Core developers
+// Copyright (c) 2017-2019 The Raven Core developers
+// Copyright (c) 2020 The AokChain Core developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
-#include <qt/networkstyle.h>
+#include "networkstyle.h"
 
-#include <qt/guiconstants.h>
+#include "guiconstants.h"
 
 #include <QApplication>
 
@@ -17,7 +19,7 @@ static const struct {
 } network_styles[] = {
     {"main", QAPP_APP_NAME_DEFAULT, 0, 0, ""},
     {"test", QAPP_APP_NAME_TESTNET, 70, 30, QT_TRANSLATE_NOOP("SplashScreen", "[testnet]")},
-    {"regtest", QAPP_APP_NAME_REGTEST, 160, 30, "[regtest]"}
+    {"regtest", QAPP_APP_NAME_TESTNET, 160, 30, "[regtest]"}
 };
 static const unsigned network_styles_count = sizeof(network_styles)/sizeof(*network_styles);
 
@@ -68,9 +70,14 @@ NetworkStyle::NetworkStyle(const QString &_appName, const int iconColorHueShift,
         }
 
         //convert back to QPixmap
+#if QT_VERSION >= 0x040700
         pixmap.convertFromImage(img);
+#else
+        pixmap = QPixmap::fromImage(img);
+#endif
     }
-
+    
+    splashIcon          = QIcon(pixmap.scaled(QSize(310,310),Qt::KeepAspectRatio,Qt::SmoothTransformation));
     appIcon             = QIcon(pixmap);
     trayAndWindowIcon   = QIcon(pixmap.scaled(QSize(256,256)));
 }
@@ -88,5 +95,5 @@ const NetworkStyle *NetworkStyle::instantiate(const QString &networkId)
                     network_styles[x].titleAddText);
         }
     }
-    return nullptr;
+    return 0;
 }

@@ -1,101 +1,98 @@
-// Copyright (c) 2011-2018 The Bitcoin Core developers
+// Copyright (c) 2011-2016 The Bitcoin Core developers
+// Copyright (c) 2017-2019 The Raven Core developers
+// Copyright (c) 2020 The AokChain Core developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
-#include <test/test_aokchain.h>
+#include "test_aokchain.h"
+#include "chainparams.h"
+#include "consensus/consensus.h"
+#include "consensus/validation.h"
+#include "crypto/sha256.h"
+#include "fs.h"
+#include "key.h"
+#include "validation.h"
+#include "miner.h"
+#include "net_processing.h"
+#include "pubkey.h"
+#include "random.h"
+#include "txdb.h"
+#include "txmempool.h"
+#include "ui_interface.h"
+#include "streams.h"
+#include "rpc/server.h"
+#include "rpc/register.h"
+#include "script/sigcache.h"
 
-#include <banman.h>
-#include <chainparams.h>
-#include <consensus/consensus.h>
-#include <consensus/params.h>
-#include <consensus/validation.h>
-#include <crypto/sha256.h>
-#include <miner.h>
-#include <net_processing.h>
-#include <noui.h>
-#include <pow.h>
-#include <rpc/register.h>
-#include <rpc/server.h>
-#include <script/sigcache.h>
-#include <streams.h>
-#include <ui_interface.h>
-#include <validation.h>
+#include <memory>
 
-const std::function<std::string(const char*)> G_TRANSLATION_FUN = nullptr;
+uint256 insecure_rand_seed = GetRandHash();
+FastRandomContext insecure_rand_ctx(insecure_rand_seed);
 
-FastRandomContext g_insecure_rand_ctx;
 
-std::ostream& operator<<(std::ostream& os, const uint256& num)
-{
-    os << num.ToString();
-    return os;
-}
+extern void noui_connect();
 
-BasicTestingSetup::BasicTestingSetup(const std::string& chainName)
-    : m_path_root(fs::temp_directory_path() / "test_aokchain" / strprintf("%lu_%i", (unsigned long)GetTime(), (int)(InsecureRandRange(1 << 30))))
+BasicTestingSetup::BasicTestingSetup(const std::string &chainName)
 {
     SHA256AutoDetect();
+    RandomInit();
     ECC_Start();
     SetupEnvironment();
     SetupNetworking();
     InitSignatureCache();
     InitScriptExecutionCache();
+    //  If additional debug information is desired, uncomment 'cout' section in VerifyScript method in the script/interpreter.cpp file (warning - this will cause the logger window to spew messages).
+    fPrintToConsole = false;
+    fPrintToDebugLog = false; // don't want to write to debug.log file
     fCheckBlockIndex = true;
-    // CreateAndProcessBlock() does not support building SegWit blocks, so don't activate in these tests.
-    // TODO: fix the code to support SegWit blocks.
-    gArgs.ForceSetArg("-vbparams", strprintf("segwit:0:%d", (int64_t)Consensus::BIP9Deployment::NO_TIMEOUT));
     SelectParams(chainName);
     noui_connect();
 }
 
 BasicTestingSetup::~BasicTestingSetup()
 {
-    fs::remove_all(m_path_root);
     ECC_Stop();
 }
 
-fs::path BasicTestingSetup::SetDataDir(const std::string& name)
+TestingSetup::TestingSetup(const std::string &chainName) : BasicTestingSetup(chainName)
 {
-    fs::path ret = m_path_root / name;
-    fs::create_directories(ret);
-    gArgs.ForceSetArg("-datadir", ret.string());
-    return ret;
-}
+    const CChainParams &chainparams = Params();
+    // Ideally we'd move all the RPC tests to the functional testing framework
+    // instead of unit tests, but for now we need these here.
+    RegisterAllCoreRPCCommands(tableRPC);
+    ClearDatadirCache();
+    pathTemp = fs::temp_directory_path() / strprintf("test_aokchain_%lu_%i", (unsigned long) GetTime(), (int) (InsecureRandRange(100000)));
+    fs::create_directories(pathTemp);
+    gArgs.ForceSetArg("-datadir", pathTemp.string());
 
-TestingSetup::TestingSetup(const std::string& chainName) : BasicTestingSetup(chainName)
-{
-    SetDataDir("tempdir");
-    const CChainParams& chainparams = Params();
-        // Ideally we'd move all the RPC tests to the functional testing framework
-        // instead of unit tests, but for now we need these here.
+    // Note that because we don't bother running a scheduler thread here,
+    // callbacks via CValidationInterface are unreliable, but that's OK,
+    // our unit tests aren't testing multiple parts of the code at once.
+    GetMainSignals().RegisterBackgroundSignalScheduler(scheduler);
 
-        RegisterAllCoreRPCCommands(tableRPC);
-        ClearDatadirCache();
+    mempool.setSanityCheck(1.0);
+    pblocktree = new CBlockTreeDB(1 << 20, true);
+    pcoinsdbview = new CCoinsViewDB(1 << 23, true);
+    pcoinsTip = new CCoinsViewCache(pcoinsdbview);
+    if (!LoadGenesisBlock(chainparams))
+    {
+        throw std::runtime_error("LoadGenesisBlock failed.");
+    }
 
-        // We have to run a scheduler thread to prevent ActivateBestChain
-        // from blocking due to queue overrun.
-        threadGroup.create_thread(std::bind(&CScheduler::serviceQueue, &scheduler));
-        GetMainSignals().RegisterBackgroundSignalScheduler(scheduler);
-
-        mempool.setSanityCheck(1.0);
-        pblocktree.reset(new CBlockTreeDB(1 << 20, true));
-        pcoinsdbview.reset(new CCoinsViewDB(1 << 23, true));
-        pcoinsTip.reset(new CCoinsViewCache(pcoinsdbview.get()));
-        if (!LoadGenesisBlock(chainparams)) {
-            throw std::runtime_error("LoadGenesisBlock failed.");
-        }
+    ptokens = new CTokensCache();
+    {
+        CValidationState state;
+        if (!ActivateBestChain(state, chainparams))
         {
-            CValidationState state;
-            if (!ActivateBestChain(state, chainparams)) {
-                throw std::runtime_error(strprintf("ActivateBestChain failed. (%s)", FormatStateMessage(state)));
-            }
+            throw std::runtime_error("ActivateBestChain failed.");
         }
-        nScriptCheckThreads = 3;
-        for (int i=0; i < nScriptCheckThreads-1; i++)
-            threadGroup.create_thread(&ThreadScriptCheck);
-
-        g_banman = MakeUnique<BanMan>(GetDataDir() / "banlist.dat", nullptr, DEFAULT_MISBEHAVING_BANTIME);
-        g_connman = MakeUnique<CConnman>(0x1337, 0x1337); // Deterministic randomness for tests.
+    }
+    nScriptCheckThreads = 3;
+    for (int i = 0; i < nScriptCheckThreads - 1; i++)
+        threadGroup.create_thread(&ThreadScriptCheck);
+    g_connman = std::unique_ptr<CConnman>(new CConnman(0x1337, 0x1337)); // Deterministic randomness for tests.
+    connman = g_connman.get();
+    peerLogic.reset(new PeerLogicValidation(connman));
 }
 
 TestingSetup::~TestingSetup()
@@ -105,23 +102,25 @@ TestingSetup::~TestingSetup()
     GetMainSignals().FlushBackgroundCallbacks();
     GetMainSignals().UnregisterBackgroundSignalScheduler();
     g_connman.reset();
-    g_banman.reset();
+    peerLogic.reset();
     UnloadBlockIndex();
-    pcoinsTip.reset();
-    pcoinsdbview.reset();
-    pblocktree.reset();
+    delete pcoinsTip;
+    delete pcoinsdbview;
+    delete pblocktree;
+    delete ptokens;
+    fs::remove_all(pathTemp);
 }
 
 TestChain100Setup::TestChain100Setup() : TestingSetup(CBaseChainParams::REGTEST)
 {
     // Generate a 100-block chain:
     coinbaseKey.MakeNewKey(true);
-    CScript scriptPubKey = CScript() <<  ToByteVector(coinbaseKey.GetPubKey()) << OP_CHECKSIG;
-    for (int i = 0; i < COINBASE_MATURITY; i++)
+    CScript scriptPubKey = CScript() << ToByteVector(coinbaseKey.GetPubKey()) << OP_CHECKSIG;
+    for (int i = 0; i < 100; i++)
     {
         std::vector<CMutableTransaction> noTxns;
         CBlock b = CreateAndProcessBlock(noTxns, scriptPubKey);
-        m_coinbase_txns.push_back(b.vtx[0]);
+        coinbaseTxns.push_back(*b.vtx[0]);
     }
 }
 
@@ -130,27 +129,24 @@ TestChain100Setup::TestChain100Setup() : TestingSetup(CBaseChainParams::REGTEST)
 // scriptPubKey, and try to add it to the current chain.
 //
 CBlock
-TestChain100Setup::CreateAndProcessBlock(const std::vector<CMutableTransaction>& txns, const CScript& scriptPubKey)
+TestChain100Setup::CreateAndProcessBlock(const std::vector<CMutableTransaction> &txns, const CScript &scriptPubKey)
 {
-    const CChainParams& chainparams = Params();
+    const CChainParams &chainparams = Params();
     std::unique_ptr<CBlockTemplate> pblocktemplate = BlockAssembler(chainparams).CreateNewBlock(scriptPubKey);
-    CBlock& block = pblocktemplate->block;
+    CBlock &block = pblocktemplate->block;
 
     // Replace mempool-selected txns with just coinbase plus passed-in txns:
     block.vtx.resize(1);
-    for (const CMutableTransaction& tx : txns)
+    for (const CMutableTransaction &tx : txns)
         block.vtx.push_back(MakeTransactionRef(tx));
     // IncrementExtraNonce creates a valid coinbase and merkleRoot
-    {
-        LOCK(cs_main);
-        unsigned int extraNonce = 0;
-        IncrementExtraNonce(&block, chainActive.Tip(), extraNonce);
-    }
+    unsigned int extraNonce = 0;
+    IncrementExtraNonce(&block, chainActive.Tip(), extraNonce);
 
-    while (!CheckProofOfWork(block.GetHash(), block.nBits, chainparams.GetConsensus())) ++block.nNonce;
+    while (!CheckProofOfWork(block.GetBlockHash(), block.nBits, chainparams.GetConsensus())) ++block.nNonce;
 
     std::shared_ptr<const CBlock> shared_pblock = std::make_shared<const CBlock>(block);
-    ProcessNewBlock(chainparams, shared_pblock, true, nullptr);
+    ProcessNewBlock(chainparams, shared_pblock, true, nullptr, shared_pblock->GetBlockHash());
 
     CBlock result = block;
     return result;
@@ -161,13 +157,15 @@ TestChain100Setup::~TestChain100Setup()
 }
 
 
-CTxMemPoolEntry TestMemPoolEntryHelper::FromTx(const CMutableTransaction &tx) {
-    return FromTx(MakeTransactionRef(tx));
+CTxMemPoolEntry TestMemPoolEntryHelper::FromTx(const CMutableTransaction &tx)
+{
+    CTransaction txn(tx);
+    return FromTx(txn);
 }
 
-CTxMemPoolEntry TestMemPoolEntryHelper::FromTx(const CTransactionRef& tx)
+CTxMemPoolEntry TestMemPoolEntryHelper::FromTx(const CTransaction &txn)
 {
-    return CTxMemPoolEntry(tx, nFee, nTime, nHeight,
+    return CTxMemPoolEntry(MakeTransactionRef(txn), nFee, nTime, nHeight,
                            spendsCoinbase, sigOpCost, lp);
 }
 

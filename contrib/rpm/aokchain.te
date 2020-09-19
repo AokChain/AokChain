@@ -1,0 +1,81 @@
+policy_module(aokchain, 1.100.1)
+
+########################################
+#
+# Declarations
+#
+
+type aokchain_t;
+type aokchain_exec_t;
+init_daemon_domain(aokchain_t, aokchain_exec_t)
+
+permissive aokchain_t;
+
+type aokchain_initrc_exec_t;
+init_script_file(aokchain_initrc_exec_t)
+
+type aokchain_conf_t;
+files_type(aokchain_conf_t)
+
+type aokchain_var_lib_t;
+files_type(aokchain_var_lib_t)
+
+type aokchain_var_run_t;
+files_type(aokchain_var_run_t)
+
+type aokchain_port_t;
+corenet_port(aokchain_port_t)
+
+########################################
+#
+# aokchain local policy
+#
+allow aokchain_t self:process { fork };
+
+allow aokchain_t self:fifo_file rw_fifo_file_perms;
+allow aokchain_t self:unix_stream_socket create_stream_socket_perms;
+
+manage_dirs_pattern(aokchain_t, aokchain_conf_t, aokchain_conf_t)
+manage_files_pattern(aokchain_t, aokchain_conf_t, aokchain_conf_t)
+
+manage_dirs_pattern(aokchain_t, aokchain_var_lib_t, aokchain_var_lib_t)
+manage_files_pattern(aokchain_t, aokchain_var_lib_t, aokchain_var_lib_t)
+files_var_lib_filetrans(aokchain_t, aokchain_var_lib_t, { dir file })
+
+manage_dirs_pattern(aokchain_t, aokchain_var_run_t, aokchain_var_run_t)
+manage_files_pattern(aokchain_t, aokchain_var_run_t, aokchain_var_run_t)
+
+sysnet_dns_name_resolve(aokchain_t)
+corenet_all_recvfrom_unlabeled(aokchain_t)
+
+allow aokchain_t self:tcp_socket create_stream_socket_perms;
+corenet_tcp_sendrecv_generic_if(aokchain_t)
+corenet_tcp_sendrecv_generic_node(aokchain_t)
+corenet_tcp_sendrecv_all_ports(aokchain_t)
+corenet_tcp_bind_generic_node(aokchain_t)
+
+gen_require(`
+    type aokchain_port_t;
+')
+allow aokchain_t aokchain_port_t:tcp_socket name_bind;
+
+gen_require(`
+    type aokchain_port_t;
+')
+allow aokchain_t aokchain_port_t:tcp_socket name_connect;
+
+domain_use_interactive_fds(aokchain_t)
+
+files_read_etc_files(aokchain_t)
+
+miscfiles_read_localization(aokchain_t)
+
+sysnet_dns_name_resolve(aokchain_t)
+
+allow aokchain_t aokchain_exec_t:file execute_no_trans;
+allow aokchain_t self:process setsched;
+corecmd_exec_ls(aokchain_t)
+corenet_tcp_connect_http_port(aokchain_t)
+dev_read_urand(aokchain_t)
+fs_getattr_xattr_fs(aokchain_t)
+kernel_read_system_state(aokchain_t)

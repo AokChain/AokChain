@@ -1,10 +1,12 @@
 // Copyright (c) 2009-2010 Satoshi Nakamoto
-// Copyright (c) 2009-2018 The Bitcoin Core developers
+// Copyright (c) 2009-2016 The Bitcoin Core developers
 // Copyright (c) 2014 The BlackCoin developers
+// Copyright (c) 2017-2019 The Raven Core developers
+// Copyright (c) 2020 The AokChain Core developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
-#include <chain.h>
+#include "chain.h"
 
 /**
  * CChain implementation
@@ -81,13 +83,12 @@ int static inline GetSkipHeight(int height) {
     return (height & 1) ? InvertLowestOne(InvertLowestOne(height - 1)) + 1 : InvertLowestOne(height);
 }
 
-const CBlockIndex* CBlockIndex::GetAncestor(int height) const
+CBlockIndex* CBlockIndex::GetAncestor(int height)
 {
-    if (height > nHeight || height < 0) {
+    if (height > nHeight || height < 0)
         return nullptr;
-    }
 
-    const CBlockIndex* pindexWalk = this;
+    CBlockIndex* pindexWalk = this;
     int heightWalk = nHeight;
     while (heightWalk > height) {
         int heightSkip = GetSkipHeight(heightWalk);
@@ -108,9 +109,9 @@ const CBlockIndex* CBlockIndex::GetAncestor(int height) const
     return pindexWalk;
 }
 
-CBlockIndex* CBlockIndex::GetAncestor(int height)
+const CBlockIndex* CBlockIndex::GetAncestor(int height) const
 {
-    return const_cast<CBlockIndex*>(static_cast<const CBlockIndex*>(this)->GetAncestor(height));
+    return const_cast<CBlockIndex*>(this)->GetAncestor(height);
 }
 
 void CBlockIndex::BuildSkip()

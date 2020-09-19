@@ -21,10 +21,9 @@ Utility to generate the pnSeed[] array that is compiled into the client.
 Build Tools and Keys
 ---------------------
 
-### Packaging ###
-The [Debian](/contrib/debian) subfolder contains the copyright file.
-
-All other packaging related files can be found in the [aokchain-core/packaging](https://github.com/aokchain-core/packaging) repository.
+### [Debian](/contrib/debian) ###
+Contains files used to package aokchaind/aokchain-qt
+for Debian-based Linux systems. If you compile aokchaind/aokchain-qt yourself, there are some useful files here.
 
 ### [Gitian-descriptors](/contrib/gitian-descriptors) ###
 Files used during the gitian build process. For more information about gitian, see the [the AokChain Core documentation repository](https://github.com/aokchain-core/docs).
@@ -35,7 +34,10 @@ PGP keys used for signing AokChain Core [Gitian release](/doc/release-process.md
 ### [MacDeploy](/contrib/macdeploy) ###
 Scripts and notes for Mac builds. 
 
-### [Gitian-build](/contrib/gitian-build.py) ###
+### [RPM](/contrib/rpm) ###
+RPM spec file for building aokchain-core on RPM based distributions.
+
+### [Gitian-build](/contrib/gitian-build.sh) ###
 Script for running full Gitian builds.
 
 Test and Verify Tools 

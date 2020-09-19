@@ -17,37 +17,15 @@ don't have test cases for.
 
 #### Style guidelines
 
-- Where possible, try to adhere to [PEP-8 guidelines](https://www.python.org/dev/peps/pep-0008/)
+- Where possible, try to adhere to [PEP-8 guidelines]([https://www.python.org/dev/peps/pep-0008/)
 - Use a python linter like flake8 before submitting PRs to catch common style
   nits (eg trailing whitespace, unused imports, etc)
-- The oldest supported Python version is specified in [doc/dependencies.md](/doc/dependencies.md).
-  Consider using [pyenv](https://github.com/pyenv/pyenv), which checks [.python-version](/.python-version),
-  to prevent accidentally introducing modern syntax from an unsupported Python version.
-  The Travis linter also checks this, but [possibly not in all cases](https://github.com/aokchain/aokchain/pull/14884#discussion_r239585126).
-- See [the python lint script](/test/lint/lint-python.sh) that checks for violations that
-  could lead to bugs and issues in the test code.
-- Avoid wildcard imports
+- Avoid wildcard imports where possible
 - Use a module-level docstring to describe what the test is testing, and how it
   is testing it.
 - When subclassing the AokChainTestFramwork, place overrides for the
   `set_test_params()`, `add_options()` and `setup_xxxx()` methods at the top of
   the subclass, then locally-defined helper methods, then the `run_test()` method.
-- Use `'{}'.format(x)` for string formatting, not `'%s' % x`.
-
-#### Naming guidelines
-
-- Name the test `<area>_test.py`, where area can be one of the following:
-    - `feature` for tests for full features that aren't wallet/mining/mempool, eg `feature_rbf.py`
-    - `interface` for tests for other interfaces (REST, ZMQ, etc), eg `interface_rest.py`
-    - `mempool` for tests for mempool behaviour, eg `mempool_reorg.py`
-    - `mining` for tests for mining features, eg `mining_prioritisetransaction.py`
-    - `p2p` for tests that explicitly test the p2p interface, eg `p2p_disconnect_ban.py`
-    - `rpc` for tests for individual RPC methods or features, eg `rpc_listtransactions.py`
-    - `tool` for tests for tools, eg `tool_wallet.py`
-    - `wallet` for tests for wallet features, eg `wallet_keypool.py`
-- use an underscore to separate words
-    - exception: for tests for specific RPCs or command line options which don't include underscores, name the test after the exact RPC or argument name, eg `rpc_decodescript.py`, not `rpc_decode_script.py`
-- Don't use the redundant word `test` in the name, eg `interface_zmq.py`, not `interface_zmq_test.py`
 
 #### General test-writing advice
 
@@ -61,15 +39,10 @@ don't have test cases for.
 - Set the `self.setup_clean_chain` variable in `set_test_params()` to control whether
   or not to use the cached data directories. The cached data directories
   contain a 200-block pre-mined blockchain and wallets for four nodes. Each node
-  has 25 mature blocks (25x50=1250 AOK) in its wallet.
+  has 25 mature blocks (25x5000=125000 AOK) in its wallet.
 - When calling RPCs with lots of arguments, consider using named keyword
   arguments instead of positional arguments to make the intent of the call
   clear to readers.
-- Many of the core test framework classes such as `CBlock` and `CTransaction`
-  don't allow new attributes to be added to their objects at runtime like
-  typical Python objects allow. This helps prevent unpredictable side effects
-  from typographical errors or usage of the objects outside of their intended
-  purpose.
 
 #### RPC and P2P definitions
 
@@ -82,21 +55,71 @@ P2P messages. These can be found in the following source files:
 
 #### Using the P2P interface
 
-- `messages.py` contains all the definitions for objects that pass
+- `mininode.py` contains all the definitions for objects that pass
 over the network (`CBlock`, `CTransaction`, etc, along with the network-level
 wrappers for them, `msg_block`, `msg_tx`, etc).
 
 - P2P tests have two threads. One thread handles all network communication
-with the aokchaind(s) being tested in a callback-based event loop; the other
+with the aokchaind(s) being tested (using python's asyncore package); the other
 implements the test logic.
 
-- `P2PConnection` is the class used to connect to a aokchaind.  `P2PInterface`
-contains the higher level logic for processing P2P payloads and connecting to
-the AokChain Core node application logic. For custom behaviour, subclass the
-P2PInterface object and override the callback methods.
+- `NodeConn` is the class used to connect to a aokchaind.  If you implement
+a callback class that derives from `NodeConnCB` and pass that to the
+`NodeConn` object, your code will receive the appropriate callbacks when
+events of interest arrive.
+
+- Call `NetworkThread.start()` after all `NodeConn` objects are created to
+start the networking thread.  (Continue with the test logic in your existing
+thread.)
 
 - Can be used to write tests where specific P2P protocol behavior is tested.
-Examples tests are `p2p_unrequested_blocks.py`, `p2p_compactblocks.py`.
+Examples tests are `p2p-accept-block.py`, `p2p-compactblocks.py`.
+
+#### Comptool
+
+- Comptool is a Testing framework for writing tests that compare the block/tx acceptance
+behavior of a aokchaind against 1 or more other aokchaind instances. It should not be used
+to write static tests with known outcomes, since that type of test is easier to write and
+maintain using the standard AokChainTestFramework.
+
+- Set the `num_nodes` variable (defined in `ComparisonTestFramework`) to start up
+1 or more nodes.  If using 1 node, then `--testbinary` can be used as a command line
+option to change the aokchaind binary used by the test.  If using 2 or more nodes,
+then `--refbinary` can be optionally used to change the aokchaind that will be used
+on nodes 2 and up.
+
+- Implement a (generator) function called `get_tests()` which yields `TestInstance`s.
+Each `TestInstance` consists of:
+  - A list of `[object, outcome, hash]` entries
+    * `object` is a `CBlock`, `CTransaction`, or
+    `CBlockHeader`.  `CBlock`'s and `CTransaction`'s are tested for
+    acceptance.  `CBlockHeader`s can be used so that the test runner can deliver
+    complete headers-chains when requested from the aokchaind, to allow writing
+    tests where blocks can be delivered out of order but still processed by
+    headers-first aokchaind's.
+    * `outcome` is `True`, `False`, or `None`.  If `True`
+    or `False`, the tip is compared with the expected tip -- either the
+    block passed in, or the hash specified as the optional 3rd entry.  If
+    `None` is specified, then the test will compare all the aokchaind's
+    being tested to see if they all agree on what the best tip is.
+    * `hash` is the block hash of the tip to compare against. Optional to
+    specify; if left out then the hash of the block passed in will be used as
+    the expected tip.  This allows for specifying an expected tip while testing
+    the handling of either invalid blocks or blocks delivered out of order,
+    which complete a longer chain.
+  - `sync_every_block`: `True/False`.  If `False`, then all blocks
+    are inv'ed together, and the test runner waits until the node receives the
+    last one, and tests only the last block for tip acceptance using the
+    outcome and specified tip.  If `True`, then each block is tested in
+    sequence and synced (this is slower when processing many blocks).
+  - `sync_every_transaction`: `True/False`.  Analogous to
+    `sync_every_block`, except if the outcome on the last tx is "None",
+    then the contents of the entire mempool are compared across all aokchaind
+    connections.  If `True` or `False`, then only the last tx's
+    acceptance is tested against the given outcome.
+
+- For examples of tests written in this framework, see
+  `invalidblockrequest.py` and `p2p-fullblocktest.py`.
 
 ### test-framework modules
 
@@ -112,8 +135,14 @@ Generally useful functions.
 #### [test_framework/mininode.py](test_framework/mininode.py)
 Basic code to support P2P connectivity to a aokchaind.
 
+#### [test_framework/comptool.py](test_framework/comptool.py)
+Framework for comparison-tool style, P2P tests.
+
 #### [test_framework/script.py](test_framework/script.py)
 Utilities for manipulating transaction scripts (originally from python-aokchainlib)
+
+#### [test_framework/blockstore.py](test_framework/blockstore.py)
+Implements disk-backed block and tx storage.
 
 #### [test_framework/key.py](test_framework/key.py)
 Wrapper around OpenSSL EC_Key (originally from python-aokchainlib)
@@ -123,36 +152,3 @@ Helpers for script.py
 
 #### [test_framework/blocktools.py](test_framework/blocktools.py)
 Helper functions for creating blocks and transactions.
-
-### Benchmarking with perf
-
-An easy way to profile node performance during functional tests is provided
-for Linux platforms using `perf`.
-
-Perf will sample the running node and will generate profile data in the node's
-datadir. The profile data can then be presented using `perf report` or a graphical
-tool like [hotspot](https://github.com/KDAB/hotspot).
-
-There are two ways of invoking perf: one is to use the `--perf` flag when
-running tests, which will profile each node during the entire test run: perf
-begins to profile when the node starts and ends when it shuts down. The other
-way is the use the `profile_with_perf` context manager, e.g.
-
-```python
-with node.profile_with_perf("send-big-msgs"):
-    # Perform activity on the node you're interested in profiling, e.g.:
-    for _ in range(10000):
-        node.p2p.send_message(some_large_message)
-```
-
-To see useful textual output, run
-
-```sh
-perf report -i /path/to/datadir/send-big-msgs.perf.data.xxxx --stdio | c++filt | less
-```
-
-#### See also:
-
-- [Installing perf](https://askubuntu.com/q/50145)
-- [Perf examples](http://www.brendangregg.com/perf.html)
-- [Hotspot](https://github.com/KDAB/hotspot): a GUI for perf output analysis

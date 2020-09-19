@@ -1,0 +1,8 @@
+/usr/bin/aokchain-cli		--	gen_context(system_u:object_r:aokchain_exec_t,s0)
+/usr/sbin/aokchaind		--	gen_context(system_u:object_r:aokchain_exec_t,s0)
+/usr/lib(64)?/aokchain/aokchaind		--	gen_context(system_u:object_r:aokchain_exec_t,s0)
+
+/etc/aokchain(/.*)?		gen_context(system_u:object_r:aokchain_conf_t,s0)
+/var/lib/aokchain(/.*)?		gen_context(system_u:object_r:aokchain_var_lib_t,s0)
+
+(/var)?/run/aokchaind(/.*)?   gen_context(system_u:object_r:aokchain_var_run_t,s0)

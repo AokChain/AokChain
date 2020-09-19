@@ -1,11 +1,9 @@
-// Copyright (c) 2017-2018 The Bitcoin Core developers
+// Copyright (c) 2017 The Bitcoin Core developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 #include <wallet/walletutil.h>
-
-#include <logging.h>
-#include <util/system.h>
+#include <util.h>
 
 fs::path GetWalletDir()
 {
@@ -34,11 +32,9 @@ static bool IsBerkeleyBtree(const fs::path& path)
     // A Berkeley DB Btree file has at least 4K.
     // This check also prevents opening lock files.
     boost::system::error_code ec;
-    auto size = fs::file_size(path, ec);
-    if (ec) LogPrintf("%s: %s %s\n", __func__, ec.message(), path.string());
-    if (size < 4096) return false;
+    if (fs::file_size(path, ec) < 4096) return false;
 
-    fsbridge::ifstream file(path, std::ios::binary);
+    fs::ifstream file(path.string(), std::ios::binary);
     if (!file.is_open()) return false;
 
     file.seekg(12, std::ios::beg); // Magic bytes start at offset 12
@@ -55,48 +51,26 @@ static bool IsBerkeleyBtree(const fs::path& path)
 std::vector<fs::path> ListWalletDir()
 {
     const fs::path wallet_dir = GetWalletDir();
-    const size_t offset = wallet_dir.string().size() + 1;
     std::vector<fs::path> paths;
-    boost::system::error_code ec;
 
-    for (auto it = fs::recursive_directory_iterator(wallet_dir, ec); it != fs::recursive_directory_iterator(); it.increment(ec)) {
-        if (ec) {
-            LogPrintf("%s: %s %s\n", __func__, ec.message(), it->path().string());
-            continue;
-        }
-
-        // Get wallet path relative to walletdir by removing walletdir from the wallet path.
-        // This can be replaced by boost::filesystem::lexically_relative once boost is bumped to 1.60.
-        const fs::path path = it->path().string().substr(offset);
-
+    for (auto it = fs::recursive_directory_iterator(wallet_dir); it != end(it); ++it) {
         if (it->status().type() == fs::directory_file && IsBerkeleyBtree(it->path() / "wallet.dat")) {
             // Found a directory which contains wallet.dat btree file, add it as a wallet.
-            paths.emplace_back(path);
+            paths.emplace_back(fs::relative(it->path(), wallet_dir));
         } else if (it.level() == 0 && it->symlink_status().type() == fs::regular_file && IsBerkeleyBtree(it->path())) {
             if (it->path().filename() == "wallet.dat") {
                 // Found top-level wallet.dat btree file, add top level directory ""
                 // as a wallet.
                 paths.emplace_back();
             } else {
-                // Found top-level btree file not called wallet.dat. Current aokchain
+                // Found top-level btree file not called wallet.dat. Current bitcoin
                 // software will never create these files but will allow them to be
                 // opened in a shared database environment for backwards compatibility.
                 // Add it to the list of available wallets.
-                paths.emplace_back(path);
+                paths.emplace_back(fs::relative(it->path(), wallet_dir));
             }
         }
     }
 
     return paths;
-}
-
-WalletLocation::WalletLocation(const std::string& name)
-    : m_name(name)
-    , m_path(fs::absolute(name, GetWalletDir()))
-{
-}
-
-bool WalletLocation::Exists() const
-{
-    return fs::symlink_status(m_path).type() != fs::file_not_found;
 }

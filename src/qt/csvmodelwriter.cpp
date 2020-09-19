@@ -1,8 +1,10 @@
-// Copyright (c) 2011-2018 The Bitcoin Core developers
+// Copyright (c) 2011-2016 The Bitcoin Core developers
+// Copyright (c) 2017-2019 The Raven Core developers
+// Copyright (c) 2020 The AokChain Core developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
-#include <qt/csvmodelwriter.h>
+#include "csvmodelwriter.h"
 
 #include <QAbstractItemModel>
 #include <QFile>
@@ -10,7 +12,7 @@
 
 CSVModelWriter::CSVModelWriter(const QString &_filename, QObject *parent) :
     QObject(parent),
-    filename(_filename), model(nullptr)
+    filename(_filename), model(0)
 {
 }
 

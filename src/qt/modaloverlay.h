@@ -1,4 +1,6 @@
-// Copyright (c) 2016-2018 The Bitcoin Core developers
+// Copyright (c) 2016 The Bitcoin Core developers
+// Copyright (c) 2017-2019 The Raven Core developers
+// Copyright (c) 2020 The AokChain Core developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -45,7 +47,6 @@ private:
     QVector<QPair<qint64, double> > blockProcessTime;
     bool layerIsVisible;
     bool userClosed;
-    void UpdateHeaderSyncLabel();
 };
 
 #endif // AOKCHAIN_QT_MODALOVERLAY_H

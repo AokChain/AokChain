@@ -1,11 +1,13 @@
-// Copyright (c) 2011-2018 The Bitcoin Core developers
+// Copyright (c) 2011-2016 The Bitcoin Core developers
+// Copyright (c) 2017-2019 The Raven Core developers
+// Copyright (c) 2020 The AokChain Core developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 #ifndef AOKCHAIN_QT_SENDCOINSDIALOG_H
 #define AOKCHAIN_QT_SENDCOINSDIALOG_H
 
-#include <qt/walletmodel.h>
+#include "walletmodel.h"
 
 #include <QDialog>
 #include <QMessageBox>
@@ -31,7 +33,7 @@ class SendCoinsDialog : public QDialog
     Q_OBJECT
 
 public:
-    explicit SendCoinsDialog(const PlatformStyle *platformStyle, QWidget *parent = nullptr);
+    explicit SendCoinsDialog(const PlatformStyle *platformStyle, QWidget *parent = 0);
     ~SendCoinsDialog();
 
     void setClientModel(ClientModel *clientModel);
@@ -45,16 +47,17 @@ public:
     void pasteEntry(const SendCoinsRecipient &rv);
     bool handlePaymentRequest(const SendCoinsRecipient &recipient);
 
+    void setupCoinControl(const PlatformStyle *platformStyle);
+    void setupScrollView(const PlatformStyle *platformStyle);
+    void setupFeeControl(const PlatformStyle *platformStyle);
 public Q_SLOTS:
     void clear();
     void reject();
     void accept();
     SendCoinsEntry *addEntry();
     void updateTabsAndLabels();
-    void setBalance(const interfaces::WalletBalances& balances);
-
-Q_SIGNALS:
-    void coinsSent(const uint256& txid);
+    void setBalance(const CAmount& balance, const CAmount& unconfirmedBalance, const CAmount& immatureBalance, const CAmount& stake,
+                    const CAmount& watchOnlyBalance, const CAmount& watchUnconfBalance, const CAmount& watchImmatureBalance, const CAmount& watchOnlyStake);
 
 private:
     Ui::SendCoinsDialog *ui;
@@ -78,7 +81,6 @@ private Q_SLOTS:
     void on_buttonChooseFee_clicked();
     void on_buttonMinimizeFee_clicked();
     void removeEntry(SendCoinsEntry* entry);
-    void useAvailableBalance(SendCoinsEntry* entry);
     void updateDisplayUnit();
     void coinControlFeatureChanged(bool);
     void coinControlButtonClicked();
@@ -92,7 +94,9 @@ private Q_SLOTS:
     void coinControlClipboardBytes();
     void coinControlClipboardLowOutput();
     void coinControlClipboardChange();
+    void setMinimumFee();
     void updateFeeSectionControls();
+    void updateMinFeeLabel();
     void updateSmartFeeLabel();
 
 Q_SIGNALS:
@@ -108,7 +112,7 @@ class SendConfirmationDialog : public QMessageBox
     Q_OBJECT
 
 public:
-    SendConfirmationDialog(const QString &title, const QString &text, int secDelay = SEND_CONFIRM_DELAY, QWidget *parent = nullptr);
+    SendConfirmationDialog(const QString &title, const QString &text, int secDelay = SEND_CONFIRM_DELAY, QWidget *parent = 0);
     int exec();
 
 private Q_SLOTS:

@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
-# Copyright (c) 2016-2018 The AokChain Core developers
+# Copyright (c) 2016 The Bitcoin Core developers
+# Copyright (c) 2017-2018 The AokChain Core developers
 # Distributed under the MIT software license, see the accompanying
 # file COPYING or http://www.opensource.org/licenses/mit-license.php.
 """Test using named arguments for RPCs."""
@@ -16,10 +17,10 @@ class NamedArgumentTest(AokChainTestFramework):
 
     def run_test(self):
         node = self.nodes[0]
-        h = node.help(command='getblockchaininfo')
-        assert(h.startswith('getblockchaininfo\n'))
+        h = node.help(command='getinfo')
+        assert(h.startswith('getinfo\n'))
 
-        assert_raises_rpc_error(-8, 'Unknown named parameter', node.help, random='getblockchaininfo')
+        assert_raises_rpc_error(-8, 'Unknown named parameter', node.help, random='getinfo')
 
         h = node.getblockhash(height=0)
         node.getblock(blockhash=h)
