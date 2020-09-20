@@ -844,7 +844,7 @@ UniValue getbalance(const JSONRPCRequest& request)
         if(include_watchonly.get_bool())
             filter = filter | ISMINE_WATCH_ONLY;
 
-    return ValueFromAmount(pwallet->GetLegacyBalance(filter, nMinDepth, nullptr));
+    return ValueFromAmount(pwallet->GetLegacyBalance(filter, nMinDepth, account));
 }
 
 UniValue getunconfirmedbalance(const JSONRPCRequest &request)
