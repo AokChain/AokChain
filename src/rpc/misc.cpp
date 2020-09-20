@@ -584,7 +584,7 @@ bool getAddressFromIndex(const int &type, const uint160 &hash, std::string &addr
 static bool getAddressesFromParams(const UniValue& params, std::vector<std::pair<uint160, int> > &addresses)
 {
     if (params[0].isStr()) {
-        CChellitAddress address(params[0].get_str());
+        CAokChainAddress address(params[0].get_str());
         uint160 hashBytes;
         int type = 0;
         if (!address.GetIndexKey(hashBytes, type)) {
@@ -701,7 +701,7 @@ UniValue getaddressmempool(const JSONRPCRequest& request)
 
 UniValue getaddressutxos(const JSONRPCRequest& request)
 {
-    if (request.fHelp || request.params.size() != 1)
+    if (request.fHelp || request.params.size() < 1 || request.params.size() > 3)
         throw std::runtime_error(
             "getaddressutxos\n"
             "\nReturns all unspent outputs for an address (requires addressindex to be enabled).\n"
@@ -734,18 +734,18 @@ UniValue getaddressutxos(const JSONRPCRequest& request)
             + HelpExampleRpc("getaddressutxos", "{\"addresses\": [\"12c6DSiU4Rq3P4ZxziKxzrL5LmMBrzjrJX\"],\"tokenName\":\"MY_TOKEN\"}")
             );
 
-    bool includeChainInfo = false;
+    CAmount requiredAmount = 0;
+    if (!request.params[1].isNull()) {
+        requiredAmount = AmountFromValue(request.params[1]);
+    }
+
     std::string tokenName = AOK;
-    if (request.params[0].isObject()) {
-        UniValue chainInfo = find_value(request.params[0].get_obj(), "chainInfo");
-        if (chainInfo.isBool()) {
-            includeChainInfo = chainInfo.get_bool();
-        }
-        UniValue tokenNameParam = find_value(request.params[0].get_obj(), "tokenName");
-        if (tokenNameParam.isStr()) {
-            if (!AreTokensDeployed())
+    if (!request.params[2].isNull()) {
+        if (request.params[2].isStr()) {
+            if (!AreTokensDeployed()) {
                 throw JSONRPCError(RPC_INVALID_PARAMETER, "Tokens aren't active.  tokenName can't be specified.");
-            tokenName = tokenNameParam.get_str();
+            }
+            tokenName = request.params[2].get_str();
         }
     }
 
@@ -796,7 +796,7 @@ UniValue getaddressutxos(const JSONRPCRequest& request)
 
         if (nTokenLockTime < ((int64_t)nTokenLockTime < LOCKTIME_THRESHOLD ? (int64_t)it->second.blockHeight : (int64_t)chainActive.Tip()->GetMedianTimePast())) {
             output.pushKV("address", address);
-            output.pushKV("tokenName", tokenNameOut);
+            output.pushKV("token_name", tokenNameOut);
             output.pushKV("txid", it->first.txhash.GetHex());
             output.pushKV("outputIndex", (int)it->first.index);
             output.pushKV("script", HexStr(it->second.script.begin(), it->second.script.end()));
@@ -808,17 +808,7 @@ UniValue getaddressutxos(const JSONRPCRequest& request)
         }
     }
 
-    if (includeChainInfo) {
-        UniValue result(UniValue::VOBJ);
-        result.pushKV("utxos", utxos);
-
-        LOCK(cs_main);
-        result.pushKV("hash", chainActive.Tip()->GetBlockHash().GetHex());
-        result.pushKV("height", (int)chainActive.Height());
-        return result;
-    } else {
-        return utxos;
-    }
+    return utxos;
 }
 
 UniValue getaddressdeltas(const JSONRPCRequest& request)
