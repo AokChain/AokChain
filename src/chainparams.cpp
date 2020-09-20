@@ -160,9 +160,6 @@ public:
         consensus.vDeployments[Consensus::DEPLOYMENT_TESTDUMMY].bit = 28;
         consensus.vDeployments[Consensus::DEPLOYMENT_TESTDUMMY].nStartTime = 1199145601; // January 1, 2008
         consensus.vDeployments[Consensus::DEPLOYMENT_TESTDUMMY].nTimeout = 1230767999; // December 31, 2008
-        consensus.vDeployments[Consensus::DEPLOYMENT_TOKENS].bit = 6;  //Tokens (RIP2)
-        consensus.vDeployments[Consensus::DEPLOYMENT_TOKENS].nStartTime = 1540944000; // Oct 31, 2018
-        consensus.vDeployments[Consensus::DEPLOYMENT_TOKENS].nTimeout = 1572480000; // Oct 31, 2019
 
         // The best chain should have at least this much work.
         consensus.nMinimumChainWork = uint256S("0x00");
@@ -209,7 +206,7 @@ public:
 
         checkpointData = (CCheckpointData) {
             {
-                // { 535721, uint256S("0x000000000001217f58a594ca742c8635ecaaaf695d1a63f6ab06979f1c159e04")},
+                { 159247, uint256S("0x8273f1ceeeba86829ff7b927f97bad5942f1aa7e401eb75afad1a1d2ff16d0d4")},
             }
         };
 
@@ -228,10 +225,7 @@ public:
         nFeeAmountSecondary = 1000 * COIN;
 
         // Fee Addresse
-        strTokenFeeAddress = "ALvFNLgZj6HPP55XMvFm4qqAZhV64bgaLW";
-
-        // Global Burn Address
-        strBurnAddress = "AOKBurnnnnnnnnnnnnnnnnnnnnnXXhzfSw";
+        strTokenFeeAddress = "KdZFAFeKV8C5JzdEdgcPYDZku92KkD3fHy";
 
         nMaxReorganizationDepth = 60; // 60 at 1 minute block timespan is +/- 60 minutes.
         nMinReorganizationPeers = 4;
@@ -262,9 +256,6 @@ public:
         consensus.vDeployments[Consensus::DEPLOYMENT_TESTDUMMY].bit = 28;
         consensus.vDeployments[Consensus::DEPLOYMENT_TESTDUMMY].nStartTime = 1199145601; // January 1, 2008
         consensus.vDeployments[Consensus::DEPLOYMENT_TESTDUMMY].nTimeout = 1230767999; // December 31, 2008
-        consensus.vDeployments[Consensus::DEPLOYMENT_TOKENS].bit = 6;  //Tokens (RIP2)
-        consensus.vDeployments[Consensus::DEPLOYMENT_TOKENS].nStartTime = 1540944000; // Oct 31, 2018
-        consensus.vDeployments[Consensus::DEPLOYMENT_TOKENS].nTimeout = 1572480000; // Oct 31, 2019
 
         // The best chain should have at least this much work.
         consensus.nMinimumChainWork = uint256S("0x00");
@@ -332,9 +323,6 @@ public:
         // Fee Addresse
         strTokenFeeAddress = "TjJYEpVi1HuFrMGrhNjQSHLvP9fbNk2yng";
 
-        // Global Burn Address
-        strBurnAddress = "TjJYEpVi1HuFrMGrhNjQSHLvP9fbNk2yng";
-
         nMaxReorganizationDepth = 60; // 60 at 1 minute block timespan is +/- 60 minutes.
         nMinReorganizationPeers = 4;
         nMinReorganizationAge = 60 * 60 * 12; // 12 hours
@@ -363,9 +351,6 @@ public:
         consensus.vDeployments[Consensus::DEPLOYMENT_TESTDUMMY].bit = 28;
         consensus.vDeployments[Consensus::DEPLOYMENT_TESTDUMMY].nStartTime = 0;
         consensus.vDeployments[Consensus::DEPLOYMENT_TESTDUMMY].nTimeout = 999999999999ULL;
-        consensus.vDeployments[Consensus::DEPLOYMENT_TOKENS].bit = 6;
-        consensus.vDeployments[Consensus::DEPLOYMENT_TOKENS].nStartTime = 0;
-        consensus.vDeployments[Consensus::DEPLOYMENT_TOKENS].nTimeout = 999999999999ULL;
 
         // The best chain should have at least this much work.
         consensus.nMinimumChainWork = uint256S("0x00");
@@ -375,10 +360,10 @@ public:
 
         consensus.nLastPOWBlock = 1440 * 1000;
 
-        pchMessageStart[0] = 0x43; // C
-        pchMessageStart[1] = 0x52; // R
-        pchMessageStart[2] = 0x4F; // O
-        pchMessageStart[3] = 0x57; // W
+        pchMessageStart[0] = 0x43;
+        pchMessageStart[1] = 0x52;
+        pchMessageStart[2] = 0x4F;
+        pchMessageStart[3] = 0x57;
         nDefaultPort = 18444;
         nPruneAfterHeight = 1000;
 
@@ -418,12 +403,6 @@ public:
         // Fee Amounts
         nFeeAmountMain = 1 * COIN;
         nFeeAmountSecondary = 1 * COIN;
-
-        // Fee Addresses
-        strTokenFeeAddress = "n1BurnXXXXXXXXXXXXXXXXXXXXXXU1qejP";
-
-        // Global Burn Address
-        strBurnAddress = "n1BurnXXXXXXXXXXXXXXXXXXXXXXU1qejP";
 
         nMaxReorganizationDepth = 60; // 60 at 1 minute block timespan is +/- 60 minutes.
         nMinReorganizationPeers = 4;

@@ -1433,12 +1433,6 @@ UniValue getblockchaininfo(const JSONRPCRequest& request)
 
     UniValue softforks(UniValue::VARR);
     UniValue bip9_softforks(UniValue::VOBJ);
-    // softforks.push_back(SoftForkDesc("bip34", 2, tip, consensusParams));
-    // softforks.push_back(SoftForkDesc("bip66", 3, tip, consensusParams));
-    // softforks.push_back(SoftForkDesc("bip65", 4, tip, consensusParams));
-    // BIP9SoftForkDescPushBack(bip9_softforks, "csv", consensusParams, Consensus::DEPLOYMENT_CSV);
-    //BIP9SoftForkDescPushBack(bip9_softforks, "segwit", consensusParams, Consensus::DEPLOYMENT_SEGWIT);
-    BIP9SoftForkDescPushBack(bip9_softforks, "tokens", consensusParams, Consensus::DEPLOYMENT_TOKENS);
     obj.pushKV("softforks",             softforks);
     obj.pushKV("bip9_softforks", bip9_softforks);
 

@@ -98,7 +98,6 @@ public:
     const std::string& ReissueTokenBurnAddress() const { return strTokenFeeAddress; }
     const std::string& IssueSubTokenBurnAddress() const { return strTokenFeeAddress; }
     const std::string& IssueUniqueTokenBurnAddress() const { return strTokenFeeAddress; }
-    const std::string& GlobalBurnAddress() const { return strBurnAddress; }
 
     int MaxReorganizationDepth() const { return nMaxReorganizationDepth; }
     int MinReorganizationPeers() const { return nMinReorganizationPeers; }
@@ -131,9 +130,6 @@ protected:
 
     // Burn Addresses
     std::string strTokenFeeAddress;
-
-    // Global Burn Address
-    std::string strBurnAddress;
 
     int nMaxReorganizationDepth;
     int nMinReorganizationPeers;
