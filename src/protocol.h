@@ -1,5 +1,7 @@
 // Copyright (c) 2009-2010 Satoshi Nakamoto
-// Copyright (c) 2009-2018 The Bitcoin Core developers
+// Copyright (c) 2009-2016 The Bitcoin Core developers
+// Copyright (c) 2017-2019 The Raven Core developers
+// Copyright (c) 2020 The AokChain Core developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -10,12 +12,11 @@
 #ifndef AOKCHAIN_PROTOCOL_H
 #define AOKCHAIN_PROTOCOL_H
 
-#include <netaddress.h>
-#include <serialize.h>
-#include <uint256.h>
-#include <version.h>
+#include "netaddress.h"
+#include "serialize.h"
+#include "uint256.h"
+#include "version.h"
 
-#include <atomic>
 #include <stdint.h>
 #include <string>
 
@@ -28,13 +29,16 @@
 class CMessageHeader
 {
 public:
-    static constexpr size_t MESSAGE_START_SIZE = 4;
-    static constexpr size_t COMMAND_SIZE = 12;
-    static constexpr size_t MESSAGE_SIZE_SIZE = 4;
-    static constexpr size_t CHECKSUM_SIZE = 4;
-    static constexpr size_t MESSAGE_SIZE_OFFSET = MESSAGE_START_SIZE + COMMAND_SIZE;
-    static constexpr size_t CHECKSUM_OFFSET = MESSAGE_SIZE_OFFSET + MESSAGE_SIZE_SIZE;
-    static constexpr size_t HEADER_SIZE = MESSAGE_START_SIZE + COMMAND_SIZE + MESSAGE_SIZE_SIZE + CHECKSUM_SIZE;
+    enum {
+        MESSAGE_START_SIZE = 4,
+        COMMAND_SIZE = 12,
+        MESSAGE_SIZE_SIZE = 4,
+        CHECKSUM_SIZE = 4,
+
+        MESSAGE_SIZE_OFFSET = MESSAGE_START_SIZE + COMMAND_SIZE,
+        CHECKSUM_OFFSET = MESSAGE_SIZE_OFFSET + MESSAGE_SIZE_SIZE,
+        HEADER_SIZE = MESSAGE_START_SIZE + COMMAND_SIZE + MESSAGE_SIZE_SIZE + CHECKSUM_SIZE
+    };
     typedef unsigned char MessageStartChars[MESSAGE_START_SIZE];
 
     explicit CMessageHeader(const MessageStartChars& pchMessageStartIn);
@@ -48,10 +52,10 @@ public:
     template <typename Stream, typename Operation>
     inline void SerializationOp(Stream& s, Operation ser_action)
     {
-        READWRITE(pchMessageStart);
-        READWRITE(pchCommand);
+        READWRITE(FLATDATA(pchMessageStart));
+        READWRITE(FLATDATA(pchCommand));
         READWRITE(nMessageSize);
-        READWRITE(pchChecksum);
+        READWRITE(FLATDATA(pchChecksum));
     }
 
     char pchMessageStart[MESSAGE_START_SIZE];
@@ -238,6 +242,27 @@ extern const char *GETBLOCKTXN;
  * @since protocol version 70014 as described by BIP 152
  */
 extern const char *BLOCKTXN;
+
+/**
+ * Contains a TokenDataRequest.
+ * Peer should respond with tokendata
+ * @since protocol version 70017
+ */
+extern const char *GETTOKENDATA;
+
+/**
+ * Contains a TokenData
+ * Sent in response to a "gettokendata" message.
+ * @since protocol version 70017
+ */
+extern const char *TOKENDATA;
+
+/**
+ * The asstnotfound message is a reply to a gettokendata message which requested an
+ * object the receiving node does not have available for relay.
+ * @since protocol version 70018.
+ */
+    extern const char *TOKENNOTFOUND;
 };
 
 /* Get a vector of all valid message types (see above) */
@@ -247,8 +272,9 @@ const std::vector<std::string> &getAllNetMessageTypes();
 enum ServiceFlags : uint64_t {
     // Nothing
     NODE_NONE = 0,
-    // NODE_NETWORK means that the node is capable of serving the complete block chain. It is currently
-    // set by all AokChain Core non pruned nodes, and is unset by SPV clients or other light clients.
+    // NODE_NETWORK means that the node is capable of serving the block chain. It is currently
+    // set by all AokChain Core nodes, and is unset by SPV clients or other peers that just want
+    // network services but don't provide them.
     NODE_NETWORK = (1 << 0),
     // NODE_GETUTXO means the node is capable of responding to the getutxo protocol request.
     // AokChain Core does not support this but a patch set called AokChain XT does.
@@ -264,10 +290,6 @@ enum ServiceFlags : uint64_t {
     // NODE_XTHIN means the node supports Xtreme Thinblocks
     // If this is turned off then the node will not service nor make xthin requests
     NODE_XTHIN = (1 << 4),
-    // NODE_NETWORK_LIMITED means the same as NODE_NETWORK with the limitation of only
-    // serving the last 288 (2 day) blocks
-    // See BIP159 for details on how this is implemented.
-    NODE_NETWORK_LIMITED = (1 << 10),
 
     // Bits 24-31 are reserved for temporary experiments. Just pick a bit that
     // isn't getting used, or one not being used much, and notify the
@@ -292,20 +314,11 @@ enum ServiceFlags : uint64_t {
  * unless they set NODE_NETWORK_LIMITED and we are out of IBD, in which
  * case NODE_NETWORK_LIMITED suffices).
  *
- * Thus, generally, avoid calling with peerServices == NODE_NONE, unless
- * state-specific flags must absolutely be avoided. When called with
- * peerServices == NODE_NONE, the returned desirable service flags are
- * guaranteed to not change dependent on state - ie they are suitable for
- * use when describing peers which we know to be desirable, but for which
- * we do not have a confirmed set of service flags.
- *
- * If the NODE_NONE return value is changed, contrib/seeds/makeseeds.py
- * should be updated appropriately to filter for the same nodes.
+ * Thus, generally, avoid calling with peerServices == NODE_NONE.
  */
-ServiceFlags GetDesirableServiceFlags(ServiceFlags services);
-
-/** Set the current IBD status in order to figure out the desirable service flags */
-void SetServiceFlagsIBDCache(bool status);
+static ServiceFlags GetDesirableServiceFlags(ServiceFlags services) {
+    return ServiceFlags(NODE_NONE);
+}
 
 /**
  * A shortcut for (services & GetDesirableServiceFlags(services))
@@ -318,10 +331,10 @@ static inline bool HasAllDesirableServiceFlags(ServiceFlags services) {
 
 /**
  * Checks if a peer with the given service flags may be capable of having a
- * robust address-storage DB.
+ * robust address-storage DB. Currently an alias for checking NODE_NETWORK.
  */
 static inline bool MayHaveUsefulAddressDB(ServiceFlags services) {
-    return (services & NODE_NETWORK) || (services & NODE_NETWORK_LIMITED);
+    return services & NODE_NETWORK;
 }
 
 /** A CService with information about it as peer */
@@ -349,7 +362,7 @@ public:
         uint64_t nServicesInt = nServices;
         READWRITE(nServicesInt);
         nServices = static_cast<ServiceFlags>(nServicesInt);
-        READWRITEAS(CService, *this);
+        READWRITE(*static_cast<CService*>(this));
     }
 
     // TODO: make private (improves encapsulation)
@@ -402,9 +415,33 @@ public:
     std::string GetCommand() const;
     std::string ToString() const;
 
+    // TODO: make private (improves encapsulation)
 public:
     int type;
     uint256 hash;
+};
+
+/** inv message data */
+class CInvToken
+{
+public:
+    CInvToken();
+    CInvToken(std::string name);
+
+    ADD_SERIALIZE_METHODS;
+
+    template <typename Stream, typename Operation>
+    inline void SerializationOp(Stream& s, Operation ser_action)
+    {
+        READWRITE(name);
+    }
+
+    friend bool operator<(const CInvToken& a, const CInvToken& b);
+
+    std::string ToString() const;
+
+public:
+    std::string name; // block height that token data should come from
 };
 
 #endif // AOKCHAIN_PROTOCOL_H

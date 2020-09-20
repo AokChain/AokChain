@@ -1,11 +1,13 @@
-// Copyright (c) 2011-2018 The Bitcoin Core developers
+// Copyright (c) 2011-2014 The Bitcoin Core developers
+// Copyright (c) 2017-2019 The Raven Core developers
+// Copyright (c) 2020 The AokChain Core developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 #ifndef AOKCHAIN_QT_TRANSACTIONFILTERPROXY_H
 #define AOKCHAIN_QT_TRANSACTIONFILTERPROXY_H
 
-#include <amount.h>
+#include "amount.h"
 
 #include <QDateTime>
 #include <QSortFilterProxyModel>
@@ -16,7 +18,7 @@ class TransactionFilterProxy : public QSortFilterProxyModel
     Q_OBJECT
 
 public:
-    explicit TransactionFilterProxy(QObject *parent = nullptr);
+    explicit TransactionFilterProxy(QObject *parent = 0);
 
     /** Earliest date that can be represented (far in the past) */
     static const QDateTime MIN_DATE;
@@ -35,7 +37,8 @@ public:
     };
 
     void setDateRange(const QDateTime &from, const QDateTime &to);
-    void setSearchString(const QString &);
+    void setAddressPrefix(const QString &addrPrefix);
+    void setTokenNamePrefix(const QString &tokenNamePrefix);
     /**
       @note Type filter takes a bit field created with TYPE() or ALL_TYPES
      */
@@ -57,12 +60,12 @@ protected:
 private:
     QDateTime dateFrom;
     QDateTime dateTo;
-    QString m_search_string;
+    QString addrPrefix;
+    QString tokenNamePrefix;
     quint32 typeFilter;
     WatchOnlyFilter watchOnlyFilter;
     CAmount minAmount;
     int limitRows;
     bool showInactive;
 };
-
 #endif // AOKCHAIN_QT_TRANSACTIONFILTERPROXY_H

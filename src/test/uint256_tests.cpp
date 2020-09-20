@@ -1,10 +1,12 @@
-// Copyright (c) 2011-2018 The Bitcoin Core developers
+// Copyright (c) 2011-2016 The Bitcoin Core developers
+// Copyright (c) 2017-2019 The Raven Core developers
+// Copyright (c) 2020 The AokChain Core developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
-#include <arith_uint256.h>
-#include <uint256.h>
-#include <version.h>
-#include <test/test_aokchain.h>
+#include "arith_uint256.h"
+#include "uint256.h"
+#include "version.h"
+#include "test/test_aokchain.h"
 
 #include <boost/test/unit_test.hpp>
 #include <stdint.h>
@@ -48,7 +50,7 @@ const unsigned char MaxArray[] =
 const uint256 MaxL = uint256(std::vector<unsigned char>(MaxArray,MaxArray+32));
 const uint160 MaxS = uint160(std::vector<unsigned char>(MaxArray,MaxArray+20));
 
-static std::string ArrayToString(const unsigned char A[], unsigned int width)
+std::string ArrayToString(const unsigned char A[], unsigned int width)
 {
     std::stringstream Stream;
     Stream << std::hex;
@@ -72,8 +74,10 @@ inline uint160 uint160S(const std::string& str)
     return rv;
 }
 
-BOOST_AUTO_TEST_CASE( basics ) // constructors, equality, inequality
+BOOST_AUTO_TEST_CASE(basics_test) // constructors, equality, inequality
 {
+    BOOST_TEST_MESSAGE("Running Basics Test");
+
     BOOST_CHECK(1 == 0+1);
     // constructor uint256(vector<char>):
     BOOST_CHECK(R1L.ToString() == ArrayToString(R1Array,32));
@@ -124,8 +128,10 @@ BOOST_AUTO_TEST_CASE( basics ) // constructors, equality, inequality
     BOOST_CHECK(uint160(OneS) == OneS);
 }
 
-BOOST_AUTO_TEST_CASE( comparison ) // <= >= < >
+BOOST_AUTO_TEST_CASE(comparison_test) // <= >= < >
 {
+    BOOST_TEST_MESSAGE("Running Comparison Test");
+
     uint256 LastL;
     for (int i = 255; i >= 0; --i) {
         uint256 TmpL;
@@ -156,8 +162,10 @@ BOOST_AUTO_TEST_CASE( comparison ) // <= >= < >
     BOOST_CHECK( R2S < MaxS );
 }
 
-BOOST_AUTO_TEST_CASE( methods ) // GetHex SetHex begin() end() size() GetLow64 GetSerializeSize, Serialize, Unserialize
+BOOST_AUTO_TEST_CASE(methods_test) // GetHex SetHex begin() end() size() GetLow64 GetSerializeSize, Serialize, Unserialize
 {
+    BOOST_TEST_MESSAGE("Running Methods Test");
+
     BOOST_CHECK(R1L.GetHex() == R1L.ToString());
     BOOST_CHECK(R2L.GetHex() == R2L.ToString());
     BOOST_CHECK(OneL.GetHex() == OneL.ToString());
@@ -184,8 +192,8 @@ BOOST_AUTO_TEST_CASE( methods ) // GetHex SetHex begin() end() size() GetLow64 G
     BOOST_CHECK(OneL.begin() + 32 == OneL.end());
     BOOST_CHECK(MaxL.begin() + 32 == MaxL.end());
     BOOST_CHECK(TmpL.begin() + 32 == TmpL.end());
-    BOOST_CHECK(GetSerializeSize(R1L, PROTOCOL_VERSION) == 32);
-    BOOST_CHECK(GetSerializeSize(ZeroL, PROTOCOL_VERSION) == 32);
+    BOOST_CHECK(GetSerializeSize(R1L, 0, PROTOCOL_VERSION) == 32);
+    BOOST_CHECK(GetSerializeSize(ZeroL, 0, PROTOCOL_VERSION) == 32);
 
     CDataStream ss(0, PROTOCOL_VERSION);
     ss << R1L;
@@ -230,8 +238,8 @@ BOOST_AUTO_TEST_CASE( methods ) // GetHex SetHex begin() end() size() GetLow64 G
     BOOST_CHECK(OneS.begin() + 20 == OneS.end());
     BOOST_CHECK(MaxS.begin() + 20 == MaxS.end());
     BOOST_CHECK(TmpS.begin() + 20 == TmpS.end());
-    BOOST_CHECK(GetSerializeSize(R1S, PROTOCOL_VERSION) == 20);
-    BOOST_CHECK(GetSerializeSize(ZeroS, PROTOCOL_VERSION) == 20);
+    BOOST_CHECK(GetSerializeSize(R1S, 0, PROTOCOL_VERSION) == 20);
+    BOOST_CHECK(GetSerializeSize(ZeroS, 0, PROTOCOL_VERSION) == 20);
 
     ss << R1S;
     BOOST_CHECK(ss.str() == std::string(R1Array,R1Array+20));
@@ -250,8 +258,10 @@ BOOST_AUTO_TEST_CASE( methods ) // GetHex SetHex begin() end() size() GetLow64 G
     ss.clear();
 }
 
-BOOST_AUTO_TEST_CASE( conversion )
+BOOST_AUTO_TEST_CASE(conversion_test)
 {
+    BOOST_TEST_MESSAGE("Running Conversion Test");
+
     BOOST_CHECK(ArithToUint256(UintToArith256(ZeroL)) == ZeroL);
     BOOST_CHECK(ArithToUint256(UintToArith256(OneL)) == OneL);
     BOOST_CHECK(ArithToUint256(UintToArith256(R1L)) == R1L);
@@ -264,19 +274,6 @@ BOOST_AUTO_TEST_CASE( conversion )
     BOOST_CHECK(arith_uint256(R2L.GetHex()) == UintToArith256(R2L));
     BOOST_CHECK(R1L.GetHex() == UintToArith256(R1L).GetHex());
     BOOST_CHECK(R2L.GetHex() == UintToArith256(R2L).GetHex());
-}
-
-BOOST_AUTO_TEST_CASE( operator_with_self )
-{
-    arith_uint256 v = UintToArith256(uint256S("02"));
-    v *= v;
-    BOOST_CHECK(v == UintToArith256(uint256S("04")));
-    v /= v;
-    BOOST_CHECK(v == UintToArith256(uint256S("01")));
-    v += v;
-    BOOST_CHECK(v == UintToArith256(uint256S("02")));
-    v -= v;
-    BOOST_CHECK(v == UintToArith256(uint256S("0")));
 }
 
 BOOST_AUTO_TEST_SUITE_END()

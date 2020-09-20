@@ -1,4 +1,6 @@
-// Copyright (c) 2011-2019 The Bitcoin Core developers
+// Copyright (c) 2011-2016 The Bitcoin Core developers
+// Copyright (c) 2017-2019 The Raven Core developers
+// Copyright (c) 2020 The AokChain Core developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -31,14 +33,14 @@ class WalletFrame : public QFrame
     Q_OBJECT
 
 public:
-    explicit WalletFrame(const PlatformStyle *platformStyle, AokChainGUI *_gui = nullptr);
+    explicit WalletFrame(const PlatformStyle *platformStyle, AokChainGUI *_gui = 0);
     ~WalletFrame();
 
     void setClientModel(ClientModel *clientModel);
 
-    bool addWallet(WalletModel *walletModel);
-    bool setCurrentWallet(WalletModel* wallet_model);
-    bool removeWallet(WalletModel* wallet_model);
+    bool addWallet(const QString& name, WalletModel *walletModel);
+    bool setCurrentWallet(const QString& name);
+    bool removeWallet(const QString &name);
     void removeAllWallets();
 
     bool handlePaymentRequest(const SendCoinsRecipient& recipient);
@@ -53,15 +55,13 @@ private:
     QStackedWidget *walletStack;
     AokChainGUI *gui;
     ClientModel *clientModel;
-    QMap<WalletModel*, WalletView*> mapWalletViews;
+    QMap<QString, WalletView*> mapWalletViews;
 
     bool bOutOfSync;
 
     const PlatformStyle *platformStyle;
 
-public:
-    WalletView* currentWalletView() const;
-    WalletModel* currentWalletModel() const;
+    WalletView *currentWalletView();
 
 public Q_SLOTS:
     /** Switch to overview (home) page */
@@ -86,6 +86,8 @@ public Q_SLOTS:
     void changePassphrase();
     /** Ask for passphrase to unlock wallet temporarily */
     void unlockWallet();
+    /** Check if wallet is unlocked */
+    bool isWalletUnlocked();
 
     unsigned long long updateWeight();
 
@@ -96,8 +98,13 @@ public Q_SLOTS:
     /** Pass on signal over requested out-of-sync-warning information */
     void outOfSyncWarningClicked();
 
-    /** Check if wallet is unlocked */
-    bool isWalletUnlocked();
+    /** TOKENS START */
+
+    /** Switch to tokens page */
+    void gotoTokensPage();
+    void gotoCreateTokensPage();
+    void gotoManageTokensPage();
+    /** TOKENS END */
 };
 
 #endif // AOKCHAIN_QT_WALLETFRAME_H

@@ -5,7 +5,7 @@ Upstart: aokchaind.conf
 OpenRC:  aokchaind.openrc
          aokchaind.openrcconf
 CentOS:  aokchaind.init
-macOS:   org.aokchain.aokchaind.plist
+OS X:    org.aokchain.aokchaind.plist
 ```
 have been made available to assist packagers in creating node packages here.
 

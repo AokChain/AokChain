@@ -15,9 +15,3 @@ endif
 if BUILD_AOKCHAIN_TX
   dist_man1_MANS+=aokchain-tx.1
 endif
-
-if ENABLE_WALLET
-if BUILD_AOKCHAIN_WALLET
-  dist_man1_MANS+=aokchain-wallet.1
-endif
-endif

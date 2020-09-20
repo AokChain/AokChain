@@ -1,15 +1,17 @@
 // Copyright (c) 2009-2010 Satoshi Nakamoto
-// Copyright (c) 2009-2018 The Bitcoin Core developers
+// Copyright (c) 2009-2016 The Bitcoin Core developers
 // Copyright (c) 2014 The BlackCoin developers
+// Copyright (c) 2017-2019 The Raven Core developers
+// Copyright (c) 2020 The AokChain Core developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 #ifndef AOKCHAIN_PRIMITIVES_BLOCK_H
 #define AOKCHAIN_PRIMITIVES_BLOCK_H
 
-#include <primitives/transaction.h>
-#include <serialize.h>
-#include <uint256.h>
+#include "primitives/transaction.h"
+#include "serialize.h"
+#include "uint256.h"
 
 /** Nodes collect new transactions into a block, hash them into a hash tree,
  * and scan through nonce values to make the block's hash satisfy proof-of-work
@@ -61,7 +63,7 @@ public:
         return (nBits == 0);
     }
 
-    uint256 GetHash() const;
+    uint256 GetBlockHash() const;
 
     int64_t GetBlockTime() const
     {
@@ -97,7 +99,7 @@ public:
 
     template <typename Stream, typename Operation>
     inline void SerializationOp(Stream& s, Operation ser_action) {
-        READWRITEAS(CBlockHeader, *this);
+        READWRITE(*static_cast<CBlockHeader*>(this));
         READWRITE(vtx);
         READWRITE(vchBlockSig);
     }
@@ -133,14 +135,10 @@ public:
         return block;
     }
 
-    // ppcoin: get max transaction timestamp
-    int64_t GetMaxTransactionTime() const
-    {
-        int64_t maxTransactionTime = 0;
-        for (const auto& tx : vtx)
-            maxTransactionTime = std::max(maxTransactionTime, (int64_t)tx->nTime);
-        return maxTransactionTime;
-    }
+    // void SetPrevBlockHash(uint256 prevHash) 
+    // {
+    //     block.hashPrevBlock = prevHash;
+    // }
 
     std::string ToString() const;
 };

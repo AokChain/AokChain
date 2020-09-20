@@ -1,4 +1,5 @@
-# Copyright (c) 2013-2016 The AokChain Core developers
+# Copyright (c) 2013-2016 The Bitcoin Core developers
+# Copyright (c) 2017 The AokChain Core developers
 # Distributed under the MIT software license, see the accompanying
 # file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -9,6 +10,7 @@ SUBDIRS += doc/man
 endif
 .PHONY: deploy FORCE
 
+override GZIP_ENV = "-9n"
 export PYTHONPATH
 
 if BUILD_AOKCHAIN_LIBS
@@ -19,9 +21,8 @@ endif
 AOKCHAIND_BIN=$(top_builddir)/src/$(AOKCHAIN_DAEMON_NAME)$(EXEEXT)
 AOKCHAIN_QT_BIN=$(top_builddir)/src/qt/$(AOKCHAIN_GUI_NAME)$(EXEEXT)
 AOKCHAIN_CLI_BIN=$(top_builddir)/src/$(AOKCHAIN_CLI_NAME)$(EXEEXT)
-AOKCHAIN_TX_BIN=$(top_builddir)/src/$(AOKCHAIN_TX_NAME)$(EXEEXT)
-AOKCHAIN_WALLET_BIN=$(top_builddir)/src/$(AOKCHAIN_WALLET_TOOL_NAME)$(EXEEXT)
 AOKCHAIN_WIN_INSTALLER=$(PACKAGE)-$(PACKAGE_VERSION)-win$(WINDOWS_BITS)-setup$(EXEEXT)
+AOKCHAIN_CLI_INSTALL=$(top_builddir)/contrib/install_cli.sh
 
 empty :=
 space := $(empty) $(empty)
@@ -44,10 +45,10 @@ DIST_CONTRIB = $(top_srcdir)/contrib/aokchain-cli.bash-completion \
 	       $(top_srcdir)/contrib/aokchain-tx.bash-completion \
 	       $(top_srcdir)/contrib/aokchaind.bash-completion \
 	       $(top_srcdir)/contrib/init \
-	       $(top_srcdir)/contrib/install_db4.sh
+	       $(top_srcdir)/contrib/rpm
 DIST_SHARE = \
   $(top_srcdir)/share/genbuild.sh \
-  $(top_srcdir)/share/rpcauth
+  $(top_srcdir)/share/rpcuser
 
 BIN_CHECKS=$(top_srcdir)/contrib/devtools/symbol-check.py \
            $(top_srcdir)/contrib/devtools/security-check.py
@@ -76,8 +77,6 @@ $(AOKCHAIN_WIN_INSTALLER): all-recursive
 	STRIPPROG="$(STRIP)" $(INSTALL_STRIP_PROGRAM) $(AOKCHAIND_BIN) $(top_builddir)/release
 	STRIPPROG="$(STRIP)" $(INSTALL_STRIP_PROGRAM) $(AOKCHAIN_QT_BIN) $(top_builddir)/release
 	STRIPPROG="$(STRIP)" $(INSTALL_STRIP_PROGRAM) $(AOKCHAIN_CLI_BIN) $(top_builddir)/release
-	STRIPPROG="$(STRIP)" $(INSTALL_STRIP_PROGRAM) $(AOKCHAIN_TX_BIN) $(top_builddir)/release
-	STRIPPROG="$(STRIP)" $(INSTALL_STRIP_PROGRAM) $(AOKCHAIN_WALLET_BIN) $(top_builddir)/release
 	@test -f $(MAKENSIS) && $(MAKENSIS) -V2 $(top_builddir)/share/setup.nsi || \
 	  echo error: could not build $@
 	@echo built $@
@@ -98,9 +97,21 @@ $(OSX_APP)/Contents/Resources/aokchain.icns: $(OSX_INSTALLER_ICONS)
 	$(MKDIR_P) $(@D)
 	$(INSTALL_DATA) $< $@
 
-$(OSX_APP)/Contents/MacOS/AokChain-Qt: all-recursive
+$(OSX_APP)/Contents/MacOS/install_cli.sh: $(AOKCHAIN_CLI_INSTALL)
 	$(MKDIR_P) $(@D)
-	STRIPPROG="$(STRIP)" $(INSTALL_STRIP_PROGRAM)  $(AOKCHAIN_QT_BIN) $@
+	$(INSTALL_DATA) $< $@
+
+$(OSX_APP)/Contents/MacOS/AokChain-Qt: $(AOKCHAIN_QT_BIN)
+	$(MKDIR_P) $(@D)
+	STRIPPROG="$(STRIP)" $(INSTALL_STRIP_PROGRAM)  $< $@
+
+$(OSX_APP)/Contents/MacOS/aokchaind: $(AOKCHAIND_BIN)
+	$(MKDIR_P) $(@D)
+	STRIPPROG="$(STRIP)" $(INSTALL_STRIP_PROGRAM)  $< $@
+
+$(OSX_APP)/Contents/MacOS/aokchain-cli: $(AOKCHAIN_CLI_BIN)
+	$(MKDIR_P) $(@D)
+	STRIPPROG="$(STRIP)" $(INSTALL_STRIP_PROGRAM)  $< $@
 
 $(OSX_APP)/Contents/Resources/Base.lproj/InfoPlist.strings:
 	$(MKDIR_P) $(@D)
@@ -108,7 +119,8 @@ $(OSX_APP)/Contents/Resources/Base.lproj/InfoPlist.strings:
 
 OSX_APP_BUILT=$(OSX_APP)/Contents/PkgInfo $(OSX_APP)/Contents/Resources/empty.lproj \
   $(OSX_APP)/Contents/Resources/aokchain.icns $(OSX_APP)/Contents/Info.plist \
-  $(OSX_APP)/Contents/MacOS/AokChain-Qt $(OSX_APP)/Contents/Resources/Base.lproj/InfoPlist.strings
+  $(OSX_APP)/Contents/MacOS/AokChain-Qt $(OSX_APP)/Contents/Resources/Base.lproj/InfoPlist.strings \
+  $(OSX_APP)/Contents/MacOS/aokchaind $(OSX_APP)/Contents/MacOS/aokchain-cli $(OSX_APP)/Contents/MacOS/install_cli.sh
 
 osx_volname:
 	echo $(OSX_VOLNAME) >$@
@@ -171,14 +183,8 @@ $(AOKCHAIND_BIN): FORCE
 $(AOKCHAIN_CLI_BIN): FORCE
 	$(MAKE) -C src $(@F)
 
-$(AOKCHAIN_TX_BIN): FORCE
-	$(MAKE) -C src $(@F)
-
-$(AOKCHAIN_WALLET_BIN): FORCE
-	$(MAKE) -C src $(@F)
-
 if USE_LCOV
-LCOV_FILTER_PATTERN=-p "/usr/include/" -p "/usr/lib/" -p "src/leveldb/" -p "src/bench/" -p "src/univalue" -p "src/crypto/ctaes" -p "src/secp256k1"
+LCOV_FILTER_PATTERN=-p "/usr/include/" -p "src/leveldb/" -p "src/bench/" -p "src/univalue" -p "src/crypto/ctaes" -p "src/secp256k1"
 
 baseline.info:
 	$(LCOV) -c -i -d $(abs_builddir)/src -o $@
@@ -225,11 +231,7 @@ endif
 
 dist_noinst_SCRIPTS = autogen.sh
 
-EXTRA_DIST = $(DIST_SHARE) $(DIST_CONTRIB) $(DIST_DOCS) $(WINDOWS_PACKAGING) $(OSX_PACKAGING) $(BIN_CHECKS)
-
-EXTRA_DIST += \
-    test/functional \
-    test/fuzz
+EXTRA_DIST = $(DIST_SHARE) test/functional/test_runner.py test/functional $(DIST_CONTRIB) $(DIST_DOCS) $(WINDOWS_PACKAGING) $(OSX_PACKAGING) $(BIN_CHECKS)
 
 EXTRA_DIST += \
     test/util/aokchain-util-test.py \
@@ -282,8 +284,7 @@ EXTRA_DIST += \
     test/util/data/txcreatescript4.json \
     test/util/data/txcreatesignv1.hex \
     test/util/data/txcreatesignv1.json \
-    test/util/data/txcreatesignv2.hex \
-    test/util/rpcauth-test.py
+    test/util/data/txcreatesignv2.hex
 
 CLEANFILES = $(OSX_DMG) $(AOKCHAIN_WIN_INSTALLER)
 
@@ -291,22 +292,6 @@ CLEANFILES = $(OSX_DMG) $(AOKCHAIN_WIN_INSTALLER)
 
 DISTCHECK_CONFIGURE_FLAGS = --enable-man
 
-doc/doxygen/.stamp: doc/Doxyfile FORCE
-	$(MKDIR_P) $(@D)
-	$(DOXYGEN) $^
-	$(AM_V_at) touch $@
-
-if HAVE_DOXYGEN
-docs: doc/doxygen/.stamp
-else
-docs:
-	@echo "error: doxygen not found"
-endif
-
-clean-docs:
-	rm -rf doc/doxygen
-
-clean-local: clean-docs
+clean-local:
 	rm -rf coverage_percent.txt test_aokchain.coverage/ total.coverage/ test/tmp/ cache/ $(OSX_APP)
-	rm -rf test/functional/__pycache__ test/functional/test_framework/__pycache__ test/cache share/rpcauth/__pycache__
-
+	rm -rf test/functional/__pycache__

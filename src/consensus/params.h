@@ -1,13 +1,16 @@
 // Copyright (c) 2009-2010 Satoshi Nakamoto
-// Copyright (c) 2009-2018 The Bitcoin Core developers
+// Copyright (c) 2009-2016 The Bitcoin Core developers
+// Copyright (c) 2014 The BlackCoin developers
+// Copyright (c) 2017-2019 The Raven Core developers
+// Copyright (c) 2020 The AokChain Core developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 #ifndef AOKCHAIN_CONSENSUS_PARAMS_H
 #define AOKCHAIN_CONSENSUS_PARAMS_H
 
-#include <uint256.h>
-#include <limits>
+#include "uint256.h"
+#include "amount.h"
 #include <map>
 #include <string>
 
@@ -30,15 +33,6 @@ struct BIP9Deployment {
     int64_t nStartTime;
     /** Timeout/expiry MedianTime for the deployment attempt. */
     int64_t nTimeout;
-
-    /** Constant for nTimeout very far in the future. */
-    static constexpr int64_t NO_TIMEOUT = std::numeric_limits<int64_t>::max();
-
-    /** Special value for nStartTime indicating that the deployment is always active.
-     *  This is useful for testing, as it means tests don't need to deal with the activation
-     *  process (which takes at least 3 BIP9 intervals). Only tests that specifically test the
-     *  behaviour during activation cannot use this. */
-    static constexpr int64_t ALWAYS_ACTIVE = -1;
 };
 
 /**
@@ -46,26 +40,39 @@ struct BIP9Deployment {
  */
 struct Params {
     uint256 hashGenesisBlock;
-    int nSubsidyHalvingInterval;
+    /** Block height and hash at which BIP34 becomes active */
     bool nBIP34Enabled;
     bool nBIP65Enabled;
     bool nBIP66Enabled;
-    bool nSegwitEnabled;
-    bool nCSVEnabled;
-
+    // uint256 BIP34Hash;
+    /** Block height at which BIP65 becomes active */
+    // int BIP65Height;
+    /** Block height at which BIP66 becomes active */
+    // int BIP66Height;
+    /**
+     * Minimum blocks including miner confirmation of the total of 2016 blocks in a retargeting period,
+     * (nTargetTimespan / nTargetSpacing) which is also used for BIP9 deployments.
+     * Examples: 1916 for 95%, 1512 for testchains.
+     */
     uint32_t nRuleChangeActivationThreshold;
     uint32_t nMinerConfirmationWindow;
     BIP9Deployment vDeployments[MAX_VERSION_BITS_DEPLOYMENTS];
     /** Proof of work parameters */
     uint256 powLimit;
     uint256 posLimit;
-    int nLastPOWBlock;
-    bool fPowAllowMinDifficultyBlocks;
-    bool fPowNoRetargeting;
     int64_t nTargetSpacing;
     int64_t nTargetTimespan;
+    int64_t DifficultyAdjustmentInterval() const { return nTargetTimespan / nTargetSpacing; }
     uint256 nMinimumChainWork;
     uint256 defaultAssumeValid;
+    bool nSegwitEnabled;
+    bool nCSVEnabled;
+    
+    // AOK
+    int nLastPOWBlock;
+    int nSubsidyHalvingInterval;
+    int nTokensDeploymentHeight;
+
     int nStakeTimestampMask;
 };
 } // namespace Consensus

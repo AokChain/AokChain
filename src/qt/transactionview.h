@@ -1,13 +1,13 @@
-// Copyright (c) 2011-2018 The Bitcoin Core developers
+// Copyright (c) 2011-2016 The Bitcoin Core developers
+// Copyright (c) 2017-2019 The Raven Core developers
+// Copyright (c) 2020 The AokChain Core developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 #ifndef AOKCHAIN_QT_TRANSACTIONVIEW_H
 #define AOKCHAIN_QT_TRANSACTIONVIEW_H
 
-#include <qt/guiutil.h>
-
-#include <uint256.h>
+#include "guiutil.h"
 
 #include <QWidget>
 #include <QKeyEvent>
@@ -35,9 +35,10 @@ class TransactionView : public QWidget
     Q_OBJECT
 
 public:
-    explicit TransactionView(const PlatformStyle *platformStyle, QWidget *parent = nullptr);
+    explicit TransactionView(const PlatformStyle *platformStyle, QWidget *parent = 0);
 
     void setModel(WalletModel *model);
+    void showTokens();
 
     // Date ranges for filter
     enum DateEnum
@@ -56,6 +57,7 @@ public:
         WATCHONLY_COLUMN_WIDTH = 23,
         DATE_COLUMN_WIDTH = 120,
         TYPE_COLUMN_WIDTH = 113,
+        TOKEN_NAME_MINIMUM_COLUMN_WIDTH = 200,
         AMOUNT_MINIMUM_COLUMN_WIDTH = 120,
         MINIMUM_COLUMN_WIDTH = 23
     };
@@ -68,8 +70,11 @@ private:
     QComboBox *dateWidget;
     QComboBox *typeWidget;
     QComboBox *watchOnlyWidget;
-    QLineEdit *search_widget;
+    QLineEdit *addressWidget;
     QLineEdit *amountWidget;
+    QLineEdit *tokenNameWidget;
+
+    bool showingTokens;
 
     QMenu *contextMenu;
     QSignalMapper *mapperThirdPartyTxUrls;
@@ -95,6 +100,7 @@ private Q_SLOTS:
     void copyAddress();
     void editLabel();
     void copyLabel();
+    void copyTokenName();
     void copyAmount();
     void copyTxID();
     void copyTxHex();
@@ -110,17 +116,16 @@ Q_SIGNALS:
     /**  Fired when a message should be reported to the user */
     void message(const QString &title, const QString &message, unsigned int style);
 
-    void bumpedFee(const uint256& txid);
-
 public Q_SLOTS:
     void chooseDate(int idx);
     void chooseType(int idx);
     void chooseWatchonly(int idx);
     void changedAmount();
-    void changedSearch();
+    void changedTokenName();
+    void changedPrefix();
     void exportClicked();
     void focusTransaction(const QModelIndex&);
-    void focusTransaction(const uint256& txid);
+
 };
 
 #endif // AOKCHAIN_QT_TRANSACTIONVIEW_H

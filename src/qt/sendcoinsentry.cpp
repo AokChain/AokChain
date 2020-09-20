@@ -1,20 +1,21 @@
-// Copyright (c) 2011-2018 The Bitcoin Core developers
+// Copyright (c) 2011-2016 The Bitcoin Core developers
+// Copyright (c) 2017-2019 The Raven Core developers
+// Copyright (c) 2020 The AokChain Core developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
-#if defined(HAVE_CONFIG_H)
-#include <config/aokchain-config.h>
-#endif
+#include "sendcoinsentry.h"
+#include "ui_sendcoinsentry.h"
 
-#include <qt/sendcoinsentry.h>
-#include <qt/forms/ui_sendcoinsentry.h>
-
-#include <qt/addressbookpage.h>
-#include <qt/addresstablemodel.h>
-#include <qt/guiutil.h>
-#include <qt/optionsmodel.h>
-#include <qt/platformstyle.h>
-#include <validation.h>
+#include "addressbookpage.h"
+#include "addresstablemodel.h"
+#include "guiutil.h"
+#include "optionsmodel.h"
+#include "platformstyle.h"
+#include "walletmodel.h"
+#include "guiconstants.h"
+#include "darkstyle.h"
+#include "validation.h"
 
 #include <QApplication>
 #include <QClipboard>
@@ -22,7 +23,7 @@
 SendCoinsEntry::SendCoinsEntry(const PlatformStyle *_platformStyle, QWidget *parent) :
     QStackedWidget(parent),
     ui(new Ui::SendCoinsEntry),
-    model(nullptr),
+    model(0),
     platformStyle(_platformStyle)
 {
     ui->setupUi(this);
@@ -37,26 +38,57 @@ SendCoinsEntry::SendCoinsEntry(const PlatformStyle *_platformStyle, QWidget *par
 
     if (platformStyle->getUseExtraSpacing())
         ui->payToLayout->setSpacing(4);
+#if QT_VERSION >= 0x040700
     ui->addAsLabel->setPlaceholderText(tr("Enter a label for this address to add it to your address book"));
+#endif
 
     // normal aokchain address field
     GUIUtil::setupAddressWidget(ui->payTo, this);
     // just a label for displaying aokchain address(es)
-    ui->payTo_is->setFont(GUIUtil::fixedPitchFont());
+    ui->payTo_is->setFont(GUIUtil::getSubLabelFont());
 
     // Connect signals
-    connect(ui->payAmount, &AokChainAmountField::valueChanged, this, &SendCoinsEntry::payAmountChanged);
-    connect(ui->checkboxSubtractFeeFromAmount, &QCheckBox::toggled, this, &SendCoinsEntry::subtractFeeFromAmountChanged);
-    connect(ui->useTimeLock, &QCheckBox::toggled, this, &SendCoinsEntry::toggleTimeLock);
-    connect(ui->deleteButton, &QPushButton::clicked, this, &SendCoinsEntry::deleteClicked);
-    connect(ui->deleteButton_is, &QPushButton::clicked, this, &SendCoinsEntry::deleteClicked);
-    connect(ui->deleteButton_s, &QPushButton::clicked, this, &SendCoinsEntry::deleteClicked);
-    connect(ui->useAvailableBalanceButton, &QPushButton::clicked, this, &SendCoinsEntry::useAvailableBalanceClicked);
+    connect(ui->payAmount, SIGNAL(valueChanged()), this, SIGNAL(payAmountChanged()));
+    connect(ui->checkboxSubtractFeeFromAmount, SIGNAL(toggled(bool)), this, SIGNAL(subtractFeeFromAmountChanged()));
+    connect(ui->useLockTime, SIGNAL(toggled(bool)), this, SLOT(toggleTimeLock(bool)));
+    connect(ui->deleteButton, SIGNAL(clicked()), this, SLOT(deleteClicked()));
+    connect(ui->deleteButton_is, SIGNAL(clicked()), this, SLOT(deleteClicked()));
+    connect(ui->deleteButton_s, SIGNAL(clicked()), this, SLOT(deleteClicked()));
+
+    this->setStyleSheet(QString(".SendCoinsEntry {background-color: %1; padding-top: 10px; padding-right: 30px; border: none;}").arg(platformStyle->SendEntriesBackGroundColor().name()));
+
+    ui->payToLabel->setStyleSheet(STRING_LABEL_COLOR);
+    ui->payToLabel->setFont(GUIUtil::getSubLabelFont());
+
+    ui->labellLabel->setStyleSheet(STRING_LABEL_COLOR);
+    ui->labellLabel->setFont(GUIUtil::getSubLabelFont());
+
+    ui->amountLabel->setStyleSheet(STRING_LABEL_COLOR);
+    ui->amountLabel->setFont(GUIUtil::getSubLabelFont());
+
+    ui->messageLabel->setStyleSheet(STRING_LABEL_COLOR);
+    ui->messageLabel->setFont(GUIUtil::getSubLabelFont());
+
+    ui->lockTimeLabel->setStyleSheet(STRING_LABEL_COLOR);
+    ui->lockTimeLabel->setFont(GUIUtil::getSubLabelFont());
+
+    ui->checkboxSubtractFeeFromAmount->setStyleSheet(QString(".QCheckBox{ %1; }").arg(STRING_LABEL_COLOR));
+#if defined(Q_OS_WIN)
+    ui->useLockTime->setStyleSheet(QString(".QCheckBox{ %1; margin-left: 10px; }").arg(STRING_LABEL_COLOR));
+#else
+    ui->useLockTime->setStyleSheet(QString(".QCheckBox{ %1; }").arg(STRING_LABEL_COLOR));
+#endif
+    ui->payTo->setFont(GUIUtil::getSubLabelFont());
+    ui->addAsLabel->setFont(GUIUtil::getSubLabelFont());
+    ui->coinLockTime->setFont(GUIUtil::getSubLabelFont());
+    ui->coinLockTime->setMinimumDate(QDate::currentDate());
+    ui->payAmount->setFont(GUIUtil::getSubLabelFont());
+    ui->messageTextLabel->setFont(GUIUtil::getSubLabelFont());
 }
 
 void SendCoinsEntry::toggleTimeLock(bool checked)
 {
-    ui->coinTimeLock->setEnabled(checked);
+    ui->coinLockTime->setEnabled(checked);
 }
 
 SendCoinsEntry::~SendCoinsEntry()
@@ -93,7 +125,7 @@ void SendCoinsEntry::setModel(WalletModel *_model)
     this->model = _model;
 
     if (_model && _model->getOptionsModel())
-        connect(_model->getOptionsModel(), &OptionsModel::displayUnitChanged, this, &SendCoinsEntry::updateDisplayUnit);
+        connect(_model->getOptionsModel(), SIGNAL(displayUnitChanged(int)), this, SLOT(updateDisplayUnit()));
 
     clear();
 }
@@ -103,10 +135,10 @@ void SendCoinsEntry::clear()
     // clear UI elements for normal payment
     ui->payTo->clear();
     ui->addAsLabel->clear();
-    ui->coinTimeLock->clear();
+    ui->coinLockTime->clear();
     ui->payAmount->clear();
     ui->checkboxSubtractFeeFromAmount->setCheckState(Qt::Unchecked);
-    ui->useTimeLock->setCheckState(Qt::Unchecked);
+    ui->useLockTime->setCheckState(Qt::Unchecked);
     ui->messageTextLabel->clear();
     ui->messageTextLabel->hide();
     ui->messageLabel->hide();
@@ -123,22 +155,12 @@ void SendCoinsEntry::clear()
     updateDisplayUnit();
 }
 
-void SendCoinsEntry::checkSubtractFeeFromAmount()
-{
-    ui->checkboxSubtractFeeFromAmount->setChecked(true);
-}
-
 void SendCoinsEntry::deleteClicked()
 {
     Q_EMIT removeEntry(this);
 }
 
-void SendCoinsEntry::useAvailableBalanceClicked()
-{
-    Q_EMIT useAvailableBalance(this);
-}
-
-bool SendCoinsEntry::validate(interfaces::Node& node)
+bool SendCoinsEntry::validate()
 {
     if (!model)
         return false;
@@ -146,11 +168,9 @@ bool SendCoinsEntry::validate(interfaces::Node& node)
     // Check input validity
     bool retval = true;
 
-#ifdef ENABLE_BIP70
     // Skip checks for payment request
     if (recipient.paymentRequest.IsInitialized())
         return retval;
-#endif
 
     if (!model->validateAddress(ui->payTo->text()))
     {
@@ -164,14 +184,14 @@ bool SendCoinsEntry::validate(interfaces::Node& node)
     }
 
     // Sending a zero amount is invalid
-    if (ui->payAmount->value(nullptr) <= 0)
+    if (ui->payAmount->value(0) <= 0)
     {
         ui->payAmount->setValid(false);
         retval = false;
     }
 
     // Reject dust outputs:
-    if (retval && GUIUtil::isDust(node, ui->payTo->text(), ui->payAmount->value())) {
+    if (retval && GUIUtil::isDust(ui->payTo->text(), ui->payAmount->value())) {
         ui->payAmount->setValid(false);
         retval = false;
     }
@@ -181,20 +201,21 @@ bool SendCoinsEntry::validate(interfaces::Node& node)
 
 SendCoinsRecipient SendCoinsEntry::getValue()
 {
-#ifdef ENABLE_BIP70
     // Payment request
     if (recipient.paymentRequest.IsInitialized())
         return recipient;
-#endif
 
     // Normal payment
     recipient.address = ui->payTo->text();
     recipient.label = ui->addAsLabel->text();
-    if (ui->useTimeLock->checkState() == Qt::Checked) {
-        recipient.coinTimeLock = ui->coinTimeLock->dateTime().toTime_t();
+    recipient.label = ui->addAsLabel->text();
+
+    if (ui->useLockTime->checkState() == Qt::Checked) {
+        recipient.coinLockTime = ui->coinLockTime->dateTime().toTime_t();
     } else {
-        recipient.coinTimeLock = 0;
+        recipient.coinLockTime = 0;
     }
+
     recipient.amount = ui->payAmount->value();
     recipient.message = ui->messageTextLabel->text();
     recipient.fSubtractFeeFromAmount = (ui->checkboxSubtractFeeFromAmount->checkState() == Qt::Checked);
@@ -218,7 +239,6 @@ void SendCoinsEntry::setValue(const SendCoinsRecipient &value)
 {
     recipient = value;
 
-#ifdef ENABLE_BIP70
     if (recipient.paymentRequest.IsInitialized()) // payment request
     {
         if (recipient.authenticatedMerchant.isEmpty()) // unauthenticated
@@ -239,7 +259,6 @@ void SendCoinsEntry::setValue(const SendCoinsRecipient &value)
         }
     }
     else // normal payment
-#endif
     {
         // message
         ui->messageTextLabel->setText(recipient.message);
@@ -258,11 +277,6 @@ void SendCoinsEntry::setAddress(const QString &address)
 {
     ui->payTo->setText(address);
     ui->payAmount->setFocus();
-}
-
-void SendCoinsEntry::setAmount(const CAmount &amount)
-{
-    ui->payAmount->setValue(amount);
 }
 
 bool SendCoinsEntry::isClear()

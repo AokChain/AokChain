@@ -1,21 +1,13 @@
 #!/usr/bin/env python3
-# Copyright (c) 2014-2018 The AokChain Core developers
+# Copyright (c) 2014-2016 The Bitcoin Core developers
+# Copyright (c) 2017-2018 The AokChain Core developers
 # Distributed under the MIT software license, see the accompanying
 # file COPYING or http://www.opensource.org/licenses/mit-license.php.
 """Test the fundrawtransaction RPC."""
 
-from decimal import Decimal
 from test_framework.test_framework import AokChainTestFramework
-from test_framework.util import (
-    assert_equal,
-    assert_fee_amount,
-    assert_greater_than,
-    assert_greater_than_or_equal,
-    assert_raises_rpc_error,
-    connect_nodes_bi,
-    count_bytes,
-    find_vout_for_address,
-)
+from test_framework.util import *
+from pprint import *
 
 
 def get_unspent(listunspent, amount):
@@ -29,10 +21,7 @@ class RawTransactionsTest(AokChainTestFramework):
         self.num_nodes = 4
         self.setup_clean_chain = True
 
-    def skip_test_if_missing_module(self):
-        self.skip_if_no_wallet()
-
-    def setup_network(self):
+    def setup_network(self, split=False):
         self.setup_nodes()
 
         connect_nodes_bi(self.nodes, 0, 1)
@@ -42,6 +31,7 @@ class RawTransactionsTest(AokChainTestFramework):
 
     def run_test(self):
         min_relay_tx_fee = self.nodes[0].getnetworkinfo()['relayfee']
+
         # This test is not meant to test fee estimation and we'd like
         # to be sure all txs are sent at a consistent desired feerate
         for node in self.nodes:
@@ -61,20 +51,15 @@ class RawTransactionsTest(AokChainTestFramework):
         self.sync_all()
 
         # ensure that setting changePosition in fundraw with an exact match is handled properly
-        rawmatch = self.nodes[2].createrawtransaction([], {self.nodes[2].getnewaddress():50})
+        rawmatch = self.nodes[2].createrawtransaction([], {self.nodes[2].getnewaddress():5000})
         rawmatch = self.nodes[2].fundrawtransaction(rawmatch, {"changePosition":1, "subtractFeeFromOutputs":[0]})
         assert_equal(rawmatch["changepos"], -1)
 
         watchonly_address = self.nodes[0].getnewaddress()
-        watchonly_pubkey = self.nodes[0].getaddressinfo(watchonly_address)["pubkey"]
-        watchonly_amount = Decimal(200)
+        watchonly_pubkey = self.nodes[0].validateaddress(watchonly_address)["pubkey"]
+        watchonly_amount = Decimal(20000)
         self.nodes[3].importpubkey(watchonly_pubkey, "", True)
         watchonly_txid = self.nodes[0].sendtoaddress(watchonly_address, watchonly_amount)
-
-        # Lock UTXO so nodes[0] doesn't accidentally spend it
-        watchonly_vout = find_vout_for_address(self.nodes[0], watchonly_txid, watchonly_address)
-        self.nodes[0].lockunspent(False, [{"txid": watchonly_txid, "vout": watchonly_vout}])
-
         self.nodes[0].sendtoaddress(self.nodes[3].getnewaddress(), watchonly_amount / 10)
 
         self.nodes[0].sendtoaddress(self.nodes[2].getnewaddress(), 1.5)
@@ -199,9 +184,6 @@ class RawTransactionsTest(AokChainTestFramework):
 
         assert_raises_rpc_error(-3, "Unexpected key foo", self.nodes[2].fundrawtransaction, rawtx, {'foo':'bar'})
 
-        # reserveChangeKey was deprecated and is now removed
-        assert_raises_rpc_error(-3, "Unexpected key reserveChangeKey", lambda: self.nodes[2].fundrawtransaction(hexstring=rawtx, options={'reserveChangeKey': True}))
-
         ############################################################
         # test a fundrawtransaction with an invalid change address #
         ############################################################
@@ -233,19 +215,6 @@ class RawTransactionsTest(AokChainTestFramework):
         out = dec_tx['vout'][0]
         assert_equal(change, out['scriptPubKey']['addresses'][0])
 
-        #########################################################
-        # test a fundrawtransaction with a provided change type #
-        #########################################################
-        utx = get_unspent(self.nodes[2].listunspent(), 5)
-
-        inputs  = [ {'txid' : utx['txid'], 'vout' : utx['vout']} ]
-        outputs = { self.nodes[0].getnewaddress() : Decimal(4.0) }
-        rawtx   = self.nodes[2].createrawtransaction(inputs, outputs)
-        assert_raises_rpc_error(-1, "JSON value is not a string as expected", self.nodes[2].fundrawtransaction, rawtx, {'change_type': None})
-        assert_raises_rpc_error(-5, "Unknown change type ''", self.nodes[2].fundrawtransaction, rawtx, {'change_type': ''})
-        rawtx = self.nodes[2].fundrawtransaction(rawtx, {'change_type': 'bech32'})
-        dec_tx = self.nodes[2].decoderawtransaction(rawtx['hex'])
-        assert_equal('witness_v0_keyhash', dec_tx['vout'][rawtx['changepos']]['scriptPubKey']['type'])
 
         #########################################################################
         # test a fundrawtransaction with a VIN smaller than the required amount #
@@ -340,16 +309,6 @@ class RawTransactionsTest(AokChainTestFramework):
         assert_equal(matchingOuts, 2)
         assert_equal(len(dec_tx['vout']), 3)
 
-        ##############################################
-        # test a fundrawtransaction with invalid vin #
-        ##############################################
-        inputs  = [ {'txid' : "1c7f966dab21119bac53213a2bc7532bff1fa844c124fd750a7d0b1332440bd1", 'vout' : 0} ] #invalid vin!
-        outputs = { self.nodes[0].getnewaddress() : 1.0}
-        rawtx   = self.nodes[2].createrawtransaction(inputs, outputs)
-        dec_tx  = self.nodes[2].decoderawtransaction(rawtx)
-
-        assert_raises_rpc_error(-4, "Insufficient funds", self.nodes[2].fundrawtransaction, rawtx)
-
         ############################################################
         #compare fee of a standard pubkeyhash transaction
         inputs = []
@@ -389,10 +348,10 @@ class RawTransactionsTest(AokChainTestFramework):
         addr1 = self.nodes[1].getnewaddress()
         addr2 = self.nodes[1].getnewaddress()
 
-        addr1Obj = self.nodes[1].getaddressinfo(addr1)
-        addr2Obj = self.nodes[1].getaddressinfo(addr2)
+        addr1Obj = self.nodes[1].validateaddress(addr1)
+        addr2Obj = self.nodes[1].validateaddress(addr2)
 
-        mSigObj = self.nodes[1].addmultisigaddress(2, [addr1Obj['pubkey'], addr2Obj['pubkey']])['address']
+        mSigObj = self.nodes[1].addmultisigaddress(2, [addr1Obj['pubkey'], addr2Obj['pubkey']])
 
         inputs = []
         outputs = {mSigObj:1.1}
@@ -419,13 +378,13 @@ class RawTransactionsTest(AokChainTestFramework):
         addr4 = self.nodes[1].getnewaddress()
         addr5 = self.nodes[1].getnewaddress()
 
-        addr1Obj = self.nodes[1].getaddressinfo(addr1)
-        addr2Obj = self.nodes[1].getaddressinfo(addr2)
-        addr3Obj = self.nodes[1].getaddressinfo(addr3)
-        addr4Obj = self.nodes[1].getaddressinfo(addr4)
-        addr5Obj = self.nodes[1].getaddressinfo(addr5)
+        addr1Obj = self.nodes[1].validateaddress(addr1)
+        addr2Obj = self.nodes[1].validateaddress(addr2)
+        addr3Obj = self.nodes[1].validateaddress(addr3)
+        addr4Obj = self.nodes[1].validateaddress(addr4)
+        addr5Obj = self.nodes[1].validateaddress(addr5)
 
-        mSigObj = self.nodes[1].addmultisigaddress(4, [addr1Obj['pubkey'], addr2Obj['pubkey'], addr3Obj['pubkey'], addr4Obj['pubkey'], addr5Obj['pubkey']])['address']
+        mSigObj = self.nodes[1].addmultisigaddress(4, [addr1Obj['pubkey'], addr2Obj['pubkey'], addr3Obj['pubkey'], addr4Obj['pubkey'], addr5Obj['pubkey']])
 
         inputs = []
         outputs = {mSigObj:1.1}
@@ -449,10 +408,10 @@ class RawTransactionsTest(AokChainTestFramework):
         addr1 = self.nodes[2].getnewaddress()
         addr2 = self.nodes[2].getnewaddress()
 
-        addr1Obj = self.nodes[2].getaddressinfo(addr1)
-        addr2Obj = self.nodes[2].getaddressinfo(addr2)
+        addr1Obj = self.nodes[2].validateaddress(addr1)
+        addr2Obj = self.nodes[2].validateaddress(addr2)
 
-        mSigObj = self.nodes[2].addmultisigaddress(2, [addr1Obj['pubkey'], addr2Obj['pubkey']])['address']
+        mSigObj = self.nodes[2].addmultisigaddress(2, [addr1Obj['pubkey'], addr2Obj['pubkey']])
 
 
         # send 1.2 AOK to msig addr
@@ -467,7 +426,7 @@ class RawTransactionsTest(AokChainTestFramework):
         rawtx = self.nodes[2].createrawtransaction(inputs, outputs)
         fundedTx = self.nodes[2].fundrawtransaction(rawtx)
 
-        signedTx = self.nodes[2].signrawtransactionwithwallet(fundedTx['hex'])
+        signedTx = self.nodes[2].signrawtransaction(fundedTx['hex'])
         txId = self.nodes[2].sendrawtransaction(signedTx['hex'])
         self.sync_all()
         self.nodes[1].generate(1)
@@ -478,8 +437,10 @@ class RawTransactionsTest(AokChainTestFramework):
 
         ############################################################
         # locked wallet test
-        self.nodes[1].encryptwallet("test")
-        self.stop_nodes()
+        self.stop_node(0)
+        self.nodes[1].node_encrypt_wallet("test")
+        self.stop_node(2)
+        self.stop_node(3)
 
         self.start_nodes()
         # This test is not meant to test fee estimation and we'd like
@@ -491,9 +452,6 @@ class RawTransactionsTest(AokChainTestFramework):
         connect_nodes_bi(self.nodes,1,2)
         connect_nodes_bi(self.nodes,0,2)
         connect_nodes_bi(self.nodes,0,3)
-        # Again lock the watchonly UTXO or nodes[0] may spend it, because
-        # lockunspent is memory-only and thus lost on restart
-        self.nodes[0].lockunspent(False, [{"txid": watchonly_txid, "vout": watchonly_vout}])
         self.sync_all()
 
         # drain the keypool
@@ -522,13 +480,13 @@ class RawTransactionsTest(AokChainTestFramework):
 
         #now we need to unlock
         self.nodes[1].walletpassphrase("test", 600)
-        signedTx = self.nodes[1].signrawtransactionwithwallet(fundedTx['hex'])
+        signedTx = self.nodes[1].signrawtransaction(fundedTx['hex'])
         txId = self.nodes[1].sendrawtransaction(signedTx['hex'])
         self.nodes[1].generate(1)
         self.sync_all()
 
         # make sure funds are received at node1
-        assert_equal(oldBalance+Decimal('51.10000000'), self.nodes[0].getbalance())
+        assert_equal(oldBalance+Decimal('5001.10000000'), self.nodes[0].getbalance())
 
 
         ###############################################
@@ -583,12 +541,12 @@ class RawTransactionsTest(AokChainTestFramework):
         outputs = {self.nodes[0].getnewaddress():0.15,self.nodes[0].getnewaddress():0.04}
         rawtx = self.nodes[1].createrawtransaction(inputs, outputs)
         fundedTx = self.nodes[1].fundrawtransaction(rawtx)
-        fundedAndSignedTx = self.nodes[1].signrawtransactionwithwallet(fundedTx['hex'])
+        fundedAndSignedTx = self.nodes[1].signrawtransaction(fundedTx['hex'])
         txId = self.nodes[1].sendrawtransaction(fundedAndSignedTx['hex'])
         self.sync_all()
         self.nodes[0].generate(1)
         self.sync_all()
-        assert_equal(oldBalance+Decimal('50.19000000'), self.nodes[0].getbalance()) #0.19+block reward
+        assert_equal(oldBalance+Decimal('5000.19000000'), self.nodes[0].getbalance()) #0.19+block reward
 
         #####################################################
         # test fundrawtransaction with OP_RETURN and no vin #
@@ -641,9 +599,9 @@ class RawTransactionsTest(AokChainTestFramework):
         assert_greater_than(result["changepos"], -1)
         assert_equal(result["fee"] + res_dec["vout"][result["changepos"]]["value"], watchonly_amount / 10)
 
-        signedtx = self.nodes[3].signrawtransactionwithwallet(result["hex"])
+        signedtx = self.nodes[3].signrawtransaction(result["hex"])
         assert(not signedtx["complete"])
-        signedtx = self.nodes[0].signrawtransactionwithwallet(signedtx["hex"])
+        signedtx = self.nodes[0].signrawtransaction(signedtx["hex"])
         assert(signedtx["complete"])
         self.nodes[0].sendrawtransaction(signedtx["hex"])
         self.nodes[0].generate(1)
@@ -658,12 +616,13 @@ class RawTransactionsTest(AokChainTestFramework):
 
         inputs = []
         outputs = {self.nodes[3].getnewaddress() : 1}
+        pprint(self.nodes[3].getbalance())
         rawtx = self.nodes[3].createrawtransaction(inputs, outputs)
-        result = self.nodes[3].fundrawtransaction(rawtx) # uses min_relay_tx_fee (set by settxfee)
-        result2 = self.nodes[3].fundrawtransaction(rawtx, {"feeRate": 2*min_relay_tx_fee})
-        result3 = self.nodes[3].fundrawtransaction(rawtx, {"feeRate": 10*min_relay_tx_fee})
-        assert_raises_rpc_error(-4, "Fee exceeds maximum configured by -maxtxfee", self.nodes[3].fundrawtransaction, rawtx, {"feeRate": 1})
+        result = self.nodes[3].fundrawtransaction(rawtx) # uses DEFAULT_TRANSACTION_MINFEE
+        result2 = self.nodes[3].fundrawtransaction(rawtx, {"feeRate": 2*0.0005})
+        result3 = self.nodes[3].fundrawtransaction(rawtx, {"feeRate": 10*0.0005})
         result_fee_rate = result['fee'] * 1000 / count_bytes(result['hex'])
+        assert_fee_amount(result['fee'], count_bytes(result['hex']), result_fee_rate)
         assert_fee_amount(result2['fee'], count_bytes(result2['hex']), 2 * result_fee_rate)
         assert_fee_amount(result3['fee'], count_bytes(result3['hex']), 10 * result_fee_rate)
 
@@ -699,7 +658,7 @@ class RawTransactionsTest(AokChainTestFramework):
                   self.nodes[3].fundrawtransaction(rawtx, {"feeRate": 2*min_relay_tx_fee}),
                   self.nodes[3].fundrawtransaction(rawtx, {"feeRate": 2*min_relay_tx_fee, "subtractFeeFromOutputs": [0]})]
 
-        dec_tx = [self.nodes[3].decoderawtransaction(tx_['hex']) for tx_ in result]
+        dec_tx = [self.nodes[3].decoderawtransaction(tx['hex']) for tx in result]
         output = [d['vout'][1 - r['changepos']]['value'] for d, r in zip(dec_tx, result)]
         change = [d['vout'][r['changepos']]['value'] for d, r in zip(dec_tx, result)]
 

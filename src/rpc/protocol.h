@@ -1,12 +1,14 @@
 // Copyright (c) 2010 Satoshi Nakamoto
-// Copyright (c) 2009-2018 The Bitcoin Core developers
+// Copyright (c) 2009-2016 The Bitcoin Core developers
+// Copyright (c) 2017-2019 The Raven Core developers
+// Copyright (c) 2020 The AokChain Core developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
-#ifndef AOKCHAIN_RPC_PROTOCOL_H
-#define AOKCHAIN_RPC_PROTOCOL_H
+#ifndef AOKCHAIN_RPCPROTOCOL_H
+#define AOKCHAIN_RPCPROTOCOL_H
 
-#include <fs.h>
+#include "fs.h"
 
 #include <list>
 #include <map>
@@ -46,6 +48,7 @@ enum RPCErrorCode
 
     //! General application defined errors
     RPC_MISC_ERROR                  = -1,  //!< std::exception thrown in command handling
+    RPC_FORBIDDEN_BY_SAFE_MODE      = -2,  //!< Server is in safe mode, and command is not allowed in safe mode
     RPC_TYPE_ERROR                  = -3,  //!< Unexpected type was passed as parameter
     RPC_INVALID_ADDRESS_OR_KEY      = -5,  //!< Invalid address or key
     RPC_OUT_OF_MEMORY               = -7,  //!< Ran out of memory during operation
@@ -87,9 +90,6 @@ enum RPCErrorCode
 
     //! Backwards compatible aliases
     RPC_WALLET_INVALID_ACCOUNT_NAME = RPC_WALLET_INVALID_LABEL_NAME,
-
-    //! Unused reserved codes, kept around for backwards compatibility. Do not reuse.
-    RPC_FORBIDDEN_BY_SAFE_MODE      = -2,  //!< Server is in safe mode, and command is not allowed in safe mode
 };
 
 UniValue JSONRPCRequestObj(const std::string& strMethod, const UniValue& params, const UniValue& id);
@@ -106,4 +106,4 @@ void DeleteAuthCookie();
 /** Parse JSON-RPC batch reply into a vector */
 std::vector<UniValue> JSONRPCProcessBatchReply(const UniValue &in, size_t num);
 
-#endif // AOKCHAIN_RPC_PROTOCOL_H
+#endif // AOKCHAIN_RPCPROTOCOL_H

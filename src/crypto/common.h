@@ -1,4 +1,6 @@
-// Copyright (c) 2014-2018 The Bitcoin Core developers
+// Copyright (c) 2014 The Bitcoin Core developers
+// Copyright (c) 2017-2019 The Raven Core developers
+// Copyright (c) 2020 The AokChain Core developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -6,13 +8,13 @@
 #define AOKCHAIN_CRYPTO_COMMON_H
 
 #if defined(HAVE_CONFIG_H)
-#include <config/aokchain-config.h>
+#include "config/aokchain-config.h"
 #endif
 
 #include <stdint.h>
 #include <string.h>
 
-#include <compat/endian.h>
+#include "compat/endian.h"
 
 uint16_t static inline ReadLE16(const unsigned char* ptr)
 {
@@ -82,12 +84,12 @@ void static inline WriteBE64(unsigned char* ptr, uint64_t x)
 /** Return the smallest number n such that (x >> n) == 0 (or 64 if the highest bit in x is set. */
 uint64_t static inline CountBits(uint64_t x)
 {
-#if HAVE_DECL___BUILTIN_CLZL
+#ifdef HAVE_DECL___BUILTIN_CLZL
     if (sizeof(unsigned long) >= sizeof(uint64_t)) {
         return x ? 8 * sizeof(unsigned long) - __builtin_clzl(x) : 0;
     }
 #endif
-#if HAVE_DECL___BUILTIN_CLZLL
+#ifdef HAVE_DECL___BUILTIN_CLZLL
     if (sizeof(unsigned long long) >= sizeof(uint64_t)) {
         return x ? 8 * sizeof(unsigned long long) - __builtin_clzll(x) : 0;
     }

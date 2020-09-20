@@ -1,4 +1,6 @@
-// Copyright (c) 2015-2018 The Bitcoin Core developers
+// Copyright (c) 2015-2016 The Bitcoin Core developers
+// Copyright (c) 2017-2019 The Raven Core developers
+// Copyright (c) 2020 The AokChain Core developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -6,6 +8,7 @@
 #define AOKCHAIN_HTTPSERVER_H
 
 #include <string>
+#include <stdint.h>
 #include <functional>
 
 static const int DEFAULT_HTTP_THREADS=4;
@@ -25,13 +28,13 @@ bool InitHTTPServer();
  * This is separate from InitHTTPServer to give users race-condition-free time
  * to register their handlers between InitHTTPServer and StartHTTPServer.
  */
-void StartHTTPServer();
+bool StartHTTPServer();
 /** Interrupt HTTP server threads */
 void InterruptHTTPServer();
 /** Stop HTTP server */
 void StopHTTPServer();
 
-/** Change logging level for libevent. Removes BCLog::LIBEVENT from log categories if
+/** Change logging level for libevent. Removes BCLog::LIBEVENT from logCategories if
  * libevent doesn't support debug logging.*/
 bool UpdateHTTPServerLogging(bool enable);
 
@@ -73,21 +76,21 @@ public:
 
     /** Get requested URI.
      */
-    std::string GetURI() const;
+    std::string GetURI();
 
     /** Get CService (address:ip) for the origin of the http request.
      */
-    CService GetPeer() const;
+    CService GetPeer();
 
     /** Get request method.
      */
-    RequestMethod GetRequestMethod() const;
+    RequestMethod GetRequestMethod();
 
     /**
      * Get the request header specified by hdr, or an empty string.
      * Return a pair (isPresent,string).
      */
-    std::pair<bool, std::string> GetHeader(const std::string& hdr) const;
+    std::pair<bool, std::string> GetHeader(const std::string& hdr);
 
     /**
      * Read request body.
@@ -113,6 +116,15 @@ public:
      * main thread, do not call any other HTTPRequest methods after calling this.
      */
     void WriteReply(int nStatus, const std::string& strReply = "");
+
+    /**
+     * Write HTTP reply from the callback thread
+     *
+     * @note Behavior is exactly the same as WriteReply, except that the send queue
+     * is bypassed. This should _only_ be called from inside the request
+     * callback, the from any other thread is undefined.
+     */
+    void WriteReplyImmediate(int nStatus, const std::string& strReply = "");
 };
 
 /** Event handler closure.
@@ -133,7 +145,7 @@ public:
      * deleteWhenTriggered deletes this event object after the event is triggered (and the handler called)
      * handler is the handler to call when the event is triggered.
      */
-    HTTPEvent(struct event_base* base, bool deleteWhenTriggered, const std::function<void()>& handler);
+    HTTPEvent(struct event_base* base, bool deleteWhenTriggered, const std::function<void(void)>& handler);
     ~HTTPEvent();
 
     /** Trigger the event. If tv is 0, trigger it immediately. Otherwise trigger it after
@@ -142,7 +154,7 @@ public:
     void trigger(struct timeval* tv);
 
     bool deleteWhenTriggered;
-    std::function<void()> handler;
+    std::function<void(void)> handler;
 private:
     struct event* ev;
 };

@@ -1,11 +1,11 @@
 #!/bin/sh
-# Copyright (c) 2012-2016 The AokChain Core developers
+# Copyright (c) 2012-2016 The Bitcoin Core developers
+# Copyright (c) 2017 The AokChain Core developers
 # Distributed under the MIT software license, see the accompanying
 # file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
-export LC_ALL=C
 if [ $# -gt 1 ]; then
-    cd "$2" || exit 1
+    cd "$2"
 fi
 if [ $# -gt 0 ]; then
     FILE="$1"

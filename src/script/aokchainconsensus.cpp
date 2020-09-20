@@ -1,14 +1,16 @@
 // Copyright (c) 2009-2010 Satoshi Nakamoto
-// Copyright (c) 2009-2018 The Bitcoin Core developers
+// Copyright (c) 2009-2016 The Bitcoin Core developers
+// Copyright (c) 2017-2019 The Raven Core developers
+// Copyright (c) 2020 The AokChain Core developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
-#include <script/aokchainconsensus.h>
+#include "aokchainconsensus.h"
 
-#include <primitives/transaction.h>
-#include <pubkey.h>
-#include <script/interpreter.h>
-#include <version.h>
+#include "primitives/transaction.h"
+#include "pubkey.h"
+#include "script/interpreter.h"
+#include "version.h"
 
 namespace {
 
@@ -40,7 +42,7 @@ public:
     }
 
     template<typename T>
-    TxInputStream& operator>>(T&& obj)
+    TxInputStream& operator>>(T& obj)
     {
         ::Unserialize(*this, obj);
         return *this;
@@ -81,14 +83,14 @@ static int verify_script(const unsigned char *scriptPubKey, unsigned int scriptP
                                     unsigned int nIn, unsigned int flags, aokchainconsensus_error* err)
 {
     if (!verify_flags(flags)) {
-        return set_error(err, aokchainconsensus_ERR_INVALID_FLAGS);
+        return aokchainconsensus_ERR_INVALID_FLAGS;
     }
     try {
         TxInputStream stream(SER_NETWORK, PROTOCOL_VERSION, txTo, txToLen);
         CTransaction tx(deserialize, stream);
         if (nIn >= tx.vin.size())
             return set_error(err, aokchainconsensus_ERR_TX_INDEX);
-        if (GetSerializeSize(tx, PROTOCOL_VERSION) != txToLen)
+        if (GetSerializeSize(tx, SER_NETWORK, PROTOCOL_VERSION) != txToLen)
             return set_error(err, aokchainconsensus_ERR_TX_SIZE_MISMATCH);
 
         // Regardless of the verification result, the tx did not error.

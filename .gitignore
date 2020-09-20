@@ -1,14 +1,20 @@
+buildspecs
+Jenkinsfile
 *.tar.gz
 
 *.exe
+*.user
 src/aokchain
 src/aokchaind
 src/aokchain-cli
 src/aokchain-tx
-src/aokchain-wallet
 src/test/test_aokchain
 src/test/test_aokchain_fuzzy
+src/test/test_aokchain_hash
 src/qt/test/test_aokchain-qt
+.vscode
+output.txt
+aokchain-qt.zip
 
 # autoreconf
 Makefile.in
@@ -37,7 +43,7 @@ src/config/stamp-h1
 share/setup.nsi
 share/qt/Info.plist
 
-src/univalue/gen
+
 
 src/qt/*.moc
 src/qt/moc_*.cpp
@@ -45,11 +51,10 @@ src/qt/forms/ui_*.h
 
 src/qt/test/moc*.cpp
 
-src/qt/aokchain-qt.config
-src/qt/aokchain-qt.creator
-src/qt/aokchain-qt.creator.user
-src/qt/aokchain-qt.files
-src/qt/aokchain-qt.includes
+.settings
+.cproject
+.project
+.vscode
 
 .deps
 .dirstamp
@@ -66,7 +71,6 @@ src/qt/aokchain-qt.includes
 *.a
 *.pb.cc
 *.pb.h
-*.dat
 
 *.log
 *.trs
@@ -84,7 +88,6 @@ src/qt/aokchain-qt.includes
 Makefile
 aokchain-qt
 AokChain-Qt.app
-background.tiff*
 
 # Unit-tests
 Makefile.test
@@ -118,9 +121,7 @@ test/cache/*
 
 libaokchainconsensus.pc
 contrib/devtools/split-debug.sh
+.idea
+cmake-build-debug
 
-# Output from running db4 installation
-db4/
-
-# clang-check
-*.plist
+CMakeLists.txt

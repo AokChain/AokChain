@@ -1,13 +1,18 @@
 // Copyright (c) 2009-2010 Satoshi Nakamoto
-// Copyright (c) 2009-2018 The Bitcoin Core developers
+// Copyright (c) 2009-2016 The Bitcoin Core developers
 // Copyright (c) 2014 The BlackCoin developers
+// Copyright (c) 2017-2019 The Raven Core developers
+// Copyright (c) 2020 The AokChain Core developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
+#include "streams.h"
+#include "version.h"
+#include "tokens/tokens.h"
+#include "script.h"
 
-#include <script/script.h>
-
-#include <tinyformat.h>
-#include <util/strencodings.h>
+#include "tinyformat.h"
+#include "utilstrencodings.h"
+#include "standard.h"
 
 const char* GetOpName(opcodetype opcode)
 {
@@ -140,7 +145,16 @@ const char* GetOpName(opcodetype opcode)
     case OP_NOP9                   : return "OP_NOP9";
     case OP_NOP10                  : return "OP_NOP10";
 
+    /** TOKENS START */
+    case OP_AOK_TOKEN              : return "OP_AOK_TOKEN";
+    /** TOKENS END */
+
     case OP_INVALIDOPCODE          : return "OP_INVALIDOPCODE";
+
+    // Note:
+    //  The template matching params OP_SMALLINTEGER/etc are defined in opcodetype enum
+    //  as kind of implementation hack, they are *NOT* real opcodes.  If found in real
+    //  Script, just let the default: case deal with them.
 
     default:
         return "OP_UNKNOWN";
@@ -195,6 +209,12 @@ unsigned int CScript::GetSigOpCount(const CScript& scriptSig) const
     return subscript.GetSigOpCount(true);
 }
 
+int CScript::GetScriptIndex(int index) const
+{
+    int value = (*this)[index];
+    return value;
+}
+
 bool CScript::IsPayToPublicKeyHash() const
 {
     // Extra-fast test for pay-to-pubkey-hash CScripts:
@@ -233,20 +253,109 @@ bool CScript::IsPayToScriptHash() const
             (*this)[22] == OP_EQUAL);
 }
 
+/** TOKENS START */
+bool CScript::IsTokenScript() const
+{
+    int nType = 0;
+    bool isOwner = false;
+    int start = 0;
+    return IsTokenScript(nType, isOwner, start);
+}
+
+bool CScript::IsTokenScript(int& nType, bool& isOwner) const
+{
+    int start = 0;
+    return IsTokenScript(nType, isOwner, start);
+}
+
+bool CScript::IsTokenScript(int& nType, bool& fIsOwner, int& nStartingIndex) const
+{
+    if (this->size() > 30) {
+        if ((*this)[25] == OP_AOK_TOKEN) { // OP_AOK_TOKEN is always in the 25 index of the script if it exists
+            int index = -1;
+            if ((*this)[27] == AOK_A) { // Check to see if AOK starts at 27 ( this->size() < 105)
+                if ((*this)[28] == AOK_L)
+                    if ((*this)[29] == AOK_P)
+                        index = 30;
+            } else {
+                if ((*this)[28] == AOK_A) // Check to see if AOK starts at 28 ( this->size() >= 105)
+                    if ((*this)[29] == AOK_L)
+                        if ((*this)[30] == AOK_P)
+                            index = 31;
+            }
+
+            if (index > 0) {
+                nStartingIndex = index + 1; // Set the index where the token data begins. Use to serialize the token data into token objects
+                if ((*this)[index] == AOK_T) { // Transfer first anticipating more transfers than other tokens operations
+                    nType = TX_TRANSFER_TOKEN;
+                    return true;
+                } else if ((*this)[index] == AOK_Q && this->size() > 39) {
+                    nType = TX_NEW_TOKEN;
+                    fIsOwner = false;
+                    return true;
+                } else if ((*this)[index] == AOK_O) {
+                    nType = TX_NEW_TOKEN;
+                    fIsOwner = true;
+                    return true;
+                } else if ((*this)[index] == AOK_A) {
+                    nType = TX_REISSUE_TOKEN;
+                    return true;
+                }
+            }
+        }
+    }
+    return false;
+}
+
+
+bool CScript::IsNewToken() const
+{
+
+    int nType = 0;
+    bool fIsOwner = false;
+    if (IsTokenScript(nType, fIsOwner))
+        return !fIsOwner && nType == TX_NEW_TOKEN;
+
+    return false;
+}
+
+bool CScript::IsOwnerToken() const
+{
+    int nType = 0;
+    bool fIsOwner = false;
+    if (IsTokenScript(nType, fIsOwner))
+        return fIsOwner && nType == TX_NEW_TOKEN;
+
+    return false;
+}
+
+bool CScript::IsReissueToken() const
+{
+    int nType = 0;
+    bool fIsOwner = false;
+    if (IsTokenScript(nType, fIsOwner))
+        return nType == TX_REISSUE_TOKEN;
+
+    return false;
+}
+
+bool CScript::IsTransferToken() const
+{
+    int nType = 0;
+    bool fIsOwner = false;
+    if (IsTokenScript(nType, fIsOwner))
+        return nType == TX_TRANSFER_TOKEN;
+
+    return false;
+}
+/** TOKENS END */
+
 bool CScript::IsPayToWitnessScriptHash() const
 {
     // Extra-fast test for pay-to-witness-script-hash CScripts:
     return (this->size() == 34 &&
             (*this)[0] == OP_0 &&
             (*this)[1] == 0x20);
-}
-
-bool CScript::IsPayToWitnessPubkeyHash() const
-{
-    // Extra-fast test for pay-to-witness-pubkey-hash CScripts:
-    return (this->size() == 22 &&
-            (*this)[0] == OP_0 &&
-            (*this)[1] == 0x14);
 }
 
 // A witness program is any valid CScript that consists of a 1-byte push opcode
@@ -266,7 +375,6 @@ bool CScript::IsWitnessProgram(int& version, std::vector<unsigned char>& program
     }
     return false;
 }
-
 bool CScript::IsPayToPublicKey() const
 {
     // Test for pay-to-pubkey CScript with both
@@ -330,54 +438,152 @@ bool CScript::HasValidOps() const
     return true;
 }
 
-bool GetScriptOp(CScriptBase::const_iterator& pc, CScriptBase::const_iterator end, opcodetype& opcodeRet, std::vector<unsigned char>* pvchRet)
+bool CScript::IsUnspendable() const
 {
-    opcodeRet = OP_INVALIDOPCODE;
-    if (pvchRet)
-        pvchRet->clear();
-    if (pc >= end)
-        return false;
+    CAmount nAmount;
+    return (size() > 0 && *begin() == OP_RETURN) || (size() > MAX_SCRIPT_SIZE) || (GetTokenAmountFromScript(*this, nAmount) && nAmount == 0);
+}
 
-    // Read instruction
-    if (end - pc < 1)
-        return false;
-    unsigned int opcode = *pc++;
+//!--------------------------------------------------------------------------------------------------------------------------!//
+//! These are needed because script.h and script.cpp do not have access to token.h and token.cpp functions. This is
+//! because the make file compiles them at different times. The script files are compiled with other
+//! consensus files, and token files are compiled with core files.
 
-    // Immediate operand
-    if (opcode <= OP_PUSHDATA4)
-    {
-        unsigned int nSize = 0;
-        if (opcode < OP_PUSHDATA1)
-        {
-            nSize = opcode;
-        }
-        else if (opcode == OP_PUSHDATA1)
-        {
-            if (end - pc < 1)
-                return false;
-            nSize = *pc++;
-        }
-        else if (opcode == OP_PUSHDATA2)
-        {
-            if (end - pc < 2)
-                return false;
-            nSize = ReadLE16(&pc[0]);
-            pc += 2;
-        }
-        else if (opcode == OP_PUSHDATA4)
-        {
-            if (end - pc < 4)
-                return false;
-            nSize = ReadLE32(&pc[0]);
-            pc += 4;
-        }
-        if (end - pc < 0 || (unsigned int)(end - pc) < nSize)
-            return false;
-        if (pvchRet)
-            pvchRet->assign(pc, pc + nSize);
-        pc += nSize;
+//! Used to check if an token script contains zero tokens. Is so, it should be unspendable
+bool GetTokenAmountFromScript(const CScript& script, CAmount& nAmount)
+{
+    // Placeholder strings that will get set if you successfully get the transfer or token from the script
+    std::string address = "";
+    std::string tokenName = "";
+
+    int nType = 0;
+    bool fIsOwner = false;
+    if (!script.IsTokenScript(nType, fIsOwner)) {
+        return false;
     }
 
-    opcodeRet = static_cast<opcodetype>(opcode);
+    txnouttype type = txnouttype(nType);
+
+    // Get the New Token or Transfer Token from the scriptPubKey
+    if (type == TX_NEW_TOKEN && !fIsOwner) {
+        if (AmountFromNewTokenScript(script, nAmount)) {
+            return true;
+        }
+    } else if (type == TX_TRANSFER_TOKEN) {
+        if (AmountFromTransferScript(script, nAmount)) {
+            return true;
+        }
+    } else if (type == TX_NEW_TOKEN && fIsOwner) {
+            nAmount = OWNER_TOKEN_AMOUNT;
+            return true;
+    } else if (type == TX_REISSUE_TOKEN) {
+        if (AmountFromReissueScript(script, nAmount)) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+bool ScriptNewToken(const CScript& scriptPubKey, int& nStartingIndex)
+{
+    int nType = 0;
+    bool fIsOwner =false;
+    if (scriptPubKey.IsTokenScript(nType, fIsOwner, nStartingIndex)) {
+        return nType == TX_NEW_TOKEN && !fIsOwner;
+    }
+
+    return false;
+}
+
+bool ScriptTransferToken(const CScript& scriptPubKey, int& nStartingIndex)
+{
+    int nType = 0;
+    bool fIsOwner =false;
+    if (scriptPubKey.IsTokenScript(nType, fIsOwner, nStartingIndex)) {
+        return nType == TX_TRANSFER_TOKEN;
+    }
+
+    return false;
+}
+
+bool ScriptReissueToken(const CScript& scriptPubKey, int& nStartingIndex)
+{
+    int nType = 0;
+    bool fIsOwner =false;
+    if (scriptPubKey.IsTokenScript(nType, fIsOwner, nStartingIndex)) {
+        return nType == TX_REISSUE_TOKEN;
+    }
+
+    return false;
+}
+
+
+bool AmountFromNewTokenScript(const CScript& scriptPubKey, CAmount& nAmount)
+{
+    int nStartingIndex = 0;
+    if (!ScriptNewToken(scriptPubKey, nStartingIndex))
+        return false;
+
+    std::vector<unsigned char> vchNewToken;
+    vchNewToken.insert(vchNewToken.end(), scriptPubKey.begin() + nStartingIndex, scriptPubKey.end());
+    CDataStream ssToken(vchNewToken, SER_NETWORK, PROTOCOL_VERSION);
+
+    CNewToken tokenNew;
+    try {
+        ssToken >> tokenNew;
+    } catch(std::exception& e) {
+        std::cout << "Failed to get the token from the stream: " << e.what() << std::endl;
+        return false;
+    }
+
+    nAmount = tokenNew.nAmount;
     return true;
 }
+
+bool AmountFromTransferScript(const CScript& scriptPubKey, CAmount& nAmount)
+{
+    int nStartingIndex = 0;
+    if (!ScriptTransferToken(scriptPubKey, nStartingIndex))
+        return false;
+
+    std::vector<unsigned char> vchToken;
+    vchToken.insert(vchToken.end(), scriptPubKey.begin() + nStartingIndex, scriptPubKey.end());
+    CDataStream ssToken(vchToken, SER_NETWORK, PROTOCOL_VERSION);
+
+    CTokenTransfer token;
+    try {
+        ssToken >> token;
+    } catch(std::exception& e) {
+        std::cout << "Failed to get the token from the stream: " << e.what() << std::endl;
+        return false;
+    }
+
+    nAmount = token.nAmount;
+    return true;
+}
+
+bool AmountFromReissueScript(const CScript& scriptPubKey, CAmount& nAmount)
+{
+    int nStartingIndex = 0;
+    if (!ScriptReissueToken(scriptPubKey, nStartingIndex))
+        return false;
+
+    std::vector<unsigned char> vchNewToken;
+    vchNewToken.insert(vchNewToken.end(), scriptPubKey.begin() + nStartingIndex, scriptPubKey.end());
+    CDataStream ssToken(vchNewToken, SER_NETWORK, PROTOCOL_VERSION);
+
+    CReissueToken token;
+    try {
+        ssToken >> token;
+    } catch(std::exception& e) {
+        std::cout << "Failed to get the token from the stream: " << e.what() << std::endl;
+        return false;
+    }
+
+    nAmount = token.nAmount;
+    return true;
+}
+//!--------------------------------------------------------------------------------------------------------------------------!//
+
+

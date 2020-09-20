@@ -1,34 +1,37 @@
-// Copyright (c) 2015-2018 The Bitcoin Core developers
+// Copyright (c) 2015-2016 The Bitcoin Core developers
+// Copyright (c) 2017-2019 The Raven Core developers
+// Copyright (c) 2020 The AokChain Core developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
-#include <httpserver.h>
+#include "httpserver.h"
 
-#include <chainparamsbase.h>
-#include <compat.h>
-#include <util/system.h>
-#include <util/strencodings.h>
-#include <netbase.h>
-#include <rpc/protocol.h> // For HTTP status codes
-#include <shutdown.h>
-#include <sync.h>
-#include <ui_interface.h>
+#include "chainparamsbase.h"
+#include "compat.h"
+#include "util.h"
+#include "utilstrencodings.h"
+#include "netbase.h"
+#include "rpc/protocol.h" // For HTTP status codes
+#include "sync.h"
+#include "ui_interface.h"
 
-#include <memory>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
 #include <sys/types.h>
 #include <sys/stat.h>
+#include <signal.h>
+#include <future>
 
 #include <event2/thread.h>
 #include <event2/buffer.h>
 #include <event2/bufferevent.h>
 #include <event2/util.h>
+#include <event2/listener.h>
 #include <event2/keyvalq_struct.h>
 
-#include <support/events.h>
+#include "support/events.h"
 
 #ifdef EVENT__HAVE_NETINET_IN_H
 #include <netinet/in.h>
@@ -39,6 +42,55 @@
 
 /** Maximum size of http request (request line + headers) */
 static const size_t MAX_HEADERS_SIZE = 8192;
+
+class ConnectionLimiter
+{
+public:
+    ConnectionLimiter(std::vector<evconnlistener*> listeners, unsigned int limit) : m_limit(limit), m_listeners(std::move(listeners))
+    {
+        assert(m_limit > 0);
+    }
+    void AddConnection(evutil_socket_t fd)
+    {
+        // Disable socket accepting if adding this connection puts us equal to the limit
+        if (!Interrupted() && m_sockets.insert(fd).second && m_sockets.size() == m_limit) {
+            LogPrint(BCLog::HTTP, "Suspending new connections");
+            for (const auto& listener : m_listeners) {
+                evconnlistener_disable(listener);
+            }
+        }
+    }
+    void RemoveConnection(evutil_socket_t fd)
+    {
+        // Re-enable socket accepting if removing this connection brings us
+        // back down under the limit
+        if (m_sockets.erase(fd) && m_sockets.size() + 1 == m_limit && !Interrupted()) {
+            LogPrint(BCLog::HTTP, "Resuming new connections\n");
+            for (const auto& listener : m_listeners) {
+                evconnlistener_enable(listener);
+            }
+        }
+    }
+    bool IsReady() const
+    {
+        return m_sockets.size() < m_limit && !Interrupted();
+    }
+    void Interrupt()
+    {
+        m_interrupted.store(true, std::memory_order_release);
+    }
+private:
+
+    inline bool Interrupted() const
+    {
+        return m_interrupted.load(std::memory_order_acquire);
+    }
+
+    const unsigned int m_limit;
+    std::vector<evconnlistener*> m_listeners;
+    std::set<evutil_socket_t> m_sockets;
+    std::atomic<bool> m_interrupted{false};
+};
 
 /** HTTP request work item */
 class HTTPWorkItem final : public HTTPClosure
@@ -68,15 +120,35 @@ class WorkQueue
 {
 private:
     /** Mutex protects entire object */
-    Mutex cs;
+    std::mutex cs;
     std::condition_variable cond;
     std::deque<std::unique_ptr<WorkItem>> queue;
     bool running;
     size_t maxDepth;
+    int numThreads;
+
+    /** RAII object to keep track of number of running worker threads */
+    class ThreadCounter
+    {
+    public:
+        WorkQueue &wq;
+        explicit ThreadCounter(WorkQueue &w): wq(w)
+        {
+            std::lock_guard<std::mutex> lock(wq.cs);
+            wq.numThreads += 1;
+        }
+        ~ThreadCounter()
+        {
+            std::lock_guard<std::mutex> lock(wq.cs);
+            wq.numThreads -= 1;
+            wq.cond.notify_all();
+        }
+    };
 
 public:
     explicit WorkQueue(size_t _maxDepth) : running(true),
-                                 maxDepth(_maxDepth)
+                                 maxDepth(_maxDepth),
+                                 numThreads(0)
     {
     }
     /** Precondition: worker threads have all stopped (they have been joined).
@@ -87,7 +159,7 @@ public:
     /** Enqueue a work item */
     bool Enqueue(WorkItem* item)
     {
-        LOCK(cs);
+        std::unique_lock<std::mutex> lock(cs);
         if (queue.size() >= maxDepth) {
             return false;
         }
@@ -98,10 +170,11 @@ public:
     /** Thread function */
     void Run()
     {
+        ThreadCounter count(*this);
         while (true) {
             std::unique_ptr<WorkItem> i;
             {
-                WAIT_LOCK(cs, lock);
+                std::unique_lock<std::mutex> lock(cs);
                 while (running && queue.empty())
                     cond.wait(lock);
                 if (!running)
@@ -115,7 +188,7 @@ public:
     /** Interrupt and exit loops */
     void Interrupt()
     {
-        LOCK(cs);
+        std::unique_lock<std::mutex> lock(cs);
         running = false;
         cond.notify_all();
     }
@@ -123,6 +196,7 @@ public:
 
 struct HTTPPathHandler
 {
+    HTTPPathHandler() {}
     HTTPPathHandler(std::string _prefix, bool _exactMatch, HTTPRequestHandler _handler):
         prefix(_prefix), exactMatch(_exactMatch), handler(_handler)
     {
@@ -207,39 +281,74 @@ static std::string RequestMethodString(HTTPRequest::RequestMethod m)
     }
 }
 
+std::unique_ptr<ConnectionLimiter> g_limiter;
+
+static void connection_close_cb(evhttp_connection* conn, void *arg)
+{
+    ConnectionLimiter* limiter = static_cast<ConnectionLimiter*>(arg);
+    assert(limiter);
+    auto* bev = evhttp_connection_get_bufferevent(conn);
+    if (bev) {
+        evutil_socket_t fd = bufferevent_getfd(bev);
+        limiter->RemoveConnection(fd);
+    }
+}
+
+#if LIBEVENT_VERSION_NUMBER >= 0x02020001
+static int http_newreq_cb(evhttp_request* req, void *arg)
+{
+    /*
+        A return value of -1 here forces the connection to close immediately.
+        Otherwise, the connection's fd will be added to the limiter in the
+        normal request callback.
+    */
+    ConnectionLimiter* limiter = static_cast<ConnectionLimiter*>(arg);
+    if (limiter && !limiter->IsReady()) {
+        return -1;
+    }
+    return 0;
+}
+#endif
+
 /** HTTP request callback */
 static void http_request_cb(struct evhttp_request* req, void* arg)
 {
-    // Disable reading to work around a libevent bug, fixed in 2.2.0.
-    if (event_get_version_number() >= 0x02010600 && event_get_version_number() < 0x02020001) {
-        evhttp_connection* conn = evhttp_request_get_connection(req);
-        if (conn) {
-            bufferevent* bev = evhttp_connection_get_bufferevent(conn);
-            if (bev) {
-                bufferevent_disable(bev, EV_READ);
-            }
-        }
-    }
     std::unique_ptr<HTTPRequest> hreq(new HTTPRequest(req));
+
+    LogPrint(BCLog::HTTP, "Received a %s request for %s from %s\n",
+             RequestMethodString(hreq->GetRequestMethod()), hreq->GetURI(), hreq->GetPeer().ToString());
+
+    bufferevent* bev = nullptr;
+    evhttp_connection* conn = evhttp_request_get_connection(req);
+    if (conn) {
+        bev = evhttp_connection_get_bufferevent(conn);
+    }
+    if (!bev) {
+        hreq->WriteHeader("Connection", "close");
+        hreq->WriteReplyImmediate(HTTP_INTERNAL, "Unknown error\n");
+        return;
+    }
+    ConnectionLimiter* limiter = static_cast<ConnectionLimiter*>(arg);
+    assert(limiter);
+    evhttp_connection_set_closecb(conn, connection_close_cb, limiter);
+    limiter->AddConnection(bufferevent_getfd(bev));
+    if (!limiter->IsReady()) {
+        hreq->WriteHeader("Connection", "close");
+        hreq->WriteReplyImmediate(HTTP_SERVUNAVAIL, "No connection slots available\n");
+        return;
+    }
 
     // Early address-based allow check
     if (!ClientAllowed(hreq->GetPeer())) {
-        LogPrint(BCLog::HTTP, "HTTP request from %s rejected: Client network is not allowed RPC access\n",
-                 hreq->GetPeer().ToString());
-        hreq->WriteReply(HTTP_FORBIDDEN);
+        hreq->WriteReplyImmediate(HTTP_FORBIDDEN);
         return;
     }
 
     // Early reject unknown HTTP methods
     if (hreq->GetRequestMethod() == HTTPRequest::UNKNOWN) {
-        LogPrint(BCLog::HTTP, "HTTP request from %s rejected: Unknown HTTP request method\n",
-                 hreq->GetPeer().ToString());
-        hreq->WriteReply(HTTP_BADMETHOD);
+        hreq->WriteReplyImmediate(HTTP_BADMETHOD);
         return;
     }
-
-    LogPrint(BCLog::HTTP, "Received a %s request for %s from %s\n",
-             RequestMethodString(hreq->GetRequestMethod()), SanitizeString(hreq->GetURI(), SAFE_CHARS_URI).substr(0, 100), hreq->GetPeer().ToString());
 
     // Find registered handler for prefix
     std::string strURI = hreq->GetURI();
@@ -266,10 +375,11 @@ static void http_request_cb(struct evhttp_request* req, void* arg)
             item.release(); /* if true, queue took ownership */
         else {
             LogPrintf("WARNING: request rejected because http work queue depth exceeded, it can be increased with the -rpcworkqueue= setting\n");
-            item->req->WriteReply(HTTP_INTERNAL, "Work queue depth exceeded");
+            item->req->WriteHeader("Connection", "close");
+            item->req->WriteReplyImmediate(HTTP_INTERNAL, "Work queue depth exceeded");
         }
     } else {
-        hreq->WriteReply(HTTP_NOTFOUND);
+        hreq->WriteReplyImmediate(HTTP_NOTFOUND);
     }
 }
 
@@ -281,7 +391,7 @@ static void http_reject_request_cb(struct evhttp_request* req, void*)
 }
 
 /** Event dispatcher thread */
-static bool ThreadHTTP(struct event_base* base)
+static bool ThreadHTTP(struct event_base* base, struct evhttp* http)
 {
     RenameThread("aokchain-http");
     LogPrint(BCLog::HTTP, "Entering http event loop\n");
@@ -292,45 +402,42 @@ static bool ThreadHTTP(struct event_base* base)
 }
 
 /** Bind HTTP server to specified addresses */
-static bool HTTPBindAddresses(struct evhttp* http)
+static std::vector<evhttp_bound_socket*> HTTPBindAddresses(struct evhttp* http)
 {
-    int http_port = gArgs.GetArg("-rpcport", BaseParams().RPCPort());
+    int defaultPort = gArgs.GetArg("-rpcport", BaseParams().RPCPort());
     std::vector<std::pair<std::string, uint16_t> > endpoints;
 
     // Determine what addresses to bind to
-    if (!(gArgs.IsArgSet("-rpcallowip") && gArgs.IsArgSet("-rpcbind"))) { // Default to loopback if not allowing external IPs
-        endpoints.push_back(std::make_pair("::1", http_port));
-        endpoints.push_back(std::make_pair("127.0.0.1", http_port));
-        if (gArgs.IsArgSet("-rpcallowip")) {
-            LogPrintf("WARNING: option -rpcallowip was specified without -rpcbind; this doesn't usually make sense\n");
-        }
+    if (!gArgs.IsArgSet("-rpcallowip")) { // Default to loopback if not allowing external IPs
+        endpoints.push_back(std::make_pair("::1", defaultPort));
+        endpoints.push_back(std::make_pair("127.0.0.1", defaultPort));
         if (gArgs.IsArgSet("-rpcbind")) {
             LogPrintf("WARNING: option -rpcbind was ignored because -rpcallowip was not specified, refusing to allow everyone to connect\n");
         }
     } else if (gArgs.IsArgSet("-rpcbind")) { // Specific bind address
         for (const std::string& strRPCBind : gArgs.GetArgs("-rpcbind")) {
-            int port = http_port;
+            int port = defaultPort;
             std::string host;
             SplitHostPort(strRPCBind, port, host);
             endpoints.push_back(std::make_pair(host, port));
         }
+    } else { // No specific bind address specified, bind to any
+        endpoints.push_back(std::make_pair("::", defaultPort));
+        endpoints.push_back(std::make_pair("0.0.0.0", defaultPort));
     }
 
+    std::vector<evhttp_bound_socket*> bound_sockets;
     // Bind addresses
     for (std::vector<std::pair<std::string, uint16_t> >::iterator i = endpoints.begin(); i != endpoints.end(); ++i) {
         LogPrint(BCLog::HTTP, "Binding RPC on address %s port %i\n", i->first, i->second);
         evhttp_bound_socket *bind_handle = evhttp_bind_socket_with_handle(http, i->first.empty() ? nullptr : i->first.c_str(), i->second);
         if (bind_handle) {
-            CNetAddr addr;
-            if (i->first.empty() || (LookupHost(i->first.c_str(), addr, false) && addr.IsBindAny())) {
-                LogPrintf("WARNING: the RPC server is not safe to expose to untrusted networks such as the public internet\n");
-            }
-            boundSockets.push_back(bind_handle);
+            bound_sockets.push_back(bind_handle);
         } else {
             LogPrintf("Binding RPC on address %s port %i failed.\n", i->first, i->second);
         }
     }
-    return !boundSockets.empty();
+    return bound_sockets;
 }
 
 /** Simple wrapper to set thread name and run work queue */
@@ -358,13 +465,20 @@ bool InitHTTPServer()
     if (!InitHTTPAllowList())
         return false;
 
+    if (gArgs.GetBoolArg("-rpcssl", false)) {
+        uiInterface.ThreadSafeMessageBox(
+            "SSL mode for RPC (-rpcssl) is no longer supported.",
+            "", CClientUIInterface::MSG_ERROR);
+        return false;
+    }
+
     // Redirect libevent's logging to our own log
     event_set_log_callback(&libevent_log_cb);
     // Update libevent's log handling. Returns false if our version of
     // libevent doesn't support debug logging, in which case we should
     // clear the BCLog::LIBEVENT flag.
-    if (!UpdateHTTPServerLogging(LogInstance().WillLogCategory(BCLog::LIBEVENT))) {
-        LogInstance().DisableCategory(BCLog::LIBEVENT);
+    if (!UpdateHTTPServerLogging(logCategories & BCLog::LIBEVENT)) {
+        logCategories &= ~BCLog::LIBEVENT;
     }
 
 #ifdef WIN32
@@ -386,9 +500,9 @@ bool InitHTTPServer()
     evhttp_set_timeout(http, gArgs.GetArg("-rpcservertimeout", DEFAULT_HTTP_SERVER_TIMEOUT));
     evhttp_set_max_headers_size(http, MAX_HEADERS_SIZE);
     evhttp_set_max_body_size(http, MAX_SIZE);
-    evhttp_set_gencb(http, http_request_cb, nullptr);
 
-    if (!HTTPBindAddresses(http)) {
+    boundSockets = HTTPBindAddresses(http);
+    if (boundSockets.empty()) {
         LogPrintf("Unable to bind any endpoint for RPC server\n");
         return false;
     }
@@ -396,6 +510,26 @@ bool InitHTTPServer()
     LogPrint(BCLog::HTTP, "Initialized HTTP server\n");
     int workQueueDepth = std::max((long)gArgs.GetArg("-rpcworkqueue", DEFAULT_HTTP_WORKQUEUE), 1L);
     LogPrintf("HTTP: creating work queue of depth %d\n", workQueueDepth);
+
+    std::vector<evconnlistener*> listeners;
+    for (const auto& bind_handle : boundSockets) {
+        evconnlistener* listener = evhttp_bound_socket_get_listener(bind_handle);
+        evutil_socket_t sock = evhttp_bound_socket_get_fd(bind_handle);
+        SetListenSocketDeferred(sock);
+        listeners.push_back(listener);
+    }
+    g_limiter = MakeUnique<ConnectionLimiter>(std::move(listeners), workQueueDepth * 2);
+    evhttp_set_gencb(http, http_request_cb, g_limiter.get());
+
+#if LIBEVENT_VERSION_NUMBER >= 0x02020001
+    /*  If the runtime libevent is new enough to have evhttp_set_newreqcb, use
+        it. http_newreq_cb will be called for each new request, and allows us to
+        reject the request (which closes the connection) immediately.
+    */
+    if (event_get_version_number() >= 0x02020001) {
+        evhttp_set_newreqcb(http, http_newreq_cb, g_limiter.get());
+    }
+#endif
 
     workQueue = new WorkQueue<HTTPClosure>(workQueueDepth);
     // transfer ownership to eventBase/HTTP via .release()
@@ -419,24 +553,40 @@ bool UpdateHTTPServerLogging(bool enable) {
 }
 
 std::thread threadHTTP;
-static std::vector<std::thread> g_thread_http_workers;
+std::future<bool> threadResult;
 
-void StartHTTPServer()
+bool StartHTTPServer()
 {
     LogPrint(BCLog::HTTP, "Starting HTTP server\n");
     int rpcThreads = std::max((long)gArgs.GetArg("-rpcthreads", DEFAULT_HTTP_THREADS), 1L);
     LogPrintf("HTTP: starting %d worker threads\n", rpcThreads);
-    threadHTTP = std::thread(ThreadHTTP, eventBase);
+    std::packaged_task<bool(event_base*, evhttp*)> task(ThreadHTTP);
+    threadResult = task.get_future();
+    threadHTTP = std::thread(std::move(task), eventBase, eventHTTP);
 
     for (int i = 0; i < rpcThreads; i++) {
-        g_thread_http_workers.emplace_back(HTTPWorkQueueRun, workQueue);
+        std::thread rpc_worker(HTTPWorkQueueRun, workQueue);
+        rpc_worker.detach();
     }
+    return true;
 }
 
 void InterruptHTTPServer()
 {
     LogPrint(BCLog::HTTP, "Interrupting HTTP server\n");
     if (eventHTTP) {
+        // Unlisten sockets
+#if LIBEVENT_VERSION_NUMBER >= 0x02020001
+        if (event_get_version_number() >= 0x02020001) {
+            evhttp_set_newreqcb(http, nullptr, nullptr);
+        }
+#endif
+        if (g_limiter) {
+            g_limiter->Interrupt();
+        }
+        for (evhttp_bound_socket *socket : boundSockets) {
+            evhttp_del_accept_socket(eventHTTP, socket);
+        }
         // Reject requests on current connections
         evhttp_set_gencb(eventHTTP, http_reject_request_cb, nullptr);
     }
@@ -449,27 +599,30 @@ void StopHTTPServer()
     LogPrint(BCLog::HTTP, "Stopping HTTP server\n");
     if (workQueue) {
         LogPrint(BCLog::HTTP, "Waiting for HTTP worker threads to exit\n");
-        for (auto& thread: g_thread_http_workers) {
-            thread.join();
-        }
-        g_thread_http_workers.clear();
         delete workQueue;
         workQueue = nullptr;
     }
-    // Unlisten sockets, these are what make the event loop running, which means
-    // that after this and all connections are closed the event loop will quit.
-    for (evhttp_bound_socket *socket : boundSockets) {
-        evhttp_del_accept_socket(eventHTTP, socket);
-    }
-    boundSockets.clear();
     if (eventBase) {
         LogPrint(BCLog::HTTP, "Waiting for HTTP event thread to exit\n");
+        // Exit the event loop as soon as there are no active events.
+        event_base_loopexit(eventBase, nullptr);
+        // Give event loop a few seconds to exit (to send back last RPC responses), then break it
+        // Before this was solved with event_base_loopexit, but that didn't work as expected in
+        // at least libevent 2.0.21 and always introduced a delay. In libevent
+        // master that appears to be solved, so in the future that solution
+        // could be used again (if desirable).
+        // (see discussion in https://github.com/AokChainNetwork/AokChainNetwork/pull/6990)
+        if (threadResult.valid() && threadResult.wait_for(std::chrono::milliseconds(2000)) == std::future_status::timeout) {
+            LogPrintf("HTTP event loop did not exit within allotted time, sending loopbreak\n");
+            event_base_loopbreak(eventBase);
+        }
         threadHTTP.join();
     }
     if (eventHTTP) {
         evhttp_free(eventHTTP);
         eventHTTP = nullptr;
     }
+    g_limiter.reset();
     if (eventBase) {
         event_base_free(eventBase);
         eventBase = nullptr;
@@ -491,7 +644,7 @@ static void httpevent_callback_fn(evutil_socket_t, short, void* data)
         delete self;
 }
 
-HTTPEvent::HTTPEvent(struct event_base* base, bool _deleteWhenTriggered, const std::function<void()>& _handler):
+HTTPEvent::HTTPEvent(struct event_base* base, bool _deleteWhenTriggered, const std::function<void(void)>& _handler):
     deleteWhenTriggered(_deleteWhenTriggered), handler(_handler)
 {
     ev = event_new(base, -1, 0, httpevent_callback_fn, this);
@@ -522,7 +675,7 @@ HTTPRequest::~HTTPRequest()
     // evhttpd cleans up the request, as long as a reply was sent.
 }
 
-std::pair<bool, std::string> HTTPRequest::GetHeader(const std::string& hdr) const
+std::pair<bool, std::string> HTTPRequest::GetHeader(const std::string& hdr)
 {
     const struct evkeyvalq* headers = evhttp_request_get_input_headers(req);
     assert(headers);
@@ -568,34 +721,29 @@ void HTTPRequest::WriteHeader(const std::string& hdr, const std::string& value)
 void HTTPRequest::WriteReply(int nStatus, const std::string& strReply)
 {
     assert(!replySent && req);
-    if (ShutdownRequested()) {
-        WriteHeader("Connection", "close");
-    }
     // Send event to main http thread to send reply message
     struct evbuffer* evb = evhttp_request_get_output_buffer(req);
     assert(evb);
     evbuffer_add(evb, strReply.data(), strReply.size());
-    auto req_copy = req;
-    HTTPEvent* ev = new HTTPEvent(eventBase, true, [req_copy, nStatus]{
-        evhttp_send_reply(req_copy, nStatus, nullptr, nullptr);
-        // Re-enable reading from the socket. This is the second part of the libevent
-        // workaround above.
-        if (event_get_version_number() >= 0x02010600 && event_get_version_number() < 0x02020001) {
-            evhttp_connection* conn = evhttp_request_get_connection(req_copy);
-            if (conn) {
-                bufferevent* bev = evhttp_connection_get_bufferevent(conn);
-                if (bev) {
-                    bufferevent_enable(bev, EV_READ | EV_WRITE);
-                }
-            }
-        }
-    });
+    HTTPEvent* ev = new HTTPEvent(eventBase, true,
+        std::bind(evhttp_send_reply, req, nStatus, (const char*)nullptr, (struct evbuffer *)nullptr));
     ev->trigger(nullptr);
     replySent = true;
     req = nullptr; // transferred back to main thread
 }
 
-CService HTTPRequest::GetPeer() const
+void HTTPRequest::WriteReplyImmediate(int nStatus, const std::string& strReply)
+{
+    assert(!replySent && req);
+    struct evbuffer* evb = evhttp_request_get_output_buffer(req);
+    assert(evb);
+    evbuffer_add(evb, strReply.data(), strReply.size());
+    evhttp_send_reply(req, nStatus, nullptr, nullptr);
+    replySent = true;
+    req = nullptr;
+}
+
+CService HTTPRequest::GetPeer()
 {
     evhttp_connection* con = evhttp_request_get_connection(req);
     CService peer;
@@ -609,12 +757,12 @@ CService HTTPRequest::GetPeer() const
     return peer;
 }
 
-std::string HTTPRequest::GetURI() const
+std::string HTTPRequest::GetURI()
 {
     return evhttp_request_get_uri(req);
 }
 
-HTTPRequest::RequestMethod HTTPRequest::GetRequestMethod() const
+HTTPRequest::RequestMethod HTTPRequest::GetRequestMethod()
 {
     switch (evhttp_request_get_command(req)) {
     case EVHTTP_REQ_GET:

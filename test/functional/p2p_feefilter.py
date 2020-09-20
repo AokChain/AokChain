@@ -1,16 +1,17 @@
 #!/usr/bin/env python3
-# Copyright (c) 2016-2018 The AokChain Core developers
+# Copyright (c) 2016 The Bitcoin Core developers
+# Copyright (c) 2017-2018 The AokChain Core developers
 # Distributed under the MIT software license, see the accompanying
 # file COPYING or http://www.opensource.org/licenses/mit-license.php.
-"""Test processing of feefilter messages."""
+"""Test processing of feefilter messages.
 
-from decimal import Decimal
+  (Wallet now has DEFAULT_TRANSACTION_MINFEE = 0.00050000"""
+
+from test_framework.mininode import *
+from test_framework.test_framework import AokChainTestFramework
+from test_framework.util import *
 import time
 
-from test_framework.messages import msg_feefilter
-from test_framework.mininode import mininode_lock, P2PInterface
-from test_framework.test_framework import AokChainTestFramework
-from test_framework.util import sync_blocks, sync_mempools
 
 def hashToHex(hash):
     return format(hash, '064x')
@@ -24,12 +25,12 @@ def allInvsMatch(invsExpected, testnode):
         time.sleep(1)
     return False
 
-class TestP2PConn(P2PInterface):
+class TestNode(NodeConnCB):
     def __init__(self):
         super().__init__()
         self.txinvs = []
 
-    def on_inv(self, message):
+    def on_inv(self, conn, message):
         for i in message.inv:
             if (i.type == 1):
                 self.txinvs.append(hashToHex(i.hash))
@@ -42,9 +43,6 @@ class FeeFilterTest(AokChainTestFramework):
     def set_test_params(self):
         self.num_nodes = 2
 
-    def skip_test_if_missing_module(self):
-        self.skip_if_no_wallet()
-
     def run_test(self):
         node1 = self.nodes[1]
         node0 = self.nodes[0]
@@ -52,26 +50,31 @@ class FeeFilterTest(AokChainTestFramework):
         node1.generate(1)
         sync_blocks(self.nodes)
 
-        self.nodes[0].add_p2p_connection(TestP2PConn())
+        # Setup the p2p connections and start up the network thread.
+        test_node = TestNode()
+        connection = NodeConn('127.0.0.1', p2p_port(0), self.nodes[0], test_node)
+        test_node.add_connection(connection)
+        NetworkThread().start()
+        test_node.wait_for_verack()
 
-        # Test that invs are received for all txs at feerate of 20 sat/byte
-        node1.settxfee(Decimal("0.00020000"))
+        # Test that invs are received for all txs at feerate of 70 sat/byte
+        node1.settxfee(Decimal("0.00070000"))
         txids = [node1.sendtoaddress(node1.getnewaddress(), 1) for x in range(3)]
-        assert(allInvsMatch(txids, self.nodes[0].p2p))
-        self.nodes[0].p2p.clear_invs()
+        assert(allInvsMatch(txids, test_node))
+        test_node.clear_invs()
 
-        # Set a filter of 15 sat/byte
-        self.nodes[0].p2p.send_and_ping(msg_feefilter(15000))
+        # Set a filter of 60 sat/byte
+        test_node.send_and_ping(msg_feefilter(60000))
 
-        # Test that txs are still being received (paying 20 sat/byte)
+        # Test that txs are still being received (paying 70 sat/byte)
         txids = [node1.sendtoaddress(node1.getnewaddress(), 1) for x in range(3)]
-        assert(allInvsMatch(txids, self.nodes[0].p2p))
-        self.nodes[0].p2p.clear_invs()
+        assert(allInvsMatch(txids, test_node))
+        test_node.clear_invs()
 
-        # Change tx fee rate to 10 sat/byte and test they are no longer received
-        node1.settxfee(Decimal("0.00010000"))
+        # Change tx fee rate to 50 sat/byte and test they are no longer received
+        node1.settxfee(Decimal("0.00050000"))
         [node1.sendtoaddress(node1.getnewaddress(), 1) for x in range(3)]
-        sync_mempools(self.nodes) # must be sure node 0 has received all txs
+        sync_mempools(self.nodes) # must be sure node 0 has received all txs 
 
         # Send one transaction from node0 that should be received, so that we
         # we can sync the test on receipt (if node1's txs were relayed, they'd
@@ -80,16 +83,16 @@ class FeeFilterTest(AokChainTestFramework):
         # to 35 entries in an inv, which means that when this next transaction
         # is eligible for relay, the prior transactions from node1 are eligible
         # as well.
-        node0.settxfee(Decimal("0.00020000"))
-        txids = [node0.sendtoaddress(node0.getnewaddress(), 1)]
-        assert(allInvsMatch(txids, self.nodes[0].p2p))
-        self.nodes[0].p2p.clear_invs()
+        node0.settxfee(Decimal("0.00070000"))
+        txids = [node0.sendtoaddress(node0.getnewaddress(), 1)] #
+        assert(allInvsMatch(txids, test_node))
+        test_node.clear_invs()
 
         # Remove fee filter and check that txs are received again
-        self.nodes[0].p2p.send_and_ping(msg_feefilter(0))
+        test_node.send_and_ping(msg_feefilter(0))
         txids = [node1.sendtoaddress(node1.getnewaddress(), 1) for x in range(3)]
-        assert(allInvsMatch(txids, self.nodes[0].p2p))
-        self.nodes[0].p2p.clear_invs()
+        assert(allInvsMatch(txids, test_node))
+        test_node.clear_invs()
 
 if __name__ == '__main__':
     FeeFilterTest().main()

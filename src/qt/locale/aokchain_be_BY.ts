@@ -30,10 +30,6 @@
         <translation>Выдаліць абраны адрас са спісу</translation>
     </message>
     <message>
-        <source>Enter address or label to search</source>
-        <translation>Увядзіце адрас ці пазнаку для пошуку</translation>
-    </message>
-    <message>
         <source>Export the data in the current tab to a file</source>
         <translation>Экспартаваць гэтыя звесткі у файл</translation>
     </message>
@@ -67,11 +63,11 @@
     </message>
     <message>
         <source>These are your AokChain addresses for sending payments. Always check the amount and the receiving address before sending coins.</source>
-        <translation>Тут знаходзяцца AOK-адрасы для высылання плацяжоў. Заўсёды спраўджвайце колькасць і адрас прызначэння перад здзяйсненнем транзакцыі.</translation>
+        <translation>Тут знаходзяцца AokChain-адрасы для высылання плацяжоў. Заўсёды спраўджвайце колькасць і адрас прызначэння перад здзяйсненнем транзакцыі.</translation>
     </message>
     <message>
         <source>These are your AokChain addresses for receiving payments. It is recommended to use a new receiving address for each transaction.</source>
-        <translation>Тут знаходзяцца AOK-адрасы для прымання плацяжоў. Пажадана выкарыстоўваць новы адрас для кожнай транзакцыі.</translation>
+        <translation>Тут знаходзяцца AokChain-адрасы для прымання плацяжоў. Пажадана выкарыстоўваць новы адрас для кожнай транзакцыі.</translation>
     </message>
     <message>
         <source>&amp;Copy Address</source>
@@ -172,8 +168,8 @@
         <translation>Пацвердзіце шыфраванне гаманца</translation>
     </message>
     <message>
-        <source>Warning: If you encrypt your wallet and lose your passphrase, you will &lt;b&gt;LOSE ALL OF YOUR AOK&lt;/b&gt;!</source>
-        <translation>Увага: калі вы зашыфруеце свой гаманец і страціце парольную фразу, то &lt;b&gt;СТРАЦІЦЕ ЎСЕ СВАЕ БІТКОЙНЫ&lt;/b&gt;!</translation>
+        <source>Warning: If you encrypt your wallet and lose your passphrase, you will &lt;b&gt;LOSE ALL OF YOUR AOKCHAINS&lt;/b&gt;!</source>
+        <translation>Увага: калі вы зашыфруеце свой гаманец і страціце парольную фразу, то &lt;b&gt;СТРАЦІЦЕ ЎСЕ СВАЕ AokChain&lt;/b&gt;!</translation>
     </message>
     <message>
         <source>Are you sure you wish to encrypt your wallet?</source>
@@ -238,6 +234,10 @@
         <translation>Агляд</translation>
     </message>
     <message>
+        <source>Node</source>
+        <translation>Вузел</translation>
+    </message>
+    <message>
         <source>Show general overview of wallet</source>
         <translation>Паказвае агульныя звесткі аб гаманцы</translation>
     </message>
@@ -282,6 +282,14 @@
         <translation>&amp;Change Passphrase...</translation>
     </message>
     <message>
+        <source>&amp;Sending addresses...</source>
+        <translation>Адрасы дасылання...</translation>
+    </message>
+    <message>
+        <source>&amp;Receiving addresses...</source>
+        <translation>Адрасы прымання...</translation>
+    </message>
+    <message>
         <source>Open &amp;URI...</source>
         <translation>Адчыниць &amp;URI...</translation>
     </message>
@@ -290,8 +298,8 @@
         <translation>Пераіндэксацыя блокаў на дыску...</translation>
     </message>
     <message>
-        <source>Send coins to a AokChain address</source>
-        <translation>Даслаць манеты на AOK-адрас</translation>
+        <source>Send coins to an AokChain address</source>
+        <translation>Даслаць манеты на AokChain-адрас</translation>
     </message>
     <message>
         <source>Backup wallet to another location</source>
@@ -315,7 +323,11 @@
     </message>
     <message>
         <source>AokChain</source>
-        <translation>AOK</translation>
+        <translation>AokChain</translation>
+    </message>
+    <message>
+        <source>Wallet</source>
+        <translation>Гаманец</translation>
     </message>
     <message>
         <source>&amp;Send</source>
@@ -339,11 +351,11 @@
     </message>
     <message>
         <source>Sign messages with your AokChain addresses to prove you own them</source>
-        <translation>Падпісаць паведамленне з дапамогай AOK-адраса каб даказаць, што яно належыць вам</translation>
+        <translation>Падпісаць паведамленне з дапамогай AokChain-адраса каб даказаць, што яно належыць вам</translation>
     </message>
     <message>
         <source>Verify messages to ensure they were signed with specified AokChain addresses</source>
-        <translation>Спраўдзіць паведамленне з дапамогай AOK-адраса каб даказаць, што яно належыць вам</translation>
+        <translation>Спраўдзіць паведамленне з дапамогай AokChain-адраса каб даказаць, што яно належыць вам</translation>
     </message>
     <message>
         <source>&amp;File</source>
@@ -359,7 +371,7 @@
     </message>
     <message>
         <source>Request payments (generates QR codes and aokchain: URIs)</source>
-        <translation>Запатрабаваць плацёж (генеруецца QR-код для AOK URI)</translation>
+        <translation>Запатрабаваць плацёж (генеруецца QR-код для AokChain URI)</translation>
     </message>
     <message>
         <source>Show the list of used sending addresses and labels</source>
@@ -371,7 +383,7 @@
     </message>
     <message>
         <source>Open a aokchain: URI or payment request</source>
-        <translation>Адкрыць AOK: URI ці запыт плацяжу</translation>
+        <translation>Адкрыць AokChain: URI ці запыт плацяжу</translation>
     </message>
     <message>
         <source>&amp;Command-line options</source>
@@ -590,6 +602,10 @@
         <translation>Адрас</translation>
     </message>
     <message>
+        <source>New receiving address</source>
+        <translation>Новы адрас для атрымання</translation>
+    </message>
+    <message>
         <source>New sending address</source>
         <translation>Новы адрас для дасылання</translation>
     </message>
@@ -600,6 +616,10 @@
     <message>
         <source>Edit sending address</source>
         <translation>Рэдагаваць адрас дасылання</translation>
+    </message>
+    <message>
+        <source>The entered address "%1" is already in the address book.</source>
+        <translation>Уведзены адрас "%1" ужо ў кніге адрасоў</translation>
     </message>
     <message>
         <source>Could not unlock wallet.</source>
@@ -635,16 +655,24 @@
         <source>Command-line options</source>
         <translation>Опцыі каманднага радка</translation>
     </message>
-</context>
+    <message>
+        <source>Usage:</source>
+        <translation>Ужыванне:</translation>
+    </message>
+    <message>
+        <source>command-line options</source>
+        <translation>опцыі каманднага радка</translation>
+    </message>
+    <message>
+        <source>Start minimized</source>
+        <translation>Стартаваць ммінімізаванай</translation>
+    </message>
+    </context>
 <context>
     <name>Intro</name>
     <message>
         <source>Welcome</source>
         <translation>Вітаем</translation>
-    </message>
-    <message>
-        <source>AokChain</source>
-        <translation>AOK</translation>
     </message>
     <message>
         <source>Error</source>
@@ -672,12 +700,12 @@
         <translation>Опцыі</translation>
     </message>
     <message>
-        <source>W&amp;allet</source>
-        <translation>Гаманец</translation>
+        <source>MB</source>
+        <translation>Мб</translation>
     </message>
     <message>
-        <source>Error</source>
-        <translation>Памылка</translation>
+        <source>W&amp;allet</source>
+        <translation>Гаманец</translation>
     </message>
     </context>
 <context>
@@ -703,11 +731,7 @@
         <source>%1 and %2</source>
         <translation>%1 і %2</translation>
     </message>
-    <message>
-        <source>unknown</source>
-        <translation>невядома</translation>
-    </message>
-</context>
+    </context>
 <context>
     <name>QObject::QObject</name>
     </context>
@@ -765,10 +789,6 @@
     <message>
         <source>Message</source>
         <translation>Паведамленне</translation>
-    </message>
-    <message>
-        <source>Wallet</source>
-        <translation>Гаманец</translation>
     </message>
     </context>
 <context>
@@ -954,6 +974,10 @@
 <context>
     <name>TransactionDesc</name>
     <message>
+        <source>%1/offline</source>
+        <translation>%1/offline</translation>
+    </message>
+    <message>
         <source>%1/unconfirmed</source>
         <translation>%1/непацверджана</translation>
     </message>
@@ -964,6 +988,10 @@
     <message>
         <source>Status</source>
         <translation>Статус</translation>
+    </message>
+    <message>
+        <source>, has not been successfully broadcast yet</source>
+        <translation>, пакуль не было паспяхова транслявана</translation>
     </message>
     <message>
         <source>Date</source>
@@ -1014,6 +1042,10 @@
     <message>
         <source>Confirmed (%1 confirmations)</source>
         <translation>Пацверджана (%1 пацверджанняў)</translation>
+    </message>
+    <message>
+        <source>This block was not received by any other nodes and will probably not be accepted!</source>
+        <translation>Гэты блок не быў прыняты іншымі вузламі і магчыма не будзе ўхвалены!</translation>
     </message>
     <message>
         <source>Generated but not accepted</source>
@@ -1115,6 +1147,10 @@
         <translation>Іншыя</translation>
     </message>
     <message>
+        <source>Enter address or label to search</source>
+        <translation>Увядзіце адрас ці пазнаку для пошуку</translation>
+    </message>
+    <message>
         <source>Min amount</source>
         <translation>Мін. колькасць</translation>
     </message>
@@ -1183,9 +1219,6 @@
     <name>UnitDisplayStatusBarControl</name>
     </context>
 <context>
-    <name>WalletController</name>
-    </context>
-<context>
     <name>WalletFrame</name>
     </context>
 <context>
@@ -1194,7 +1227,7 @@
         <source>Send Coins</source>
         <translation>Даслаць Манеты</translation>
     </message>
-    </context>
+</context>
 <context>
     <name>WalletView</name>
     <message>
@@ -1208,6 +1241,22 @@
     </context>
 <context>
     <name>aokchain-core</name>
+    <message>
+        <source>Options:</source>
+        <translation>Опцыі:</translation>
+    </message>
+    <message>
+        <source>Specify data directory</source>
+        <translation>Вызначыць каталог даных</translation>
+    </message>
+    <message>
+        <source>Accept command line and JSON-RPC commands</source>
+        <translation>Прымаць камандны радок і JSON-RPC каманды</translation>
+    </message>
+    <message>
+        <source>Run in the background as a daemon and accept commands</source>
+        <translation>Запусціць у фоне як дэман і прымаць каманды</translation>
+    </message>
     <message>
         <source>AokChain Core</source>
         <translation>AokChain Core</translation>
@@ -1245,12 +1294,32 @@
         <translation>Не хапае файлавых дэскрыптараў.</translation>
     </message>
     <message>
+        <source>Use UPnP to map the listening port (default: %u)</source>
+        <translation>Use UPnP to map the listening port (default: %u)</translation>
+    </message>
+    <message>
         <source>Verifying blocks...</source>
         <translation>Праверка блокаў...</translation>
     </message>
     <message>
+        <source>Verifying wallet...</source>
+        <translation>Праверка гаманца...</translation>
+    </message>
+    <message>
+        <source>Wallet options:</source>
+        <translation>Опцыі гаманца:</translation>
+    </message>
+    <message>
         <source>Information</source>
         <translation>Інфармацыя</translation>
+    </message>
+    <message>
+        <source>RPC server options:</source>
+        <translation>Опцыі RPC сервера:</translation>
+    </message>
+    <message>
+        <source>Send trace/debug info to console instead of debug.log file</source>
+        <translation>Слаць trace/debug звесткі ў кансоль замест файла debug.log</translation>
     </message>
     <message>
         <source>Signing transaction failed</source>
@@ -1269,8 +1338,24 @@
         <translation>Транзакцыя занадта вялікая</translation>
     </message>
     <message>
+        <source>Username for JSON-RPC connections</source>
+        <translation>Імя карыстальника для JSON-RPC злучэнняў</translation>
+    </message>
+    <message>
         <source>Warning</source>
         <translation>Увага</translation>
+    </message>
+    <message>
+        <source>Password for JSON-RPC connections</source>
+        <translation>Пароль для JSON-RPC злучэнняў</translation>
+    </message>
+    <message>
+        <source>Execute command when the best block changes (%s in cmd is replaced by block hash)</source>
+        <translation>Выканаць каманду калі лепшы блок зменіцца (%s замяняецца на хэш блока)</translation>
+    </message>
+    <message>
+        <source>Loading addresses...</source>
+        <translation>Загружаем адрасы...</translation>
     </message>
     <message>
         <source>Insufficient funds</source>

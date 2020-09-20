@@ -1,11 +1,13 @@
-// Copyright (c) 2011-2018 The Bitcoin Core developers
+// Copyright (c) 2011-2016 The Bitcoin Core developers
+// Copyright (c) 2017-2019 The Raven Core developers
+// Copyright (c) 2020 The AokChain Core developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 #ifndef AOKCHAIN_QT_COINCONTROLDIALOG_H
 #define AOKCHAIN_QT_COINCONTROLDIALOG_H
 
-#include <amount.h>
+#include "amount.h"
 
 #include <QAbstractButton>
 #include <QAction>
@@ -43,7 +45,7 @@ class CoinControlDialog : public QDialog
     Q_OBJECT
 
 public:
-    explicit CoinControlDialog(const PlatformStyle *platformStyle, QWidget *parent = nullptr);
+    explicit CoinControlDialog(const PlatformStyle *platformStyle, QWidget *parent = 0);
     ~CoinControlDialog();
 
     void setModel(WalletModel *model);
@@ -52,7 +54,7 @@ public:
     static void updateLabels(WalletModel*, QDialog*);
 
     static QList<CAmount> payAmounts;
-    static CCoinControl *coinControl();
+    static CCoinControl *coinControl;
     static bool fSubtractFeeFromAmount;
 
 private:
@@ -80,14 +82,9 @@ private:
         COLUMN_ADDRESS,
         COLUMN_DATE,
         COLUMN_CONFIRMATIONS,
+        COLUMN_TXHASH,
+        COLUMN_VOUT_INDEX,
     };
-
-    enum
-    {
-        TxHashRole = Qt::UserRole,
-        VOutRole
-    };
-
     friend class CCoinControlWidgetItem;
 
 private Q_SLOTS:

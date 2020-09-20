@@ -1,10 +1,12 @@
-// Copyright (c) 2011-2018 The Bitcoin Core developers
+// Copyright (c) 2011-2014 The Bitcoin Core developers
+// Copyright (c) 2017-2019 The Raven Core developers
+// Copyright (c) 2020 The AokChain Core developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
-#include <qt/aokchainaddressvalidator.h>
+#include "aokchainaddressvalidator.h"
 
-#include <key_io.h>
+#include "base58.h"
 
 /* Base58 characters are:
      "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz"
@@ -67,7 +69,7 @@ QValidator::State AokChainAddressEntryValidator::validate(QString &input, int &p
         if (((ch >= '0' && ch<='9') ||
             (ch >= 'a' && ch<='z') ||
             (ch >= 'A' && ch<='Z')) &&
-            ch != 'I' && ch != 'O') // Characters invalid in both Base58 and Bech32
+            ch != 'l' && ch != 'I' && ch != '0' && ch != 'O')
         {
             // Alphanumeric and not a 'forbidden' character
         }

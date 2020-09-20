@@ -1,18 +1,14 @@
-// Copyright (c) 2016-2018 The Bitcoin Core developers
+// Copyright (c) 2016 The Bitcoin Core developers
+// Copyright (c) 2017-2019 The Raven Core developers
+// Copyright (c) 2020 The AokChain Core developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
-#if defined(HAVE_CONFIG_H)
-#include <config/aokchain-config.h>
-#endif
+#include "paymentrequestplus.h" // this includes protobuf's port.h which defines its own bswap macos
 
-#if defined(ENABLE_WALLET) && defined(ENABLE_BIP70)
-#include <qt/paymentrequestplus.h> // this includes protobuf's port.h which defines its own bswap macos
-#endif
+#include "compattests.h"
 
-#include <qt/test/compattests.h>
-
-#include <compat/byteswap.h>
+#include "compat/byteswap.h"
 
 void CompatTests::bswapTests()
 {

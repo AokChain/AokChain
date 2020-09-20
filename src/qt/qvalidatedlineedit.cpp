@@ -1,18 +1,21 @@
-// Copyright (c) 2011-2018 The Bitcoin Core developers
+// Copyright (c) 2011-2016 The Bitcoin Core developers
+// Copyright (c) 2017-2019 The Raven Core developers
+// Copyright (c) 2020 The AokChain Core developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
-#include <qt/qvalidatedlineedit.h>
+#include "qvalidatedlineedit.h"
 
-#include <qt/aokchainaddressvalidator.h>
-#include <qt/guiconstants.h>
+#include "aokchainaddressvalidator.h"
+#include "guiconstants.h"
+#include "platformstyle.h"
 
 QValidatedLineEdit::QValidatedLineEdit(QWidget *parent) :
     QLineEdit(parent),
     valid(true),
-    checkValidator(nullptr)
+    checkValidator(0)
 {
-    connect(this, &QValidatedLineEdit::textChanged, this, &QValidatedLineEdit::markValid);
+    connect(this, SIGNAL(textChanged(QString)), this, SLOT(markValid()));
 }
 
 void QValidatedLineEdit::setValid(bool _valid)
@@ -24,7 +27,10 @@ void QValidatedLineEdit::setValid(bool _valid)
 
     if(_valid)
     {
-        setStyleSheet("");
+        if (darkModeEnabled)
+            setStyleSheet("");
+        else
+            setStyleSheet(STYLE_VALID);
     }
     else
     {

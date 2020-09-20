@@ -1,18 +1,26 @@
 // Copyright (c) 2009-2010 Satoshi Nakamoto
-// Copyright (c) 2009-2018 The Bitcoin Core developers
+// Copyright (c) 2009-2016 The Bitcoin Core developers
+// Copyright (c) 2017-2019 The Raven Core developers
+// Copyright (c) 2020 The AokChain Core developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 #ifndef AOKCHAIN_CHAINPARAMS_H
 #define AOKCHAIN_CHAINPARAMS_H
 
-#include <chainparamsbase.h>
-#include <consensus/params.h>
-#include <primitives/block.h>
-#include <protocol.h>
+#include "chainparamsbase.h"
+#include "consensus/params.h"
+#include "primitives/block.h"
+#include "protocol.h"
 
 #include <memory>
 #include <vector>
+
+struct CDNSSeedData {
+    std::string host;
+    bool supportsServiceBitsFiltering;
+    CDNSSeedData(const std::string &strHost, bool supportsServiceBitsFilteringIn) : host(strHost), supportsServiceBitsFiltering(supportsServiceBitsFilteringIn) {}
+};
 
 struct SeedSpec6 {
     uint8_t addr[16];
@@ -25,16 +33,10 @@ struct CCheckpointData {
     MapCheckpoints mapCheckpoints;
 };
 
-/**
- * Holds various statistics on transactions within a chain. Used to estimate
- * verification progress during chain sync.
- *
- * See also: CChainParams::TxData, GuessVerificationProgress.
- */
 struct ChainTxData {
-    int64_t nTime;    //!< UNIX timestamp of last known number of transactions
-    int64_t nTxCount; //!< total number of transactions between genesis and that timestamp
-    double dTxRate;   //!< estimated number of transactions per second after that timestamp
+    int64_t nTime;
+    int64_t nTxCount;
+    double dTxRate;
 };
 
 /**
@@ -61,29 +63,47 @@ public:
     const CMessageHeader::MessageStartChars& MessageStart() const { return pchMessageStart; }
     int GetDefaultPort() const { return nDefaultPort; }
 
+    bool MiningRequiresPeers() const {return fMiningRequiresPeers; }
     const CBlock& GenesisBlock() const { return genesis; }
     /** Default value for -checkmempool and -checkblockindex argument */
     bool DefaultConsistencyChecks() const { return fDefaultConsistencyChecks; }
     /** Policy: Filter transactions that do not match well-defined patterns */
     bool RequireStandard() const { return fRequireStandard; }
     uint64_t PruneAfterHeight() const { return nPruneAfterHeight; }
-    /** Minimum free space (in GB) needed for data directory */
-    uint64_t AssumedBlockchainSize() const { return m_assumed_blockchain_size; }
-    /** Minimum free space (in GB) needed for data directory when pruned; Does not include prune target*/
-    uint64_t AssumedChainStateSize() const { return m_assumed_chain_state_size; }
     /** Make miner stop after a block is found. In RPC, don't return until nGenProcLimit blocks are generated */
     bool MineBlocksOnDemand() const { return fMineBlocksOnDemand; }
     /** Return the BIP70 network string (main, test or regtest) */
     std::string NetworkIDString() const { return strNetworkID; }
-    /** Return true if the fallback fee is by default enabled for this network */
-    bool IsFallbackFeeEnabled() const { return m_fallback_fee_enabled; }
-    /** Return the list of hostnames to look up for DNS seeds */
-    const std::vector<std::string>& DNSSeeds() const { return vSeeds; }
+    const std::vector<CDNSSeedData>& DNSSeeds() const { return vSeeds; }
     const std::vector<unsigned char>& Base58Prefix(Base58Type type) const { return base58Prefixes[type]; }
-    const std::string& Bech32HRP() const { return bech32_hrp; }
     const std::vector<SeedSpec6>& FixedSeeds() const { return vFixedSeeds; }
     const CCheckpointData& Checkpoints() const { return checkpointData; }
     const ChainTxData& TxData() const { return chainTxData; }
+    void UpdateVersionBitsParameters(Consensus::DeploymentPos d, int64_t nStartTime, int64_t nTimeout);
+    void TurnOffSegwit();
+    void TurnOffCSV();
+    void TurnOffBIP34();
+    void TurnOffBIP65();
+    void TurnOffBIP66();
+    bool BIP34();
+    bool BIP65();
+    bool BIP66();
+    bool CSVEnabled() const;
+
+    /** TOKENS START **/
+    const CAmount& MainFeeAmount() const { return nFeeAmountMain; }
+    const CAmount& SecondaryFeeAmount() const { return nFeeAmountSecondary; }
+
+    const std::string& IssueTokenBurnAddress() const { return strTokenFeeAddress; }
+    const std::string& ReissueTokenBurnAddress() const { return strTokenFeeAddress; }
+    const std::string& IssueSubTokenBurnAddress() const { return strTokenFeeAddress; }
+    const std::string& IssueUniqueTokenBurnAddress() const { return strTokenFeeAddress; }
+
+    int MaxReorganizationDepth() const { return nMaxReorganizationDepth; }
+    int MinReorganizationPeers() const { return nMinReorganizationPeers; }
+    int MinReorganizationAge() const { return nMinReorganizationAge; }
+    /** TOKENS END **/
+
 protected:
     CChainParams() {}
 
@@ -91,20 +111,30 @@ protected:
     CMessageHeader::MessageStartChars pchMessageStart;
     int nDefaultPort;
     uint64_t nPruneAfterHeight;
-    uint64_t m_assumed_blockchain_size;
-    uint64_t m_assumed_chain_state_size;
-    std::vector<std::string> vSeeds;
+    std::vector<CDNSSeedData> vSeeds;
     std::vector<unsigned char> base58Prefixes[MAX_BASE58_TYPES];
-    std::string bech32_hrp;
     std::string strNetworkID;
     CBlock genesis;
     std::vector<SeedSpec6> vFixedSeeds;
     bool fDefaultConsistencyChecks;
     bool fRequireStandard;
     bool fMineBlocksOnDemand;
+    bool fMiningRequiresPeers;
     CCheckpointData checkpointData;
     ChainTxData chainTxData;
-    bool m_fallback_fee_enabled;
+
+    /** TOKENS START **/
+    // Burn Amounts
+    CAmount nFeeAmountMain;
+    CAmount nFeeAmountSecondary;
+
+    // Burn Addresses
+    std::string strTokenFeeAddress;
+
+    int nMaxReorganizationDepth;
+    int nMinReorganizationPeers;
+    int nMinReorganizationAge;
+    /** TOKENS END **/
 };
 
 /**
@@ -112,18 +142,34 @@ protected:
  * @returns a CChainParams* of the chosen chain.
  * @throws a std::runtime_error if the chain is not supported.
  */
-std::unique_ptr<const CChainParams> CreateChainParams(const std::string& chain);
+std::unique_ptr<CChainParams> CreateChainParams(const std::string& chain);
 
 /**
  * Return the currently selected parameters. This won't change after app
  * startup, except for unit tests.
  */
 const CChainParams &Params();
+const CChainParams &CParams();
 
 /**
  * Sets the params returned by Params() to those for the given BIP70 chain name.
  * @throws std::runtime_error when the chain is not supported.
  */
 void SelectParams(const std::string& chain);
+
+/**
+ * Allows modifying the Version Bits regtest parameters.
+ */
+void UpdateVersionBitsParameters(Consensus::DeploymentPos d, int64_t nStartTime, int64_t nTimeout);
+
+void TurnOffSegwit();
+
+void TurnOffBIP34();
+
+void TurnOffBIP65();
+
+void TurnOffBIP66();
+
+void TurnOffCSV();
 
 #endif // AOKCHAIN_CHAINPARAMS_H

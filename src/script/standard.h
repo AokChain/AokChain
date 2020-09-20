@@ -1,14 +1,16 @@
 // Copyright (c) 2009-2010 Satoshi Nakamoto
-// Copyright (c) 2009-2018 The Bitcoin Core developers
+// Copyright (c) 2009-2016 The Bitcoin Core developers
 // Copyright (c) 2014 The BlackCoin developers
+// Copyright (c) 2017-2019 The Raven Core developers
+// Copyright (c) 2020 The AokChain Core developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 #ifndef AOKCHAIN_SCRIPT_STANDARD_H
 #define AOKCHAIN_SCRIPT_STANDARD_H
 
-#include <script/interpreter.h>
-#include <uint256.h>
+#include "script/interpreter.h"
+#include "uint256.h"
 
 #include <boost/variant.hpp>
 
@@ -24,7 +26,7 @@ class CScriptID : public uint160
 {
 public:
     CScriptID() : uint160() {}
-    explicit CScriptID(const CScript& in);
+    CScriptID(const CScript& in);
     CScriptID(const uint160& in) : uint160(in) {}
 };
 
@@ -61,17 +63,21 @@ static const unsigned int MANDATORY_SCRIPT_VERIFY_FLAGS = SCRIPT_VERIFY_P2SH |
 
 enum txnouttype
 {
-    TX_NONSTANDARD,
+    TX_NONSTANDARD = 0,
     // 'standard' transaction types:
-    TX_PUBKEY,
-    TX_PUBKEYHASH,
-    TX_SCRIPTHASH,
-    TX_MULTISIG,
-    TX_NULL_DATA, //!< unspendable OP_RETURN script that carries data
-    TX_WITNESS_V0_SCRIPTHASH,
-    TX_WITNESS_V0_KEYHASH,
-    TX_WITNESS_UNKNOWN, //!< Only for Witness versions not already defined above,
-    TX_CLTV
+    TX_PUBKEY = 1,
+    TX_PUBKEYHASH = 2,
+    TX_SCRIPTHASH = 3,
+    TX_MULTISIG = 4,
+    TX_NULL_DATA = 5, //!< unspendable OP_RETURN script that carries data
+    TX_WITNESS_V0_SCRIPTHASH = 6,
+    TX_WITNESS_V0_KEYHASH = 7,
+    /** TOKENS START */
+    TX_NEW_TOKEN = 8,
+    TX_REISSUE_TOKEN = 9,
+    TX_TRANSFER_TOKEN = 10,
+    /** TOKENS END */
+    TX_CLTV = 11
 };
 
 class CNoDestination {
@@ -80,54 +86,14 @@ public:
     friend bool operator<(const CNoDestination &a, const CNoDestination &b) { return true; }
 };
 
-struct WitnessV0ScriptHash : public uint256
-{
-    WitnessV0ScriptHash() : uint256() {}
-    explicit WitnessV0ScriptHash(const uint256& hash) : uint256(hash) {}
-    explicit WitnessV0ScriptHash(const CScript& script);
-    using uint256::uint256;
-};
-
-struct WitnessV0KeyHash : public uint160
-{
-    WitnessV0KeyHash() : uint160() {}
-    explicit WitnessV0KeyHash(const uint160& hash) : uint160(hash) {}
-    using uint160::uint160;
-};
-
-//! CTxDestination subtype to encode any future Witness version
-struct WitnessUnknown
-{
-    unsigned int version;
-    unsigned int length;
-    unsigned char program[40];
-
-    friend bool operator==(const WitnessUnknown& w1, const WitnessUnknown& w2) {
-        if (w1.version != w2.version) return false;
-        if (w1.length != w2.length) return false;
-        return std::equal(w1.program, w1.program + w1.length, w2.program);
-    }
-
-    friend bool operator<(const WitnessUnknown& w1, const WitnessUnknown& w2) {
-        if (w1.version < w2.version) return true;
-        if (w1.version > w2.version) return false;
-        if (w1.length < w2.length) return true;
-        if (w1.length > w2.length) return false;
-        return std::lexicographical_compare(w1.program, w1.program + w1.length, w2.program, w2.program + w2.length);
-    }
-};
-
 /**
  * A txout script template with a specific destination. It is either:
  *  * CNoDestination: no destination set
- *  * CKeyID: TX_PUBKEYHASH destination (P2PKH)
- *  * CScriptID: TX_SCRIPTHASH destination (P2SH)
- *  * WitnessV0ScriptHash: TX_WITNESS_V0_SCRIPTHASH destination (P2WSH)
- *  * WitnessV0KeyHash: TX_WITNESS_V0_KEYHASH destination (P2WPKH)
- *  * WitnessUnknown: TX_WITNESS_UNKNOWN destination (P2W???)
+ *  * CKeyID: TX_PUBKEYHASH destination
+ *  * CScriptID: TX_SCRIPTHASH destination
  *  A CTxDestination is the internal data type encoded in a aokchain address
  */
-typedef boost::variant<CNoDestination, CKeyID, CScriptID, WitnessV0ScriptHash, WitnessV0KeyHash, WitnessUnknown> CTxDestination;
+typedef boost::variant<CNoDestination, CKeyID, CScriptID> CTxDestination;
 
 /** Check whether a CTxDestination is a CNoDestination. */
 bool IsValidDestination(const CTxDestination& dest);
@@ -142,16 +108,17 @@ const char* GetTxnOutputType(txnouttype t);
  * script hash, for P2PKH it will contain the key hash, etc.
  *
  * @param[in]   scriptPubKey   Script to parse
+ * @param[out]  typeRet        The script type
  * @param[out]  vSolutionsRet  Vector of parsed pubkeys and hashes
- * @return                     The script type. TX_NONSTANDARD represents a failed solve.
+ * @return                     True if script matches standard template
  */
-txnouttype Solver(const CScript& scriptPubKey, std::vector<std::vector<unsigned char>>& vSolutionsRet);
+bool Solver(const CScript& scriptPubKey, txnouttype& typeRet, std::vector<std::vector<unsigned char> >& vSolutionsRet);
 
 /**
  * Parse a standard scriptPubKey for the destination address. Assigns result to
  * the addressRet parameter and returns true if successful. For multisig
  * scripts, instead use ExtractDestinations. Currently only works for P2PK,
- * P2PKH, P2SH, P2WPKH, and P2WSH scripts.
+ * P2PKH, and P2SH scripts.
  */
 bool ExtractDestination(const CScript& scriptPubKey, CTxDestination& addressRet);
 
@@ -162,10 +129,6 @@ bool ExtractDestination(const CScript& scriptPubKey, CTxDestination& addressRet)
  * addressRet is populated with a single value and nRequiredRet is set to 1.
  * Returns true if successful. Currently does not extract address from
  * pay-to-witness scripts.
- *
- * Note: this function confuses destinations (a subset of CScripts that are
- * encodable as an address) with key identifiers (of keys involved in a
- * CScript), and its use should be phased out.
  */
 bool ExtractDestinations(const CScript& scriptPubKey, txnouttype& typeRet, std::vector<CTxDestination>& addressRet, int& nRequiredRet);
 
@@ -186,9 +149,6 @@ CScript GetScriptForMultisig(int nRequired, const std::vector<CPubKey>& keys);
  * Generate a pay-to-witness script for the given redeem script. If the redeem
  * script is P2PK or P2PKH, this returns a P2WPKH script, otherwise it returns a
  * P2WSH script.
- *
- * TODO: replace calls to GetScriptForWitness with GetScriptForDestination using
- * the various witness-specific CTxDestination subtypes.
  */
 CScript GetScriptForWitness(const CScript& redeemscript);
 

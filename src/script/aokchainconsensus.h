@@ -1,15 +1,17 @@
 // Copyright (c) 2009-2010 Satoshi Nakamoto
-// Copyright (c) 2009-2018 The Bitcoin Core developers
+// Copyright (c) 2009-2016 The Bitcoin Core developers
+// Copyright (c) 2017-2019 The Raven Core developers
+// Copyright (c) 2020 The AokChain Core developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
-#ifndef AOKCHAIN_SCRIPT_AOKCHAINCONSENSUS_H
-#define AOKCHAIN_SCRIPT_AOKCHAINCONSENSUS_H
+#ifndef AOKCHAIN_AOKCHAINCONSENSUS_H
+#define AOKCHAIN_AOKCHAINCONSENSUS_H
 
 #include <stdint.h>
 
 #if defined(BUILD_AOKCHAIN_INTERNAL) && defined(HAVE_CONFIG_H)
-#include <config/aokchain-config.h>
+#include "config/aokchain-config.h"
   #if defined(_WIN32)
     #if defined(DLL_EXPORT)
       #if defined(HAVE_FUNC_ATTRIBUTE_DLLEXPORT)
@@ -80,4 +82,4 @@ EXPORT_SYMBOL unsigned int aokchainconsensus_version();
 
 #undef EXPORT_SYMBOL
 
-#endif // AOKCHAIN_SCRIPT_AOKCHAINCONSENSUS_H
+#endif // AOKCHAIN_AOKCHAINCONSENSUS_H

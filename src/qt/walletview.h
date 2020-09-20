@@ -1,11 +1,13 @@
-// Copyright (c) 2011-2018 The Bitcoin Core developers
+// Copyright (c) 2011-2016 The Bitcoin Core developers
+// Copyright (c) 2017-2019 The Raven Core developers
+// Copyright (c) 2020 The AokChain Core developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 #ifndef AOKCHAIN_QT_WALLETVIEW_H
 #define AOKCHAIN_QT_WALLETVIEW_H
 
-#include <amount.h>
+#include "amount.h"
 
 #include <QStackedWidget>
 
@@ -19,6 +21,9 @@ class SendCoinsRecipient;
 class TransactionView;
 class WalletModel;
 class AddressBookPage;
+class TokensDialog;
+class CreateTokenDialog;
+class ReissueTokenDialog;
 
 QT_BEGIN_NAMESPACE
 class QModelIndex;
@@ -44,7 +49,6 @@ public:
         The client model represents the part of the core that communicates with the P2P network, and is wallet-agnostic.
     */
     void setClientModel(ClientModel *clientModel);
-    WalletModel *getWalletModel() { return walletModel; }
     /** Set the wallet model.
         The wallet model represents a aokchain wallet, and offers access to the list of transactions, address book and sending
         functionality.
@@ -71,6 +75,13 @@ private:
     QProgressDialog *progressDialog;
     const PlatformStyle *platformStyle;
 
+
+    /** TOKENS START */
+    TokensDialog *tokensPage;
+    CreateTokenDialog *createTokensPage;
+    ReissueTokenDialog *manageTokensPage;
+    /** TOKENS END */
+
 public Q_SLOTS:
     /** Switch to overview (home) page */
     void gotoOverviewPage();
@@ -90,7 +101,7 @@ public Q_SLOTS:
 
         The new items are those between start and end inclusive, under the given parent item.
     */
-    void processNewTransaction(const QModelIndex& parent, int start, int /*end*/);
+    void processNewTransaction(const QModelIndex& parent, int start, int end);
     /** Encrypt the wallet */
     void encryptWallet(bool status);
     /** Backup the wallet */
@@ -118,19 +129,29 @@ public Q_SLOTS:
     /** User has requested more information about the out of sync state */
     void requestedSyncWarningInfo();
 
+
+    /** TOKENS START */
+    /** Switch to tokens page */
+    void gotoTokensPage();
+    void gotoCreateTokensPage();
+    void gotoManageTokensPage();
+    /** TOKENS END */
+
 Q_SIGNALS:
     /** Signal that we want to show the main window */
     void showNormalIfMinimized();
     /**  Fired when a message should be reported to the user */
     void message(const QString &title, const QString &message, unsigned int style);
     /** Encryption status of wallet changed */
-    void encryptionStatusChanged();
+    void encryptionStatusChanged(int status);
     /** HD-Enabled status of wallet changed (only possible during startup) */
-    void hdEnabledStatusChanged();
+    void hdEnabledStatusChanged(int hdEnabled);
     /** Notify that a new transaction appeared */
-    void incomingTransaction(const QString& date, int unit, const CAmount& amount, const QString& type, const QString& address, const QString& label, const QString& walletName);
+    void incomingTransaction(const QString& date, int unit, const CAmount& amount, const QString& type, const QString& address, const QString& label, const QString& tokenName);
     /** Notify that the out of sync warning icon has been pressed */
     void outOfSyncWarningClicked();
+    /** Show the tokens GUI */
+    void checkTokens();
 };
 
 #endif // AOKCHAIN_QT_WALLETVIEW_H

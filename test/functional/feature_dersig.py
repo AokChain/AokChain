@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
-# Copyright (c) 2015-2018 The AokChain Core developers
+# Copyright (c) 2015-2016 The Bitcoin Core developers
+# Copyright (c) 2017-2018 The AokChain Core developers
 # Distributed under the MIT software license, see the accompanying
 # file COPYING or http://www.opensource.org/licenses/mit-license.php.
 """Test BIP66 (DER SIG).
@@ -7,21 +8,18 @@
 Test that the DERSIG soft-fork activates at (regtest) height 1251.
 """
 
-from test_framework.blocktools import create_coinbase, create_block, create_transaction
-from test_framework.messages import msg_block
-from test_framework.mininode import mininode_lock, P2PInterface
-from test_framework.script import CScript
 from test_framework.test_framework import AokChainTestFramework
-from test_framework.util import (
-    assert_equal,
-    bytes_to_hex_str,
-    wait_until,
-)
+from test_framework.util import *
+from test_framework.mininode import *
+from test_framework.blocktools import create_coinbase, create_block
+from test_framework.script import CScript
+from io import BytesIO
 
 DERSIG_HEIGHT = 1251
 
 # Reject codes that we might receive in this test
 REJECT_INVALID = 16
+REJECT_OBSOLETE = 17
 REJECT_NONSTANDARD = 64
 
 # A canonical signature consists of:
@@ -40,29 +38,40 @@ def unDERify(tx):
             newscript.append(i)
     tx.vin[0].scriptSig = CScript(newscript)
 
-
+def create_transaction(node, coinbase, to_address, amount):
+    from_txid = node.getblock(coinbase)['tx'][0]
+    inputs = [{ "txid" : from_txid, "vout" : 0}]
+    outputs = { to_address : amount }
+    rawtx = node.createrawtransaction(inputs, outputs)
+    signresult = node.signrawtransaction(rawtx)
+    tx = CTransaction()
+    tx.deserialize(BytesIO(hex_str_to_bytes(signresult['hex'])))
+    return tx
 
 class BIP66Test(AokChainTestFramework):
     def set_test_params(self):
         self.num_nodes = 1
-        self.extra_args = [['-whitelist=127.0.0.1', '-par=1', '-enablebip61']]  # Use only one script thread to get the exact reject reason for testing
+        self.extra_args = [['-promiscuousmempoolflags=1', '-whitelist=127.0.0.1']]
         self.setup_clean_chain = True
-        self.rpc_timeout = 120
-
-    def skip_test_if_missing_module(self):
-        self.skip_if_no_wallet()
 
     def run_test(self):
-        self.nodes[0].add_p2p_connection(P2PInterface())
+        node0 = NodeConnCB()
+        connections = []
+        connections.append(NodeConn('127.0.0.1', p2p_port(0), self.nodes[0], node0))
+        node0.add_connection(connections[0])
+        NetworkThread().start() # Start up network handling in another thread
+
+        # wait_for_verack ensures that the P2P connection is fully up.
+        node0.wait_for_verack()
 
         self.log.info("Mining %d blocks", DERSIG_HEIGHT - 2)
-        self.coinbase_txids = [self.nodes[0].getblock(b)['tx'][0] for b in self.nodes[0].generate(DERSIG_HEIGHT - 2)]
+        self.coinbase_blocks = self.nodes[0].generate(DERSIG_HEIGHT - 2)
         self.nodeaddress = self.nodes[0].getnewaddress()
 
         self.log.info("Test that a transaction with non-DER signature can still appear in a block")
 
-        spendtx = create_transaction(self.nodes[0], self.coinbase_txids[0],
-                self.nodeaddress, amount=1.0)
+        spendtx = create_transaction(self.nodes[0], self.coinbase_blocks[0],
+                self.nodeaddress, 1.0)
         unDERify(spendtx)
         spendtx.rehash()
 
@@ -75,7 +84,7 @@ class BIP66Test(AokChainTestFramework):
         block.rehash()
         block.solve()
 
-        self.nodes[0].p2p.send_and_ping(msg_block(block))
+        node0.send_and_ping(msg_block(block))
         assert_equal(self.nodes[0].getbestblockhash(), block.hash)
 
         self.log.info("Test that blocks must now be at least version 3")
@@ -85,51 +94,62 @@ class BIP66Test(AokChainTestFramework):
         block.nVersion = 2
         block.rehash()
         block.solve()
+        node0.send_and_ping(msg_block(block))
+        assert_equal(int(self.nodes[0].getbestblockhash(), 16), tip)
 
-        with self.nodes[0].assert_debug_log(expected_msgs=['{}, bad-version(0x00000002)'.format(block.hash)]):
-            self.nodes[0].p2p.send_and_ping(msg_block(block))
-            assert_equal(int(self.nodes[0].getbestblockhash(), 16), tip)
-            self.nodes[0].p2p.sync_with_ping()
+        wait_until(lambda: "reject" in node0.last_message.keys(), lock=mininode_lock)
+        with mininode_lock:
+            assert_equal(node0.last_message["reject"].code, REJECT_OBSOLETE)
+            assert_equal(node0.last_message["reject"].reason, b'bad-version(0x00000002)')
+            assert_equal(node0.last_message["reject"].data, block.sha256)
+            del node0.last_message["reject"]
 
         self.log.info("Test that transactions with non-DER signatures cannot appear in a block")
         block.nVersion = 3
 
-        spendtx = create_transaction(self.nodes[0], self.coinbase_txids[1],
-                self.nodeaddress, amount=1.0)
+        spendtx = create_transaction(self.nodes[0], self.coinbase_blocks[1],
+                self.nodeaddress, 1.0)
         unDERify(spendtx)
         spendtx.rehash()
 
         # First we show that this tx is valid except for DERSIG by getting it
-        # rejected from the mempool for exactly that reason.
-        assert_equal(
-            [{'txid': spendtx.hash, 'allowed': False, 'reject-reason': '64: non-mandatory-script-verify-flag (Non-canonical DER signature)'}],
-            self.nodes[0].testmempoolaccept(rawtxs=[bytes_to_hex_str(spendtx.serialize())], allowhighfees=True)
-        )
+        # accepted to the mempool (which we can achieve with
+        # -promiscuousmempoolflags).
+        node0.send_and_ping(msg_tx(spendtx))
+        assert spendtx.hash in self.nodes[0].getrawmempool()
 
-        # Now we verify that a block with this transaction is also invalid.
+        # Now we verify that a block with this transaction is invalid.
         block.vtx.append(spendtx)
         block.hashMerkleRoot = block.calc_merkle_root()
         block.rehash()
         block.solve()
 
-        with self.nodes[0].assert_debug_log(expected_msgs=['CheckInputs on {} failed with non-mandatory-script-verify-flag (Non-canonical DER signature)'.format(block.vtx[-1].hash)]):
-            self.nodes[0].p2p.send_and_ping(msg_block(block))
-            assert_equal(int(self.nodes[0].getbestblockhash(), 16), tip)
-            self.nodes[0].p2p.sync_with_ping()
+        node0.send_and_ping(msg_block(block))
+        assert_equal(int(self.nodes[0].getbestblockhash(), 16), tip)
 
-        wait_until(lambda: "reject" in self.nodes[0].p2p.last_message.keys(), lock=mininode_lock)
+        wait_until(lambda: "reject" in node0.last_message.keys(), lock=mininode_lock)
         with mininode_lock:
-            assert self.nodes[0].p2p.last_message["reject"].code in [REJECT_INVALID, REJECT_NONSTANDARD]
-            assert_equal(self.nodes[0].p2p.last_message["reject"].data, block.sha256)
-            assert b'Non-canonical DER signature' in self.nodes[0].p2p.last_message["reject"].reason
+            # We can receive different reject messages depending on whether
+            # aokchaind is running with multiple script check threads. If script
+            # check threads are not in use, then transaction script validation
+            # happens sequentially, and aokchaind produces more specific reject
+            # reasons.
+            assert node0.last_message["reject"].code in [REJECT_INVALID, REJECT_NONSTANDARD]
+            assert_equal(node0.last_message["reject"].data, block.sha256)
+            if node0.last_message["reject"].code == REJECT_INVALID:
+                # Generic rejection when a block is invalid
+                assert_equal(node0.last_message["reject"].reason, b'block-validation-failed')
+            else:
+                assert b'Non-canonical DER signature' in node0.last_message["reject"].reason
 
         self.log.info("Test that a version 3 block with a DERSIG-compliant transaction is accepted")
-        block.vtx[1] = create_transaction(self.nodes[0], self.coinbase_txids[1], self.nodeaddress, amount=1.0)
+        block.vtx[1] = create_transaction(self.nodes[0],
+                self.coinbase_blocks[1], self.nodeaddress, 1.0)
         block.hashMerkleRoot = block.calc_merkle_root()
         block.rehash()
         block.solve()
 
-        self.nodes[0].p2p.send_and_ping(msg_block(block))
+        node0.send_and_ping(msg_block(block))
         assert_equal(int(self.nodes[0].getbestblockhash(), 16), block.sha256)
 
 if __name__ == '__main__':

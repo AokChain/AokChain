@@ -1,14 +1,17 @@
-// Copyright (c) 2016-2018 The Bitcoin Core developers
+// Copyright (c) 2016 The Bitcoin Core developers
+// Copyright (c) 2017-2019 The Raven Core developers
+// Copyright (c) 2020 The AokChain Core developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
-#include <crypto/aes.h>
-#include <crypto/common.h>
+#include "aes.h"
+#include "crypto/common.h"
 
+#include <assert.h>
 #include <string.h>
 
 extern "C" {
-#include <crypto/ctaes/ctaes.c>
+#include "crypto/ctaes/ctaes.c"
 }
 
 AES128Encrypt::AES128Encrypt(const unsigned char key[16])

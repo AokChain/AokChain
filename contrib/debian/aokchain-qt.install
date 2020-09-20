@@ -1,0 +1,6 @@
+usr/local/bin/aokchain-qt usr/bin
+share/pixmaps/aokchain32.xpm usr/share/pixmaps
+share/pixmaps/aokchain16.xpm usr/share/pixmaps
+share/pixmaps/aokchain128.png usr/share/pixmaps
+debian/aokchain-qt.desktop usr/share/applications
+debian/aokchain-qt.protocol usr/share/kde4/services/

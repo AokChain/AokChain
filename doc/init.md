@@ -15,14 +15,14 @@ Service User
 
 All three Linux startup configurations assume the existence of a "aokchain" user
 and group.  They must be created before attempting to use these scripts.
-The macOS configuration assumes aokchaind will be set up for the current user.
+The OS X configuration assumes aokchaind will be set up for the current user.
 
 Configuration
 ---------------------------------
 
 At a bare minimum, aokchaind requires that the rpcpassword setting be set
 when running as a daemon.  If the configuration file does not exist or this
-setting is not set, aokchaind will shut down promptly after startup.
+setting is not set, aokchaind will shutdown promptly after startup.
 
 This password does not have to be remembered or typed as it is mostly used
 as a fixed token that aokchaind and client programs read from the configuration
@@ -44,7 +44,7 @@ This allows for running aokchaind without having to do any manual configuration.
 relative to the data directory. `wallet` *only* supports relative paths.
 
 For an example configuration file that describes the configuration settings,
-see `share/examples/aokchain.conf`.
+see `contrib/debian/examples/aokchain.conf`.
 
 Paths
 ---------------------------------
@@ -56,7 +56,7 @@ All three configurations assume several paths that might need to be adjusted.
 Binary:              `/usr/bin/aokchaind`  
 Configuration file:  `/etc/aokchain/aokchain.conf`  
 Data directory:      `/var/lib/aokchaind`  
-PID file:            `/var/run/aokchaind/aokchaind.pid` (OpenRC and Upstart) or `/run/aokchaind/aokchaind.pid` (systemd)
+PID file:            `/var/run/aokchaind/aokchaind.pid` (OpenRC and Upstart) or `/var/lib/aokchaind/aokchaind.pid` (systemd)  
 Lock file:           `/var/lock/subsys/aokchaind` (CentOS)  
 
 The configuration file, PID directory (if applicable) and data directory
@@ -65,23 +65,7 @@ reasons to make the configuration file and data directory only readable by the
 aokchain user and group.  Access to aokchain-cli and other aokchaind rpc clients
 can then be controlled by group membership.
 
-NOTE: When using the systemd .service file, the creation of the aforementioned
-directories and the setting of their permissions is automatically handled by
-systemd. Directories are given a permission of 710, giving the aokchain group
-access to files under it _if_ the files themselves give permission to the
-aokchain group to do so (e.g. when `-sysperms` is specified). This does not allow
-for the listing of files under the directory.
-
-NOTE: It is not currently possible to override `datadir` in
-`/etc/aokchain/aokchain.conf` with the current systemd, OpenRC, and Upstart init
-files out-of-the-box. This is because the command line options specified in the
-init files take precedence over the configurations in
-`/etc/aokchain/aokchain.conf`. However, some init systems have their own
-configuration mechanisms that would allow for overriding the command line
-options specified in the init files (e.g. setting `AOKCHAIND_DATADIR` for
-OpenRC).
-
-### macOS
+### Mac OS X
 
 Binary:              `/usr/local/bin/aokchaind`  
 Configuration file:  `~/Library/Application Support/AokChain/aokchain.conf`  
@@ -100,8 +84,6 @@ Installing this .service file consists of just copying it to
 To test, run `systemctl start aokchaind` and to enable for system startup run
 `systemctl enable aokchaind`
 
-NOTE: When installing for systemd in Debian/Ubuntu the .service file needs to be copied to the /lib/systemd/system directory instead.
-
 ### OpenRC
 
 Rename aokchaind.openrc to aokchaind and drop it in /etc/init.d.  Double
@@ -110,8 +92,6 @@ check ownership and permissions and make it executable.  Test it with
 `rc-update add aokchaind`
 
 ### Upstart (for Debian/Ubuntu based distributions)
-
-Upstart is the default init system for Debian/Ubuntu versions older than 15.04. If you are using version 15.04 or newer and haven't manually configured upstart you should follow the systemd instructions instead.
 
 Drop aokchaind.conf in /etc/init.  Test by running `service aokchaind start`
 it will automatically start on reboot.
@@ -127,7 +107,7 @@ Using this script, you can adjust the path and flags to the aokchaind program by
 setting the AOKCHAIND and FLAGS environment variables in the file
 /etc/sysconfig/aokchaind. You can also use the DAEMONOPTS environment variable here.
 
-### macOS
+### Mac OS X
 
 Copy org.aokchain.aokchaind.plist into ~/Library/LaunchAgents. Load the launch agent by
 running `launchctl load ~/Library/LaunchAgents/org.aokchain.aokchaind.plist`.

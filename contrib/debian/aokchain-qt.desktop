@@ -1,0 +1,13 @@
+[Desktop Entry]
+Encoding=UTF-8
+Name=AokChain Core
+Comment=Connect to the AokChain P2P Network
+Comment[de]=Verbinde mit dem AokChain peer-to-peer Netzwerk
+Comment[fr]=AokChain, monnaie virtuelle cryptographique pair à pair
+Comment[tr]=AokChain, eşten eşe kriptografik sanal para birimi
+Exec=aokchain-qt %u
+Terminal=false
+Type=Application
+Icon=aokchain128
+MimeType=x-scheme-handler/aokchain;
+Categories=Office;Finance;

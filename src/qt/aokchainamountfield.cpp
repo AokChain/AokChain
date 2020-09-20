@@ -1,13 +1,18 @@
-// Copyright (c) 2011-2018 The Bitcoin Core developers
+// Copyright (c) 2011-2015 The Bitcoin Core developers
+// Copyright (c) 2017-2019 The Raven Core developers
+// Copyright (c) 2020 The AokChain Core developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
-#include <qt/aokchainamountfield.h>
+#include "aokchainamountfield.h"
 
-#include <qt/aokchainunits.h>
-#include <qt/guiconstants.h>
-#include <qt/qvaluecombobox.h>
+#include "aokchainunits.h"
+#include "guiconstants.h"
+#include "qvaluecombobox.h"
+#include "platformstyle.h"
+#include "util.h"
 
+#include <QDebug>
 #include <QApplication>
 #include <QAbstractSpinBox>
 #include <QHBoxLayout>
@@ -24,11 +29,14 @@ class AmountSpinBox: public QAbstractSpinBox
 
 public:
     explicit AmountSpinBox(QWidget *parent):
-        QAbstractSpinBox(parent)
+        QAbstractSpinBox(parent),
+        currentUnit(AokChainUnits::AOK),
+        singleStep(100000), // satoshis
+        tokenUnit(-1)
     {
         setAlignment(Qt::AlignRight);
 
-        connect(lineEdit(), &QLineEdit::textEdited, this, &AmountSpinBox::valueChanged);
+        connect(lineEdit(), SIGNAL(textEdited(QString)), this, SIGNAL(valueChanged()));
     }
 
     QValidator::State validate(QString &text, int &pos) const
@@ -43,48 +51,24 @@ public:
 
     void fixup(QString &input) const
     {
-        bool valid;
-        CAmount val;
-
-        if (input.isEmpty() && !m_allow_empty) {
-            valid = true;
-            val = m_min_amount;
-        } else {
-            valid = false;
-            val = parse(input, &valid);
-        }
-
-        if (valid) {
-            val = qBound(m_min_amount, val, m_max_amount);
-            input = AokChainUnits::format(currentUnit, val, false, AokChainUnits::separatorAlways);
+        bool valid = false;
+        CAmount val = parse(input, &valid);
+        if(valid)
+        {
+            input = AokChainUnits::format(currentUnit, val, false, AokChainUnits::separatorAlways, tokenUnit);
             lineEdit()->setText(input);
         }
     }
 
-    CAmount value(bool *valid_out=nullptr) const
+    CAmount value(bool *valid_out=0) const
     {
         return parse(text(), valid_out);
     }
 
     void setValue(const CAmount& value)
     {
-        lineEdit()->setText(AokChainUnits::format(currentUnit, value, false, AokChainUnits::separatorAlways));
+        lineEdit()->setText(AokChainUnits::format(currentUnit, value, false, AokChainUnits::separatorAlways, tokenUnit));
         Q_EMIT valueChanged();
-    }
-
-    void SetAllowEmpty(bool allow)
-    {
-        m_allow_empty = allow;
-    }
-
-    void SetMinValue(const CAmount& value)
-    {
-        m_min_amount = value;
-    }
-
-    void SetMaxValue(const CAmount& value)
-    {
-        m_max_amount = value;
     }
 
     void stepBy(int steps)
@@ -92,7 +76,7 @@ public:
         bool valid = false;
         CAmount val = value(&valid);
         val = val + steps * singleStep;
-        val = qBound(m_min_amount, val, m_max_amount);
+        val = qMin(qMax(val, CAmount(0)), AokChainUnits::maxMoney());
         setValue(val);
     }
 
@@ -114,6 +98,22 @@ public:
         singleStep = step;
     }
 
+    void setTokenUnit(int unit)
+    {
+        if (unit > MAX_TOKEN_UNITS)
+            unit = MAX_TOKEN_UNITS;
+
+        tokenUnit = unit;
+
+        bool valid = false;
+        CAmount val = value(&valid);
+
+        if(valid)
+            setValue(val);
+        else
+            clear();
+    }
+
     QSize minimumSizeHint() const
     {
         if(cachedMinimumSizeHint.isEmpty())
@@ -122,7 +122,7 @@ public:
 
             const QFontMetrics fm(fontMetrics());
             int h = lineEdit()->minimumSizeHint().height();
-            int w = fm.width(AokChainUnits::format(AokChainUnits::AOK, AokChainUnits::maxMoney(), false, AokChainUnits::separatorAlways));
+            int w = fm.width(AokChainUnits::format(AokChainUnits::AOK, AokChainUnits::maxMoney(), false, AokChainUnits::separatorAlways, tokenUnit));
             w += 2; // cursor blinking space
 
             QStyleOptionSpinBox opt;
@@ -148,22 +148,28 @@ public:
     }
 
 private:
-    int currentUnit{AokChainUnits::AOK};
-    CAmount singleStep{CAmount(100000)}; // satoshis
+    int currentUnit;
+    CAmount singleStep;
     mutable QSize cachedMinimumSizeHint;
-    bool m_allow_empty{true};
-    CAmount m_min_amount{CAmount(0)};
-    CAmount m_max_amount{AokChainUnits::maxMoney()};
+    int tokenUnit;
 
     /**
      * Parse a string into a number of base monetary units and
      * return validity.
      * @note Must return 0 if !valid.
      */
-    CAmount parse(const QString &text, bool *valid_out=nullptr) const
+    CAmount parse(const QString &text, bool *valid_out=0) const
     {
         CAmount val = 0;
-        bool valid = AokChainUnits::parse(currentUnit, text, &val);
+
+        // Update parsing function to work with token parsing units
+        bool valid = false;
+        if (tokenUnit >= 0) {
+            valid = AokChainUnits::tokenParse(tokenUnit, text, &val);
+        }
+        else
+            valid = AokChainUnits::parse(currentUnit, text, &val);
+
         if(valid)
         {
             if(val < 0 || val > AokChainUnits::maxMoney())
@@ -197,13 +203,14 @@ protected:
         if (text().isEmpty()) // Allow step-up with empty field
             return StepUpEnabled;
 
-        StepEnabled rv = StepNone;
+        StepEnabled rv = 0;
         bool valid = false;
         CAmount val = value(&valid);
-        if (valid) {
-            if (val > m_min_amount)
+        if(valid)
+        {
+            if(val > 0)
                 rv |= StepDownEnabled;
-            if (val < m_max_amount)
+            if(val < AokChainUnits::maxMoney())
                 rv |= StepUpEnabled;
         }
         return rv;
@@ -213,24 +220,27 @@ Q_SIGNALS:
     void valueChanged();
 };
 
-#include <qt/aokchainamountfield.moc>
+#include "aokchainamountfield.moc"
 
 AokChainAmountField::AokChainAmountField(QWidget *parent) :
     QWidget(parent),
-    amount(nullptr)
+    amount(0)
 {
     amount = new AmountSpinBox(this);
     amount->setLocale(QLocale::c());
     amount->installEventFilter(this);
-    amount->setMaximumWidth(240);
+    amount->setMaximumWidth(170);
 
     QHBoxLayout *layout = new QHBoxLayout(this);
     layout->addWidget(amount);
-    unit = new QValueComboBox(this);
+    unit = new QValueComboBox();
     unit->setModel(new AokChainUnits(this));
 
-    unit->setVisible(false);
-    layout->addWidget(new QLabel(tr("AOK")));
+    if (gArgs.GetBoolArg("-advancedui", false)) {
+        layout->addWidget(unit);
+    } else {
+        layout->addWidget(new QLabel(tr("AOK")));
+    }
 
     layout->addStretch(1);
     layout->setContentsMargins(0,0,0,0);
@@ -241,11 +251,12 @@ AokChainAmountField::AokChainAmountField(QWidget *parent) :
     setFocusProxy(amount);
 
     // If one if the widgets changes, the combined content changes as well
-    connect(amount, &AmountSpinBox::valueChanged, this, &AokChainAmountField::valueChanged);
-    // connect(unit, static_cast<void (QComboBox::*)(int)>(&QComboBox::currentIndexChanged), this, &AokChainAmountField::unitChanged);
+    connect(amount, SIGNAL(valueChanged()), this, SIGNAL(valueChanged()));
+    connect(unit, SIGNAL(currentIndexChanged(int)), this, SLOT(unitChanged(int)));
 
     // Set default based on configuration
     unitChanged(unit->currentIndex());
+
 }
 
 void AokChainAmountField::clear()
@@ -270,10 +281,11 @@ bool AokChainAmountField::validate()
 
 void AokChainAmountField::setValid(bool valid)
 {
-    if (valid)
-        amount->setStyleSheet("");
-    else
-        amount->setStyleSheet(STYLE_INVALID);
+    if (valid) {
+            amount->setStyleSheet("");
+    } else {
+            amount->setStyleSheet(STYLE_INVALID);
+    }
 }
 
 bool AokChainAmountField::eventFilter(QObject *object, QEvent *event)
@@ -303,21 +315,6 @@ void AokChainAmountField::setValue(const CAmount& value)
     amount->setValue(value);
 }
 
-void AokChainAmountField::SetAllowEmpty(bool allow)
-{
-    amount->SetAllowEmpty(allow);
-}
-
-void AokChainAmountField::SetMinValue(const CAmount& value)
-{
-    amount->SetMinValue(value);
-}
-
-void AokChainAmountField::SetMaxValue(const CAmount& value)
-{
-    amount->SetMaxValue(value);
-}
-
 void AokChainAmountField::setReadOnly(bool fReadOnly)
 {
     amount->setReadOnly(fReadOnly);
@@ -342,4 +339,94 @@ void AokChainAmountField::setDisplayUnit(int newUnit)
 void AokChainAmountField::setSingleStep(const CAmount& step)
 {
     amount->setSingleStep(step);
+}
+
+TokenAmountField::TokenAmountField(QWidget *parent) :
+        QWidget(parent),
+        amount(0)
+{
+    amount = new AmountSpinBox(this);
+    amount->setLocale(QLocale::c());
+    amount->installEventFilter(this);
+    amount->setMaximumWidth(170);
+
+    QHBoxLayout *layout = new QHBoxLayout(this);
+    layout->addWidget(amount);
+    layout->addStretch(1);
+    layout->setContentsMargins(0,0,0,0);
+
+    setLayout(layout);
+
+    setFocusPolicy(Qt::TabFocus);
+    setFocusProxy(amount);
+
+    // If one if the widgets changes, the combined content changes as well
+    connect(amount, SIGNAL(valueChanged()), this, SIGNAL(valueChanged()));
+
+    // Set default based on configuration
+    setUnit(MAX_TOKEN_UNITS);
+}
+
+void TokenAmountField::clear()
+{
+    amount->clear();
+    setUnit(MAX_TOKEN_UNITS);
+}
+
+void TokenAmountField::setEnabled(bool fEnabled)
+{
+    amount->setEnabled(fEnabled);
+}
+
+bool TokenAmountField::validate()
+{
+    bool valid = false;
+    value(&valid);
+    setValid(valid);
+    return valid;
+}
+
+void TokenAmountField::setValid(bool valid)
+{
+    if (valid) {
+        amount->setStyleSheet("");
+    } else {
+        amount->setStyleSheet(STYLE_INVALID);
+    }
+}
+
+bool TokenAmountField::eventFilter(QObject *object, QEvent *event)
+{
+    if (event->type() == QEvent::FocusIn)
+    {
+        // Clear invalid flag on focus
+        setValid(true);
+    }
+    return QWidget::eventFilter(object, event);
+}
+
+CAmount TokenAmountField::value(bool *valid_out) const
+{
+    return amount->value(valid_out) * AokChainUnits::factorToken(8 - tokenUnit);
+}
+
+void TokenAmountField::setValue(const CAmount& value)
+{
+    amount->setValue(value);
+}
+
+void TokenAmountField::setReadOnly(bool fReadOnly)
+{
+    amount->setReadOnly(fReadOnly);
+}
+
+void TokenAmountField::setSingleStep(const CAmount& step)
+{
+    amount->setSingleStep(step);
+}
+
+void TokenAmountField::setUnit(int unit)
+{
+    tokenUnit = unit;
+    amount->setTokenUnit(tokenUnit);
 }

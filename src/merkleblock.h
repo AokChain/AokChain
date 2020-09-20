@@ -1,15 +1,17 @@
 // Copyright (c) 2009-2010 Satoshi Nakamoto
-// Copyright (c) 2009-2018 The Bitcoin Core developers
+// Copyright (c) 2009-2016 The Bitcoin Core developers
+// Copyright (c) 2017-2019 The Raven Core developers
+// Copyright (c) 2020 The AokChain Core developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 #ifndef AOKCHAIN_MERKLEBLOCK_H
 #define AOKCHAIN_MERKLEBLOCK_H
 
-#include <serialize.h>
-#include <uint256.h>
-#include <primitives/block.h>
-#include <bloom.h>
+#include "serialize.h"
+#include "uint256.h"
+#include "primitives/block.h"
+#include "bloom.h"
 
 #include <vector>
 
@@ -115,12 +117,6 @@ public:
      * returns the merkle root, or 0 in case of failure
      */
     uint256 ExtractMatches(std::vector<uint256> &vMatch, std::vector<unsigned int> &vnIndex);
-
-    /** Get number of transactions the merkle proof is indicating for cross-reference with
-     * local blockchain knowledge.
-     */
-    unsigned int GetNumTransactions() const { return nTransactions; };
-
 };
 
 

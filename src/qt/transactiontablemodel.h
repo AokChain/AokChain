@@ -1,25 +1,23 @@
-// Copyright (c) 2011-2018 The Bitcoin Core developers
+// Copyright (c) 2011-2016 The Bitcoin Core developers
+// Copyright (c) 2017-2019 The Raven Core developers
+// Copyright (c) 2020 The AokChain Core developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 #ifndef AOKCHAIN_QT_TRANSACTIONTABLEMODEL_H
 #define AOKCHAIN_QT_TRANSACTIONTABLEMODEL_H
 
-#include <qt/aokchainunits.h>
+#include "aokchainunits.h"
 
 #include <QAbstractTableModel>
 #include <QStringList>
-
-#include <memory>
-
-namespace interfaces {
-class Handler;
-}
 
 class PlatformStyle;
 class TransactionRecord;
 class TransactionTablePriv;
 class WalletModel;
+
+class CWallet;
 
 /** UI model for the transaction table of a wallet.
  */
@@ -28,7 +26,7 @@ class TransactionTableModel : public QAbstractTableModel
     Q_OBJECT
 
 public:
-    explicit TransactionTableModel(const PlatformStyle *platformStyle, WalletModel *parent = nullptr);
+    explicit TransactionTableModel(const PlatformStyle *platformStyle, CWallet* wallet, WalletModel *parent = 0);
     ~TransactionTableModel();
 
     enum ColumnIndex {
@@ -37,7 +35,8 @@ public:
         Date = 2,
         Type = 3,
         ToAddress = 4,
-        Amount = 5
+        Amount = 5,
+        TokenName = 6
     };
 
     /** Roles to get specific information from a transaction row.
@@ -60,6 +59,8 @@ public:
         LabelRole,
         /** Net amount of transaction */
         AmountRole,
+        /** Unique identifier */
+        TxIDRole,
         /** Transaction hash */
         TxHashRole,
         /** Transaction data, hex-encoded */
@@ -74,6 +75,8 @@ public:
         StatusRole,
         /** Unprocessed icon */
         RawDecorationRole,
+        /** AOK or name of an token */
+        TokenNameRole,
     };
 
     int rowCount(const QModelIndex &parent) const;
@@ -84,9 +87,8 @@ public:
     bool processingQueuedTransactions() const { return fProcessingQueuedTransactions; }
 
 private:
+    CWallet* wallet;
     WalletModel *walletModel;
-    std::unique_ptr<interfaces::Handler> m_handler_transaction_changed;
-    std::unique_ptr<interfaces::Handler> m_handler_show_progress;
     QStringList columns;
     TransactionTablePriv *priv;
     bool fProcessingQueuedTransactions;

@@ -1,13 +1,15 @@
 // Copyright (c) 2009-2010 Satoshi Nakamoto
-// Copyright (c) 2009-2018 The Bitcoin Core developers
+// Copyright (c) 2009-2016 The Bitcoin Core developers
+// Copyright (c) 2017-2019 The Raven Core developers
+// Copyright (c) 2020 The AokChain Core developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 #ifndef AOKCHAIN_SUPPORT_ALLOCATORS_SECURE_H
 #define AOKCHAIN_SUPPORT_ALLOCATORS_SECURE_H
 
-#include <support/lockedpool.h>
-#include <support/cleanse.h>
+#include "support/lockedpool.h"
+#include "support/cleanse.h"
 
 #include <string>
 
@@ -40,11 +42,7 @@ struct secure_allocator : public std::allocator<T> {
 
     T* allocate(std::size_t n, const void* hint = 0)
     {
-        T* allocation = static_cast<T*>(LockedPoolManager::Instance().alloc(sizeof(T) * n));
-        if (!allocation) {
-            throw std::bad_alloc();
-        }
-        return allocation;
+        return static_cast<T*>(LockedPoolManager::Instance().alloc(sizeof(T) * n));
     }
 
     void deallocate(T* p, std::size_t n)

@@ -1,14 +1,21 @@
-// Copyright (c) 2011-2018 The Bitcoin Core developers
+// Copyright (c) 2011-2016 The Bitcoin Core developers
+// Copyright (c) 2017-2019 The Raven Core developers
+// Copyright (c) 2020 The AokChain Core developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 #ifndef AOKCHAIN_QT_AOKCHAINUNITS_H
 #define AOKCHAIN_QT_AOKCHAINUNITS_H
 
-#include <amount.h>
+#include "amount.h"
 
 #include <QAbstractListModel>
 #include <QString>
+
+// Token units
+#define MAX_TOKEN_UNITS 8
+#define MIN_TOKEN_UNITS 0
+
 
 // U+2009 THIN SPACE = UTF-8 E2 80 89
 #define REAL_THIN_SP_CP 0x2009
@@ -58,8 +65,7 @@ public:
     {
         AOK,
         mAOK,
-        uAOK,
-        SAT
+        uAOK
     };
 
     enum SeparatorStyle
@@ -77,24 +83,27 @@ public:
     static QList<Unit> availableUnits();
     //! Is unit ID valid?
     static bool valid(int unit);
-    //! Long name
-    static QString longName(int unit);
     //! Short name
-    static QString shortName(int unit);
+    static QString name(int unit);
     //! Longer description
     static QString description(int unit);
     //! Number of Satoshis (1e-8) per unit
     static qint64 factor(int unit);
+    //! Number of Satoshis (1e-8) per unit for tokens
+    static qint64 factorToken(int unit);
     //! Number of decimals left
     static int decimals(int unit);
     //! Format as string
-    static QString format(int unit, const CAmount& amount, bool plussign=false, SeparatorStyle separators=separatorStandard);
+    static QString format(int unit, const CAmount& amount, bool plussign=false, SeparatorStyle separators=separatorStandard, const int nTokenUnit = MIN_TOKEN_UNITS - 1);
     //! Format as string (with unit)
     static QString formatWithUnit(int unit, const CAmount& amount, bool plussign=false, SeparatorStyle separators=separatorStandard);
+    //! Format as string (with custom name)
+    static QString formatWithCustomName(QString customName, const CAmount& amount, int unit = MAX_TOKEN_UNITS, bool plussign=false, SeparatorStyle separators=separatorStandard);
     //! Format as HTML string (with unit)
     static QString formatHtmlWithUnit(int unit, const CAmount& amount, bool plussign=false, SeparatorStyle separators=separatorStandard);
     //! Parse string to coin amount
     static bool parse(int unit, const QString &value, CAmount *val_out);
+    static bool tokenParse(int tokenUnit, const QString &value, CAmount *val_out);
     //! Gets title for amount column including current display unit if optionsModel reference available */
     static QString getAmountColumnTitle(int unit);
     ///@}
