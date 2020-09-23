@@ -18,10 +18,12 @@ struct CAddressUnspentKey {
     std::string token;
     uint256 txhash;
     size_t index;
+    int timeLock;
 
     size_t GetSerializeSize() const {
-        return 57 + token.size();
+        return 61 + token.size();
     }
+
     template<typename Stream>
     void Serialize(Stream& s) const {
         ser_writedata8(s, type);
@@ -29,6 +31,7 @@ struct CAddressUnspentKey {
         ::Serialize(s, token);
         txhash.Serialize(s);
         ser_writedata32(s, index);
+        ser_writedata32be(s, timeLock);
     }
     template<typename Stream>
     void Unserialize(Stream& s) {
@@ -37,22 +40,25 @@ struct CAddressUnspentKey {
         ::Unserialize(s, token);
         txhash.Unserialize(s);
         index = ser_readdata32(s);
+        timeLock = ser_readdata32be(s);
     }
 
-    CAddressUnspentKey(unsigned int addressType, uint160 addressHash, uint256 txid, size_t indexValue) {
+    CAddressUnspentKey(unsigned int addressType, uint160 addressHash, uint256 txid, size_t indexValue, int txTimeLock = 0) {
         type = addressType;
         hashBytes = addressHash;
         token = AOK;
         txhash = txid;
         index = indexValue;
+        timeLock = txTimeLock;
     }
 
-    CAddressUnspentKey(unsigned int addressType, uint160 addressHash, std::string tokenName, uint256 txid, size_t indexValue) {
+    CAddressUnspentKey(unsigned int addressType, uint160 addressHash, std::string tokenName, uint256 txid, size_t indexValue, int txTimeLock = 0) {
         type = addressType;
         hashBytes = addressHash;
         token = tokenName;
         txhash = txid;
         index = indexValue;
+        timeLock = txTimeLock;
     }
 
     CAddressUnspentKey() {
@@ -65,6 +71,7 @@ struct CAddressUnspentKey {
         token.clear();
         txhash.SetNull();
         index = 0;
+        timeLock = 0;
     }
 };
 

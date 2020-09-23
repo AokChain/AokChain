@@ -794,7 +794,8 @@ UniValue getaddressutxos(const JSONRPCRequest& request)
             }
         }
 
-        if (nTokenLockTime < ((int64_t)nTokenLockTime < LOCKTIME_THRESHOLD ? (int64_t)it->second.blockHeight : (int64_t)chainActive.Tip()->GetMedianTimePast())) {
+        int64_t timeLock = (tokenName == "AOK") ? it->first.timeLock : nTokenLockTime;
+        if (timeLock < ((int64_t)timeLock < LOCKTIME_THRESHOLD ? (int64_t)it->second.blockHeight : (int64_t)chainActive.Tip()->GetMedianTimePast())) {
             output.pushKV("address", address);
             output.pushKV("token_name", tokenNameOut);
             output.pushKV("txid", it->first.txhash.GetHex());
@@ -802,6 +803,8 @@ UniValue getaddressutxos(const JSONRPCRequest& request)
             output.pushKV("script", HexStr(it->second.script.begin(), it->second.script.end()));
             output.pushKV("satoshis", it->second.satoshis);
             output.pushKV("height", it->second.blockHeight);
+            output.pushKV("height", it->second.blockHeight);
+            output.pushKV("timelock", timeLock);
             utxos.push_back(output);
 
             total += it->second.satoshis;

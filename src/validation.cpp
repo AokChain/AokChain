@@ -1772,15 +1772,16 @@ static DisconnectResult DisconnectBlock(const CBlock& block, const CBlockIndex* 
                 } else if (out.scriptPubKey.IsPayToPublicKeyHashLocked()) {
 
                     std::vector<std::string> result = ScriptToAsmVector(out.scriptPubKey);
+                    int timeLock = std::stoi(result[0]);
 
                     int offset = out.scriptPubKey.size() - 25;
                     std::vector<unsigned char> hashBytes(out.scriptPubKey.begin() + (3 + offset), out.scriptPubKey.begin() + (23 + offset));
 
                     // undo receiving activity
-                    addressIndex.push_back(std::make_pair(CAddressIndexKey(1, uint160(hashBytes), pindex->nHeight, i, hash, k, false, std::stoi(result[0])), out.nValue));
+                    addressIndex.push_back(std::make_pair(CAddressIndexKey(1, uint160(hashBytes), pindex->nHeight, i, hash, k, false, timeLock), out.nValue));
 
                     // undo unspent index
-                    addressUnspentIndex.push_back(std::make_pair(CAddressUnspentKey(1, uint160(hashBytes), hash, k), CAddressUnspentValue()));
+                    addressUnspentIndex.push_back(std::make_pair(CAddressUnspentKey(1, uint160(hashBytes), hash, k, timeLock), CAddressUnspentValue()));
 
                 } else if (out.scriptPubKey.IsPayToPublicKey()) {
                     uint160 hashBytes(Hash160(out.scriptPubKey.begin()+1, out.scriptPubKey.end()-1));
@@ -1974,19 +1975,20 @@ static DisconnectResult DisconnectBlock(const CBlock& block, const CBlockIndex* 
 
                     } else if (prevout.scriptPubKey.IsPayToPublicKeyHashLocked()) {
                         std::vector<std::string> result = ScriptToAsmVector(prevout.scriptPubKey);
+                        int timeLock = std::stoi(result[0]);
 
                         int offset = prevout.scriptPubKey.size() - 25;
 
                         std::vector<unsigned char> hashBytes(prevout.scriptPubKey.begin() + (3 + offset), prevout.scriptPubKey.begin() + (23 + offset));
 
                         // undo spending activity
-                        addressIndex.push_back(std::make_pair(CAddressIndexKey(1, uint160(hashBytes), pindex->nHeight, i, hash, j, true, std::stoi(result[0])), prevout.nValue * -1));
+                        addressIndex.push_back(std::make_pair(CAddressIndexKey(1, uint160(hashBytes), pindex->nHeight, i, hash, j, true, timeLock), prevout.nValue * -1));
 
                         // restore unspent index
-                        addressUnspentIndex.push_back(std::make_pair(CAddressUnspentKey(1, uint160(hashBytes), input.prevout.hash, input.prevout.n), CAddressUnspentValue(prevout.nValue, prevout.scriptPubKey, undo.nHeight, tx.nTime)));
+                        addressUnspentIndex.push_back(std::make_pair(CAddressUnspentKey(1, uint160(hashBytes), input.prevout.hash, input.prevout.n, timeLock), CAddressUnspentValue(prevout.nValue, prevout.scriptPubKey, undo.nHeight, tx.nTime)));
 
                     } else if (prevout.scriptPubKey.IsPayToPublicKey()) {
-                        uint160 hashBytes(Hash160(prevout.scriptPubKey.begin()+1, prevout.scriptPubKey.end()-1));
+                        uint160 hashBytes(Hash160(prevout.scriptPubKey.begin() + 1, prevout.scriptPubKey.end() - 1));
                         addressIndex.push_back(std::make_pair(CAddressIndexKey(1, hashBytes, pindex->nHeight, i, hash, j, false), prevout.nValue));
                         addressUnspentIndex.push_back(std::make_pair(CAddressUnspentKey(1, hashBytes, hash, j), CAddressUnspentValue()));
                     } else {
@@ -1998,9 +2000,6 @@ static DisconnectResult DisconnectBlock(const CBlock& block, const CBlockIndex* 
                             uint32_t nTokenLockTime;
 
                             if (ParseTokenScript(prevout.scriptPubKey, hashBytes, tokenName, tokenAmount, nTokenLockTime)) {
-//                                std::cout << "ConnectBlock(): pushing tokens onto addressIndex: " << "1" << ", " << hashBytes.GetHex() << ", " << tokenName << ", " << pindex->nHeight
-//                                          << ", " << i << ", " << hash.GetHex() << ", " << j << ", " << "true" << ", " << tokenAmount * -1 << std::endl;
-
                                 // undo spending activity
                                 addressIndex.push_back(std::make_pair(
                                         CAddressIndexKey(1, uint160(hashBytes), tokenName, pindex->nHeight, i, hash, j,
@@ -2379,21 +2378,18 @@ static bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockInd
                     if (fAddressIndex && addressType > 0) {
                         /** TOKENS START */
                         if (isToken) {
-//                            std::cout << "ConnectBlock(): pushing tokens onto addressIndex: " << "1" << ", " << hashBytes.GetHex() << ", " << tokenName << ", " << pindex->nHeight
-//                                      << ", " << i << ", " << txhash.GetHex() << ", " << j << ", " << "true" << ", " << tokenAmount * -1 << std::endl;
-
                             // record spending activity
                             addressIndex.push_back(std::make_pair(CAddressIndexKey(addressType, hashBytes, tokenName, pindex->nHeight, i, txhash, j, true, timeLock), tokenAmount * -1));
 
                             // remove address from unspent index
-                            addressUnspentIndex.push_back(std::make_pair(CAddressUnspentKey(addressType, hashBytes, tokenName, input.prevout.hash, input.prevout.n), CAddressUnspentValue()));
+                            addressUnspentIndex.push_back(std::make_pair(CAddressUnspentKey(addressType, hashBytes, tokenName, input.prevout.hash, input.prevout.n, timeLock), CAddressUnspentValue()));
                         /** TOKENS END */
                         } else {
                             // record spending activity
                             addressIndex.push_back(std::make_pair(CAddressIndexKey(addressType, hashBytes, pindex->nHeight, i, txhash, j, true, timeLock), prevout.nValue * -1));
 
                             // remove address from unspent index
-                            addressUnspentIndex.push_back(std::make_pair(CAddressUnspentKey(addressType, hashBytes, input.prevout.hash, input.prevout.n), CAddressUnspentValue()));
+                            addressUnspentIndex.push_back(std::make_pair(CAddressUnspentKey(addressType, hashBytes, input.prevout.hash, input.prevout.n, timeLock), CAddressUnspentValue()));
                         }
                     }
                     /** TOKENS END */
@@ -2524,13 +2520,15 @@ static bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockInd
                 } else if (out.scriptPubKey.IsPayToPublicKeyHashLocked()) {
                     std::vector<std::string> result = ScriptToAsmVector(out.scriptPubKey);
                     int offset = out.scriptPubKey.size() - 25;
+                    int timeLock = std::stoi(result[0]);
+
                     std::vector<unsigned char> hashBytes(out.scriptPubKey.begin() + (3 + offset), out.scriptPubKey.begin() + (23 + offset));
 
                     // record receiving activity
-                    addressIndex.push_back(std::make_pair(CAddressIndexKey(1, uint160(hashBytes), pindex->nHeight, i, txhash, k, false, std::stoi(result[0])), out.nValue));
+                    addressIndex.push_back(std::make_pair(CAddressIndexKey(1, uint160(hashBytes), pindex->nHeight, i, txhash, k, false, timeLock), out.nValue));
 
                     // record unspent output
-                    addressUnspentIndex.push_back(std::make_pair(CAddressUnspentKey(1, uint160(hashBytes), txhash, k), CAddressUnspentValue(out.nValue, out.scriptPubKey, pindex->nHeight, tx.nTime)));
+                    addressUnspentIndex.push_back(std::make_pair(CAddressUnspentKey(1, uint160(hashBytes), txhash, k, timeLock), CAddressUnspentValue(out.nValue, out.scriptPubKey, pindex->nHeight, tx.nTime)));
 
                 } else if (out.scriptPubKey.IsPayToPublicKey()) {
                     uint160 hashBytes(Hash160(out.scriptPubKey.begin() + 1, out.scriptPubKey.end() - 1));
