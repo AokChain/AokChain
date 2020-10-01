@@ -210,7 +210,7 @@ bool CheckTransaction(const CTransaction& tx, CValidationState &state, CTokensCa
         if (AreTokensDeployed() && isToken) {
             if (tokenCache) {
                 // Get the transfer transaction data from the scriptPubKey
-                if ( nType == TX_TRANSFER_TOKEN) {
+                if (nType == TX_TRANSFER_TOKEN) {
                     CTokenTransfer transfer;
                     std::string address;
                     if (!TransferTokenFromScript(txout.scriptPubKey, transfer, address))

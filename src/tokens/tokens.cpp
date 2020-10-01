@@ -544,7 +544,7 @@ bool TransferTokenFromScript(const CScript& scriptPubKey, CTokenTransfer& tokenT
     strAddress = EncodeDestination(destination);
 
     std::vector<unsigned char> vchTransferToken;
-    vchTransferToken.insert(vchTransferToken.end(), scriptPubKey.begin() + 31, scriptPubKey.end());
+    vchTransferToken.insert(vchTransferToken.end(), scriptPubKey.begin() + nStartingIndex, scriptPubKey.end());
     CDataStream ssToken(vchTransferToken, SER_NETWORK, PROTOCOL_VERSION);
 
     try {
