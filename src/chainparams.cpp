@@ -221,8 +221,8 @@ public:
 
         /** TOKENS START **/
         // Fee Amounts
-        nFeeAmountMain = 1000000 * COIN;
-        nFeeAmountSecondary = 1000 * COIN;
+        nFeeAmountMain = 10000 * COIN;
+        nFeeAmountSecondary = 10000 * COIN;
 
         // Fee Addresse
         strTokenFeeAddress = "KdZFAFeKV8C5JzdEdgcPYDZku92KkD3fHy";
