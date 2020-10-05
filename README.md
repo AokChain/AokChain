@@ -1,8 +1,17 @@
-<p>
-  <a href="https://aokchain.io/">
-    <img src="https://i.imgur.com/M7pRy0w.png" width="200px" alt="aokchain" />
-  </a>
-</p>
-<h3>A Blockchain-based Healthcare Big Data Platform</h3>
-<p>Offering an optimal personalized health solution through a blockchain-based healthcare Big Data platform, individuals are given ownership rights to their healthcare Big Data, and have the right to store, distribute, and use this data freely in the AokChain Network ecosystem.</p>
-<a href="doc/">Documentation</a>
+AokChain Core
+=====================================
+
+AokChain is an experimental digital Proof-of-Stake currency that enables instant payments to
+anyone, anywhere in the world. AokChain uses peer-to-peer technology to operate
+with no central authority: managing transactions and issuing money are carried
+out collectively by the network. AokChain Core is the name of open source
+software which enables the use of this currency.
+
+For more information, as well as an immediately useable, binary version of
+the AokChain Core software, see https://aok.network.
+
+License
+-------
+
+AokChain Core is released under the terms of the MIT license. See [COPYING](COPYING) for more
+information or see https://opensource.org/licenses/MIT.
