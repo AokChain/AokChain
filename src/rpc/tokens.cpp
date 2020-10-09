@@ -1006,8 +1006,15 @@ UniValue transferfrom(const JSONRPCRequest& request)
     EnsureWalletIsUnlocked(pwallet);
 
     std::string account = LabelFromValue(request.params[0]);
-    CTxDestination dest = GetLabelDestination(pwallet, account);
-    std::string from_address = EncodeDestination(dest);
+    std::set<std::string> setFromDestinations;
+
+    for (const std::pair<CTxDestination, CAddressBookData>& item : pwallet->mapAddressBook) {
+        const CTxDestination& dest = item.first;
+        const std::string& strName = item.second.name;
+        if (strName == account) {
+            setFromDestinations.insert(EncodeDestination(dest));
+        }
+    }
 
     std::string token_name = request.params[1].get_str();
 
@@ -1045,7 +1052,7 @@ UniValue transferfrom(const JSONRPCRequest& request)
         CTxDestination dest;
         ExtractDestination(out.tx->tx->vout[out.i].scriptPubKey, dest);
 
-        if (from_address == EncodeDestination(dest))
+        if (setFromDestinations.count(EncodeDestination(dest)))
             ctrl.SelectToken(COutPoint(out.tx->GetHash(), out.i));
     }
 
