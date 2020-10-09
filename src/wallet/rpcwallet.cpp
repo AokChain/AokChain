@@ -1683,9 +1683,16 @@ void ListTransactions(CWallet* const pwallet, const CWalletTx& wtx, const std::s
                 entry.pushKV("address", EncodeDestination(data.destination));
                 entry.pushKV("vout", data.vout);
                 entry.pushKV("category", "receive");
-                entry.pushKV("blockhash", wtx.hashBlock.GetHex());
-                entry.pushKV("blockindex", wtx.nIndex);
-                entry.pushKV("blocktime", mapBlockIndex[wtx.hashBlock]->GetBlockTime());
+
+                if (confirms > 0)
+                {
+                    entry.pushKV("blockhash", wtx.hashBlock.GetHex());
+                    entry.pushKV("blockindex", wtx.nIndex);
+                    entry.pushKV("blocktime", mapBlockIndex[wtx.hashBlock]->GetBlockTime());
+                } else {
+                    entry.pushKV("trusted", wtx.IsTrusted());
+                }
+
                 entry.pushKV("txid", hash.GetHex());
                 entry.pushKV("confirmations", confirms);
 
@@ -1713,9 +1720,16 @@ void ListTransactions(CWallet* const pwallet, const CWalletTx& wtx, const std::s
                 entry.pushKV("address", EncodeDestination(data.destination));
                 entry.pushKV("vout", data.vout);
                 entry.pushKV("category", "send");
-                entry.pushKV("blockhash", wtx.hashBlock.GetHex());
-                entry.pushKV("blockindex", wtx.nIndex);
-                entry.pushKV("blocktime", mapBlockIndex[wtx.hashBlock]->GetBlockTime());
+
+                if (confirms > 0)
+                {
+                    entry.pushKV("blockhash", wtx.hashBlock.GetHex());
+                    entry.pushKV("blockindex", wtx.nIndex);
+                    entry.pushKV("blocktime", mapBlockIndex[wtx.hashBlock]->GetBlockTime());
+                } else {
+                    entry.pushKV("trusted", wtx.IsTrusted());
+                }
+
                 entry.pushKV("txid", hash.GetHex());
                 entry.pushKV("confirmations", confirms);
 
@@ -1730,7 +1744,6 @@ void ListTransactions(CWallet* const pwallet, const CWalletTx& wtx, const std::s
                 retTokens.push_back(entry);
             }
         }
-
     }
     /** TOKENS END */
 }
