@@ -1111,6 +1111,8 @@ UniValue transferfrom(const JSONRPCRequest& request)
     CAmount nRequiredFee;
 
     CCoinControl ctrl;
+    ctrl.destChange = DecodeDestination(change_address);
+
     std::map<std::string, std::vector<COutput> > mapTokenCoins;
     pwallet->AvailableTokens(mapTokenCoins);
 
@@ -1135,7 +1137,7 @@ UniValue transferfrom(const JSONRPCRequest& request)
     }
 
     // Create the Transaction
-    if (!CreateTransferTokenTransaction(pwallet, ctrl, vTransfers, change_address, error, transaction, reservekey, nRequiredFee))
+    if (!CreateTransferTokenTransaction(pwallet, ctrl, vTransfers, "", error, transaction, reservekey, nRequiredFee))
         throw JSONRPCError(error.first, error.second);
 
     // Send the Transaction to the network
