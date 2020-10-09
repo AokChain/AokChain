@@ -1720,47 +1720,39 @@ void ListTransactions(CWallet* const pwallet, const CWalletTx& wtx, const std::s
 
         if ((!listTokensSent.empty() || nFee != 0) && (fAllAccounts || strAccount == strSentAccount)) {
             for (const CTokenOutputEntry &data : listTokensSent) {
-                std::string account;
-                if (pwallet->mapAddressBook.count(data.destination)) {
-                    account = pwallet->mapAddressBook[data.destination].name;
-                }
+                int confirms = wtx.GetDepthInMainChain();
+                UniValue entry(UniValue::VOBJ);
+                uint256 hash = wtx.GetHash();
 
-                if (fAllAccounts || (account == strAccount))
+                entry.pushKV("account", strSentAccount);
+                entry.pushKV("token_type", GetTxnOutputType(data.type));
+                entry.pushKV("token_name", data.tokenName);
+                entry.pushKV("amount", ValueFromAmount(data.nAmount));
+                entry.pushKV("address", EncodeDestination(data.destination));
+                entry.pushKV("vout", data.vout);
+                entry.pushKV("category", "send");
+
+                if (confirms > 0)
                 {
-                    int confirms = wtx.GetDepthInMainChain();
-                    UniValue entry(UniValue::VOBJ);
-                    uint256 hash = wtx.GetHash();
-
-                    entry.pushKV("account", account);
-                    entry.pushKV("token_type", GetTxnOutputType(data.type));
-                    entry.pushKV("token_name", data.tokenName);
-                    entry.pushKV("amount", ValueFromAmount(data.nAmount));
-                    entry.pushKV("address", EncodeDestination(data.destination));
-                    entry.pushKV("vout", data.vout);
-                    entry.pushKV("category", "send");
-
-                    if (confirms > 0)
-                    {
-                        entry.pushKV("blockhash", wtx.hashBlock.GetHex());
-                        entry.pushKV("blockindex", wtx.nIndex);
-                        entry.pushKV("blocktime", mapBlockIndex[wtx.hashBlock]->GetBlockTime());
-                    } else {
-                        entry.pushKV("trusted", wtx.IsTrusted());
-                    }
-
-                    entry.pushKV("txid", hash.GetHex());
-                    entry.pushKV("confirmations", confirms);
-
-                    UniValue conflicts(UniValue::VARR);
-                    for (const uint256& conflict : wtx.GetConflicts())
-                        conflicts.push_back(conflict.GetHex());
-                    entry.pushKV("walletconflicts", conflicts);
-
-                    entry.pushKV("time", wtx.GetTxTime());
-                    entry.pushKV("timereceived", (int64_t)wtx.nTimeReceived);
-
-                    retTokens.push_back(entry);
+                    entry.pushKV("blockhash", wtx.hashBlock.GetHex());
+                    entry.pushKV("blockindex", wtx.nIndex);
+                    entry.pushKV("blocktime", mapBlockIndex[wtx.hashBlock]->GetBlockTime());
+                } else {
+                    entry.pushKV("trusted", wtx.IsTrusted());
                 }
+
+                entry.pushKV("txid", hash.GetHex());
+                entry.pushKV("confirmations", confirms);
+
+                UniValue conflicts(UniValue::VARR);
+                for (const uint256& conflict : wtx.GetConflicts())
+                    conflicts.push_back(conflict.GetHex());
+                entry.pushKV("walletconflicts", conflicts);
+
+                entry.pushKV("time", wtx.GetTxTime());
+                entry.pushKV("timereceived", (int64_t)wtx.nTimeReceived);
+
+                retTokens.push_back(entry);
             }
         }
     }
