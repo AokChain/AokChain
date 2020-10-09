@@ -979,7 +979,7 @@ UniValue transferfrom(const JSONRPCRequest& request)
                 "\nTransfer a quantity of an owned token in a specific address to a given address"
 
                 "\nArguments:\n"
-                "2. \"account\"                  (string, required) account name\n"
+                "1. \"account\"                  (string, required) account name\n"
                 "2. \"token_name\"               (string, required) name of token\n"
                 "3. \"qty\"                      (numeric, required) number of tokens you want to send to the address\n"
                 "4. \"to_address\"               (string, required) address to send the token to\n"
@@ -1009,7 +1009,106 @@ UniValue transferfrom(const JSONRPCRequest& request)
     CTxDestination dest = GetLabelDestination(pwallet, account);
     std::string from_address = EncodeDestination(dest);
 
-    std::cout << "\n\n" << from_address << "\n\n";
+    std::string token_name = request.params[1].get_str();
+
+    CAmount nAmount = AmountFromValue(request.params[2]);
+
+    std::string address = request.params[3].get_str();
+
+    int token_lock_time = 0;
+    if (request.params.size() > 4) {
+        token_lock_time = request.params[4].get_int();
+        if (token_lock_time < 0) {
+            throw JSONRPCError(RPC_INVALID_PARAMETER, "token_lock_time time must be greater or equal to 0.");
+        }
+    }
+
+    std::pair<int, std::string> error;
+    std::vector< std::pair<CTokenTransfer, std::string> >vTransfers;
+
+    vTransfers.emplace_back(std::make_pair(CTokenTransfer(token_name, nAmount, token_lock_time), address));
+    CReserveKey reservekey(pwallet);
+    CWalletTx transaction;
+    CAmount nRequiredFee;
+
+    CCoinControl ctrl;
+    std::map<std::string, std::vector<COutput> > mapTokenCoins;
+    pwallet->AvailableTokens(mapTokenCoins);
+
+    if (!mapTokenCoins.count(token_name)) {
+        throw JSONRPCError(RPC_INVALID_PARAMETER, std::string("Wallet doesn't own the token_name: " + token_name));
+    }
+
+    // Add all the token outpoints that match the given from addresses
+    for (const auto& out : mapTokenCoins.at(token_name)) {
+        // Get the address that the coin resides in, because to send a valid message. You need to send it to the same address that it currently resides in.
+        CTxDestination dest;
+        ExtractDestination(out.tx->tx->vout[out.i].scriptPubKey, dest);
+
+        if (from_address == EncodeDestination(dest))
+            ctrl.SelectToken(COutPoint(out.tx->GetHash(), out.i));
+    }
+
+    std::vector<COutPoint> outs;
+    ctrl.ListSelectedTokens(outs);
+    if (!outs.size()) {
+        throw JSONRPCError(RPC_INVALID_PARAMETER, std::string("Account has insufficient token funds"));
+    }
+
+    // Create the Transaction
+    if (!CreateTransferTokenTransaction(pwallet, ctrl, vTransfers, "", error, transaction, reservekey, nRequiredFee))
+        throw JSONRPCError(error.first, error.second);
+
+    // Send the Transaction to the network
+    std::string txid;
+    if (!SendTokenTransaction(pwallet, transaction, reservekey, error, txid))
+        throw JSONRPCError(error.first, error.second);
+
+    // Display the transaction id
+    UniValue result(UniValue::VARR);
+    result.push_back(txid);
+    return result;
+}
+
+UniValue transferfromaddress(const JSONRPCRequest& request)
+{
+    if (request.fHelp || !AreTokensDeployed() || request.params.size() < 4 || request.params.size() > 5)
+        throw std::runtime_error(
+                "transferfromaddress \"address\" \"token_name\" qty \"to_address\" \"token_lock_time\"\n"
+                + TokenActivationWarning() +
+                "\nTransfer a quantity of an owned token in a specific address to a given address"
+
+                "\nArguments:\n"
+                "1. \"address\"                  (string, required) valid AOK address\n"
+                "2. \"token_name\"               (string, required) name of token\n"
+                "3. \"qty\"                      (numeric, required) number of tokens you want to send to the address\n"
+                "4. \"to_address\"               (string, required) address to send the token to\n"
+                "5. \"token_lock_time\"          (integer, optional, default=0) Locktime for token UTXOs, could be height or timestamp\n"
+
+                "\nResult:\n"
+                "txid"
+                "[ \n"
+                "txid\n"
+                "]\n"
+
+                "\nExamples:\n"
+                + HelpExampleCli("transferfromaddress", "\"address\" \"ASSET_NAME\" 20 \"address\" \"token_lock_time\"")
+        );
+
+    CWallet * const pwallet = GetWalletForJSONRPCRequest(request);
+    if (!EnsureWalletIsAvailable(pwallet, request.fHelp)) {
+        return NullUniValue;
+    }
+
+    ObserveSafeMode();
+    LOCK2(cs_main, pwallet->cs_wallet);
+
+    EnsureWalletIsUnlocked(pwallet);
+
+    std::string from_address = request.params[0].get_str();
+    CTxDestination dest = DecodeDestination(from_address);
+    if (!IsValidDestination(dest))
+        throw JSONRPCError(RPC_INVALID_PARAMETER, std::string("From address must be valid addresses. Invalid address: ") + from_address);
 
     std::string token_name = request.params[1].get_str();
 
@@ -1313,7 +1412,8 @@ static const CRPCCommand commands[] =
     { "tokens",   "listmylockedtokens",         &listmylockedtokens,         {"token", "verbose", "count", "start"}},
     { "tokens",   "listaddressesbytoken",       &listaddressesbytoken,       {"token_name", "onlytotal", "count", "start"}},
     { "tokens",   "transfer",                   &transfer,                   {"token_name", "qty", "to_address", "token_lock_time"}},
-    { "assets",   "transferfrom",               &transferfrom,               {"token_name", "from_address" "qty", "to_address"}},
+    { "assets",   "transferfrom",               &transferfrom,               {"account", "token_name", "qty", "to_address", "token_lock_time"}},
+    { "assets",   "transferfromaddress",        &transferfromaddress,        {"address", "token_name", "qty", "to_address", "token_lock_time"}},
     { "tokens",   "reissue",                    &reissue,                    {"token_name", "qty", "to_address", "change_address", "reissuable", "new_unit"}},
     { "tokens",   "listtokens",                 &listtokens,                 {"token", "verbose", "count", "start"}},
     { "tokens",   "getcacheinfo",               &getcacheinfo,               {}}
