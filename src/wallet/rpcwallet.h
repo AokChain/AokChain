@@ -7,6 +7,7 @@
 #ifndef AOKCHAIN_WALLET_RPCWALLET_H
 #define AOKCHAIN_WALLET_RPCWALLET_H
 
+#include <univalue.h>
 #include <string>
 
 class CRPCTable;
@@ -26,5 +27,8 @@ CWallet *GetWalletForJSONRPCRequest(const JSONRPCRequest& request);
 std::string HelpRequiringPassphrase(CWallet *);
 void EnsureWalletIsUnlocked(CWallet *);
 bool EnsureWalletIsAvailable(CWallet *, bool avoidException);
+
+std::string LabelFromValue(const UniValue& value);
+CTxDestination GetLabelDestination(CWallet* const pwallet, const std::string& label, bool bForceNew=false);
 
 #endif //AOKCHAIN_WALLET_RPCWALLET_H

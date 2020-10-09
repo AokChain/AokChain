@@ -173,7 +173,7 @@ UniValue getnewaddress(const JSONRPCRequest& request)
     return EncodeDestination(keyID);
 }
 
-CTxDestination GetLabelDestination(CWallet* const pwallet, const std::string& label, bool bForceNew=false)
+CTxDestination GetLabelDestination(CWallet* const pwallet, const std::string& label, bool bForceNew)
 {
     CTxDestination dest;
     if (!pwallet->GetLabelDestination(dest, label, bForceNew)) {

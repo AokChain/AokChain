@@ -31,24 +31,7 @@
 #include "wallet/feebumper.h"
 #include "wallet/wallet.h"
 #include "wallet/walletdb.h"
-
-std::string LabelFromValue(const UniValue& value)
-{
-    std::string label = value.get_str();
-    if (label == "*")
-        throw JSONRPCError(RPC_WALLET_INVALID_LABEL_NAME, "Invalid label name");
-    return label;
-}
-
-CTxDestination GetLabelDestination(CWallet* const pwallet, const std::string& label, bool bForceNew=false)
-{
-    CTxDestination dest;
-    if (!pwallet->GetLabelDestination(dest, label, bForceNew)) {
-        throw JSONRPCError(RPC_WALLET_KEYPOOL_RAN_OUT, "Error: Keypool ran out, please call keypoolrefill first");
-    }
-
-    return dest;
-}
+#include "wallet/rpcwallet.h"
 
 std::string TokenActivationWarning()
 {
