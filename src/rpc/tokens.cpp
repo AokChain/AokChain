@@ -1077,12 +1077,14 @@ UniValue transferfrom(const JSONRPCRequest& request)
 
     std::string account = LabelFromValue(request.params[0]);
     std::set<std::string> setFromDestinations;
+    std::string change_address;
 
     for (const std::pair<CTxDestination, CAddressBookData>& item : pwallet->mapAddressBook) {
         const CTxDestination& dest = item.first;
         const std::string& strName = item.second.name;
         if (strName == account) {
             setFromDestinations.insert(EncodeDestination(dest));
+            change_address = EncodeDestination(dest);
         }
     }
 
@@ -1133,7 +1135,7 @@ UniValue transferfrom(const JSONRPCRequest& request)
     }
 
     // Create the Transaction
-    if (!CreateTransferTokenTransaction(pwallet, ctrl, vTransfers, "", error, transaction, reservekey, nRequiredFee))
+    if (!CreateTransferTokenTransaction(pwallet, ctrl, vTransfers, change_address, error, transaction, reservekey, nRequiredFee))
         throw JSONRPCError(error.first, error.second);
 
     // Send the Transaction to the network
