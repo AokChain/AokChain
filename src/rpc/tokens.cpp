@@ -649,6 +649,76 @@ UniValue listmytokens(const JSONRPCRequest &request)
     return result;
 }
 
+UniValue listaccounttokens(const JSONRPCRequest &request)
+{
+    if (request.fHelp || !AreTokensDeployed() || request.params.size() > 2 || request.params.size() < 1)
+        throw std::runtime_error(
+                "listmytokens ( account ) \"( token )\"\n"
+                + TokenActivationWarning() +
+                "\nReturns a list of all token that are owned by this wallet\n"
+
+                "\nArguments:\n"
+                "1. \"account\"                  (string, required) AokChain wallet account\n"
+                "2. \"token\"                    (string, optional, default=\"*\") filters results -- must be an token name or a partial token name followed by '*' ('*' matches all trailing characters)\n"
+
+                "\nResult:\n"
+                "{\n"
+                "  (token_name): balance,\n"
+                "  ...\n"
+                "}\n"
+
+                "\nExamples:\n"
+                + HelpExampleRpc("listaccounttokens", "account")
+        );
+
+    CWallet * const pwallet = GetWalletForJSONRPCRequest(request);
+    if (!EnsureWalletIsAvailable(pwallet, request.fHelp)) {
+        return NullUniValue;
+    }
+
+    ObserveSafeMode();
+    LOCK2(cs_main, pwallet->cs_wallet);
+
+    std::string strAccount = LabelFromValue(request.params[0]);
+
+    std::string filter = "*";
+    if (request.params.size() > 1)
+        filter = request.params[1].get_str();
+
+    if (filter == "")
+        filter = "*";
+
+    // retrieve balances
+    std::map<std::string, CAmount> balances;
+    std::map<std::string, std::vector<COutput> > outputs;
+    if (filter == "*") {
+        if (!GetAllMyTokenBalancesWallet(pwallet, outputs, balances, "", &strAccount))
+            throw JSONRPCError(RPC_INTERNAL_ERROR, "Couldn't get token balances. For all tokens");
+    } else if (filter.back() == '*') {
+        std::vector<std::string> tokenNames;
+        filter.pop_back();
+        if (!GetAllMyTokenBalancesWallet(pwallet, outputs, balances, filter, &strAccount))
+            throw JSONRPCError(RPC_INTERNAL_ERROR, "Couldn't get token balances. For all tokens");
+    } else {
+        if (!IsTokenNameValid(filter))
+            throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid token name.");
+        if (!GetAllMyTokenBalancesWallet(pwallet, outputs, balances, filter, &strAccount))
+            throw JSONRPCError(RPC_INTERNAL_ERROR, "Couldn't get token balances. For all tokens");
+    }
+
+    // generate output
+    UniValue result(UniValue::VOBJ);
+
+    auto bal = balances.begin();
+    auto end = balances.end();
+
+    for (; bal != end && bal != balances.end(); bal++) {
+        result.pushKV(bal->first, UnitValueFromAmount(bal->second, bal->first));
+    }
+
+    return result;
+}
+
 UniValue listmylockedtokens(const JSONRPCRequest &request)
 {
     if (request.fHelp || !AreTokensDeployed() || request.params.size() > 4)
@@ -1416,11 +1486,12 @@ static const CRPCCommand commands[] =
     { "tokens",   "listtokenbalancesbyaddress", &listtokenbalancesbyaddress, {"address", "onlytotal", "count", "start"} },
     { "tokens",   "gettokendata",               &gettokendata,               {"token_name"}},
     { "tokens",   "listmytokens",               &listmytokens,               {"token", "verbose", "count", "start"}},
+    { "tokens",   "listaccounttokens",          &listaccounttokens,          {"account", "token"}},
     { "tokens",   "listmylockedtokens",         &listmylockedtokens,         {"token", "verbose", "count", "start"}},
     { "tokens",   "listaddressesbytoken",       &listaddressesbytoken,       {"token_name", "onlytotal", "count", "start"}},
     { "tokens",   "transfer",                   &transfer,                   {"token_name", "qty", "to_address", "token_lock_time"}},
-    { "assets",   "transferfrom",               &transferfrom,               {"account", "token_name", "qty", "to_address", "token_lock_time"}},
-    { "assets",   "transferfromaddress",        &transferfromaddress,        {"address", "token_name", "qty", "to_address", "token_lock_time"}},
+    { "tokens",   "transferfrom",               &transferfrom,               {"account", "token_name", "qty", "to_address", "token_lock_time"}},
+    { "tokens",   "transferfromaddress",        &transferfromaddress,        {"address", "token_name", "qty", "to_address", "token_lock_time"}},
     { "tokens",   "reissue",                    &reissue,                    {"token_name", "qty", "to_address", "change_address", "reissuable", "new_unit"}},
     { "tokens",   "listtokens",                 &listtokens,                 {"token", "verbose", "count", "start"}},
     { "tokens",   "getcacheinfo",               &getcacheinfo,               {}}

@@ -331,7 +331,7 @@ bool SendTokenTransaction(CWallet* pwallet, CWalletTx& transaction, CReserveKey&
 bool ParseTokenScript(CScript scriptPubKey, uint160 &hashBytes, std::string &tokenName, CAmount &tokenAmount, uint32_t &nTokenLockTime);
 
 /** Wrappers **/
-bool GetAllMyTokenBalancesWallet(CWallet* pwallet, std::map<std::string, std::vector<COutput> >& outputs, std::map<std::string, CAmount>& amounts, const std::string& prefix = "");
+bool GetAllMyTokenBalancesWallet(CWallet* pwallet, std::map<std::string, std::vector<COutput> >& outputs, std::map<std::string, CAmount>& amounts, const std::string& prefix = "", const std::string* account = nullptr);
 bool GetAllMyLockedTokenBalancesWallet(CWallet* pwallet, std::map<std::string, std::vector<COutput> >& outputs, std::map<std::string, CAmount>& amounts, const std::string& prefix = "");
 
 #endif //AOKCHAINCOIN_TOKEN_PROTOCOL_H
