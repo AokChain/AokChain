@@ -35,6 +35,7 @@ static const CRPCConvertParam vRPCConvertParams[] =
     { "issue", 5, "reissuable" },
     { "issueunique", 1, "token_tags"},
     { "transfer", 1, "qty"},
+    { "transferfrom", 2, "qty"},
     { "transfer", 3, "token_lock_time"},
     { "reissue", 1, "qty"},
     { "reissue", 4, "reissuable"},
