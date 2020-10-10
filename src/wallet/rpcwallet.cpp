@@ -1727,7 +1727,7 @@ void ListTransactions(CWallet* const pwallet, const CWalletTx& wtx, const std::s
                 entry.pushKV("account", strSentAccount);
                 entry.pushKV("token_type", GetTxnOutputType(data.type));
                 entry.pushKV("token_name", data.tokenName);
-                entry.pushKV("amount", ValueFromAmount(data.nAmount));
+                entry.pushKV("amount", ValueFromAmount(-data.nAmount));
                 entry.pushKV("address", EncodeDestination(data.destination));
                 entry.pushKV("vout", data.vout);
                 entry.pushKV("category", "send");
