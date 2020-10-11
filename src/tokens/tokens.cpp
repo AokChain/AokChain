@@ -2481,7 +2481,7 @@ bool GetBestTokenAddressAmount(CTokensCache& cache, const std::string& tokenName
     return false;
 }
 
-bool GetAllMyTokenBalancesWallet(CWallet* pwallet, std::map<std::string, std::vector<COutput> >& outputs, std::map<std::string, CAmount>& amounts, const std::string& prefix, const std::string* account) {
+bool GetAllMyTokenBalancesWallet(CWallet* pwallet, std::map<std::string, std::vector<COutput> >& outputs, std::map<std::string, CAmount>& amounts, const std::string& prefix) {
     // Get the map of tokennames to outputs
     pwallet->AvailableTokens(outputs, true, nullptr, 1, MAX_MONEY_TOKENS, MAX_MONEY_TOKENS);
 
@@ -2491,10 +2491,8 @@ bool GetAllMyTokenBalancesWallet(CWallet* pwallet, std::map<std::string, std::ve
             CAmount balance = 0;
             for (auto txout : pair.second) { // Compute balance of token by summing all Available Outputs
                 CTokenOutputEntry data;
-                if (!account || *account == pwallet->GetLabelName(txout.tx->tx->vout[txout.i].scriptPubKey)) {
-                    if (GetTokenData(txout.tx->tx->vout[txout.i].scriptPubKey, data)) {
-                        balance += data.nAmount;
-                    }
+                if (GetTokenData(txout.tx->tx->vout[txout.i].scriptPubKey, data)) {
+                    balance += data.nAmount;
                 }
             }
 
