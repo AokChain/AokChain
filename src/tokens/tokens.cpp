@@ -2551,7 +2551,7 @@ std::string DecodeIPFS(std::string encoded)
     std::vector<unsigned char> b;
     DecodeBase58(encoded, b);
     return std::string(b.begin(), b.end());
-};
+}
 
 // 34 char KAW compatible --> 46 char base58
 std::string EncodeIPFS(std::string decoded){
@@ -2560,7 +2560,7 @@ std::string EncodeIPFS(std::string decoded){
     for (char c : charData)
         unsignedCharData.push_back(static_cast<unsigned char>(c));
     return EncodeBase58(unsignedCharData);
-};
+}
 
 bool CreateTokenTransaction(CWallet* pwallet, CCoinControl& coinControl, const CNewToken& token, const std::string& address, std::pair<int, std::string>& error, CWalletTx& wtxNew, CReserveKey& reservekey, CAmount& nFeeRequired)
 {
