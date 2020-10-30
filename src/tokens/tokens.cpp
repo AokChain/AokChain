@@ -430,13 +430,13 @@ void CNewToken::ConstructTransaction(CScript& script) const
     ssToken << *this;
 
     std::vector<unsigned char> vchMessage;
-    vchMessage.push_back(AOK_A); // a
-    vchMessage.push_back(AOK_L); // l
-    vchMessage.push_back(AOK_P); // p
-    vchMessage.push_back(AOK_Q); // q
+    vchMessage.push_back(TOKEN_AOK);
+    vchMessage.push_back(TOKEN_LOCAL);
+    vchMessage.push_back(TOKEN_PAYMENT);
+    vchMessage.push_back(TOKEN_ISSUE);
 
     vchMessage.insert(vchMessage.end(), ssToken.begin(), ssToken.end());
-    script << OP_AOK_TOKEN << ToByteVector(vchMessage) << OP_DROP;
+    script << OP_TOKEN_SCRIPT << ToByteVector(vchMessage) << OP_DROP;
 }
 
 void CNewToken::ConstructOwnerTransaction(CScript& script) const
@@ -445,13 +445,13 @@ void CNewToken::ConstructOwnerTransaction(CScript& script) const
     ssOwner << std::string(this->strName + OWNER_TAG);
 
     std::vector<unsigned char> vchMessage;
-    vchMessage.push_back(AOK_A); // a
-    vchMessage.push_back(AOK_L); // l
-    vchMessage.push_back(AOK_P); // p
-    vchMessage.push_back(AOK_O); // o
+    vchMessage.push_back(TOKEN_AOK);
+    vchMessage.push_back(TOKEN_LOCAL);
+    vchMessage.push_back(TOKEN_PAYMENT);
+    vchMessage.push_back(TOKEN_OWNER);
 
     vchMessage.insert(vchMessage.end(), ssOwner.begin(), ssOwner.end());
-    script << OP_AOK_TOKEN << ToByteVector(vchMessage) << OP_DROP;
+    script << OP_TOKEN_SCRIPT << ToByteVector(vchMessage) << OP_DROP;
 }
 
 bool TokenFromTransaction(const CTransaction& tx, CNewToken& token, std::string& strAddress)
@@ -932,13 +932,13 @@ void CTokenTransfer::ConstructTransaction(CScript& script) const
     ssTransfer << *this;
 
     std::vector<unsigned char> vchMessage;
-    vchMessage.push_back(AOK_A); // a
-    vchMessage.push_back(AOK_L); // l
-    vchMessage.push_back(AOK_P); // p
-    vchMessage.push_back(AOK_T); // t
+    vchMessage.push_back(TOKEN_AOK);
+    vchMessage.push_back(TOKEN_LOCAL);
+    vchMessage.push_back(TOKEN_PAYMENT);
+    vchMessage.push_back(TOKEN_TRANSFER);
 
     vchMessage.insert(vchMessage.end(), ssTransfer.begin(), ssTransfer.end());
-    script << OP_AOK_TOKEN << ToByteVector(vchMessage) << OP_DROP;
+    script << OP_TOKEN_SCRIPT << ToByteVector(vchMessage) << OP_DROP;
 }
 
 CReissueToken::CReissueToken(const std::string &strTokenName, const CAmount &nAmount, const int &nUnits, const int &nReissuable,
@@ -1009,13 +1009,13 @@ void CReissueToken::ConstructTransaction(CScript& script) const
     ssReissue << *this;
 
     std::vector<unsigned char> vchMessage;
-    vchMessage.push_back(AOK_A); // a
-    vchMessage.push_back(AOK_L); // l
-    vchMessage.push_back(AOK_P); // p
-    vchMessage.push_back(AOK_A); // a
+    vchMessage.push_back(TOKEN_AOK);
+    vchMessage.push_back(TOKEN_LOCAL);
+    vchMessage.push_back(TOKEN_PAYMENT);
+    vchMessage.push_back(TOKEN_AOK);
 
     vchMessage.insert(vchMessage.end(), ssReissue.begin(), ssReissue.end());
-    script << OP_AOK_TOKEN << ToByteVector(vchMessage) << OP_DROP;
+    script << OP_TOKEN_SCRIPT << ToByteVector(vchMessage) << OP_DROP;
 }
 
 bool CReissueToken::IsNull() const

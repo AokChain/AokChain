@@ -146,7 +146,7 @@ const char* GetOpName(opcodetype opcode)
     case OP_NOP10                  : return "OP_NOP10";
 
     /** TOKENS START */
-    case OP_AOK_TOKEN              : return "OP_AOK_TOKEN";
+    case OP_TOKEN_SCRIPT              : return "OP_TOKEN_SCRIPT";
     /** TOKENS END */
 
     case OP_INVALIDOPCODE          : return "OP_INVALIDOPCODE";
@@ -271,33 +271,33 @@ bool CScript::IsTokenScript(int& nType, bool& isOwner) const
 bool CScript::IsTokenScript(int& nType, bool& fIsOwner, int& nStartingIndex) const
 {
     if (this->size() > 30) {
-        if ((*this)[25] == OP_AOK_TOKEN) { // OP_AOK_TOKEN is always in the 25 index of the script if it exists
+        if ((*this)[25] == OP_TOKEN_SCRIPT) { // OP_TOKEN_SCRIPT is always in the 25 index of the script if it exists
             int index = -1;
-            if ((*this)[27] == AOK_A) { // Check to see if AOK starts at 27 ( this->size() < 105)
-                if ((*this)[28] == AOK_L)
-                    if ((*this)[29] == AOK_P)
+            if ((*this)[27] == TOKEN_AOK) { // Check to see if TOKEN_AOK starts at 27 ( this->size() < 105)
+                if ((*this)[28] == TOKEN_LOCAL)
+                    if ((*this)[29] == TOKEN_PAYMENT)
                         index = 30;
             } else {
-                if ((*this)[28] == AOK_A) // Check to see if AOK starts at 28 ( this->size() >= 105)
-                    if ((*this)[29] == AOK_L)
-                        if ((*this)[30] == AOK_P)
+                if ((*this)[28] == TOKEN_AOK) // Check to see if TOKEN_AOK starts at 28 ( this->size() >= 105)
+                    if ((*this)[29] == TOKEN_LOCAL)
+                        if ((*this)[30] == TOKEN_PAYMENT)
                             index = 31;
             }
 
             if (index > 0) {
                 nStartingIndex = index + 1; // Set the index where the token data begins. Use to serialize the token data into token objects
-                if ((*this)[index] == AOK_T) { // Transfer first anticipating more transfers than other tokens operations
+                if ((*this)[index] == TOKEN_TRANSFER) { // Transfer first anticipating more transfers than other tokens operations
                     nType = TX_TRANSFER_TOKEN;
                     return true;
-                } else if ((*this)[index] == AOK_Q && this->size() > 39) {
+                } else if ((*this)[index] == TOKEN_ISSUE && this->size() > 39) {
                     nType = TX_NEW_TOKEN;
                     fIsOwner = false;
                     return true;
-                } else if ((*this)[index] == AOK_O) {
+                } else if ((*this)[index] == TOKEN_OWNER) {
                     nType = TX_NEW_TOKEN;
                     fIsOwner = true;
                     return true;
-                } else if ((*this)[index] == AOK_A) {
+                } else if ((*this)[index] == TOKEN_AOK) {
                     nType = TX_REISSUE_TOKEN;
                     return true;
                 }
@@ -306,7 +306,6 @@ bool CScript::IsTokenScript(int& nType, bool& fIsOwner, int& nStartingIndex) con
     }
     return false;
 }
-
 
 bool CScript::IsNewToken() const
 {

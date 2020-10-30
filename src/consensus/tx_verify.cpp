@@ -324,7 +324,7 @@ bool CheckTransaction(const CTransaction& tx, CValidationState &state, CTokensCa
                 }
             } else {
                 // Fail if transaction contains any non-transfer token scripts and hasn't conformed to one of the
-                // above transaction types.  Also fail if it contains OP_AOK_TOKEN opcode but wasn't a valid script.
+                // above transaction types.  Also fail if it contains OP_TOKEN_SCRIPT opcode but wasn't a valid script.
                 for (auto out : tx.vout) {
                     int nType;
                     bool _isOwner;
@@ -333,7 +333,7 @@ bool CheckTransaction(const CTransaction& tx, CValidationState &state, CTokensCa
                             return state.DoS(100, false, REJECT_INVALID, "bad-txns-bad-token-transaction");
                         }
                     } else {
-                        if (out.scriptPubKey.Find(OP_AOK_TOKEN) > 0) {
+                        if (out.scriptPubKey.Find(OP_TOKEN_SCRIPT) > 0) {
                             return state.DoS(100, false, REJECT_INVALID, "bad-txns-bad-token-script");
                         }
                     }

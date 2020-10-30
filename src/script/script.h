@@ -187,7 +187,7 @@ enum opcodetype
     OP_NOP10 = 0xb9,
 
     /** TOKENS START */
-    OP_AOK_TOKEN = 0xc0,
+    OP_TOKEN_SCRIPT = 0xc0,
     /** TOKENS END */
 
 

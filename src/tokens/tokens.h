@@ -17,12 +17,12 @@
 #include <unordered_map>
 #include <list>
 
-#define AOK_A 97
-#define AOK_L 108
-#define AOK_P 112
-#define AOK_Q 113
-#define AOK_T 116
-#define AOK_O 111
+#define TOKEN_AOK 97
+#define TOKEN_LOCAL 108
+#define TOKEN_PAYMENT 112
+#define TOKEN_ISSUE 113
+#define TOKEN_TRANSFER 116
+#define TOKEN_OWNER 111
 
 #define DEFAULT_UNITS 0
 #define DEFAULT_REISSUABLE 1
