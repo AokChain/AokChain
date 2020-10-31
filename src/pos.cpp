@@ -68,12 +68,6 @@ bool CheckStakeKernelHash(const CBlockIndex* pindexPrev, unsigned int nBits, CAm
     ss << pindexPrev->nStakeModifier << nTimeTxPoS << prevout.hash << prevout.n << nTimeTx;
     uint256 hashProofOfStake = ss.GetHash();
 
-    // Now check if proof-of-stake hash meets target protocol
-    // if (UintToArith256(hashProofOfStake) / nValueIn > bnTarget) {
-    //     return false;
-    // }
-
-    // return true;
     return (UintToArith256(hashProofOfStake) / nValueIn) <= bnTarget;
 }
 
