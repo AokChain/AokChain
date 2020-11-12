@@ -970,6 +970,89 @@ UniValue transfer(const JSONRPCRequest& request)
     return result;
 }
 
+UniValue transfermany(const JSONRPCRequest& request)
+{
+    if (request.fHelp || request.params.size() < 2 || request.params.size() > 8)
+        throw std::runtime_error(
+            "transfermany \"token_name\" {\"address\":amount,...}\n"
+            "\nSend multiple times. Amounts are double-precision floating point numbers."
+            + TokenActivationWarning() +
+            "\nArguments:\n"
+            "1. \"token_name\"          (string, required) name of token\n"
+            "2. \"amounts\"             (string, required) A json object with addresses and amounts\n"
+            "    {\n"
+            "      \"address\":amount   (numeric or string) The aokchain address is the key, the numeric amount (can be string) in " + CURRENCY_UNIT + " is the value\n"
+            "      ,...\n"
+            "    }\n"
+            "\nResult:\n"
+            "\"txid\"                   (string) The transaction id for the send. Only 1 transaction is created regardless of \n"
+            "                                    the number of addresses.\n"
+            "\nExamples:\n"
+            "\nSend two amounts to two different addresses:\n"
+            + HelpExampleCli("transfermany", "\"TOKEN_NAME\" \"{\\\"1D1ZrZNe3JUo7ZycKEYQQiQAWd9y54F4XX\\\":0.01,\\\"1353tsE8YMTA4EuV7dgUXGjNFf9KpVvKHz\\\":0.02}\"")
+        );
+
+    CWallet * const pwallet = GetWalletForJSONRPCRequest(request);
+    if (!EnsureWalletIsAvailable(pwallet, request.fHelp)) {
+        return NullUniValue;
+    }
+
+    ObserveSafeMode();
+    LOCK2(cs_main, pwallet->cs_wallet);
+
+    EnsureWalletIsUnlocked(pwallet);
+
+    if (pwallet->GetBroadcastTransactions() && !g_connman) {
+        throw JSONRPCError(RPC_CLIENT_P2P_DISABLED, "Error: Peer-to-peer functionality missing or disabled");
+    }
+
+    std::string token_name = request.params[0].get_str();
+
+    UniValue sendTo = request.params[1].get_obj();
+
+    std::set<CTxDestination> destinations;
+    std::vector<std::string> keys = sendTo.getKeys();
+
+    std::pair<int, std::string> error;
+    std::vector< std::pair<CTokenTransfer, std::string> >vTransfers;
+
+    for (const std::string& address : keys) {
+        int token_lock_time = 0;
+        CTxDestination dest = DecodeDestination(address);
+        if (!IsValidDestination(dest)) {
+            throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, std::string("Invalid AokChain address: ") + address);
+        }
+
+        if (destinations.count(dest)) {
+            throw JSONRPCError(RPC_INVALID_PARAMETER, std::string("Invalid parameter, duplicated address: ") + address);
+        }
+        destinations.insert(dest);
+
+        CAmount nAmount = AmountFromValue(sendTo[address]);
+        if (nAmount <= 0)
+            throw JSONRPCError(RPC_TYPE_ERROR, "Invalid amount for send");
+
+        vTransfers.emplace_back(std::make_pair(CTokenTransfer(token_name, nAmount, token_lock_time), address));
+    }
+
+    CReserveKey reservekey(pwallet);
+    CWalletTx transaction;
+    CAmount nRequiredFee;
+
+    CCoinControl ctrl;
+
+    // Create the Transaction
+    if (!CreateTransferTokenTransaction(pwallet, ctrl, vTransfers, "", error, transaction, reservekey, nRequiredFee))
+        throw JSONRPCError(error.first, error.second);
+
+    // Send the Transaction to the network
+    std::string txid;
+    if (!SendTokenTransaction(pwallet, transaction, reservekey, error, txid))
+        throw JSONRPCError(error.first, error.second);
+
+    return transaction.GetHash().GetHex();
+}
+
 UniValue transferfromaddress(const JSONRPCRequest& request)
 {
     if (request.fHelp || !AreTokensDeployed() || request.params.size() < 4 || request.params.size() > 5)
@@ -1312,6 +1395,7 @@ static const CRPCCommand commands[] =
     { "tokens",   "listmylockedtokens",         &listmylockedtokens,         {"token", "verbose", "count", "start"}},
     { "tokens",   "listaddressesbytoken",       &listaddressesbytoken,       {"token_name", "onlytotal", "count", "start"}},
     { "tokens",   "transfer",                   &transfer,                   {"token_name", "qty", "to_address", "token_lock_time"}},
+    { "tokens",   "transfermany",               &transfermany,               {"token_name", "amounts"}},
     { "tokens",   "transferfromaddress",        &transferfromaddress,        {"address", "token_name", "qty", "to_address", "token_lock_time"}},
     { "tokens",   "reissue",                    &reissue,                    {"token_name", "qty", "to_address", "change_address", "reissuable", "new_unit"}},
     { "tokens",   "listtokens",                 &listtokens,                 {"token", "verbose", "count", "start"}},
