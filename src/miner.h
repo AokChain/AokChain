@@ -194,7 +194,7 @@ public:
     CMutableTransaction originalRewardTx;
 
     /** Construct a new block template with coinbase to scriptPubKeyIn */
-    std::unique_ptr<CBlockTemplate> CreateNewBlock(const CScript& scriptPubKeyIn, bool fProofOfStake = false);
+    std::unique_ptr<CBlockTemplate> CreateNewBlock(const CScript& scriptPubKeyIn, bool fProofOfStake = false, int64_t* pTotalFees = 0);
 
 private:
     // utility functions

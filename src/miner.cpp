@@ -507,7 +507,7 @@ bool CheckStake(const std::shared_ptr<const CBlock> pblock, CWallet& wallet)
 
 // Solo
 
-std::unique_ptr<CBlockTemplate> BlockAssembler::CreateNewBlock(const CScript& scriptPubKeyIn, bool fProofOfStake)
+std::unique_ptr<CBlockTemplate> BlockAssembler::CreateNewBlock(const CScript& scriptPubKeyIn, bool fProofOfStake, int64_t* pTotalFees)
 {
     int64_t nTimeStart = GetTimeMicros();
 
@@ -597,6 +597,9 @@ std::unique_ptr<CBlockTemplate> BlockAssembler::CreateNewBlock(const CScript& sc
 
     LogPrintf("CreateNewBlock(): block weight: %u txs: %u fees: %ld sigops %d\n", GetBlockWeight(*pblock), nBlockTx, nFees, nBlockSigOpsCost);
 
+    if (pTotalFees)
+        *pTotalFees = nFees;
+
     // Fill in header
     pblock->hashPrevBlock  = pindexPrev->GetBlockHash();
 
@@ -666,7 +669,7 @@ void ThreadStakeMiner(CWallet *pwallet)
         //
         if (pwallet->HaveAvailableCoinsForStaking()) {
             int64_t nTotalFees = 0;
-            std::unique_ptr<CBlockTemplate> pblocktemplate(BlockAssembler(Params()).CreateNewBlock(reservekey.reserveScript, true));
+            std::unique_ptr<CBlockTemplate> pblocktemplate(BlockAssembler(Params()).CreateNewBlock(reservekey.reserveScript, true, &nTotalFees));
             if (!pblocktemplate.get())
                 return;
 
@@ -675,8 +678,7 @@ void ThreadStakeMiner(CWallet *pwallet)
             // Try to sign a block (this also checks for a PoS stake)
             std::shared_ptr<CBlock> pblock = std::make_shared<CBlock>(pblocktemplate->block);
             if (SignBlock(pblock, *pwallet, nTotalFees)) {
-
-                std::cout << "\n\nSuccessfully signed block, now trying to check it: " << pblock->GetBlockHash().ToString() << "\n\n" << std::endl;
+                LogPrintf("Successfully signed block, now trying to check it: %s", pblock->GetBlockHash().ToString());
 
                 // Another block was received while building ours, scrap progress
                 if (chainActive.Tip()->GetBlockHash() != pblock->hashPrevBlock) {
