@@ -227,8 +227,8 @@ public:
         // Fee Addresse
         strTokenFeeAddress = "KdZFAFeKV8C5JzdEdgcPYDZku92KkD3fHy";
 
-        nMaxReorganizationDepth = 60; // 60 at 1 minute block timespan is +/- 60 minutes.
-        nMinReorganizationPeers = 3;
+        nMaxReorganizationDepth = 90; // 90 at 1 minute block timespan is +/- 90 minutes.
+        nMinReorganizationPeers = 2;
         nMinReorganizationAge = 60 * 60 * 12; // 12 hours
         /** TOKENS END **/
     }
