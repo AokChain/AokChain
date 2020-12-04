@@ -19,7 +19,7 @@ reference the release tarball available from https://aokchain.org/bin/ and
 `Source1` should reference the BerkeleyDB source.
 
 Sources 10-99 are for source files that are maintained in the
-[AokChain git repository](https://github.com/AokChainNetwork/AokChainNetwork) but are not part of
+[AokChain git repository](https://github.com/AokChain/AokChain) but are not part of
 the release tarball. Most of these will reside in the `contrib` sub-directory.
 
 Sources 10-19 should be reserved for miscellaneous configuration files.

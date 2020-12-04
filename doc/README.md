@@ -5,7 +5,7 @@ Setup
 ---------------------
 AokChain Core is the original AokChain client and it builds the backbone of the network. It downloads and, by default, stores the entire history of AokChain transactions; depending on the speed of your computer and network connection, the synchronization process is typically complete in under an hour.
 
-To download compiled binaries of the AokChain Core and wallet, visit the [GitHub release page](https://github.com/AokChainNetwork/AokChainNetwork/releases).
+To download compiled binaries of the AokChain Core and wallet, visit the [GitHub release page](https://github.com/AokChain/AokChain/releases).
 
 Running
 ---------------------
@@ -104,41 +104,41 @@ To resolve, you will need to copy libboost_system.dylib to libboost_system-mt.dy
 ---------------------
 The following are developer notes on how to build the AokChain core software on your native platform. They are not complete guides, but include notes on the necessary libraries, compile flags, etc.
 
-- [Dependencies](https://github.com/AokChainNetwork/AokChainNetwork/tree/master/doc/dependencies.md)
-- [OS X Build Notes](https://github.com/AokChainNetwork/AokChainNetwork/tree/master/doc/build-osx.md)
-- [Unix Build Notes](https://github.com/AokChainNetwork/AokChainNetwork/tree/master/doc/build-unix.md)
-- [Windows Build Notes](https://github.com/AokChainNetwork/AokChainNetwork/tree/master/doc/build-windows.md)
-- [OpenBSD Build Notes](https://github.com/AokChainNetwork/AokChainNetwork/tree/master/doc/build-openbsd.md)
-- [Gitian Building Guide](https://github.com/AokChainNetwork/AokChainNetwork/tree/master/doc/gitian-building.md)
+- [Dependencies](https://github.com/AokChain/AokChain/tree/master/doc/dependencies.md)
+- [OS X Build Notes](https://github.com/AokChain/AokChain/tree/master/doc/build-osx.md)
+- [Unix Build Notes](https://github.com/AokChain/AokChain/tree/master/doc/build-unix.md)
+- [Windows Build Notes](https://github.com/AokChain/AokChain/tree/master/doc/build-windows.md)
+- [OpenBSD Build Notes](https://github.com/AokChain/AokChain/tree/master/doc/build-openbsd.md)
+- [Gitian Building Guide](https://github.com/AokChain/AokChain/tree/master/doc/gitian-building.md)
 
 Development
 ---------------------
-AokChain repo's [root README](https://github.com/AokChainNetwork/AokChainNetwork/blob/master/README.md) contains relevant information on the development process and automated testing.
+AokChain repo's [root README](https://github.com/AokChain/AokChain/blob/master/README.md) contains relevant information on the development process and automated testing.
 
-- [Developer Notes](https://github.com/AokChainNetwork/AokChainNetwork/blob/master/doc/developer-notes.md)
-- [Release Notes](https://github.com/AokChainNetwork/AokChainNetwork/blob/master/doc/release-notes.md)
-- [Release Process](https://github.com/AokChainNetwork/AokChainNetwork/blob/master/doc/release-process.md)
+- [Developer Notes](https://github.com/AokChain/AokChain/blob/master/doc/developer-notes.md)
+- [Release Notes](https://github.com/AokChain/AokChain/blob/master/doc/release-notes.md)
+- [Release Process](https://github.com/AokChain/AokChain/blob/master/doc/release-process.md)
 - [Source Code Documentation (External Link)](https://dev.visucore.com/aokchain/doxygen/) -- 2018-05-11 -- Broken link
-- [Translation Process](https://github.com/AokChainNetwork/AokChainNetwork/blob/master/doc/translation_process.md)
-- [Translation Strings Policy](https://github.com/AokChainNetwork/AokChainNetwork/blob/master/doc/translation_strings_policy.md)
-- [Travis CI](https://github.com/AokChainNetwork/AokChainNetwork/blob/master/doc/travis-ci.md)
-- [Unauthenticated REST Interface](https://github.com/AokChainNetwork/AokChainNetwork/blob/master/doc/REST-interface.md)
-- [Shared Libraries](https://github.com/AokChainNetwork/AokChainNetwork/blob/master/doc/shared-libraries.md)
-- [BIPS](https://github.com/AokChainNetwork/AokChainNetwork/blob/master/doc/bips.md)
-- [Dnsseed Policy](https://github.com/AokChainNetwork/AokChainNetwork/blob/master/doc/dnsseed-policy.md)
-- [Benchmarking](https://github.com/AokChainNetwork/AokChainNetwork/blob/master/doc/benchmarking.md)
+- [Translation Process](https://github.com/AokChain/AokChain/blob/master/doc/translation_process.md)
+- [Translation Strings Policy](https://github.com/AokChain/AokChain/blob/master/doc/translation_strings_policy.md)
+- [Travis CI](https://github.com/AokChain/AokChain/blob/master/doc/travis-ci.md)
+- [Unauthenticated REST Interface](https://github.com/AokChain/AokChain/blob/master/doc/REST-interface.md)
+- [Shared Libraries](https://github.com/AokChain/AokChain/blob/master/doc/shared-libraries.md)
+- [BIPS](https://github.com/AokChain/AokChain/blob/master/doc/bips.md)
+- [Dnsseed Policy](https://github.com/AokChain/AokChain/blob/master/doc/dnsseed-policy.md)
+- [Benchmarking](https://github.com/AokChain/AokChain/blob/master/doc/benchmarking.md)
 
 ### Miscellaneous
-- [Assets Attribution](https://github.com/AokChainNetwork/AokChainNetwork/blob/master/doc/assets-attribution.md)
-- [Files](https://github.com/AokChainNetwork/AokChainNetwork/blob/master/doc/files.md)
-- [Fuzz-testing](https://github.com/AokChainNetwork/AokChainNetwork/blob/master/doc/fuzzing.md)
-- [Reduce Traffic](https://github.com/AokChainNetwork/AokChainNetwork/blob/master/doc/reduce-traffic.md)
-- [Tor Support](https://github.com/AokChainNetwork/AokChainNetwork/blob/master/doc/tor.md)
-- [Init Scripts (systemd/upstart/openrc)](https://github.com/AokChainNetwork/AokChainNetwork/blob/master/doc/init.md)
-- [ZMQ](https://github.com/AokChainNetwork/AokChainNetwork/blob/master/doc/zmq.md)
+- [Assets Attribution](https://github.com/AokChain/AokChain/blob/master/doc/assets-attribution.md)
+- [Files](https://github.com/AokChain/AokChain/blob/master/doc/files.md)
+- [Fuzz-testing](https://github.com/AokChain/AokChain/blob/master/doc/fuzzing.md)
+- [Reduce Traffic](https://github.com/AokChain/AokChain/blob/master/doc/reduce-traffic.md)
+- [Tor Support](https://github.com/AokChain/AokChain/blob/master/doc/tor.md)
+- [Init Scripts (systemd/upstart/openrc)](https://github.com/AokChain/AokChain/blob/master/doc/init.md)
+- [ZMQ](https://github.com/AokChain/AokChain/blob/master/doc/zmq.md)
 
 License
 ---------------------
-Distributed under the [MIT software license](https://github.com/AokChainNetwork/AokChainNetwork/blob/master/COPYING).
+Distributed under the [MIT software license](https://github.com/AokChain/AokChain/blob/master/COPYING).
 This product includes software developed by the OpenSSL Project for use in the [OpenSSL Toolkit](https://www.openssl.org/). This product includes
 cryptographic software written by Eric Young ([eay@cryptsoft.com](mailto:eay@cryptsoft.com)), and UPnP software written by Thomas Bernard.

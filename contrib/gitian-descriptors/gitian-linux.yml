@@ -28,7 +28,7 @@ packages:
 - "ca-certificates"
 - "python"
 remotes:
-- "url": "https://github.com/AokChainNetwork/AokChainNetwork.git"
+- "url": "https://github.com/AokChain/AokChain.git"
   "dir": "aokchain"
 files: []
 script: |

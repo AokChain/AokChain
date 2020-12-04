@@ -26,9 +26,9 @@ Build-Depends: debhelper,
  python,
  libzmq3-dev
 Standards-Version: 3.9.2
-Homepage: https://aokchain.io/
+Homepage: https://aok.network/
 Vcs-Git: git://github.com/AokChainNetwork/AokChainNetwork.git
-Vcs-Browser: https://github.com/AokChainNetwork/AokChainNetwork
+Vcs-Browser: https://github.com/AokChain/AokChain
 
 Package: aokchaind
 Architecture: any

@@ -51,7 +51,7 @@ Build AokChain Core
 
 1. Clone the aokchain source code and cd into `aokchain`
 
-        git clone https://github.com/AokChainNetwork/AokChainNetwork
+        git clone https://github.com/AokChain/AokChain
         cd AokChain
 
 2.  Build aokchain-core:

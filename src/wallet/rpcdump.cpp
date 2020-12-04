@@ -672,7 +672,7 @@ UniValue dumpwallet(const JSONRPCRequest& request)
 
     /* Prevent arbitrary files from being overwritten. There have been reports
      * that users have overwritten wallet files this way:
-     * https://github.com/AokChainNetwork/AokChainNetwork/issues/9934
+     * https://github.com/AokChain/AokChain/issues/9934
      * It may also avoid other security issues.
      */
     if (boost::filesystem::exists(filepath)) {

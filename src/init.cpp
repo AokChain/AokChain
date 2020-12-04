@@ -537,8 +537,8 @@ std::string HelpMessage(HelpMessageMode mode)
 
 std::string LicenseInfo()
 {
-    const std::string URL_SOURCE_CODE = "<https://github.com/AokChainNetwork/AokChainNetwork>";
-    const std::string URL_WEBSITE = "<https://aokchain.io>";
+    const std::string URL_SOURCE_CODE = "<https://github.com/AokChain/AokChain>";
+    const std::string URL_WEBSITE = "<https://aok.network>";
 
     return CopyrightHolders(strprintf(_("Copyright (C) %i"), COPYRIGHT_YEAR) + " ") + "\n" +
            "\n" +

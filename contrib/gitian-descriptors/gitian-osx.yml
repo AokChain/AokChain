@@ -28,7 +28,7 @@ packages:
 - "python-setuptools"
 - "fonts-tuffy"
 remotes:
-- "url": "https://github.com/AokChainNetwork/AokChainNetwork.git"
+- "url": "https://github.com/AokChain/AokChain.git"
   "dir": "aokchain"
 files:
 - "MacOSX10.11.sdk.tar.gz"
