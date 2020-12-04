@@ -656,7 +656,7 @@ void ThreadStakeMiner(CWallet *pwallet)
 
             if (fTryToSync) {
                 fTryToSync = false;
-                if (g_connman->vNodes.size() < 1 ||
+                if (g_connman->vNodes.size() < 2 ||
                     chainActive.Tip()->GetBlockTime() < GetTime() - 10 * 60) {
                     MilliSleep(60000);
                     continue;
