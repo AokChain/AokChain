@@ -293,7 +293,7 @@ bool CScript::IsTokenScript(int& nType, bool& fIsOwner, int& nStartingIndex) con
                     nType = TX_NEW_TOKEN;
                     fIsOwner = false;
                     return true;
-                } else if ((*this)[index] == TOKEN_OWNER) {
+                } else if ((*this)[index] == TOKEN_OWNER_KEY) {
                     nType = TX_NEW_TOKEN;
                     fIsOwner = true;
                     return true;

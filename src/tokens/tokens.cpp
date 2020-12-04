@@ -448,7 +448,7 @@ void CNewToken::ConstructOwnerTransaction(CScript& script) const
     vchMessage.push_back(TOKEN_AOK);
     vchMessage.push_back(TOKEN_LOCAL);
     vchMessage.push_back(TOKEN_PAYMENT);
-    vchMessage.push_back(TOKEN_OWNER);
+    vchMessage.push_back(TOKEN_OWNER_KEY);
 
     vchMessage.insert(vchMessage.end(), ssOwner.begin(), ssOwner.end());
     script << OP_TOKEN_SCRIPT << ToByteVector(vchMessage) << OP_DROP;
