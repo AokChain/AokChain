@@ -28,7 +28,7 @@ QT_BEGIN_NAMESPACE
 class QModelIndex;
 QT_END_NAMESPACE
 
-/** Dialog for requesting payment of aokchains */
+/** Dialog for requesting payment of AOK */
 class ReceiveCoinsDialog : public QDialog
 {
     Q_OBJECT

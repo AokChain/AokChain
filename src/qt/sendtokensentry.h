@@ -22,7 +22,7 @@ namespace Ui {
 }
 
 /**
- * A single entry in the dialog for sending aokchains.
+ * A single entry in the dialog for sending AOK.
  * Stacked widget, with different UIs for payment requests
  * with a strong payee identity.
  */

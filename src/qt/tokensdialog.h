@@ -27,7 +27,7 @@ QT_BEGIN_NAMESPACE
 class QUrl;
 QT_END_NAMESPACE
 
-/** Dialog for sending aokchains */
+/** Dialog for sending AOK */
 class TokensDialog : public QDialog
 {
     Q_OBJECT

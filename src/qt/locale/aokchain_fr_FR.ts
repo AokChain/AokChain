@@ -43,11 +43,11 @@
     </message>
     <message>
         <source>Choose the address to send coins to</source>
-        <translation>Choisissez une adresse où envoyer les aokchains</translation>
+        <translation>Choisissez une adresse où envoyer les AOK</translation>
     </message>
     <message>
         <source>Choose the address to receive coins with</source>
-        <translation>Choisissez une adresse où recevoir les aokchains</translation>
+        <translation>Choisissez une adresse où recevoir les AOK</translation>
     </message>
     <message>
         <source>C&amp;hoose</source>
