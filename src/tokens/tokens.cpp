@@ -35,14 +35,11 @@ std::map<std::string, uint256> mapReissuedTokens;
 
 // excluding owner tag ('!')
 static const auto MAX_NAME_LENGTH = 31;
-static const auto MAX_CHANNEL_NAME_LENGTH = 12;
 
 // min lengths are expressed by quantifiers
 static const std::regex ROOT_NAME_CHARACTERS("^[A-Z0-9._]{3,}$");
 static const std::regex SUB_NAME_CHARACTERS("^[A-Z0-9._]+$");
 static const std::regex UNIQUE_TAG_CHARACTERS("^[-A-Za-z0-9@$%&*()[\\]{}_.?:]+$");
-static const std::regex CHANNEL_TAG_CHARACTERS("^[A-Z0-9._]+$");
-static const std::regex VOTE_TAG_CHARACTERS("^[A-Z0-9._]+$");
 
 static const std::regex DOUBLE_PUNCTUATION("^.*[._]{2,}.*$");
 static const std::regex LEADING_PUNCTUATION("^[._].*$");
@@ -50,13 +47,9 @@ static const std::regex TRAILING_PUNCTUATION("^.*[._]$");
 
 static const std::string SUB_NAME_DELIMITER = "/";
 static const std::string UNIQUE_TAG_DELIMITER = "#";
-static const std::string CHANNEL_TAG_DELIMITER = "~";
-static const std::string VOTE_TAG_DELIMITER = "^";
 
 static const std::regex UNIQUE_INDICATOR(R"(^[^^~#!]+#[^~#!\/]+$)");
-static const std::regex CHANNEL_INDICATOR(R"(^[^^~#!]+~[^~#!\/]+$)");
 static const std::regex OWNER_INDICATOR(R"(^[^^~#!]+!$)");
-static const std::regex VOTE_INDICATOR(R"(^[^^~#!]+\^[^~#!\/]+$)");
 
 static const std::regex PROTECTED_NAMES("^AOK$|^AOKCHAIN$|^AOKCOIN$|^AOKHACOIN$|^AOKHACHAIN$");
 
@@ -80,19 +73,6 @@ bool IsSubNameValid(const std::string& name)
 bool IsUniqueTagValid(const std::string& tag)
 {
     return std::regex_match(tag, UNIQUE_TAG_CHARACTERS);
-}
-
-bool IsVoteTagValid(const std::string& tag)
-{
-    return std::regex_match(tag, VOTE_TAG_CHARACTERS);
-}
-
-bool IsChannelTagValid(const std::string& tag)
-{
-    return std::regex_match(tag, CHANNEL_TAG_CHARACTERS)
-        && !std::regex_match(tag, DOUBLE_PUNCTUATION)
-        && !std::regex_match(tag, LEADING_PUNCTUATION)
-        && !std::regex_match(tag, TRAILING_PUNCTUATION);
 }
 
 bool IsNameValidBeforeTag(const std::string& name)
@@ -134,27 +114,11 @@ bool IsTokenNameValid(const std::string& name, KnownTokenType& tokenType, std::s
 
         return ret;
     }
-    else if (std::regex_match(name, CHANNEL_INDICATOR))
-    {
-        bool ret = IsTypeCheckNameValid(KnownTokenType::MSGCHANNEL, name, error);
-        if (ret)
-            tokenType = KnownTokenType::MSGCHANNEL;
-
-        return ret;
-    }
     else if (std::regex_match(name, OWNER_INDICATOR))
     {
         bool ret = IsTypeCheckNameValid(KnownTokenType::OWNER, name, error);
         if (ret)
             tokenType = KnownTokenType::OWNER;
-
-        return ret;
-    }
-    else if (std::regex_match(name, VOTE_INDICATOR))
-    {
-        bool ret = IsTypeCheckNameValid(KnownTokenType::VOTE, name, error);
-        if (ret)
-            tokenType = KnownTokenType::VOTE;
 
         return ret;
     }
@@ -197,25 +161,10 @@ bool IsTypeCheckNameValid(const KnownTokenType type, const std::string& name, st
         bool valid = IsNameValidBeforeTag(parts.front()) && IsUniqueTagValid(parts.back());
         if (!valid) { error = "Unique name contains invalid characters (Valid characters are: A-Z a-z 0-9 @ $ % & * ( ) [ ] { } _ . ? : -)";  return false; }
         return true;
-    } else if (type == KnownTokenType::MSGCHANNEL) {
-        if (name.size() > MAX_NAME_LENGTH) { error = "Name is greater than max length of " + std::to_string(MAX_NAME_LENGTH); return false; }
-        std::vector<std::string> parts;
-        boost::split(parts, name, boost::is_any_of(CHANNEL_TAG_DELIMITER));
-        bool valid = IsNameValidBeforeTag(parts.front()) && IsChannelTagValid(parts.back());
-        if (parts.back().size() > MAX_CHANNEL_NAME_LENGTH) { error = "Channel name is greater than max length of " + std::to_string(MAX_CHANNEL_NAME_LENGTH); return false; }
-        if (!valid) { error = "Message Channel name contains invalid characters (Valid characters are: A-Z 0-9 _ .) (special characters can't be the first or last characters)";  return false; }
-        return true;
     } else if (type == KnownTokenType::OWNER) {
         if (name.size() > MAX_NAME_LENGTH) { error = "Name is greater than max length of " + std::to_string(MAX_NAME_LENGTH); return false; }
         bool valid = IsNameValidBeforeTag(name.substr(0, name.size() - 1));
         if (!valid) { error = "Owner name contains invalid characters (Valid characters are: A-Z 0-9 _ .) (special characters can't be the first or last characters)";  return false; }
-        return true;
-    } else if (type == KnownTokenType::VOTE) {
-        if (name.size() > MAX_NAME_LENGTH) { error = "Name is greater than max length of " + std::to_string(MAX_NAME_LENGTH); return false; }
-        std::vector<std::string> parts;
-        boost::split(parts, name, boost::is_any_of(VOTE_TAG_DELIMITER));
-        bool valid = IsNameValidBeforeTag(parts.front()) && IsVoteTagValid(parts.back());
-        if (!valid) { error = "Vote name contains invalid characters (Valid characters are: A-Z 0-9 _ .) (special characters can't be the first or last characters)";  return false; }
         return true;
     } else {
         if (name.size() > MAX_NAME_LENGTH - 1) { error = "Name is greater than max length of " + std::to_string(MAX_NAME_LENGTH - 1); return false; }  //Tokens and sub-tokens need to leave one extra char for OWNER indicator
@@ -238,10 +187,6 @@ std::string GetParentName(const std::string& name)
         index = name.find_last_of(SUB_NAME_DELIMITER);
     } else if (type == KnownTokenType::UNIQUE) {
         index = name.find_last_of(UNIQUE_TAG_DELIMITER);
-    } else if (type == KnownTokenType::MSGCHANNEL) {
-        index = name.find_last_of(CHANNEL_TAG_DELIMITER);
-    } else if (type == KnownTokenType::VOTE) {
-        index = name.find_last_of(VOTE_TAG_DELIMITER);
     } else if (type == KnownTokenType::ROOT)
         return name;
 
@@ -2393,14 +2338,10 @@ CAmount GetBurnAmount(const KnownTokenType type)
             return GetIssueTokenBurnAmount();
         case KnownTokenType::SUB:
             return GetIssueSubTokenBurnAmount();
-        case KnownTokenType::MSGCHANNEL:
-            return 0;
         case KnownTokenType::OWNER:
             return 0;
         case KnownTokenType::UNIQUE:
             return GetIssueUniqueTokenBurnAmount();
-        case KnownTokenType::VOTE:
-            return 0;
         case KnownTokenType::REISSUE:
             return GetReissueTokenBurnAmount();
         default:
@@ -2420,14 +2361,10 @@ std::string GetBurnAddress(const KnownTokenType type)
             return Params().IssueTokenBurnAddress();
         case KnownTokenType::SUB:
             return Params().IssueSubTokenBurnAddress();
-        case KnownTokenType::MSGCHANNEL:
-            return "";
         case KnownTokenType::OWNER:
             return "";
         case KnownTokenType::UNIQUE:
             return Params().IssueUniqueTokenBurnAddress();
-        case KnownTokenType::VOTE:
-            return "";
         case KnownTokenType::REISSUE:
             return Params().ReissueTokenBurnAddress();
         default:

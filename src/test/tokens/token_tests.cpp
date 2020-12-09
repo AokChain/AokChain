@@ -106,14 +106,6 @@ BOOST_FIXTURE_TEST_SUITE(token_tests, BasicTestingSetup)
         BOOST_CHECK(!IsTokenNameValid("ABC#RESERVED~", type));
         BOOST_CHECK(!IsTokenNameValid("ABC#RESERVED^", type));
 
-        // channel
-        BOOST_CHECK(IsTokenNameValid("ABC~1", type));
-        BOOST_CHECK(type == KnownTokenType::MSGCHANNEL);
-        BOOST_CHECK(IsTokenNameValid("ABC~MAX_OF_12_CR", type));
-        BOOST_CHECK(!IsTokenNameValid("ABC~MAX_OF_12_CHR", type));
-        BOOST_CHECK(IsTokenNameValid("TEST/TEST~CHANNEL", type));
-        BOOST_CHECK(type == KnownTokenType::MSGCHANNEL);
-
         BOOST_CHECK(!IsTokenNameValid("MIN~", type));
         BOOST_CHECK(!IsTokenNameValid("ABC~NO~TILDE", type));
         BOOST_CHECK(!IsTokenNameValid("ABC~_ANN", type));
@@ -137,19 +129,6 @@ BOOST_FIXTURE_TEST_SUITE(token_tests, BasicTestingSetup)
         BOOST_CHECK(IsTokenNameValid("ABC!", type));
         BOOST_CHECK(type == KnownTokenType::OWNER);
 
-        // vote
-        BOOST_CHECK(IsTokenNameValid("ABC^VOTE"));
-        BOOST_CHECK(!IsTokenNameValid("ABC^"));
-        BOOST_CHECK(IsTokenNameValid("ABC^VOTING"));
-        BOOST_CHECK(IsTokenNameValid("ABC^VOTING_IS_30_CHARACTERS_LN"));
-        BOOST_CHECK(!IsTokenNameValid("ABC^VOTING_IS_31_CHARACTERS_LN!"));
-        BOOST_CHECK(IsTokenNameValid("ABC/SUB/SUB/SUB/SUB^VOTE"));
-        BOOST_CHECK(IsTokenNameValid("ABC/SUB/SUB/SUB/SUB/SUB/30^VOT"));
-        BOOST_CHECK(IsTokenNameValid("ABC/SUB/SUB/SUB/SUB/SUB/31^VOTE"));
-        BOOST_CHECK(!IsTokenNameValid("ABC/SUB/SUB/SUB/SUB/SUB/32X^VOTE"));
-        BOOST_CHECK(IsTokenNameValid("ABC/SUB/SUB^VOTE", type));
-        BOOST_CHECK(type == KnownTokenType::VOTE);
-
         // Check type for different type of sub tokens
         BOOST_CHECK(IsTokenNameValid("TEST/UYTH#UNIQUE", type));
         BOOST_CHECK(type == KnownTokenType::UNIQUE);
@@ -157,24 +136,12 @@ BOOST_FIXTURE_TEST_SUITE(token_tests, BasicTestingSetup)
         BOOST_CHECK(IsTokenNameValid("TEST/UYTH/SUB#UNIQUE", type));
         BOOST_CHECK(type == KnownTokenType::UNIQUE);
 
-        BOOST_CHECK(IsTokenNameValid("TEST/UYTH/SUB~CHANNEL", type));
-        BOOST_CHECK(type == KnownTokenType::MSGCHANNEL);
-
-        BOOST_CHECK(!IsTokenNameValid("TEST/UYTH/SUB#UNIQUE^VOTE", type));
-        BOOST_CHECK(!IsTokenNameValid("TEST/UYTH/SUB#UNIQUE#UNIQUE", type));
-        BOOST_CHECK(!IsTokenNameValid("TEST/UYTH/SUB~CHANNEL^VOTE", type));
-        BOOST_CHECK(!IsTokenNameValid("TEST/UYTH/SUB~CHANNEL^UNIQUE", type));
-        BOOST_CHECK(!IsTokenNameValid("TEST/UYTH/SUB~CHANNEL!", type));
-        BOOST_CHECK(!IsTokenNameValid("TEST/UYTH/SUB^VOTE!", type));
-
         // Check ParentName function
         BOOST_CHECK(GetParentName("TEST!") == "TEST!");
         BOOST_CHECK(GetParentName("TEST") == "TEST");
         BOOST_CHECK(GetParentName("TEST/SUB") == "TEST");
         BOOST_CHECK(GetParentName("TEST/SUB#UNIQUE") == "TEST/SUB");
         BOOST_CHECK(GetParentName("TEST/TEST/SUB/SUB") == "TEST/TEST/SUB");
-        BOOST_CHECK(GetParentName("TEST/SUB^VOTE") == "TEST/SUB");
-        BOOST_CHECK(GetParentName("TEST/SUB/SUB~CHANNEL") == "TEST/SUB/SUB");
     }
 
     BOOST_AUTO_TEST_CASE(transfer_token_coin_test)
@@ -191,7 +158,6 @@ BOOST_FIXTURE_TEST_SUITE(token_tests, BasicTestingSetup)
         CTxOut txOut;
         txOut.nValue = 0;
         txOut.scriptPubKey = scriptPubKey;
-
 
         Coin coin(txOut, 0, 0, 0, 0);
 

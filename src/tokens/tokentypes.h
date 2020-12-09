@@ -25,8 +25,6 @@ enum class KnownTokenType
     SUB = 1,
     UNIQUE = 2,
     OWNER = 3,
-    MSGCHANNEL = 4,
-    VOTE = 5,
     REISSUE = 6,
     INVALID = 7
 };

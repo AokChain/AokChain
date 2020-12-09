@@ -233,11 +233,6 @@ bool CheckTransaction(const CTransaction& tx, CValidationState &state, CTokensCa
                         if (transfer.nAmount != UNIQUE_TOKEN_AMOUNT)
                             return state.DoS(100, false, REJECT_INVALID, "bad-txns-transfer-unique-amount-was-not-1");
                     }
-
-                    if (tokenType == KnownTokenType::MSGCHANNEL || tokenType == KnownTokenType::VOTE) {
-                        return state.DoS(100, false, REJECT_INVALID, "disabled-token-type");
-                    }
-
                 }
             }
         }
