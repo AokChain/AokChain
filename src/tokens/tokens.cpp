@@ -707,6 +707,26 @@ bool CTransaction::VerifyNewToken(std::string& strError) const
         return false;
     }
 
+    if (tokenType == KnownTokenType::SUB) {
+        // check for owner change outpoint that matches root
+        bool fOwnerOutFound = false;
+        for (auto out : vout) {
+            CTokenTransfer transfer;
+            std::string transferAddress;
+            if (TransferTokenFromScript(out.scriptPubKey, transfer, transferAddress)) {
+                if (GetParentName(token.strName) + OWNER_TAG == transfer.strName) {
+                    fOwnerOutFound = true;
+                    break;
+                }
+            }
+        }
+
+        if (!fOwnerOutFound) {
+            strError = "bad-txns-issue-sub-token-owner-not-found";
+            return false;
+        }
+    }
+
     // Loop through all of the vouts and make sure only the expected token creations are taking place
     int nTransfers = 0;
     int nOwners = 0;

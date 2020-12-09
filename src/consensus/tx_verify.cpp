@@ -264,6 +264,15 @@ bool CheckTransaction(const CTransaction& tx, CValidationState &state, CTokensCa
         }
     }
 
+    if (tx.IsCoinBase() || tx.IsCoinStake()) {
+        for (auto vout : tx.vout) {
+            if (vout.scriptPubKey.IsTokenScript()) {
+                return state.DoS(0, error("%s: coinstake contains token transaction", __func__),
+                                 REJECT_INVALID, "bad-txns-coinstake-contains-token-txes");
+            }
+        }
+    }
+
     /** TOKENS START */
     if (AreTokensDeployed()) {
         if (tokenCache) {
@@ -465,6 +474,11 @@ bool Consensus::CheckTxTokens(const CTransaction& tx, CValidationState& state, c
             std::string address;
             if (!TransferTokenFromScript(txout.scriptPubKey, transfer, address))
                 return state.DoS(100, false, REJECT_INVALID, "bad-tx-token-transfer-bad-deserialize");
+
+            std::string strError = "";
+            if (!transfer.IsValid(strError)) {
+                return state.DoS(100, false, REJECT_INVALID, strError);
+            }
 
             // Add to the total value of tokens in the outputs
             if (totalOutputs.count(transfer.strName))

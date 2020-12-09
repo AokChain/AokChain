@@ -5,14 +5,15 @@
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
-#include "coins.h"
+#include <coins.h>
 
-#include "consensus/consensus.h"
-#include "memusage.h"
-#include "random.h"
-#include "util.h"
-#include "validation.h"
-#include "tinyformat.h"
+#include <consensus/consensus.h>
+#include <memusage.h>
+#include <random.h>
+#include <util.h>
+#include <validation.h>
+#include <tinyformat.h>
+#include <base58.h>
 
 #include <assert.h>
 #include <tokens/tokens.h>
@@ -176,17 +177,20 @@ void AddCoins(CCoinsViewCache& cache, const CTransaction &tx, int nHeight, uint2
         /** TOKENS START */
         if (AreTokensDeployed()) {
             if (tokensCache) {
-                if (tx.vout[i].scriptPubKey.IsTransferToken() && !tx.vout[i].scriptPubKey.IsUnspendable()) {
-                    CTokenTransfer tokenTransfer;
-                    std::string address;
-                    if (!TransferTokenFromScript(tx.vout[i].scriptPubKey, tokenTransfer, address))
-                        LogPrintf(
-                                "%s : ERROR - Received a coin that was a Transfer Token but failed to get the transfer object from the scriptPubKey. CTxOut: %s\n",
-                                __func__, tx.vout[i].ToString());
+                CTokenOutputEntry tokenData;
+                if (GetTokenData(tx.vout[i].scriptPubKey, tokenData)) {
+                    // If this is a transfer token, and the amount is greater than zero
+                    // We want to make sure it is added to the token addresses database if (fTokenIndex == true)
+                    if (tokenData.type == TX_TRANSFER_TOKEN && tokenData.nAmount > 0) {
+                        // Create the objects needed from the tokenData
+                        CTokenTransfer tokenTransfer(tokenData.tokenName, tokenData.nAmount, tokenData.nTokenLockTime);
+                        std::string address = EncodeDestination(tokenData.destination);
 
-                    if (!tokensCache->AddTransferToken(tokenTransfer, address, COutPoint(txid, i), tx.vout[i]))
-                        LogPrintf("%s : ERROR - Failed to add transfer token CTxOut: %s\n", __func__,
-                                  tx.vout[i].ToString());
+                        // Add the transfer token data to the token cache
+                        if (!tokensCache->AddTransferToken(tokenTransfer, address, COutPoint(txid, i), tx.vout[i]))
+                            LogPrintf("%s : ERROR - Failed to add transfer token CTxOut: %s\n", __func__,
+                                      tx.vout[i].ToString());
+                    }
                 }
             }
         }
