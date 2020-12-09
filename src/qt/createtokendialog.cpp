@@ -46,11 +46,9 @@ CreateTokenDialog::CreateTokenDialog(const PlatformStyle *_platformStyle, QWidge
 {
     ui->setupUi(this);
     setWindowTitle("Create Tokens");
-    connect(ui->ipfsBox, SIGNAL(clicked()), this, SLOT(ipfsStateChanged()));
     connect(ui->availabilityButton, SIGNAL(clicked()), this, SLOT(checkAvailabilityClicked()));
     connect(ui->nameText, SIGNAL(textChanged(QString)), this, SLOT(onNameChanged(QString)));
     connect(ui->addressText, SIGNAL(textChanged(QString)), this, SLOT(onAddressNameChanged(QString)));
-    connect(ui->ipfsText, SIGNAL(textChanged(QString)), this, SLOT(onIPFSHashChanged(QString)));
     connect(ui->createTokenButton, SIGNAL(clicked()), this, SLOT(onCreateTokenClicked()));
     connect(ui->unitBox, SIGNAL(valueChanged(int)), this, SLOT(onUnitChanged(int)));
     connect(ui->tokenType, SIGNAL(activated(int)), this, SLOT(onTokenTypeActivated(int)));
@@ -132,9 +130,6 @@ CreateTokenDialog::CreateTokenDialog(const PlatformStyle *_platformStyle, QWidge
 
     ui->nameText->installEventFilter(this);
     ui->tokenList->installEventFilter(this);
-
-    ui->ipfsBox->hide();
-    ui->ipfsText->hide();
 }
 
 void CreateTokenDialog::setClientModel(ClientModel *_clientModel)
@@ -246,7 +241,6 @@ void CreateTokenDialog::setUpValues()
 {
     ui->unitBox->setValue(0);
     ui->reissuableBox->setCheckState(Qt::CheckState::Checked);
-    ui->ipfsText->hide();
     hideMessage();
     CheckFormState();
     ui->availabilityButton->setDisabled(true);
@@ -333,8 +327,6 @@ void CreateTokenDialog::setupTokenDataView(const PlatformStyle *platformStyle)
     ui->unitsLabel->setFont(GUIUtil::getSubLabelFont());
 
     ui->reissuableBox->setStyleSheet(QString(".QCheckBox{ %1; }").arg(STRING_LABEL_COLOR));
-    ui->ipfsBox->setStyleSheet(QString(".QCheckBox{ %1; }").arg(STRING_LABEL_COLOR));
-
 }
 
 void CreateTokenDialog::setupFeeControl(const PlatformStyle *platformStyle)
@@ -398,18 +390,6 @@ void CreateTokenDialog::updateDisplayUnit()
     updateSmartFeeLabel();
 }
 
-void CreateTokenDialog::toggleIPFSText()
-{
-    if (ui->ipfsBox->isChecked()) {
-        ui->ipfsText->show();
-    } else {
-        ui->ipfsText->hide();
-        ui->ipfsText->clear();
-    }
-
-    CheckFormState();
-}
-
 void CreateTokenDialog::showMessage(QString string)
 {
     ui->messageLabel->setStyleSheet("color: red; font-size: 15pt;font-weight: bold;");
@@ -428,8 +408,6 @@ void CreateTokenDialog::hideMessage()
 {
     ui->nameText->setStyleSheet("");
     ui->addressText->setStyleSheet("");
-    if (ui->ipfsBox->isChecked())
-        ui->ipfsText->setStyleSheet("");
 
     ui->messageLabel->hide();
 }
@@ -443,35 +421,6 @@ void CreateTokenDialog::enableCreateButton()
 {
     if (checkedAvailablity)
         ui->createTokenButton->setDisabled(false);
-}
-
-bool CreateTokenDialog::checkIPFSHash(QString hash)
-{
-    if (!hash.isEmpty()) {
-        std::string error;
-        if (!CheckEncodedIPFS(hash.toStdString(), error)) {
-            ui->ipfsText->setStyleSheet("border: 2px solid red");
-            showMessage("IPFS Hash must start with 'Qm'");
-            disableCreateButton();
-            return false;
-        }
-        else if (hash.size() != 46) {
-            ui->ipfsText->setStyleSheet("border: 2px solid red");
-            showMessage("IPFS Hash must have size of 46 characters");
-            disableCreateButton();
-            return false;
-        } else if (DecodeIPFS(hash.toStdString()).empty()) {
-            showMessage("IPFS hash is not valid. Please use a valid IPFS hash");
-            disableCreateButton();
-            return false;
-        }
-    }
-
-    // No problems where found with the hash, reset the border, and hide the messages.
-    hideMessage();
-    ui->ipfsText->setStyleSheet("");
-
-    return true;
 }
 
 void CreateTokenDialog::CheckFormState()
@@ -508,10 +457,6 @@ void CreateTokenDialog::CheckFormState()
         return;
     }
 
-    if (ui->ipfsBox->isChecked())
-        if (!checkIPFSHash(ui->ipfsText->text()))
-            return;
-
     if (checkedAvailablity) {
         showValidMessage(tr("Valid Token"));
         enableCreateButton();
@@ -523,10 +468,6 @@ void CreateTokenDialog::CheckFormState()
 }
 
 /** SLOTS */
-void CreateTokenDialog::ipfsStateChanged()
-{
-    toggleIPFSText();
-}
 
 void CreateTokenDialog::checkAvailabilityClicked()
 {
@@ -624,12 +565,6 @@ void CreateTokenDialog::onAddressNameChanged(QString address)
     CheckFormState();
 }
 
-void CreateTokenDialog::onIPFSHashChanged(QString hash)
-{
-    if (checkIPFSHash(hash))
-        CheckFormState();
-}
-
 void CreateTokenDialog::onCreateTokenClicked()
 {
     WalletModel::UnlockContext ctx(model->requestUnlock());
@@ -643,13 +578,8 @@ void CreateTokenDialog::onCreateTokenClicked()
     CAmount quantity = ui->quantitySpinBox->value() * COIN;
     int units = ui->unitBox->value();
     bool reissuable = ui->reissuableBox->isChecked();
-    bool hasIPFS = ui->ipfsBox->isChecked() && !ui->ipfsText->text().isEmpty();
 
-    std::string ipfsDecoded = "";
-    if (hasIPFS)
-        ipfsDecoded = DecodeIPFS(ui->ipfsText->text().toStdString());
-
-    CNewToken token(name.toStdString(), quantity, units, reissuable ? 1 : 0, hasIPFS ? 1 : 0, ipfsDecoded);
+    CNewToken token(name.toStdString(), quantity, units, reissuable ? 1 : 0);
 
     CWalletTx tx;
     CReserveKey reservekey(model->getWallet());
@@ -1203,8 +1133,6 @@ void CreateTokenDialog::clear()
     ui->quantitySpinBox->setValue(1);
     ui->unitBox->setValue(0);
     ui->reissuableBox->setChecked(true);
-    ui->ipfsBox->setChecked(false);
-    ui->ipfsText->hide();
     ui->tokenList->hide();
     ui->tokenList->setCurrentIndex(0);
     type = 0;

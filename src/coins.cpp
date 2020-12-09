@@ -140,12 +140,10 @@ void AddCoins(CCoinsViewCache& cache, const CTransaction &tx, int nHeight, uint2
                 if (!tokensCache->AddReissueToken(reissue, strAddress, COutPoint(txid, reissueIndex)))
                     error("%s: Failed to reissue an token. Token Name : %s", __func__, reissue.strName);
 
-                // Set the old IPFSHash for the blockundo
-                bool fIPFSChanged = !reissue.strIPFSHash.empty();
                 bool fUnitsChanged = reissue.nUnits != -1;
-                if (fIPFSChanged || fUnitsChanged) {
+                if (fUnitsChanged) {
                     undoTokenData->first = reissue.strName; // Token Name
-                    undoTokenData->second = CBlockTokenUndo {fIPFSChanged, fUnitsChanged, token.strIPFSHash, token.units}; // ipfschanged, unitchanged, Old Tokens IPFSHash, old units
+                    undoTokenData->second = CBlockTokenUndo {fUnitsChanged, token.units};
                 }
             } else if (tx.IsNewUniqueToken()) {
                 for (int n = 0; n < (int)tx.vout.size(); n++) {

@@ -37,7 +37,7 @@ BOOST_FIXTURE_TEST_SUITE(token_reissue_tests, BasicTestingSetup)
         BOOST_CHECK_MESSAGE(cache.AddNewToken(token1, Params().GlobalBurnAddress(), 0, hash), "Failed to add new token");
 
         // Create a reissuance of the token
-        CReissueToken reissue1("AOKTOKEN", CAmount(1 * COIN), 8, 1, DecodeIPFS("QmacSRmrkVmvJfbCpmU6pK72furJ8E8fbKHindrLxmYMQo"));
+        CReissueToken reissue1("AOKTOKEN", CAmount(1 * COIN), 8);
         COutPoint out(uint256S("BF50CB9A63BE0019171456252989A459A7D0A5F494735278290079D22AB704A4"), 1);
 
         // Add an reissuance of the token to the cache
@@ -56,7 +56,6 @@ BOOST_FIXTURE_TEST_SUITE(token_reissue_tests, BasicTestingSetup)
         BOOST_CHECK_MESSAGE(token2.nAmount == CAmount(101 * COIN), "Token2: Amount isn't 101");
         BOOST_CHECK_MESSAGE(token2.strName == "AOKTOKEN", "Token2: Token name is wrong");
         BOOST_CHECK_MESSAGE(token2.units == 8, "Token2: Units is wrong");
-        BOOST_CHECK_MESSAGE(EncodeIPFS(token2.strIPFSHash) == "QmacSRmrkVmvJfbCpmU6pK72furJ8E8fbKHindrLxmYMQo", "Token2: IPFS hash is wrong");
 
         // Remove the reissue from the cache
         std::vector<std::pair<std::string, CBlockTokenUndo> > undoBlockData;
@@ -72,7 +71,6 @@ BOOST_FIXTURE_TEST_SUITE(token_reissue_tests, BasicTestingSetup)
         BOOST_CHECK_MESSAGE(token3.nAmount == CAmount(100 * COIN), "Token3: Amount isn't 100");
         BOOST_CHECK_MESSAGE(token3.strName == "AOKTOKEN", "Token3: Token name is wrong");
         BOOST_CHECK_MESSAGE(token3.units == 8, "Token3: Units is wrong");
-        BOOST_CHECK_MESSAGE(token3.strIPFSHash == "", "Token3: IPFS hash is wrong");
 
         // Check to see if the reissue removal updated the cache correctly
         BOOST_CHECK_MESSAGE(cache.mapReissuedTokenData.count("AOKTOKEN"), "Map of reissued data was removed, even though changes were made and not databased yet");
@@ -95,23 +93,23 @@ BOOST_FIXTURE_TEST_SUITE(token_reissue_tests, BasicTestingSetup)
         BOOST_CHECK_MESSAGE(cache.AddNewToken(token1, Params().GlobalBurnAddress(), 0, uint256()), "Failed to add new token");
 
         // Create a reissuance of the token that is valid
-        CReissueToken reissue1("AOKTOKEN", CAmount(1 * COIN), 8, 1, DecodeIPFS("QmacSRmrkVmvJfbCpmU6pK72furJ8E8fbKHindrLxmYMQo"));
+        CReissueToken reissue1("AOKTOKEN", CAmount(1 * COIN), 8);
 
         std::string error;
         BOOST_CHECK_MESSAGE(reissue1.IsValid(error, cache), "Reissue should of been valid");
 
         // Create a reissuance of the token that is not valid
-        CReissueToken reissue2("NOTEXIST", CAmount(1 * COIN), 8, 1, DecodeIPFS("QmacSRmrkVmvJfbCpmU6pK72furJ8E8fbKHindrLxmYMQo"));
+        CReissueToken reissue2("NOTEXIST", CAmount(1 * COIN), 8);
 
         BOOST_CHECK_MESSAGE(!reissue2.IsValid(error, cache), "Reissue shouldn't of been valid");
 
         // Create a reissuance of the token that is not valid (unit is smaller than current token)
-        CReissueToken reissue3("AOKTOKEN", CAmount(1 * COIN), 7, 1, DecodeIPFS("QmacSRmrkVmvJfbCpmU6pK72furJ8E8fbKHindrLxmYMQo"));
+        CReissueToken reissue3("AOKTOKEN", CAmount(1 * COIN), 7);
 
         BOOST_CHECK_MESSAGE(!reissue3.IsValid(error, cache), "Reissue shouldn't of been valid because of units");
 
         // Create a reissuance of the token that is not valid (unit is not changed)
-        CReissueToken reissue4("AOKTOKEN", CAmount(1 * COIN), -1, 1, DecodeIPFS("QmacSRmrkVmvJfbCpmU6pK72furJ8E8fbKHindrLxmYMQo"));
+        CReissueToken reissue4("AOKTOKEN", CAmount(1 * COIN), -1);
 
         BOOST_CHECK_MESSAGE(reissue4.IsValid(error, cache), "Reissue4 wasn't valid");
 
@@ -121,13 +119,13 @@ BOOST_FIXTURE_TEST_SUITE(token_reissue_tests, BasicTestingSetup)
         // Add new token to a valid AOK address
         BOOST_CHECK_MESSAGE(cache.AddNewToken(token2, Params().GlobalBurnAddress(), 0, uint256()), "Failed to add new token");
 
-        // Create a reissuance of the token that is valid unit go from 0 -> 1 and change the ipfs hash
-        CReissueToken reissue5("AOKTOKEN2", CAmount(1 * COIN), 1, 1, DecodeIPFS("QmacSRmrkVmvJfbCpmU6pK72furJ8E8fbKHindrLxmYMQo"));
+        // Create a reissuance of the token that is valid unit go from 0 -> 1
+        CReissueToken reissue5("AOKTOKEN2", CAmount(1 * COIN), 1);
 
         BOOST_CHECK_MESSAGE(reissue5.IsValid(error, cache), "Reissue5 wasn't valid");
 
-        // Create a reissuance of the token that is valid unit go from 1 -> 1 and change the ipfs hash
-        CReissueToken reissue6("AOKTOKEN2", CAmount(1 * COIN), 1, 1, DecodeIPFS("QmacSRmrkVmvJfbCpmU6pK72furJ8E8fbKHindrLxmYMQo"));
+        // Create a reissuance of the token that is valid unit go from 1 -> 1
+        CReissueToken reissue6("AOKTOKEN2", CAmount(1 * COIN), 1);
 
         BOOST_CHECK_MESSAGE(reissue6.IsValid(error, cache), "Reissue6 wasn't valid");
     }

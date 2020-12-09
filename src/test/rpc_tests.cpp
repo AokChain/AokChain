@@ -158,7 +158,7 @@ BOOST_FIXTURE_TEST_SUITE(rpc_tests, TestingSetup)
 
         BOOST_CHECK_NO_THROW(CallRPC("createrawtransaction [{\"txid\":\"a3b807410df0b60fcb9736768df5823938b2f838694939ba45f3c0a1bff150ed\",\"vout\":0}] {\"rNNjqrDbSHxJZNfC54WsF8dxqbcue9SoiB\":20000}"));
         BOOST_CHECK_NO_THROW(CallRPC("createrawtransaction [{\"txid\":\"a3b807410df0b60fcb9736768df5823938b2f838694939ba45f3c0a1bff150ed\",\"vout\":0}] {\"rNNjqrDbSHxJZNfC54WsF8dxqbcue9SoiB\":{\"transfer\":{\"AOKCHAIN_TOKEN\":20000}}}"));
-        BOOST_CHECK_NO_THROW(CallRPC("createrawtransaction [{\"txid\":\"a3b807410df0b60fcb9736768df5823938b2f838694939ba45f3c0a1bff150ed\",\"vout\":0}] {\"rNNjqrDbSHxJZNfC54WsF8dxqbcue9SoiB\":{\"issue\":{\"name_length\":1,\"token_name\":\"AOKCHAIN_TOKEN\",\"token_quantity\":20000,\"units\":0,\"reissuable\":1,\"has_ipfs\":0}}}"));
+        BOOST_CHECK_NO_THROW(CallRPC("createrawtransaction [{\"txid\":\"a3b807410df0b60fcb9736768df5823938b2f838694939ba45f3c0a1bff150ed\",\"vout\":0}] {\"rNNjqrDbSHxJZNfC54WsF8dxqbcue9SoiB\":{\"issue\":{\"name_length\":1,\"token_name\":\"AOKCHAIN_TOKEN\",\"token_quantity\":20000,\"units\":0,\"reissuable\":1}}}"));
 
         // one address multiple token outs
         BOOST_CHECK_NO_THROW(CallRPC("createrawtransaction [{\"txid\":\"a3b807410df0b60fcb9736768df5823938b2f838694939ba45f3c0a1bff150ed\",\"vout\":0}] {\"rNNjqrDbSHxJZNfC54WsF8dxqbcue9SoiB\":{\"transfer\":{\"AOKCHAIN_TOKEN\":20000,\"AOKCHAIN_TOKEN_2\":20000}}}"));

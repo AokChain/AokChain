@@ -781,29 +781,6 @@
           </item>
           <item>
            <layout class="QHBoxLayout" name="horizontalLayout_6">
-            <item>
-             <widget class="QCheckBox" name="ipfsBox">
-              <property name="toolTip">
-               <string>Does this token have an ipfs hash to go with it</string>
-              </property>
-              <property name="text">
-               <string>Add JSON Meta Data Hash</string>
-              </property>
-             </widget>
-            </item>
-            <item>
-             <widget class="QLineEdit" name="ipfsText">
-              <property name="toolTip">
-               <string>The ipfs hash that contains information about the token</string>
-              </property>
-              <property name="maxLength">
-               <number>46</number>
-              </property>
-              <property name="placeholderText">
-               <string>The IPFS Hash that is associated with the token being created (e.g. QmU4h365LYMHx...)</string>
-              </property>
-             </widget>
-            </item>
            </layout>
           </item>
           <item>

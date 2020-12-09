@@ -339,16 +339,6 @@ bool CNewToken::IsValid(std::string& strError, CTokensCache& tokenCache, bool fC
         return false;
     }
 
-    if (nHasIPFS != 0) {
-        strError = _("Invalid parameter: this feature is disabled.");
-        return false;
-    }
-
-    if (strIPFSHash != "") {
-        strError = _("Invalid parameter: this feature is disabled.");
-        return false;
-    }
-
     return true;
 }
 
@@ -357,9 +347,7 @@ CNewToken::CNewToken(const CNewToken& token)
     this->strName = token.strName;
     this->nAmount = token.nAmount;
     this->units = token.units;
-    this->nHasIPFS = token.nHasIPFS;
     this->nReissuable = token.nReissuable;
-    this->strIPFSHash = token.strIPFSHash;
 }
 
 CNewToken& CNewToken::operator=(const CNewToken& token)
@@ -367,9 +355,7 @@ CNewToken& CNewToken::operator=(const CNewToken& token)
     this->strName = token.strName;
     this->nAmount = token.nAmount;
     this->units = token.units;
-    this->nHasIPFS = token.nHasIPFS;
     this->nReissuable = token.nReissuable;
-    this->strIPFSHash = token.strIPFSHash;
     return *this;
 }
 
@@ -385,15 +371,13 @@ std::string CNewToken::ToString()
     return ss.str();
 }
 
-CNewToken::CNewToken(const std::string& strName, const CAmount& nAmount, const int& units, const int& nReissuable, const int& nHasIPFS, const std::string& strIPFSHash)
+CNewToken::CNewToken(const std::string& strName, const CAmount& nAmount, const int& units, const int& nReissuable)
 {
     this->SetNull();
     this->strName = strName;
     this->nAmount = nAmount;
     this->units = int8_t(units);
     this->nReissuable = int8_t(nReissuable);
-    this->nHasIPFS = int8_t(nHasIPFS);
-    this->strIPFSHash = strIPFSHash;
 }
 CNewToken::CNewToken(const std::string& strName, const CAmount& nAmount)
 {
@@ -402,8 +386,6 @@ CNewToken::CNewToken(const std::string& strName, const CAmount& nAmount)
     this->nAmount = nAmount;
     this->units = int8_t(DEFAULT_UNITS);
     this->nReissuable = int8_t(DEFAULT_REISSUABLE);
-    this->nHasIPFS = int8_t(DEFAULT_HAS_IPFS);
-    this->strIPFSHash = DEFAULT_IPFS;
 }
 
 CDatabasedTokenData::CDatabasedTokenData(const CNewToken& token, const int& nHeight, const uint256& blockHash)
@@ -961,12 +943,10 @@ void CTokenTransfer::ConstructTransaction(CScript& script) const
     script << OP_TOKEN_SCRIPT << ToByteVector(vchMessage) << OP_DROP;
 }
 
-CReissueToken::CReissueToken(const std::string &strTokenName, const CAmount &nAmount, const int &nUnits, const int &nReissuable,
-                             const std::string &strIPFSHash)
+CReissueToken::CReissueToken(const std::string &strTokenName, const CAmount &nAmount, const int &nUnits, const int &nReissuable)
 {
 
     this->strName = strTokenName;
-    this->strIPFSHash = strIPFSHash;
     this->nReissuable = int8_t(nReissuable);
     this->nAmount = nAmount;
     this->nUnits = nUnits;
@@ -1003,11 +983,6 @@ bool CReissueToken::IsValid(std::string &strError, CTokensCache& tokenCache, boo
             strError = _("Unable to reissue token: unit must be larger than current unit selection");
             return false;
         }
-    }
-
-    if (strIPFSHash != "") {
-        if (!CheckEncodedIPFS(EncodeIPFS(strIPFSHash), strError))
-            return false;
     }
 
     if (nAmount < 0) {
@@ -1317,20 +1292,12 @@ bool CTokensCache::AddReissueToken(const CReissueToken& reissue, const std::stri
         if (reissue.nUnits != -1)
             token.units = reissue.nUnits;
 
-        if (reissue.strIPFSHash != "") {
-            return error("%s: This function is disabled. Token Name : %s",
-                     __func__, reissue.strName);
-        }
         mapReissuedTokenData.insert(make_pair(reissue.strName, token));
     } else {
         mapReissuedTokenData.at(reissue.strName).nAmount += reissue.nAmount;
         mapReissuedTokenData.at(reissue.strName).nReissuable = reissue.nReissuable;
         if (reissue.nUnits != -1) {
             mapReissuedTokenData.at(reissue.strName).units = reissue.nUnits;
-        }
-        if (reissue.strIPFSHash != "") {
-            return error("%s: This function is disabled. Token Name : %s",
-                     __func__, reissue.strName);
         }
     }
 
@@ -1354,7 +1321,7 @@ bool CTokensCache::AddReissueToken(const CReissueToken& reissue, const std::stri
 }
 
 //! Changes Memory Only
-bool CTokensCache::RemoveReissueToken(const CReissueToken& reissue, const std::string address, const COutPoint& out, const std::vector<std::pair<std::string, CBlockTokenUndo> >& vUndoIPFS)
+bool CTokensCache::RemoveReissueToken(const CReissueToken& reissue, const std::string address, const COutPoint& out, const std::vector<std::pair<std::string, CBlockTokenUndo> >& vUndoToken)
 {
     auto pair = std::make_pair(reissue.strName, address);
 
@@ -1368,15 +1335,10 @@ bool CTokensCache::RemoveReissueToken(const CReissueToken& reissue, const std::s
     tokenData.nAmount -= reissue.nAmount;
     tokenData.nReissuable = 1;
 
-    // Find the ipfs hash in the undoblock data and restore the ipfs hash to its previous hash
-    for (auto undoItem : vUndoIPFS) {
+    for (auto undoItem : vUndoToken) {
         if (undoItem.first == reissue.strName) {
-            if (undoItem.second.fChangedIPFS)
-                tokenData.strIPFSHash = undoItem.second.strIPFS;
             if(undoItem.second.fChangedUnits)
                 tokenData.units = undoItem.second.nUnits;
-            if (tokenData.strIPFSHash == "")
-                tokenData.nHasIPFS = 0;
             break;
         }
     }
@@ -2571,23 +2533,6 @@ bool GetAllMyLockedTokenBalances(std::map<std::string, std::vector<COutput> >& o
     return GetAllMyLockedTokenBalancesWallet(vpwallets[0], outputs, amounts, prefix);
 }
 
-// 46 char base58 --> 34 char KAW compatible
-std::string DecodeIPFS(std::string encoded)
-{
-    std::vector<unsigned char> b;
-    DecodeBase58(encoded, b);
-    return std::string(b.begin(), b.end());
-}
-
-// 34 char KAW compatible --> 46 char base58
-std::string EncodeIPFS(std::string decoded){
-    std::vector<char> charData(decoded.begin(), decoded.end());
-    std::vector<unsigned char> unsignedCharData;
-    for (char c : charData)
-        unsignedCharData.push_back(static_cast<unsigned char>(c));
-    return EncodeBase58(unsignedCharData);
-}
-
 bool CreateTokenTransaction(CWallet* pwallet, CCoinControl& coinControl, const CNewToken& token, const std::string& address, std::pair<int, std::string>& error, CWalletTx& wtxNew, CReserveKey& reservekey, CAmount& nFeeRequired)
 {
     std::vector<CNewToken> tokens;
@@ -2932,16 +2877,6 @@ bool VerifyWalletHasToken(CWallet* pwallet, const std::string& token_name, std::
 bool CheckAmountWithUnits(const CAmount& nAmount, const int8_t nUnits)
 {
     return nAmount % int64_t(pow(10, (MAX_UNIT - nUnits))) == 0;
-}
-
-bool CheckEncodedIPFS(const std::string& hash, std::string& strError)
-{
-    if (hash.substr(0, 2) != "Qm") {
-        strError = _("Invalid parameter: ipfs_hash must start with 'Qm'.");
-        return false;
-    }
-
-    return true;
 }
 
 void GetTxOutTokenTypes(const std::vector<CTxOut>& vout, int& issues, int& reissues, int& transfers, int& owners)

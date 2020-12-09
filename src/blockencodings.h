@@ -219,8 +219,6 @@ public:
     int8_t units;
     CAmount amount;
     int8_t reissuable;
-    int8_t hasIPFS;
-    std::string ipfs;
     int32_t nHeight;
 
     SerializedTokenData(const CDatabasedTokenData &tokenData);
@@ -229,15 +227,16 @@ public:
 
     template <typename Stream, typename Operation>
     inline void SerializationOp(Stream& s, Operation ser_action) {
+        int8_t empty = 0;
+        std::string empty_str = "";
+
         READWRITE(name);
         READWRITE(amount);
         READWRITE(units);
         READWRITE(reissuable);
-        READWRITE(hasIPFS);
-        READWRITE(ipfs);
+        READWRITE(empty);
+        READWRITE(empty_str);
         READWRITE(nHeight);
     }
-
-
 };
 #endif

@@ -565,7 +565,7 @@ UniValue createrawtransaction(const JSONRPCRequest& request)
                     CAmount nAmount = AmountFromValue(token_quantity);
 
                     // Create a new token
-                    CNewToken token(token_name.get_str(), nAmount, units.get_int(), reissuable.get_int(), 0, DecodeIPFS(""));
+                    CNewToken token(token_name.get_str(), nAmount, units.get_int(), reissuable.get_int());
 
                     // Verify that data
                     std::string strError = "";
@@ -626,7 +626,7 @@ UniValue createrawtransaction(const JSONRPCRequest& request)
                         // Create a new token
                         CNewToken token;
                         token = CNewToken(GetUniqueTokenName(root_name.get_str(), token_tags[i].get_str()),
-                                              UNIQUE_TOKEN_AMOUNT,  UNIQUE_TOKEN_UNITS, UNIQUE_TOKENS_REISSUABLE, 0, "");
+                                              UNIQUE_TOKEN_AMOUNT,  UNIQUE_TOKEN_UNITS, UNIQUE_TOKENS_REISSUABLE);
 
                         // Verify that data
                         std::string strError = "";

@@ -185,7 +185,7 @@ UniValue issue(const JSONRPCRequest& request)
         throw JSONRPCError(RPC_INVALID_PARAMETER, std::string("Invalid parameters for issuing a unique token."));
     }
 
-    CNewToken token(tokenName, nAmount, units, reissuable ? 1 : 0, 0, DecodeIPFS(""));
+    CNewToken token(tokenName, nAmount, units, reissuable ? 1 : 0);
 
     CReserveKey reservekey(pwallet);
     CWalletTx transaction;
@@ -311,7 +311,7 @@ UniValue issueunique(const JSONRPCRequest& request)
         std::string tokenName = GetUniqueTokenName(rootName, tag);
         CNewToken token;
 
-        token = CNewToken(tokenName, UNIQUE_TOKEN_AMOUNT, UNIQUE_TOKEN_UNITS, UNIQUE_TOKENS_REISSUABLE, 0, "");
+        token = CNewToken(tokenName, UNIQUE_TOKEN_AMOUNT, UNIQUE_TOKEN_UNITS, UNIQUE_TOKENS_REISSUABLE);
 
         tokens.push_back(token);
     }
@@ -1209,7 +1209,7 @@ UniValue reissue(const JSONRPCRequest& request)
         newUnits = request.params[5].get_int();
     }
 
-    CReissueToken reissueToken(token_name, nAmount, newUnits, reissuable, DecodeIPFS(""));
+    CReissueToken reissueToken(token_name, nAmount, newUnits, reissuable);
 
     std::pair<int, std::string> error;
     CReserveKey reservekey(pwallet);

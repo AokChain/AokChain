@@ -227,7 +227,5 @@ SerializedTokenData::SerializedTokenData(const CDatabasedTokenData &tokenData)
     amount = tokenData.token.nAmount;
     units = tokenData.token.units;
     reissuable = tokenData.token.nReissuable;
-    hasIPFS = tokenData.token.nHasIPFS;
-    ipfs = tokenData.token.strIPFSHash;
     nHeight = tokenData.nHeight;
 }
