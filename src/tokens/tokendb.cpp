@@ -7,18 +7,18 @@
 #include <consensus/params.h>
 #include <script/ismine.h>
 #include <tinyformat.h>
-#include "tokendb.h"
-#include "tokens.h"
-#include "validation.h"
+#include <tokens/tokendb.h>
+#include <tokens/tokens.h>
+#include <validation.h>
 
 #include <boost/thread.hpp>
 
-static const char TOKEN_FLAG = 'T';
-static const char TOKEN_ADDRESS_QUANTITY_FLAG = 'B';
-static const char ADDRESS_TOKEN_QUANTITY_FLAG = 'C';
-static const char MY_TOKEN_FLAG = 'M';
-static const char BLOCK_TOKEN_UNDO_DATA = 'U';
-static const char MEMPOOL_REISSUED_TX = 'Z';
+static const char TOKEN_FLAG = "T";
+static const char TOKEN_ADDRESS_QUANTITY_FLAG = "B";
+static const char ADDRESS_TOKEN_QUANTITY_FLAG = "C";
+static const char MY_TOKEN_FLAG = "M";
+static const char BLOCK_TOKEN_UNDO_DATA = "U";
+static const char MEMPOOL_REISSUED_TX = "Z";
 
 static size_t MAX_DATABASE_RESULTS = 50000;
 
@@ -182,7 +182,7 @@ bool CTokensDB::TokenDir(std::vector<CDatabasedTokenData>& tokens, const std::st
     pcursor->Seek(std::make_pair(TOKEN_FLAG, std::string()));
 
     auto prefix = filter;
-    bool wildcard = prefix.back() == '*';
+    bool wildcard = prefix.back() == "*";
     if (wildcard)
         prefix.pop_back();
 

@@ -7,9 +7,9 @@
 #ifndef AOKCHAINCOIN_TOKEN_PROTOCOL_H
 #define AOKCHAINCOIN_TOKEN_PROTOCOL_H
 
-#include "amount.h"
-#include "tinyformat.h"
-#include "tokentypes.h"
+#include <amount.h>
+#include <tinyformat.h>
+#include <tokens/tokentypes.h>
 
 #include <string>
 #include <set>

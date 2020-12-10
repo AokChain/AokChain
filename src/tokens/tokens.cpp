@@ -21,14 +21,14 @@
 #include <consensus/validation.h>
 #include <rpc/protocol.h>
 #include <net.h>
-#include "tokens.h"
-#include "tokendb.h"
-#include "tokentypes.h"
-#include "protocol.h"
-#include "wallet/coincontrol.h"
-#include "utilmoneystr.h"
-#include "coins.h"
-#include "wallet/wallet.h"
+#include <tokens/tokens.h>
+#include <tokens/tokendb.h>
+#include <tokens/tokentypes.h>
+#include <protocol.h>
+#include <wallet/coincontrol.h>
+#include <utilmoneystr.h>
+#include <coins.h>
+#include <wallet/wallet.h>
 
 std::map<uint256, std::string> mapReissuedTx;
 std::map<std::string, uint256> mapReissuedTokens;
