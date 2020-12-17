@@ -182,7 +182,7 @@ bool CTokensDB::TokenDir(std::vector<CDatabasedTokenData>& tokens, const std::st
     pcursor->Seek(std::make_pair(TOKEN_FLAG, std::string()));
 
     auto prefix = filter;
-    bool wildcard = prefix.back() == "*";
+    bool wildcard = prefix.back() == '*';
     if (wildcard)
         prefix.pop_back();
 
