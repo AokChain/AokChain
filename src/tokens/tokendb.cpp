@@ -13,12 +13,12 @@
 
 #include <boost/thread.hpp>
 
-static const char TOKEN_FLAG = "T";
-static const char TOKEN_ADDRESS_QUANTITY_FLAG = "B";
-static const char ADDRESS_TOKEN_QUANTITY_FLAG = "C";
-static const char MY_TOKEN_FLAG = "M";
-static const char BLOCK_TOKEN_UNDO_DATA = "U";
-static const char MEMPOOL_REISSUED_TX = "Z";
+static const char TOKEN_FLAG = 'T';
+static const char TOKEN_ADDRESS_QUANTITY_FLAG = 'B';
+static const char ADDRESS_TOKEN_QUANTITY_FLAG = 'C';
+static const char MY_TOKEN_FLAG = 'M';
+static const char BLOCK_TOKEN_UNDO_DATA = 'U';
+static const char MEMPOOL_REISSUED_TX = 'Z';
 
 static size_t MAX_DATABASE_RESULTS = 50000;
 
