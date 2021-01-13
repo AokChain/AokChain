@@ -1214,6 +1214,54 @@ UniValue getspentinfo(const JSONRPCRequest& request)
     return obj;
 }
 
+
+UniValue getaddresses(const JSONRPCRequest& request)
+{
+    if (request.fHelp || request.params.size() > 1)
+        throw std::runtime_error(
+            "getaddresses \"excludeZeroBalances\" \n"
+            "\nPrint a list of all addresses in the blockchain.\n"
+            "\nArguments:\n"
+            "1. \"excludeZeroBalances\"  (bool, optional, default: true) If true, addresses with zero balance aren't included in the list. If false, they are.\n"
+            "\nExamples:\n"
+            + HelpExampleCli("getaddressbalance", "true")
+            + HelpExampleRpc("getaddressbalance", "true")
+        );
+
+    bool fExcludeZeroBalances = request.params.size() == 1 ? request.params[0].get_bool() : true;
+    std::vector<CAddressListEntry> addressList;
+
+    if (!GetAddresses(addressList, fExcludeZeroBalances)) {
+        throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Failed to load the address list.");
+    }
+
+    std::sort(addressList.begin(), addressList.end(),
+        [](const CAddressListEntry & a, const CAddressListEntry & b) -> bool
+    {
+        return a.balance > b.balance;
+    });
+
+    UniValue result(UniValue::VARR);
+
+    for (std::vector<CAddressListEntry>::const_iterator it=addressList.begin(); it!=addressList.end(); it++) {
+
+        std::string address;
+        if (!getAddressFromIndex(it->type, it->hashBytes, address)) {
+            throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Unknown address type");
+        }
+
+        UniValue entry(UniValue::VOBJ);
+
+        entry.push_back(Pair("address", address));
+        entry.push_back(Pair("received", it->received));
+        entry.push_back(Pair("balance", it->balance));
+
+        result.push_back(entry);
+    }
+
+    return result;
+}
+
 static const CRPCCommand commands[] =
 { //  category              name                      actor (function)         argNames
   //  --------------------- ------------------------  -----------------------  ----------
@@ -1229,6 +1277,7 @@ static const CRPCCommand commands[] =
     { "addressindex",       "getaddressdeltas",       &getaddressdeltas,       {"addresses"} },
     { "addressindex",       "getaddresstxids",        &getaddresstxids,        {"addresses","includeTokens"} },
     { "addressindex",       "getaddressbalance",      &getaddressbalance,      {"addresses","includeTokens"} },
+    { "addressindex",       "getaddresses",           &getaddresses,           {"excludeZeroBalances"} },
 
     /* Blockchain */
     { "blockchain",         "getspentinfo",           &getspentinfo,           {} },

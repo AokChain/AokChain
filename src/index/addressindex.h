@@ -198,6 +198,9 @@ struct CAddressIndexKey {
         spending = false;
     }
 
+    bool IsNull() {
+        return hashBytes.IsNull();
+    }
 };
 
 struct CAddressIndexIteratorKey {
@@ -325,6 +328,33 @@ struct CAddressIndexIteratorHeightKey {
         token.clear();
         blockHeight = 0;
     }
+};
+
+struct CAddressListEntry {
+    unsigned int type;
+    uint160 hashBytes;
+    CAmount received;
+    CAmount balance;
+
+    CAddressListEntry(unsigned int addressType, uint160 addressHash, CAmount nReceived, CAmount nBalance) {
+        type = addressType;
+        hashBytes = addressHash;
+        received = nReceived;
+        balance = nBalance;
+    }
+
+    CAddressListEntry() {
+        SetNull();
+    }
+
+    void SetNull() {
+        type = 0;
+        hashBytes.SetNull();
+        received = 0;
+        balance = 0;
+    }
+
+    bool IsNull(){ return hashBytes.IsNull(); }
 };
 
 struct CMempoolAddressDelta
