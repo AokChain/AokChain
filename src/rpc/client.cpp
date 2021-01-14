@@ -170,6 +170,8 @@ static const CRPCConvertParam vRPCConvertParams[] =
     { "getaddresstxids", 1, "includeTokens"},
     { "getaddressbalance", 1, "includeTokens"},
     { "getaddressmempool", 1, "includeTokens"},
+    { "gettokentransactions", 1, "count"},
+    { "gettokentransactions", 2, "skip"},
     { "bumpfee", 1, "options" },
     { "logging", 0, "include" },
     { "logging", 1, "exclude" },

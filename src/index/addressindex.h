@@ -354,7 +354,28 @@ struct CAddressListEntry {
         balance = 0;
     }
 
-    bool IsNull(){ return hashBytes.IsNull(); }
+    bool IsNull() {
+        return hashBytes.IsNull();
+    }
+};
+
+struct CAddressTransactionsEntry {
+    int blockHeight;
+    uint256 txhash;
+
+    CAddressTransactionsEntry(int height, uint256 hash) {
+        blockHeight = height;
+        txhash = hash;
+    }
+
+    CAddressTransactionsEntry() {
+        SetNull();
+    }
+
+    void SetNull() {
+        blockHeight = 0;
+        txhash.SetNull();
+    }
 };
 
 struct CMempoolAddressDelta

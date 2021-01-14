@@ -411,23 +411,22 @@ bool CBlockTreeDB::ReadAddresses(std::vector<CAddressListEntry> &addressList, bo
     while (pcursor->Valid()) {
         boost::this_thread::interruption_point();
         std::pair<char,CAddressIndexKey> key;
-        if (pcursor->GetKey(key)){
-
-            if( currentKey.IsNull() ){
+        if (pcursor->GetKey(key)) {
+            if (currentKey.IsNull())
                 currentKey = key.second;
-            }
 
-            if( key.first != DB_ADDRESSINDEX)
+            if (key.first != DB_ADDRESSINDEX)
                 break;
 
-            if( key.second.hashBytes != currentKey.hashBytes ) {
+            if (key.second.hashBytes != currentKey.hashBytes) {
 
-                if( !excludeZeroBalances || (excludeZeroBalances && currentBalance ))
+                if (!excludeZeroBalances || (excludeZeroBalances && currentBalance)) {
                     // Save the address info
                     addressList.push_back(CAddressListEntry(currentKey.type,
                                                             currentKey.hashBytes,
                                                             currentReceived,
                                                             currentBalance));
+                }
 
                 // And move on with the next one
                 currentReceived = 0;
@@ -438,8 +437,9 @@ bool CBlockTreeDB::ReadAddresses(std::vector<CAddressListEntry> &addressList, bo
             CAmount nValue;
             if (pcursor->GetValue(nValue)) {
                 currentBalance += nValue;
-                if( nValue > 0)
+                if (nValue > 0) {
                     currentReceived += nValue;
+                }
 
                 pcursor->Next();
             } else {
@@ -450,12 +450,55 @@ bool CBlockTreeDB::ReadAddresses(std::vector<CAddressListEntry> &addressList, bo
         }
     }
 
-    if( !excludeZeroBalances || (excludeZeroBalances && currentBalance ))
-        // Store the last one..
+    if (!excludeZeroBalances || (excludeZeroBalances && currentBalance)) {
+        // Store the last one
         addressList.push_back(CAddressListEntry(currentKey.type,
                                                 currentKey.hashBytes,
                                                 currentReceived,
                                                 currentBalance));
+    }
+
+    return true;
+}
+
+bool CBlockTreeDB::ReadTokenTransactions(std::vector<CAddressTransactionsEntry> &transactionsList, std::string tokenName) {
+
+    boost::scoped_ptr<CDBIterator> pcursor(NewIterator());
+
+    pcursor->Seek(DB_ADDRESSINDEX);
+
+    CAddressIndexKey currentKey = CAddressIndexKey();
+
+    while (pcursor->Valid()) {
+        boost::this_thread::interruption_point();
+        std::pair<char,CAddressIndexKey> key;
+        if (pcursor->GetKey(key)) {
+            if (currentKey.IsNull())
+                currentKey = key.second;
+
+            if (key.first != DB_ADDRESSINDEX)
+                break;
+
+            if (key.second.hashBytes != currentKey.hashBytes) {
+                if (currentKey.token == tokenName) {
+                    transactionsList.push_back(CAddressTransactionsEntry(currentKey.blockHeight,
+                                                                         currentKey.txhash));
+                }
+
+                currentKey = key.second;
+            }
+
+            pcursor->Next();
+        } else {
+            break;
+        }
+    }
+
+    // Store the last one
+    if (currentKey.token == tokenName) {
+        transactionsList.push_back(CAddressTransactionsEntry(currentKey.blockHeight,
+                                                             currentKey.txhash));
+    }
 
     return true;
 }

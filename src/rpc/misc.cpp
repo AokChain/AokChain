@@ -1224,8 +1224,7 @@ UniValue getaddresses(const JSONRPCRequest& request)
             "\nArguments:\n"
             "1. \"excludeZeroBalances\"  (bool, optional, default: true) If true, addresses with zero balance aren't included in the list. If false, they are.\n"
             "\nExamples:\n"
-            + HelpExampleCli("getaddressbalance", "true")
-            + HelpExampleRpc("getaddressbalance", "true")
+            + HelpExampleCli("getaddresses", "true")
         );
 
     bool fExcludeZeroBalances = request.params.size() == 1 ? request.params[0].get_bool() : true;
@@ -1262,6 +1261,82 @@ UniValue getaddresses(const JSONRPCRequest& request)
     return result;
 }
 
+UniValue gettokentransactions(const JSONRPCRequest& request)
+{
+    if (request.fHelp || request.params.size() < 1 || request.params.size() > 3)
+        throw std::runtime_error(
+            "gettokentransactions \"token\" \n"
+            "\nPrint a list of all token transactions.\n"
+            "\nArguments:\n"
+            "1. \"token\"  (str, required) Token name.\n"
+            "\nExamples:\n"
+            + HelpExampleCli("gettokentransactions", "TOKEN")
+        );
+
+    std::string tokenName = request.params[0].get_str();
+    std::vector<CAddressTransactionsEntry> transactionsList;
+
+    int nCount = 100;
+    if (!request.params[1].isNull())
+        nCount = request.params[1].get_int();
+
+    int nFrom = 0;
+    if (!request.params[2].isNull())
+        nFrom = request.params[2].get_int();
+
+    if (nCount < 0)
+        throw JSONRPCError(RPC_INVALID_PARAMETER, "Negative count");
+
+    if (nFrom < 0)
+        throw JSONRPCError(RPC_INVALID_PARAMETER, "Negative from");
+
+    if (!GetTokenTransactions(transactionsList, tokenName)) {
+        throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Failed to load the address list.");
+    }
+
+    std::sort(transactionsList.begin(), transactionsList.end(),
+        [](const CAddressTransactionsEntry & a, const CAddressTransactionsEntry & b) -> bool
+    {
+        return a.blockHeight > b.blockHeight;
+    });
+
+    UniValue result(UniValue::VARR);
+
+    for (std::vector<CAddressTransactionsEntry>::const_iterator it=transactionsList.begin(); it!=transactionsList.end(); it++) {
+
+        UniValue entry(UniValue::VOBJ);
+
+        entry.push_back(Pair("height", it->blockHeight));
+        entry.push_back(Pair("txhash", it->txhash.GetHex()));
+
+        result.push_back(entry);
+
+        if ((int)result.size() >= (nCount + nFrom)) break;
+    }
+
+    if (nFrom > (int)result.size())
+        nFrom = result.size();
+
+    if ((nFrom + nCount) > (int)result.size())
+        nCount = result.size() - nFrom;
+
+    std::vector<UniValue> arrTmp = result.getValues();
+
+    std::vector<UniValue>::iterator first = arrTmp.begin();
+    std::advance(first, nFrom);
+    std::vector<UniValue>::iterator last = arrTmp.begin();
+    std::advance(last, nFrom+nCount);
+
+    if (last != arrTmp.end()) arrTmp.erase(last, arrTmp.end());
+    if (first != arrTmp.begin()) arrTmp.erase(arrTmp.begin(), first);
+
+    result.clear();
+    result.setArray();
+    result.push_backV(arrTmp);
+
+    return result;
+}
+
 static const CRPCCommand commands[] =
 { //  category              name                      actor (function)         argNames
   //  --------------------- ------------------------  -----------------------  ----------
@@ -1278,6 +1353,7 @@ static const CRPCCommand commands[] =
     { "addressindex",       "getaddresstxids",        &getaddresstxids,        {"addresses","includeTokens"} },
     { "addressindex",       "getaddressbalance",      &getaddressbalance,      {"addresses","includeTokens"} },
     { "addressindex",       "getaddresses",           &getaddresses,           {"excludeZeroBalances"} },
+    { "addressindex",       "gettokentransactions",   &gettokentransactions,   {"tokenName", "count", "skip"} },
 
     /* Blockchain */
     { "blockchain",         "getspentinfo",           &getspentinfo,           {} },

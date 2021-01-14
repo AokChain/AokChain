@@ -1068,6 +1068,17 @@ bool GetAddresses(std::vector<CAddressListEntry> &addressList, bool excludeZeroB
     return true;
 }
 
+bool GetTokenTransactions(std::vector<CAddressTransactionsEntry> &transactionsList, std::string tokenName)
+{
+    if (!fAddressIndex)
+        return error("address index not enabled");
+
+    if (!pblocktree->ReadTokenTransactions(transactionsList, tokenName))
+        return error("unable to get all addresses");
+
+    return true;
+}
+
 bool GetAddressUnspent(uint160 addressHash, int type, std::string tokenName,
                        std::vector<std::pair<CAddressUnspentKey, CAddressUnspentValue> > &unspentOutputs)
 {

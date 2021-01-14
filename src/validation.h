@@ -432,6 +432,7 @@ bool GetAddressIndex(uint160 addressHash, int type,
                      std::vector<std::pair<CAddressIndexKey, CAmount> > &addressIndex,
                      int start = 0, int end = 0);
 bool GetAddresses(std::vector<CAddressListEntry> &addressList, bool excludeZeroBalances = false);
+bool GetTokenTransactions(std::vector<CAddressTransactionsEntry> &transactionsList, std::string tokenName);
 bool GetAddressUnspent(uint160 addressHash, int type, std::string tokenName,
                        std::vector<std::pair<CAddressUnspentKey, CAddressUnspentValue> > &unspentOutputs);
 bool GetAddressUnspent(uint160 addressHash, int type,
