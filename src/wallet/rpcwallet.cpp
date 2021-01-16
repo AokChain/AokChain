@@ -1664,6 +1664,11 @@ void ListTransactions(CWallet* const pwallet, const CWalletTx& wtx, const std::s
                 entry.pushKV("vout", r.vout);
                 if (fLong)
                     WalletTxToJSON(wtx, entry);
+
+                if (r.nLockTime > 0) {
+                    entry.pushKV("locktime", (int64_t)r.nLockTime);
+                }
+
                 ret.push_back(entry);
             }
         }
@@ -1712,6 +1717,10 @@ void ListTransactions(CWallet* const pwallet, const CWalletTx& wtx, const std::s
 
                     entry.pushKV("time", wtx.GetTxTime());
                     entry.pushKV("timereceived", (int64_t)wtx.nTimeReceived);
+
+                    if (data.nTokenLockTime > 0) {
+                        entry.pushKV("locktime", (int64_t)data.nTokenLockTime);
+                    }
 
                     retTokens.push_back(entry);
                 }

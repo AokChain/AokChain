@@ -230,7 +230,7 @@ isminetype IsMine(const CKeyStore &keystore, const CScript& scriptPubKey, CBlock
     return ISMINE_NO;
 }
 
-bool IsTimeLock(const CKeyStore &keystore, const CScript& scriptPubKey, CScriptNum& nFreezeLockTime)
+bool IsTimeLock(const CKeyStore &keystore, const CScript& scriptPubKey, CScriptNum& nLockTime)
 {
     std::vector<valtype> vSolutions;
     txnouttype whichType;
@@ -247,7 +247,23 @@ bool IsTimeLock(const CKeyStore &keystore, const CScript& scriptPubKey, CScriptN
         if (whichType == TX_CLTV)
         {
             CScriptNum sn(vSolutions[0], true, 5);
-            nFreezeLockTime = sn.getint64();
+            nLockTime = sn.getint64();
+            return true;
+        }
+    }
+    return false;
+}
+
+bool IsTimeLock(const CScript& scriptPubKey, CScriptNum& nLockTime)
+{
+    std::vector<valtype> vSolutions;
+    txnouttype whichType;
+    if (Solver(scriptPubKey, whichType, vSolutions))
+    {
+        if (whichType == TX_CLTV)
+        {
+            CScriptNum sn(vSolutions[0], true, 5);
+            nLockTime = sn.getint64();
             return true;
         }
     }

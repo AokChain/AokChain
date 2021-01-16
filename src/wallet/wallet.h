@@ -192,6 +192,7 @@ static inline void WriteOrderPos(const int64_t& nOrderPos, mapValue_t& mapValue)
 
 struct COutputEntry
 {
+    uint32_t nLockTime;
     CTxDestination destination;
     CAmount amount;
     int vout;

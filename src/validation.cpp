@@ -1792,9 +1792,7 @@ static DisconnectResult DisconnectBlock(const CBlock& block, const CBlockIndex* 
                     addressUnspentIndex.push_back(std::make_pair(CAddressUnspentKey(1, uint160(hashBytes), hash, k), CAddressUnspentValue()));
 
                 } else if (out.scriptPubKey.IsPayToPublicKeyHashLocked()) {
-
-                    std::vector<std::string> result = ScriptToAsmVector(out.scriptPubKey);
-                    int timeLock = std::stoi(result[0]);
+                    int timeLock = out.GetLockTime();
 
                     int offset = out.scriptPubKey.size() - 25;
                     std::vector<unsigned char> hashBytes(out.scriptPubKey.begin() + (3 + offset), out.scriptPubKey.begin() + (23 + offset));
@@ -1996,8 +1994,7 @@ static DisconnectResult DisconnectBlock(const CBlock& block, const CBlockIndex* 
                         addressUnspentIndex.push_back(std::make_pair(CAddressUnspentKey(1, uint160(hashBytes), input.prevout.hash, input.prevout.n), CAddressUnspentValue(prevout.nValue, prevout.scriptPubKey, undo.nHeight, tx.nTime)));
 
                     } else if (prevout.scriptPubKey.IsPayToPublicKeyHashLocked()) {
-                        std::vector<std::string> result = ScriptToAsmVector(prevout.scriptPubKey);
-                        int timeLock = std::stoi(result[0]);
+                        int timeLock = prevout.GetLockTime();
 
                         int offset = prevout.scriptPubKey.size() - 25;
 
@@ -2382,8 +2379,7 @@ static bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockInd
                         hashBytes = uint160(std::vector <unsigned char>(prevout.scriptPubKey.begin()+3, prevout.scriptPubKey.begin()+23));
                         addressType = 1;
                     } else if (prevout.scriptPubKey.IsPayToPublicKeyHashLocked()) {
-                        std::vector<std::string> result = ScriptToAsmVector(prevout.scriptPubKey);
-                        timeLock = std::stoi(result[0]);
+                        timeLock = prevout.GetLockTime();
                         int offset = prevout.scriptPubKey.size() - 25;
                         hashBytes = uint160(std::vector <unsigned char>(prevout.scriptPubKey.begin() + (3 + offset), prevout.scriptPubKey.begin() + (23 + offset)));
                         addressType = 1;
@@ -2549,9 +2545,8 @@ static bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockInd
                     addressUnspentIndex.push_back(std::make_pair(CAddressUnspentKey(1, uint160(hashBytes), txhash, k), CAddressUnspentValue(out.nValue, out.scriptPubKey, pindex->nHeight, tx.nTime)));
 
                 } else if (out.scriptPubKey.IsPayToPublicKeyHashLocked()) {
-                    std::vector<std::string> result = ScriptToAsmVector(out.scriptPubKey);
                     int offset = out.scriptPubKey.size() - 25;
-                    int timeLock = std::stoi(result[0]);
+                    int timeLock = out.GetLockTime();
 
                     std::vector<unsigned char> hashBytes(out.scriptPubKey.begin() + (3 + offset), out.scriptPubKey.begin() + (23 + offset));
 
