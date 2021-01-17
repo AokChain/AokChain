@@ -972,14 +972,14 @@ UniValue transfer(const JSONRPCRequest& request)
 
 UniValue transfermany(const JSONRPCRequest& request)
 {
-    if (request.fHelp || request.params.size() < 2 || request.params.size() > 8)
+    if (request.fHelp || request.params.size() != 2)
         throw std::runtime_error(
             "transfermany \"token_name\" {\"address\":amount,...}\n"
             "\nSend multiple times. Amounts are double-precision floating point numbers."
             + TokenActivationWarning() +
             "\nArguments:\n"
             "1. \"token_name\"          (string, required) name of token\n"
-            "2. \"amounts\"             (string, required) A json object with addresses and amounts\n"
+            "2. \"amounts\"             (object, required) A json object with addresses and amounts\n"
             "    {\n"
             "      \"address\":amount   (numeric or string) The aokchain address is the key, the numeric amount (can be string) in " + CURRENCY_UNIT + " is the value\n"
             "      ,...\n"
@@ -1033,6 +1033,103 @@ UniValue transfermany(const JSONRPCRequest& request)
             throw JSONRPCError(RPC_TYPE_ERROR, "Invalid amount for send");
 
         vTransfers.emplace_back(std::make_pair(CTokenTransfer(token_name, nAmount, token_lock_time), address));
+    }
+
+    CReserveKey reservekey(pwallet);
+    CWalletTx transaction;
+    CAmount nRequiredFee;
+
+    CCoinControl ctrl;
+
+    // Create the Transaction
+    if (!CreateTransferTokenTransaction(pwallet, ctrl, vTransfers, "", error, transaction, reservekey, nRequiredFee))
+        throw JSONRPCError(error.first, error.second);
+
+    // Send the Transaction to the network
+    std::string txid;
+    if (!SendTokenTransaction(pwallet, transaction, reservekey, error, txid))
+        throw JSONRPCError(error.first, error.second);
+
+    return transaction.GetHash().GetHex();
+}
+
+UniValue transfermanyoutputs(const JSONRPCRequest& request)
+{
+    if (request.fHelp || request.params.size() != 1)
+        throw std::runtime_error(
+            "transfermanyoutputs [{\"address\":\"Kb9ma4bw6aRcB6CrbE67VPzGH8VUyafTrh\",...}]\n"
+            "\nSend transaction with multiple outputs."
+            + TokenActivationWarning() +
+            "\nArguments:\n"
+            "1. \"outputs\"             (array, required) name of token\n"
+            "\nResult:\n"
+            "\"txid\"                   (string) The transaction id for the send. Only 1 transaction is created regardless of \n"
+            "                                    the number of addresses.\n"
+            "\nExamples:\n"
+            "\nSend two amounts to two different addresses:\n"
+            + HelpExampleCli("transfermanyoutputs", "[{\"address\":\"Kb9ma4bw6aRcB6CrbE67VPzGH8VUyafTrh\",...}]")
+        );
+
+    CWallet * const pwallet = GetWalletForJSONRPCRequest(request);
+    if (!EnsureWalletIsAvailable(pwallet, request.fHelp)) {
+        return NullUniValue;
+    }
+
+    ObserveSafeMode();
+    LOCK2(cs_main, pwallet->cs_wallet);
+
+    EnsureWalletIsUnlocked(pwallet);
+
+    if (pwallet->GetBroadcastTransactions() && !g_connman) {
+        throw JSONRPCError(RPC_CLIENT_P2P_DISABLED, "Error: Peer-to-peer functionality missing or disabled");
+    }
+
+    UniValue inputs = request.params[0].get_array();
+
+    std::pair<int, std::string> error;
+    std::vector<std::pair<CTokenTransfer, std::string> >vTransfers;
+
+    for (unsigned int i = 0; i < inputs.size(); i++)
+    {
+        UniValue sendTo = inputs[i].get_obj();
+
+        if (!sendTo.exists("address"))
+            throw JSONRPCError(RPC_INVALID_PARAMETER, "Missing address field");
+
+        if (!sendTo.exists("token_name"))
+            throw JSONRPCError(RPC_INVALID_PARAMETER, "Missing token name field");
+
+        if (!sendTo.exists("amount"))
+            throw JSONRPCError(RPC_INVALID_PARAMETER, "Missing amount field");
+
+        if (!sendTo.exists("locktime"))
+            throw JSONRPCError(RPC_INVALID_PARAMETER, "Missing locktime field");
+
+        const UniValue& address_field = find_value(sendTo, "address");
+        if (!address_field.isStr())
+            throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid address");
+
+        std::string address = address_field.get_str();
+        CTxDestination dest = DecodeDestination(address);
+
+        if (!IsValidDestination(dest))
+            throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, std::string("Invalid AokChain address: ") + address);
+
+        CAmount nAmount = AmountFromValue(find_value(sendTo, "amount"));
+        if (nAmount <= 0)
+            throw JSONRPCError(RPC_TYPE_ERROR, "Invalid amount for send");
+
+        const UniValue& token_name_field = find_value(sendTo, "token_name");
+        if (!token_name_field.isStr())
+            throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid address");
+
+        std::string token_name = token_name_field.get_str();
+
+        int locktime = find_value(sendTo, "locktime").get_int();
+        if (locktime < 0)
+            throw JSONRPCError(RPC_DESERIALIZATION_ERROR, "locktime time must be greater or equal to 0.");
+
+        vTransfers.emplace_back(std::make_pair(CTokenTransfer(token_name, nAmount, locktime), address));
     }
 
     CReserveKey reservekey(pwallet);
@@ -1396,6 +1493,7 @@ static const CRPCCommand commands[] =
     { "tokens",   "listaddressesbytoken",       &listaddressesbytoken,       {"token_name", "onlytotal", "count", "start"}},
     { "tokens",   "transfer",                   &transfer,                   {"token_name", "qty", "to_address", "token_lock_time"}},
     { "tokens",   "transfermany",               &transfermany,               {"token_name", "amounts"}},
+    { "tokens",   "transfermanyoutputs",        &transfermanyoutputs,        {"outputs"}},
     { "tokens",   "transferfromaddress",        &transferfromaddress,        {"address", "token_name", "qty", "to_address", "token_lock_time"}},
     { "tokens",   "reissue",                    &reissue,                    {"token_name", "qty", "to_address", "change_address", "reissuable", "new_unit"}},
     { "tokens",   "listtokens",                 &listtokens,                 {"token", "verbose", "count", "start"}},
