@@ -103,7 +103,7 @@ bool CheckFirstCoinstakeOutput(const CBlock& block){
 
 #ifdef ENABLE_WALLET
 // novacoin: attempt to generate suitable proof-of-stake
-bool SignBlock(std::shared_ptr<CBlock> pblock, CWallet& wallet, const CAmount& nTotalFees)
+bool SignBlock(std::shared_ptr<CBlock> pblock, CWallet& wallet, const CAmount& nTotalFees, const CBlockIndex* pindexPrev)
 {
     // if we are trying to sign
     //    something except proof-of-stake block template
@@ -121,7 +121,7 @@ bool SignBlock(std::shared_ptr<CBlock> pblock, CWallet& wallet, const CAmount& n
 
     if (wallet.CreateCoinStake(wallet, pblock->nBits, nTotalFees, pblock->nTime, txCoinStake, key))
     {
-        if (txCoinStake.nTime >= chainActive.Tip()->GetMedianTimePast()+1)
+        if (txCoinStake.nTime >= pindexPrev->GetMedianTimePast() + 1)
         {
             // make sure coinstake would meet timestamp protocol
             //    as it would be the same as the block timestamp
@@ -130,7 +130,8 @@ bool SignBlock(std::shared_ptr<CBlock> pblock, CWallet& wallet, const CAmount& n
             pblock->hashMerkleRoot = BlockMerkleRoot(*pblock);
 
             // Check timestamp against prev
-            if(pblock->GetBlockTime() <= chainActive.Tip()->GetBlockTime() || FutureDrift(pblock->GetBlockTime()) < chainActive.Tip()->GetBlockTime())
+            if (pblock->GetBlockTime() <= pindexPrev->GetBlockTime() ||
+                FutureDrift(pblock->GetBlockTime()) < pindexPrev->GetBlockTime())
             {
                 return false;
             }
@@ -595,8 +596,6 @@ std::unique_ptr<CBlockTemplate> BlockAssembler::CreateNewBlock(const CScript& sc
     pblocktemplate->vchCoinbaseCommitment = GenerateCoinbaseCommitment(*pblock, pindexPrev, chainparams.GetConsensus(), fProofOfStake);
     pblocktemplate->vTxFees[0] = -nFees;
 
-    LogPrintf("CreateNewBlock(): block weight: %u txs: %u fees: %ld sigops %d\n", GetBlockWeight(*pblock), nBlockTx, nFees, nBlockSigOpsCost);
-
     if (pTotalFees)
         *pTotalFees = nFees;
 
@@ -630,7 +629,7 @@ void ThreadStakeMiner(CWallet *pwallet)
     SetThreadPriority(THREAD_PRIORITY_LOWEST);
 
     // Make this thread recognisable as the mining thread
-    std::string threadName = "alphacon-stake";
+    std::string threadName = "aok-stake";
     if(pwallet && pwallet->GetName() != "")
     {
         threadName = threadName + "-" + pwallet->GetName();
@@ -677,14 +676,10 @@ void ThreadStakeMiner(CWallet *pwallet)
 
             // Try to sign a block (this also checks for a PoS stake)
             std::shared_ptr<CBlock> pblock = std::make_shared<CBlock>(pblocktemplate->block);
-            if (SignBlock(pblock, *pwallet, nTotalFees)) {
-                LogPrintf("Successfully signed block, now trying to check it: %s", pblock->GetBlockHash().ToString());
+            if (SignBlock(pblock, *pwallet, nTotalFees, pindexPrev)) {
+                SetThreadPriority(THREAD_PRIORITY_NORMAL);
 
-                // Another block was received while building ours, scrap progress
-                if (chainActive.Tip()->GetBlockHash() != pblock->hashPrevBlock) {
-                    LogPrintf("ThreadStakeMiner(): Valid future PoS block was orphaned before becoming valid");
-                    continue;
-                }
+                LogPrintf("Successfully signed block, now trying to check it: %s", pblock->GetBlockHash().ToString());
 
                 // Check timestamps
                 if (pblock->GetBlockTime() <= pindexPrev->GetBlockTime() ||
@@ -694,7 +689,9 @@ void ThreadStakeMiner(CWallet *pwallet)
                 }
 
                 CheckStake(pblock, *pwallet);
-                // Update the search time when new valid block is created, needed for status bar icon
+
+                SetThreadPriority(THREAD_PRIORITY_LOWEST);
+                MilliSleep(500);
             } else {
                 // Wait till next stake
                 MilliSleep(nMinerSleep);

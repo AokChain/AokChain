@@ -45,7 +45,7 @@ static const int32_t BYTECODE_TIME_BUFFER = 6;
 static const int32_t STAKE_TIME_BUFFER = 2;
 
 // How often to try to stake blocks in milliseconds
-static const int32_t STAKER_POLLING_PERIOD = 500;
+static const int32_t STAKER_POLLING_PERIOD = 1000;
 
 struct CBlockTemplate
 {
@@ -236,7 +236,7 @@ void StakeCoins(bool fStake, CWallet *pwallet, boost::thread_group*& stakeThread
 /** Modify the extranonce in a block */
 void IncrementExtraNonce(CBlock* pblock, const CBlockIndex* pindexPrev, unsigned int& nExtraNonce);
 int64_t UpdateTime(CBlockHeader* pblock, const Consensus::Params& consensusParams, const CBlockIndex* pindexPrev);
-bool SignBlock(std::shared_ptr<CBlock> pblock, CWallet& wallet, const CAmount& nTotalFees);
+bool SignBlock(std::shared_ptr<CBlock> pblock, CWallet& wallet, const CAmount& nTotalFees, const CBlockIndex* pindexPrev);
 
 bool CheckFirstCoinstakeOutput(const CBlock& block);
 

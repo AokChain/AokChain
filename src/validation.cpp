@@ -3876,9 +3876,10 @@ bool CheckBlock(const CBlock& block, CValidationState& state, const uint256& has
                              REJECT_INVALID, "bad-cb-not-empty");
 
         // Second transaction must be coinstake, the rest must not be
-        if (block.vtx.size() < 2 || !block.vtx[1]->IsCoinStake())
+        if (block.vtx.empty() || block.vtx.size() < 2 || !block.vtx[1]->IsCoinStake())
             return state.DoS(100, error("CheckBlock(): second tx is not coinstake"),
                              REJECT_INVALID, "bad-cs-missing");
+
         for (unsigned int i = 2; i < block.vtx.size(); i++)
             if (block.vtx[i]->IsCoinStake())
                 return state.DoS(100, error("CheckBlock(): more than one coinstake"),
@@ -3989,19 +3990,14 @@ static bool ContextualCheckBlockHeader(const CBlock& block, CValidationState& st
     assert(pindexPrev != nullptr);
     const int nHeight = pindexPrev->nHeight + 1;
 
-    //If this is a reorg, check that it is not too deep
     int nMaxReorgDepth = gArgs.GetArg("-maxreorg", Params().MaxReorganizationDepth());
-    int nMinReorgPeers = gArgs.GetArg("-minreorgpeers", Params().MinReorganizationPeers());
-    int nMinReorgAge = gArgs.GetArg("-minreorgage", Params().MinReorganizationAge());
     bool fGreaterThanMaxReorg = chainActive.Height() - (nHeight - 1) >= nMaxReorgDepth;
-    if (fGreaterThanMaxReorg && g_connman) {
-        int nCurrentNodeCount = g_connman->GetNodeCount(CConnman::CONNECTIONS_ALL);
-        bool bIsCurrentChainCaughtUp = (GetTime() - pindexPrev->nTime) <= nMinReorgAge;
-        if ((nCurrentNodeCount >= nMinReorgPeers) && bIsCurrentChainCaughtUp)
-            return state.DoS(1,
-                             error("%s: forked chain older than max reorganization depth (height %d), with connections (count %d), and caught up with active chain (%s)",
-                                   __func__, nHeight, nCurrentNodeCount, bIsCurrentChainCaughtUp ? "true" : "false"),
-                             REJECT_MAXREORGDEPTH, "bad-fork-prior-to-maxreorgdepth");
+
+    if (fGreaterThanMaxReorg) {
+        return state.DoS(1,
+            error("%s: forked chain older than max reorganization depth (height %d)",__func__, nHeight),
+            REJECT_MAXREORGDEPTH, "bad-fork-prior-to-maxreorgdepth"
+        );
     }
 
     if (hash == params.GetConsensus().hashGenesisBlock)

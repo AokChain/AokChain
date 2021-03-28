@@ -227,9 +227,7 @@ public:
         // Fee Addresse
         strTokenFeeAddress = "KdZFAFeKV8C5JzdEdgcPYDZku92KkD3fHy";
 
-        nMaxReorganizationDepth = 90; // 90 at 1 minute block timespan is +/- 90 minutes.
-        nMinReorganizationPeers = 2;
-        nMinReorganizationAge = 60 * 60 * 12; // 12 hours
+        nMaxReorganizationDepth = 500; // Around 8 hours
         /** TOKENS END **/
     }
 };
@@ -324,8 +322,6 @@ public:
         strTokenFeeAddress = "TjJYEpVi1HuFrMGrhNjQSHLvP9fbNk2yng";
 
         nMaxReorganizationDepth = 60; // 60 at 1 minute block timespan is +/- 60 minutes.
-        nMinReorganizationPeers = 4;
-        nMinReorganizationAge = 60 * 60 * 12; // 12 hours
         /** TOKENS END **/
     }
 };
@@ -344,6 +340,7 @@ public:
         consensus.nSegwitEnabled = true;
         consensus.nCSVEnabled = true;
         consensus.powLimit = uint256S("7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff");
+        consensus.posLimit = uint256S("7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff");
         consensus.nTargetTimespan = 2016 * 60; // 1.4 days
         consensus.nTargetSpacing = 1 * 60;
         consensus.nRuleChangeActivationThreshold = 108; // 75% for testchains
@@ -405,8 +402,6 @@ public:
         nFeeAmountSecondary = 1 * COIN;
 
         nMaxReorganizationDepth = 60; // 60 at 1 minute block timespan is +/- 60 minutes.
-        nMinReorganizationPeers = 4;
-        nMinReorganizationAge = 60 * 60 * 12; // 12 hours
         /** TOKENS END **/
     }
 };

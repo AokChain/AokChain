@@ -100,8 +100,6 @@ public:
     const std::string& IssueUniqueTokenBurnAddress() const { return strTokenFeeAddress; }
 
     int MaxReorganizationDepth() const { return nMaxReorganizationDepth; }
-    int MinReorganizationPeers() const { return nMinReorganizationPeers; }
-    int MinReorganizationAge() const { return nMinReorganizationAge; }
     /** TOKENS END **/
 
 protected:
@@ -132,8 +130,6 @@ protected:
     std::string strTokenFeeAddress;
 
     int nMaxReorganizationDepth;
-    int nMinReorganizationPeers;
-    int nMinReorganizationAge;
     /** TOKENS END **/
 };
 
