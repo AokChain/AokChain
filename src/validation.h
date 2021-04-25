@@ -546,6 +546,7 @@ bool LoadMempool();
 
 /** TOKENS START */
 bool AreTokensDeployed();
+bool AreTokensP2SHDeployed();
 
 CTokensCache* GetCurrentTokenCache();
 /** TOKENS END */

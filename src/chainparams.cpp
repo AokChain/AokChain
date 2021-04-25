@@ -171,6 +171,7 @@ public:
         consensus.nLastPOWBlock = 1440;
         consensus.nStakeTimestampMask = 0xf; // 15
         consensus.nTokensDeploymentHeight = 159500;
+        consensus.nTokensP2SHDeploymentHeight = 99999999;
 
         /**
          * The message start string is designed to be unlikely to occur in normal data.
@@ -268,6 +269,7 @@ public:
         consensus.nLastPOWBlock = 1440 * 10;
         consensus.nStakeTimestampMask = 0xf; // 15
         consensus.nTokensDeploymentHeight = 10;
+        consensus.nTokensP2SHDeploymentHeight = 99999999;
 
         /**
          * The message start string is designed to be unlikely to occur in normal data.

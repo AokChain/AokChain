@@ -2337,6 +2337,14 @@ static bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockInd
                         return state.DoS(100, error("%s : Received Block with tx that contained an token when tokens wasn't active", __func__), REJECT_INVALID, "bad-txns-tokens-not-active");
             }
 
+            // ToDo: Add username validation here
+            if (!AreTokensP2SHDeployed()) {
+                for (auto out : tx.vout)
+                    if (IsScriptNewUsername(out.scriptPubKey)) {
+                        return state.DoS(100, error("%s : Received Block with tx that contained an username token when usernames wasn't active", __func__), REJECT_INVALID, "bad-txns-userames-not-active");
+                    }
+            }
+
             if (AreTokensDeployed()) {
                 std::vector<std::pair<std::string, uint256>> vReissueTokens;
                 if (!Consensus::CheckTxTokens(tx, state, view, pindex->nHeight, pindex->nTime, vReissueTokens)) {
@@ -4031,7 +4039,6 @@ static bool ContextualCheckBlockHeader(const CBlock& block, CValidationState& st
                          REJECT_INVALID, "bad-pos-time");
 
     // Reject outdated veresion blocks onces tokens are active.
-    // ToDo: Test this!!!
     if (AreTokensDeployed() && block.nVersion < VERSIONBITS_TOP_BITS_TOKENS) {
         return state.Invalid(false, REJECT_OBSOLETE, strprintf("bad-version(0x%08x)", block.nVersion), strprintf("rejected nVersion=0x%08x block", block.nVersion));
     }
@@ -5617,6 +5624,15 @@ double GuessVerificationProgress(const ChainTxData& data, CBlockIndex *pindex) {
 bool AreTokensDeployed() {
     const int nHeight = chainActive.Height() + 1;
     if (nHeight >= Params().GetConsensus().nTokensDeploymentHeight) {
+        return true;
+    } else {
+        return false;
+    }
+}
+
+bool AreTokensP2SHDeployed() {
+    const int nHeight = chainActive.Height() + 1;
+    if (nHeight >= Params().GetConsensus().nTokensP2SHDeploymentHeight) {
         return true;
     } else {
         return false;
