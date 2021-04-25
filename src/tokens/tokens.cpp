@@ -40,7 +40,7 @@ static const auto MAX_NAME_LENGTH = 31;
 static const std::regex ROOT_NAME_CHARACTERS("^[A-Z0-9._]{3,}$");
 static const std::regex SUB_NAME_CHARACTERS("^[A-Z0-9._]+$");
 static const std::regex UNIQUE_TAG_CHARACTERS("^[-A-Za-z0-9@$%&*()[\\]{}_.?:]+$");
-static const std::regex USERNAME_CHARACTERS("^@[A-Z0-9._]{3,}$");
+static const std::regex USERNAME_CHARACTERS("^@[A-Z0-9._]{4,}$");
 
 static const std::regex DOUBLE_PUNCTUATION("^.*[._]{2,}.*$");
 static const std::regex LEADING_PUNCTUATION("^[._].*$");
@@ -50,6 +50,7 @@ static const std::string SUB_NAME_DELIMITER = "/";
 static const std::string UNIQUE_TAG_DELIMITER = "#";
 
 static const std::regex UNIQUE_INDICATOR(R"(^[^^~#!]+#[^~#!\/]+$)");
+static const std::regex USERNAME_INDICATOR(R"(^@[A-Z0-9._]{4,}$)");
 static const std::regex OWNER_INDICATOR(R"(^[^^~#!]+!$)");
 
 static const std::regex PROTECTED_NAMES("^AOK$|^AOKCHAIN$|^AOKCOIN$|^AOKHACOIN$|^AOKHACHAIN$");
@@ -74,6 +75,11 @@ bool IsSubNameValid(const std::string& name)
 bool IsUniqueTagValid(const std::string& tag)
 {
     return std::regex_match(tag, UNIQUE_TAG_CHARACTERS);
+}
+
+bool IsUsernameValid(const std::string& tag)
+{
+    return std::regex_match(tag, USERNAME_CHARACTERS);
 }
 
 bool IsNameValidBeforeTag(const std::string& name)
@@ -123,6 +129,14 @@ bool IsTokenNameValid(const std::string& name, KnownTokenType& tokenType, std::s
 
         return ret;
     }
+    else if (std::regex_match(name, USERNAME_INDICATOR))
+    {
+        bool ret = IsTypeCheckNameValid(KnownTokenType::USERNAME, name, error);
+        if (ret)
+            tokenType = KnownTokenType::USERNAME;
+
+        return ret;
+    }
     else
     {
         auto type = IsTokenNameASubtoken(name) ? KnownTokenType::SUB : KnownTokenType::ROOT;
@@ -152,27 +166,71 @@ bool IsTokenNameAnOwner(const std::string& name)
     return IsTokenNameValid(name) && std::regex_match(name, OWNER_INDICATOR);
 }
 
-// TODO get the string translated below
 bool IsTypeCheckNameValid(const KnownTokenType type, const std::string& name, std::string& error)
 {
     if (type == KnownTokenType::UNIQUE) {
-        if (name.size() > MAX_NAME_LENGTH) { error = "Name is greater than max length of " + std::to_string(MAX_NAME_LENGTH); return false; }
+        if (name.size() > MAX_NAME_LENGTH) {
+            error = "Name is greater than max length of " + std::to_string(MAX_NAME_LENGTH);
+            return false;
+        }
+
         std::vector<std::string> parts;
         boost::split(parts, name, boost::is_any_of(UNIQUE_TAG_DELIMITER));
         bool valid = IsNameValidBeforeTag(parts.front()) && IsUniqueTagValid(parts.back());
-        if (!valid) { error = "Unique name contains invalid characters (Valid characters are: A-Z a-z 0-9 @ $ % & * ( ) [ ] { } _ . ? : -)";  return false; }
+        if (!valid) {
+            error = "Unique name contains invalid characters (Valid characters are: A-Z a-z 0-9 @ $ % & * ( ) [ ] { } _ . ? : -)";
+            return false;
+        }
+
         return true;
     } else if (type == KnownTokenType::OWNER) {
-        if (name.size() > MAX_NAME_LENGTH) { error = "Name is greater than max length of " + std::to_string(MAX_NAME_LENGTH); return false; }
+        if (name.size() > MAX_NAME_LENGTH) {
+            error = "Name is greater than max length of " + std::to_string(MAX_NAME_LENGTH);
+            return false;
+        }
+
         bool valid = IsNameValidBeforeTag(name.substr(0, name.size() - 1));
-        if (!valid) { error = "Owner name contains invalid characters (Valid characters are: A-Z 0-9 _ .) (special characters can't be the first or last characters)";  return false; }
+        if (!valid) {
+            error = "Owner name contains invalid characters (Valid characters are: A-Z 0-9 _ .) (special characters can't be the first or last characters)";
+            return false;
+        }
+
+        return true;
+    } else if (type == KnownTokenType::USERNAME) {
+        if (name.size() > MAX_NAME_LENGTH) {
+            error = "Name is greater than max length of " + std::to_string(MAX_NAME_LENGTH);
+            return false;
+        }
+
+        bool valid = IsUsernameValid(name);
+        if (!valid) {
+            error = "Username contains invalid characters (Valid characters are: A-Z 0-9 _ .) (special characters can't be the first or last characters)";
+            return false;
+        }
+
         return true;
     } else {
-        if (name.size() > MAX_NAME_LENGTH - 1) { error = "Name is greater than max length of " + std::to_string(MAX_NAME_LENGTH - 1); return false; }  //Tokens and sub-tokens need to leave one extra char for OWNER indicator
-        if (!IsTokenNameASubtoken(name) && name.size() < MIN_TOKEN_LENGTH) { error = "Name must be contain " + std::to_string(MIN_TOKEN_LENGTH) + " characters"; return false; }
+        if (name.size() > MAX_NAME_LENGTH - 1) {
+            error = "Name is greater than max length of " + std::to_string(MAX_NAME_LENGTH - 1);
+            return false;
+        }  //Tokens and sub-tokens need to leave one extra char for OWNER indicator
+
+        if (!IsTokenNameASubtoken(name) && name.size() < MIN_TOKEN_LENGTH) {
+            error = "Name must be contain " + std::to_string(MIN_TOKEN_LENGTH) + " characters";
+            return false;
+        }
+
         bool valid = IsNameValidBeforeTag(name);
-        if (!valid && IsTokenNameASubtoken(name) && name.size() < 3) { error = "Name must have at least 3 characters (Valid characters are: A-Z 0-9 _ .)";  return false; }
-        if (!valid) { error = "Name contains invalid characters (Valid characters are: A-Z 0-9 _ .) (special characters can't be the first or last characters)";  return false; }
+        if (!valid && IsTokenNameASubtoken(name) && name.size() < 3) {
+            error = "Name must have at least 3 characters (Valid characters are: A-Z 0-9 _ .)";
+            return false;
+        }
+
+        if (!valid) {
+            error = "Name contains invalid characters (Valid characters are: A-Z 0-9 _ .) (special characters can't be the first or last characters)";
+            return false;
+        }
+
         return true;
     }
 }
@@ -240,7 +298,7 @@ bool CNewToken::IsValid(std::string& strError, CTokensCache& tokenCache, bool fC
         return false;
     }
 
-    if (tokenType == KnownTokenType::UNIQUE) {
+    if (tokenType == KnownTokenType::UNIQUE || tokenType == KnownTokenType::USERNAME) {
         if (units != UNIQUE_TOKEN_UNITS) {
             strError = _("Invalid parameter: units must be ") + std::to_string(UNIQUE_TOKEN_UNITS / COIN);
             return false;
@@ -410,6 +468,18 @@ bool UniqueTokenFromTransaction(const CTransaction& tx, CNewToken& token, std::s
 {
     // Check to see if the transaction is an new token issue tx
     if (!tx.IsNewUniqueToken())
+        return false;
+
+    // Get the scriptPubKey from the last tx in vout
+    CScript scriptPubKey = tx.vout[tx.vout.size() - 1].scriptPubKey;
+
+    return TokenFromScript(scriptPubKey, token, strAddress);
+}
+
+bool UsernameFromTransaction(const CTransaction& tx, CNewToken& token, std::string& strAddress)
+{
+    // Check to see if the transaction is an new token issue tx
+    if (!tx.IsNewUsername())
         return false;
 
     // Get the scriptPubKey from the last tx in vout
@@ -666,6 +736,72 @@ bool CTransaction::VerifyNewToken(std::string& strError) const
         strError = "bad-txns-failed-issue-token-formatting-check";
         return false;
     }
+
+    return true;
+}
+
+bool CTransaction::VerifyNewUsername(std::string& strError) const
+{
+    // Issuing an username must contain at least 2 CTxOut(Yona Burn Tx, Any Number of other Outputs ..., New Token Tx)
+    if (vout.size() < 2) {
+        strError  = "bad-txns-issue-vout-size-to-small";
+        return false;
+    }
+
+    // Check for the tokens data CTxOut. This will always be the last output in the transaction
+    if (!CheckIssueDataTx(vout[vout.size() - 1])) {
+        strError  = "bad-txns-issue-data-not-found";
+        return false;
+    }
+
+    // Get the token type
+    CNewToken token;
+    std::string address;
+    if (!TokenFromScript(vout[vout.size() - 1].scriptPubKey, token, address)) {
+        strError = "bad-txns-issue-serialzation-failed";
+        return error("%s : Failed to get new token from transaction: %s", __func__, this->GetHash().GetHex());
+    }
+
+    KnownTokenType tokenType;
+    IsTokenNameValid(token.strName, tokenType);
+
+    // Check for the Burn CTxOut in one of the vouts ( This is needed because the change CTxOut is places in a random position in the CWalletTx
+    bool fFoundIssueBurnTx = false;
+    for (auto out : vout) {
+        if (CheckIssueBurnTx(out, tokenType)) {
+            fFoundIssueBurnTx = true;
+            break;
+        }
+    }
+
+    if (!fFoundIssueBurnTx) {
+        strError = "bad-txns-issue-burn-not-found";
+        return false;
+    }
+
+    // Loop through all of the vouts and make sure only the expected token creations are taking place
+    int nTransfers = 0;
+    int nOwners = 0;
+    int nIssues = 0;
+    int nReissues = 0;
+    GetTxOutTokenTypes(vout, nIssues, nReissues, nTransfers, nOwners);
+
+    if (nOwners > 0 || nReissues > 0) {
+        strError = "bad-txns-failed-issue-token-formatting-check";
+        return false;
+    }
+
+    return true;
+}
+
+bool CTransaction::IsNewUsername() const
+{
+    // Check trailing outpoint for issue data with unique token name
+    if (!CheckIssueDataTx(vout[vout.size() - 1]))
+        return false;
+
+    if (!IsScriptNewUsername(vout[vout.size() - 1].scriptPubKey))
+        return false;
 
     return true;
 }
@@ -1873,6 +2009,9 @@ bool CheckIssueBurnTx(const CTxOut& txOut, const KnownTokenType& type, const int
     } else if (type == KnownTokenType::UNIQUE) {
         burnAmount = GetIssueUniqueTokenBurnAmount();
         burnAddress = Params().IssueUniqueTokenBurnAddress();
+    } else if (type == KnownTokenType::USERNAME) {
+        burnAmount = GetIssueTokenBurnAmount();
+        burnAddress = Params().IssueTokenBurnAddress();
     } else {
         return false;
     }
@@ -2000,6 +2139,31 @@ bool IsScriptNewUniqueToken(const CScript& scriptPubKey, int& nStartingIndex)
         return false;
 
     return KnownTokenType::UNIQUE == tokenType;
+}
+
+bool IsScriptNewUsername(const CScript& scriptPubKey)
+{
+    int index = 0;
+    return IsScriptNewUsername(scriptPubKey, index);
+}
+
+bool IsScriptNewUsername(const CScript& scriptPubKey, int& nStartingIndex)
+{
+    int nType = 0;
+    bool fIsOwner = false;
+    if (!scriptPubKey.IsTokenScript(nType, fIsOwner, nStartingIndex))
+        return false;
+
+    CNewToken token;
+    std::string address;
+    if (!TokenFromScript(scriptPubKey, token, address))
+        return false;
+
+    KnownTokenType tokenType;
+    if (!IsTokenNameValid(token.strName, tokenType))
+        return false;
+
+    return KnownTokenType::USERNAME == tokenType;
 }
 
 bool IsScriptOwnerToken(const CScript& scriptPubKey)
@@ -2343,6 +2507,8 @@ CAmount GetBurnAmount(const KnownTokenType type)
             return 0;
         case KnownTokenType::UNIQUE:
             return GetIssueUniqueTokenBurnAmount();
+        case KnownTokenType::USERNAME:
+            return GetIssueTokenBurnAmount();
         case KnownTokenType::REISSUE:
             return GetReissueTokenBurnAmount();
         default:
@@ -2366,6 +2532,8 @@ std::string GetBurnAddress(const KnownTokenType type)
             return "";
         case KnownTokenType::UNIQUE:
             return Params().IssueUniqueTokenBurnAddress();
+        case KnownTokenType::USERNAME:
+            return Params().IssueTokenBurnAddress();
         case KnownTokenType::REISSUE:
             return Params().ReissueTokenBurnAddress();
         default:

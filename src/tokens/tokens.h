@@ -268,6 +268,7 @@ bool TokenFromTransaction(const CTransaction& tx, CNewToken& token, std::string&
 bool OwnerFromTransaction(const CTransaction& tx, std::string& ownerName, std::string& strAddress);
 bool ReissueTokenFromTransaction(const CTransaction& tx, CReissueToken& reissue, std::string& strAddress);
 bool UniqueTokenFromTransaction(const CTransaction& tx, CNewToken& token, std::string& strAddress);
+bool UsernameFromTransaction(const CTransaction& tx, CNewToken& token, std::string& strAddress);
 
 bool TransferTokenFromScript(const CScript& scriptPubKey, CTokenTransfer& tokenTransfer, std::string& strAddress);
 bool TokenFromScript(const CScript& scriptPubKey, CNewToken& token, std::string& strAddress);
@@ -286,12 +287,14 @@ bool CheckTransferOwnerTx(const CTxOut& txOut);
 bool CheckAmountWithUnits(const CAmount& nAmount, const int8_t nUnits);
 
 bool IsScriptNewToken(const CScript& scriptPubKey, int& nStartingIndex);
+bool IsScriptNewUsername(const CScript& scriptPubKey, int& nStartingIndex);
 bool IsScriptNewUniqueToken(const CScript& scriptPubKey, int& nStartingIndex);
 bool IsScriptOwnerToken(const CScript& scriptPubKey, int& nStartingIndex);
 bool IsScriptReissueToken(const CScript& scriptPubKey, int& nStartingIndex);
 bool IsScriptTransferToken(const CScript& scriptPubKey, int& nStartingIndex);
 bool IsScriptNewToken(const CScript& scriptPubKey);
 bool IsScriptNewUniqueToken(const CScript& scriptPubKey);
+bool IsScriptNewUsername(const CScript& scriptPubKey);
 bool IsScriptOwnerToken(const CScript& scriptPubKey);
 bool IsScriptReissueToken(const CScript& scriptPubKey);
 bool IsScriptTransferToken(const CScript& scriptPubKey);

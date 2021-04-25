@@ -123,6 +123,16 @@ void AddCoins(CCoinsViewCache& cache, const CTransaction &tx, int nHeight, uint2
                     error("%s : Failed at adding a new token to our cache. token: %s", __func__,
                           token.strName);
 
+            } if (tx.IsNewUsername()) {
+                CNewToken token;
+                std::string strAddress;
+                UsernameFromTransaction(tx, token, strAddress);
+
+                // Add the new token to cache
+                if (!tokensCache->AddNewToken(token, strAddress, nHeight, blockHash))
+                    error("%s : Failed at adding a new token to our cache. token: %s", __func__,
+                          token.strName);
+
             } else if (tx.IsReissueToken()) {
                 CReissueToken reissue;
                 std::string strAddress;

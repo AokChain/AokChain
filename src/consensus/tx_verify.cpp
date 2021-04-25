@@ -229,7 +229,7 @@ bool CheckTransaction(const CTransaction& tx, CValidationState &state, CTokensCa
                     }
 
                     // If the transfer is a unique token. Check to make sure that it is UNIQUE_TOKEN_AMOUNT
-                    if (tokenType == KnownTokenType::UNIQUE) {
+                    if (tokenType == KnownTokenType::UNIQUE || tokenType == KnownTokenType::USERNAME) {
                         if (transfer.nAmount != UNIQUE_TOKEN_AMOUNT)
                             return state.DoS(100, false, REJECT_INVALID, "bad-txns-transfer-unique-amount-was-not-1");
                     }
@@ -272,8 +272,7 @@ bool CheckTransaction(const CTransaction& tx, CValidationState &state, CTokensCa
     if (AreTokensDeployed()) {
         if (tokenCache) {
             if (tx.IsNewToken()) {
-
-                /** Verify the reissue tokens data */
+                /** Verify the issue tokens data */
                 std::string strError = "";
                 if(!tx.VerifyNewToken(strError))
                     return state.DoS(100, false, REJECT_INVALID, strError);
@@ -326,6 +325,21 @@ bool CheckTransaction(const CTransaction& tx, CValidationState &state, CTokensCa
                             return state.DoS(100, false, REJECT_INVALID, "bad-txns-" + strError);
                     }
                 }
+            } else if (tx.IsNewUsername()) {
+                /** Verify the username tokens data */
+                std::string strError = "";
+                if (!tx.VerifyNewUsername(strError)) {
+                    return state.DoS(100, false, REJECT_INVALID, strError);
+                }
+
+                CNewToken token;
+                std::string strAddress;
+                if (!UsernameFromTransaction(tx, token, strAddress))
+                    return state.DoS(100, false, REJECT_INVALID, "bad-txns-issue-username-from-transaction");
+
+                if (!token.IsValid(strError, *tokenCache, fMemPoolCheck, fCheckTokenDuplicate, fForceDuplicateCheck))
+                    return state.DoS(100, error("%s: %s", __func__, strError), REJECT_INVALID, "bad-txns-issue-" + strError);
+
             } else {
                 // Fail if transaction contains any non-transfer token scripts and hasn't conformed to one of the
                 // above transaction types.  Also fail if it contains OP_TOKEN_SCRIPT opcode but wasn't a valid script.

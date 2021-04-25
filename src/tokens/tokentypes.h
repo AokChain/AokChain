@@ -26,7 +26,8 @@ enum class KnownTokenType
     UNIQUE = 2,
     OWNER = 3,
     REISSUE = 6,
-    INVALID = 7
+    USERNAME = 7,
+    INVALID = 8
 };
 
 int IntFromTokenType(KnownTokenType type);
@@ -126,7 +127,6 @@ public:
     std::string strName;
     CAmount nAmount;
     uint32_t nTokenLockTime;
-
 
     CTokenTransfer()
     {

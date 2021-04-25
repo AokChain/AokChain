@@ -47,6 +47,7 @@ std::string TokenTypeToString(KnownTokenType& tokenType)
         case KnownTokenType::UNIQUE:        return "UNIQUE";
         case KnownTokenType::OWNER:         return "OWNER";
         case KnownTokenType::REISSUE:       return "REISSUE";
+        case KnownTokenType::USERNAME:      return "USERNAME";
         case KnownTokenType::INVALID:       return "INVALID";
         default:                       return "UNKNOWN";
     }
@@ -124,7 +125,10 @@ UniValue issue(const JSONRPCRequest& request)
     }
 
     // Check tokenType supported
-    if (!(tokenType == KnownTokenType::ROOT || tokenType == KnownTokenType::SUB || tokenType == KnownTokenType::UNIQUE)) {
+    if (!(tokenType == KnownTokenType::ROOT ||
+        tokenType == KnownTokenType::SUB ||
+        tokenType == KnownTokenType::UNIQUE ||
+        tokenType == KnownTokenType::USERNAME)) {
         throw JSONRPCError(RPC_INVALID_PARAMETER, std::string("Unsupported token type: ") + TokenTypeToString(tokenType));
     }
 
@@ -176,7 +180,10 @@ UniValue issue(const JSONRPCRequest& request)
     if (request.params.size() > 4)
         units = request.params[4].get_int();
 
-    bool reissuable = tokenType != KnownTokenType::UNIQUE;
+    bool reissuable = (
+        tokenType != KnownTokenType::UNIQUE &&
+        tokenType != KnownTokenType::USERNAME);
+
     if (request.params.size() > 5)
         reissuable = request.params[5].get_bool();
 
