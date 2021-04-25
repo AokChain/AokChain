@@ -2010,7 +2010,7 @@ bool CheckIssueBurnTx(const CTxOut& txOut, const KnownTokenType& type, const int
         burnAmount = GetIssueUniqueTokenBurnAmount();
         burnAddress = Params().IssueUniqueTokenBurnAddress();
     } else if (type == KnownTokenType::USERNAME) {
-        burnAmount = GetIssueTokenBurnAmount();
+        burnAmount = GetIssueUsernameTokenBurnAmount();
         burnAddress = Params().IssueTokenBurnAddress();
     } else {
         return false;

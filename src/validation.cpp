@@ -624,6 +624,13 @@ static bool AcceptToMemoryPoolWorker(const CChainParams& chainparams, CTxMemPool
             }
         }
 
+        if (!AreTokensP2SHDeployed()) {
+            for (auto out : tx.vout)
+                if (IsScriptNewUsername(out.scriptPubKey)) {
+                    return state.DoS(100, false, REJECT_INVALID, "bad-txns-contained-username-when-not-active");
+                }
+        }
+
         if (AreTokensDeployed()) {
             if (!Consensus::CheckTxTokens(tx, state, view, GetSpendHeight(view), GetSpendTime(view), vReissueTokens))
                 return error("%s: Consensus::CheckTxTokens: %s, %s", __func__, tx.GetHash().ToString(),
@@ -2337,7 +2344,6 @@ static bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockInd
                         return state.DoS(100, error("%s : Received Block with tx that contained an token when tokens wasn't active", __func__), REJECT_INVALID, "bad-txns-tokens-not-active");
             }
 
-            // ToDo: Add username validation here
             if (!AreTokensP2SHDeployed()) {
                 for (auto out : tx.vout)
                     if (IsScriptNewUsername(out.scriptPubKey)) {
