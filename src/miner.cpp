@@ -677,7 +677,8 @@ void ThreadStakeMiner(CWallet *pwallet)
             // Try to sign a block (this also checks for a PoS stake)
             std::shared_ptr<CBlock> pblock = std::make_shared<CBlock>(pblocktemplate->block);
             if (SignBlock(pblock, *pwallet, nTotalFees, pindexPrev)) {
-                SetThreadPriority(THREAD_PRIORITY_NORMAL);
+                // Increase priority so we can build the full PoS block ASAP to ensure the timestamp doesn't expire
+                SetThreadPriority(THREAD_PRIORITY_ABOVE_NORMAL);
 
                 LogPrintf("Successfully signed block, now trying to check it: %s", pblock->GetBlockHash().ToString());
 
