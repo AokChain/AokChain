@@ -2473,22 +2473,27 @@ void GetAllMyTokens(CWallet* pwallet, std::vector<std::string>& names, int nMinC
 
 CAmount GetIssueTokenBurnAmount()
 {
-    return Params().MainFeeAmount();
+    return Params().RootFeeAmount();
 }
 
 CAmount GetReissueTokenBurnAmount()
 {
-    return Params().SecondaryFeeAmount();
+    return Params().ReissueFeeAmount();
 }
 
 CAmount GetIssueSubTokenBurnAmount()
 {
-    return Params().SecondaryFeeAmount();
+    return Params().SubFeeAmount();
 }
 
 CAmount GetIssueUniqueTokenBurnAmount()
 {
-    return Params().SecondaryFeeAmount();
+    return Params().UniqueFeeAmount();
+}
+
+CAmount GetIssueUsernameTokenBurnAmount()
+{
+    return Params().UsernameFeeAmount();
 }
 
 CAmount GetBurnAmount(const int nType)
@@ -2508,7 +2513,7 @@ CAmount GetBurnAmount(const KnownTokenType type)
         case KnownTokenType::UNIQUE:
             return GetIssueUniqueTokenBurnAmount();
         case KnownTokenType::USERNAME:
-            return GetIssueTokenBurnAmount();
+            return GetIssueUsernameTokenBurnAmount();
         case KnownTokenType::REISSUE:
             return GetReissueTokenBurnAmount();
         default:

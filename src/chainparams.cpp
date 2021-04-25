@@ -221,8 +221,11 @@ public:
 
         /** TOKENS START **/
         // Fee Amounts
-        nFeeAmountMain = 10000 * COIN;
-        nFeeAmountSecondary = 10000 * COIN;
+        nFeeAmountRoot = 10000 * COIN;
+        nFeeAmountReissue = 10000 * COIN;
+        nFeeAmountUnique = 100 * COIN;
+        nFeeAmountSub = 100 * COIN;
+        nFeeAmountUsername = 1 * COIN;
 
         // Fee Addresse
         strTokenFeeAddress = "KdZFAFeKV8C5JzdEdgcPYDZku92KkD3fHy";
@@ -315,8 +318,11 @@ public:
 
         /** TOKENS START **/
         // Fee Amounts
-        nFeeAmountMain = 1 * COIN;
-        nFeeAmountSecondary = 1 * COIN;
+        nFeeAmountRoot = 10000 * COIN;
+        nFeeAmountReissue = 10000 * COIN;
+        nFeeAmountUnique = 100 * COIN;
+        nFeeAmountSub = 100 * COIN;
+        nFeeAmountUsername = 1 * COIN;
 
         // Fee Addresse
         strTokenFeeAddress = "TjJYEpVi1HuFrMGrhNjQSHLvP9fbNk2yng";
@@ -398,8 +404,12 @@ public:
 
         /** TOKENS START **/
         // Fee Amounts
-        nFeeAmountMain = 1 * COIN;
-        nFeeAmountSecondary = 1 * COIN;
+
+        nFeeAmountRoot = 10000 * COIN;
+        nFeeAmountReissue = 10000 * COIN;
+        nFeeAmountUnique = 100 * COIN;
+        nFeeAmountSub = 100 * COIN;
+        nFeeAmountUsername = 1 * COIN;
 
         nMaxReorganizationDepth = 60; // 60 at 1 minute block timespan is +/- 60 minutes.
         /** TOKENS END **/
