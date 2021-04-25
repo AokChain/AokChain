@@ -258,6 +258,8 @@ bool IsTokenNameValid(const std::string& name, KnownTokenType& tokenType);
 bool IsTokenNameValid(const std::string& name, KnownTokenType& tokenType, std::string& error);
 bool IsUniqueTagValid(const std::string& tag);
 bool IsTokenNameAnOwner(const std::string& name);
+bool IsUsernameValid(const std::string& name);
+
 std::string GetParentName(const std::string& name); // Gets the parent name of a subtoken TEST/TESTSUB would return TEST
 std::string GetUniqueTokenName(const std::string& parent, const std::string& tag);
 

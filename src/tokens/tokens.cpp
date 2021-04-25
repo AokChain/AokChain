@@ -77,9 +77,9 @@ bool IsUniqueTagValid(const std::string& tag)
     return std::regex_match(tag, UNIQUE_TAG_CHARACTERS);
 }
 
-bool IsUsernameValid(const std::string& tag)
+bool IsUsernameValid(const std::string& name)
 {
-    return std::regex_match(tag, USERNAME_CHARACTERS);
+    return std::regex_match(name, USERNAME_CHARACTERS);
 }
 
 bool IsNameValidBeforeTag(const std::string& name)

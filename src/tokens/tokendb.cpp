@@ -174,6 +174,34 @@ bool CTokensDB::LoadTokens()
     return true;
 }
 
+std::string CTokensDB::UsernameAddress(const std::string& tokenName)
+{
+    FlushStateToDisk();
+
+    std::unique_ptr<CDBIterator> pcursor(NewIterator());
+    pcursor->Seek(std::make_pair(TOKEN_ADDRESS_QUANTITY_FLAG, std::make_pair(tokenName, std::string())));
+
+    std::string address = "";
+    size_t loaded = 0;
+
+    // Load tokens
+    while (pcursor->Valid() && loaded < MAX_DATABASE_RESULTS) {
+        boost::this_thread::interruption_point();
+
+        std::pair<char, std::pair<std::string, std::string> > key;
+        if (pcursor->GetKey(key) && key.first == TOKEN_ADDRESS_QUANTITY_FLAG && key.second.first == tokenName) {
+            address = key.second.second;
+            loaded += 1;
+
+            break;
+        } else {
+            break;
+        }
+    }
+
+    return address;
+}
+
 bool CTokensDB::TokenDir(std::vector<CDatabasedTokenData>& tokens, const std::string filter, const size_t count, const long start)
 {
     FlushStateToDisk();

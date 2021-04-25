@@ -1045,6 +1045,13 @@ UniValue transfer(const JSONRPCRequest& request)
 
     std::string address = request.params[2].get_str();
 
+    if (IsUsernameValid(address)) {
+        address = ptokensdb->UsernameAddress(address);
+        if (address == "") {
+            throw JSONRPCError(RPC_INVALID_PARAMETER, "You specified invalid username.");
+        }
+    }
+
     std::pair<int, std::string> error;
     std::vector< std::pair<CTokenTransfer, std::string> >vTransfers;
 
@@ -1124,7 +1131,16 @@ UniValue transfermany(const JSONRPCRequest& request)
     std::pair<int, std::string> error;
     std::vector< std::pair<CTokenTransfer, std::string> >vTransfers;
 
-    for (const std::string& address : keys) {
+    for (const std::string& receiver : keys) {
+        std::string address = receiver;
+
+        if (IsUsernameValid(address)) {
+            address = ptokensdb->UsernameAddress(address);
+            if (address == "") {
+                throw JSONRPCError(RPC_INVALID_PARAMETER, "You specified invalid username.");
+            }
+        }
+
         int token_lock_time = 0;
         CTxDestination dest = DecodeDestination(address);
         if (!IsValidDestination(dest)) {
@@ -1589,12 +1605,36 @@ UniValue getcacheinfo(const JSONRPCRequest& request)
     return result;
 }
 
+UniValue getusernameaddress(const JSONRPCRequest& request)
+{
+    if (request.fHelp || !AreTokensDeployed() || request.params.size() != 1)
+        throw std::runtime_error(
+                "getusernameaddress @USERNAME\n"
+                + TokenActivationWarning() +
+
+                "\nExample:\n"
+                + HelpExampleCli("getusernameaddress", "@USERNAME")
+        );
+
+    std::string address = ptokensdb->UsernameAddress(request.params[0].get_str());
+    if (address == "") {
+        throw JSONRPCError(RPC_INVALID_PARAMETER, "You specified invalid username.");
+    }
+
+    UniValue result(UniValue::VOBJ);
+
+    result.pushKV("address", address);
+
+    return result;
+}
+
 static const CRPCCommand commands[] =
 { //  category    name                          actor (function)             argNames
   //  ----------- ------------------------      -----------------------      ----------
     { "tokens",   "issue",                      &issue,                      {"token_name","qty","to_address","change_address","units","reissuable"} },
     { "tokens",   "issueunique",                &issueunique,                {"root_name", "token_tags", "to_address", "change_address"}},
-    { "tokens",   "registerusername",           &registerusername,           {"username", "to_address"} },
+    { "tokens",   "registerusername",           &registerusername,           {"username","to_address"} },
+    { "tokens",   "getusernameaddress",         &getusernameaddress,         {"username"} },
     { "tokens",   "listtokenbalancesbyaddress", &listtokenbalancesbyaddress, {"address", "onlytotal", "count", "start"} },
     { "tokens",   "gettokendata",               &gettokendata,               {"token_name"}},
     { "tokens",   "listmytokens",               &listmytokens,               {"token", "verbose", "count", "start"}},

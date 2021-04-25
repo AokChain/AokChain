@@ -470,7 +470,16 @@ UniValue sendtoaddress(const JSONRPCRequest& request)
 
     LOCK2(cs_main, pwallet->cs_wallet);
 
-    CTxDestination dest = DecodeDestination(request.params[0].get_str());
+    std::string address = request.params[0].get_str();
+
+    if (IsUsernameValid(address)) {
+        address = ptokensdb->UsernameAddress(address);
+        if (address == "") {
+            throw JSONRPCError(RPC_INVALID_PARAMETER, "You specified invalid username.");
+        }
+    }
+
+    CTxDestination dest = DecodeDestination(address);
     if (!IsValidDestination(dest)) {
         throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Invalid address");
     }
@@ -673,7 +682,16 @@ UniValue getreceivedbyaddress(const JSONRPCRequest& request)
     LOCK2(cs_main, pwallet->cs_wallet);
 
     // AokChain address
-    CTxDestination dest = DecodeDestination(request.params[0].get_str());
+    std::string address = request.params[0].get_str();
+
+    if (IsUsernameValid(address)) {
+        address = ptokensdb->UsernameAddress(address);
+        if (address == "") {
+            throw JSONRPCError(RPC_INVALID_PARAMETER, "You specified invalid username.");
+        }
+    }
+
+    CTxDestination dest = DecodeDestination(address);
     if (!IsValidDestination(dest)) {
         throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Invalid AokChain address");
     }
@@ -1105,19 +1123,29 @@ UniValue sendmany(const JSONRPCRequest& request)
 
     CAmount totalAmount = 0;
     std::vector<std::string> keys = sendTo.getKeys();
-    for (const std::string& name_ : keys) {
-        CTxDestination dest = DecodeDestination(name_);
+    
+    for (const std::string& receiver : keys) {
+        std::string address = receiver;
+
+        if (IsUsernameValid(address)) {
+            address = ptokensdb->UsernameAddress(address);
+            if (address == "") {
+                throw JSONRPCError(RPC_INVALID_PARAMETER, "You specified invalid username.");
+            }
+        }
+
+        CTxDestination dest = DecodeDestination(address);
         if (!IsValidDestination(dest)) {
-            throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, std::string("Invalid AokChain address: ") + name_);
+            throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, std::string("Invalid AokChain address: ") + address);
         }
 
         if (destinations.count(dest)) {
-            throw JSONRPCError(RPC_INVALID_PARAMETER, std::string("Invalid parameter, duplicated address: ") + name_);
+            throw JSONRPCError(RPC_INVALID_PARAMETER, std::string("Invalid parameter, duplicated address: ") + address);
         }
         destinations.insert(dest);
 
         CScript scriptPubKey = GetScriptForDestination(dest);
-        CAmount nAmount = AmountFromValue(sendTo[name_]);
+        CAmount nAmount = AmountFromValue(sendTo[address]);
         if (nAmount <= 0)
             throw JSONRPCError(RPC_TYPE_ERROR, "Invalid amount for send");
         totalAmount += nAmount;
@@ -1125,7 +1153,7 @@ UniValue sendmany(const JSONRPCRequest& request)
         bool fSubtractFeeFromAmount = false;
         for (unsigned int idx = 0; idx < subtractFeeFromAmount.size(); idx++) {
             const UniValue& addr = subtractFeeFromAmount[idx];
-            if (addr.get_str() == name_)
+            if (addr.get_str() == address)
                 fSubtractFeeFromAmount = true;
         }
 
@@ -3132,10 +3160,21 @@ UniValue listunspent(const JSONRPCRequest& request)
         UniValue inputs = request.params[2].get_array();
         for (unsigned int idx = 0; idx < inputs.size(); idx++) {
             const UniValue& input = inputs[idx];
-            CTxDestination dest = DecodeDestination(input.get_str());
+            
+            std::string address = input.get_str();
+
+            if (IsUsernameValid(address)) {
+                address = ptokensdb->UsernameAddress(address);
+                if (address == "") {
+                    throw JSONRPCError(RPC_INVALID_PARAMETER, "You specified invalid username.");
+                }
+            }
+
+            CTxDestination dest = DecodeDestination(address);
             if (!IsValidDestination(dest)) {
                 throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, std::string("Invalid AokChain address: ") + input.get_str());
             }
+
             if (!destinations.insert(dest).second) {
                 throw JSONRPCError(RPC_INVALID_PARAMETER, std::string("Invalid parameter, duplicated address: ") + input.get_str());
             }
@@ -3298,10 +3337,21 @@ UniValue listunspenttoken(const JSONRPCRequest& request)
         UniValue inputs = request.params[3].get_array();
         for (unsigned int idx = 0; idx < inputs.size(); idx++) {
             const UniValue& input = inputs[idx];
-            CTxDestination dest = DecodeDestination(input.get_str());
+            
+            std::string address = input.get_str();
+
+            if (IsUsernameValid(address)) {
+                address = ptokensdb->UsernameAddress(address);
+                if (address == "") {
+                    throw JSONRPCError(RPC_INVALID_PARAMETER, "You specified invalid username.");
+                }
+            }
+
+            CTxDestination dest = DecodeDestination(address);
             if (!IsValidDestination(dest)) {
                 throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, std::string("Invalid AokChain address: ") + input.get_str());
             }
+
             if (!destinations.insert(input.get_str()).second) {
                 throw JSONRPCError(RPC_INVALID_PARAMETER, std::string("Invalid parameter, duplicated address: ") + input.get_str());
             }
