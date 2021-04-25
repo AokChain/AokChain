@@ -17,6 +17,8 @@
 #include "darkstyle.h"
 #include "validation.h"
 
+#include <tokens/tokens.h>
+
 #include <QApplication>
 #include <QClipboard>
 
@@ -172,7 +174,7 @@ bool SendCoinsEntry::validate()
     if (recipient.paymentRequest.IsInitialized())
         return retval;
 
-    if (!model->validateAddress(ui->payTo->text()))
+    if (!model->validateAddress(ui->payTo->text()) && !IsUsernameValid(ui->payTo->text().toStdString()))
     {
         ui->payTo->setValid(false);
         retval = false;
@@ -206,7 +208,15 @@ SendCoinsRecipient SendCoinsEntry::getValue()
         return recipient;
 
     // Normal payment
-    recipient.address = ui->payTo->text();
+    
+    if (IsUsernameValid(ui->payTo->text().toStdString()))
+    {
+        recipient.username = ui->payTo->text();
+        recipient.address = QString::fromStdString(ptokensdb->UsernameAddress(ui->payTo->text().toStdString()));
+    } else {
+        recipient.address = ui->payTo->text();
+    }
+
     recipient.label = ui->addAsLabel->text();
     recipient.label = ui->addAsLabel->text();
 
