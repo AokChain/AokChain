@@ -2109,8 +2109,9 @@ bool IsScriptNewToken(const CScript& scriptPubKey)
 bool IsScriptNewToken(const CScript& scriptPubKey, int& nStartingIndex)
 {
     int nType = 0;
+    int nScriptType = 0;
     bool fIsOwner =false;
-    if (scriptPubKey.IsTokenScript(nType, fIsOwner, nStartingIndex)) {
+    if (scriptPubKey.IsTokenScript(nType, nScriptType, fIsOwner, nStartingIndex)) {
         return nType == TX_NEW_TOKEN && !fIsOwner;
     }
     return false;
@@ -2125,8 +2126,9 @@ bool IsScriptNewUniqueToken(const CScript& scriptPubKey)
 bool IsScriptNewUniqueToken(const CScript& scriptPubKey, int& nStartingIndex)
 {
     int nType = 0;
+    int nScriptType = 0;
     bool fIsOwner = false;
-    if (!scriptPubKey.IsTokenScript(nType, fIsOwner, nStartingIndex))
+    if (!scriptPubKey.IsTokenScript(nType, nScriptType, fIsOwner, nStartingIndex))
         return false;
 
     CNewToken token;
@@ -2150,8 +2152,9 @@ bool IsScriptNewUsername(const CScript& scriptPubKey)
 bool IsScriptNewUsername(const CScript& scriptPubKey, int& nStartingIndex)
 {
     int nType = 0;
+    int nScriptType = 0;
     bool fIsOwner = false;
-    if (!scriptPubKey.IsTokenScript(nType, fIsOwner, nStartingIndex))
+    if (!scriptPubKey.IsTokenScript(nType, nScriptType, fIsOwner, nStartingIndex))
         return false;
 
     CNewToken token;
@@ -2176,8 +2179,9 @@ bool IsScriptOwnerToken(const CScript& scriptPubKey)
 bool IsScriptOwnerToken(const CScript& scriptPubKey, int& nStartingIndex)
 {
     int nType = 0;
+    int nScriptType = 0;
     bool fIsOwner =false;
-    if (scriptPubKey.IsTokenScript(nType, fIsOwner, nStartingIndex)) {
+    if (scriptPubKey.IsTokenScript(nType, nScriptType, fIsOwner, nStartingIndex)) {
         return nType == TX_NEW_TOKEN && fIsOwner;
     }
 
@@ -2193,8 +2197,9 @@ bool IsScriptReissueToken(const CScript& scriptPubKey)
 bool IsScriptReissueToken(const CScript& scriptPubKey, int& nStartingIndex)
 {
     int nType = 0;
+    int nScriptType = 0;
     bool fIsOwner =false;
-    if (scriptPubKey.IsTokenScript(nType, fIsOwner, nStartingIndex)) {
+    if (scriptPubKey.IsTokenScript(nType, nScriptType, fIsOwner, nStartingIndex)) {
         return nType == TX_REISSUE_TOKEN;
     }
 
@@ -2210,8 +2215,9 @@ bool IsScriptTransferToken(const CScript& scriptPubKey)
 bool IsScriptTransferToken(const CScript& scriptPubKey, int& nStartingIndex)
 {
     int nType = 0;
+    int nScriptType = 0;
     bool fIsOwner = false;
-    if (scriptPubKey.IsTokenScript(nType, fIsOwner, nStartingIndex)) {
+    if (scriptPubKey.IsTokenScript(nType, nScriptType, fIsOwner, nStartingIndex)) {
         return nType == TX_TRANSFER_TOKEN;
     }
 
@@ -2389,12 +2395,15 @@ bool GetTokenData(const CScript& script, CTokenOutputEntry& data)
     std::string tokenName = "";
 
     int nType = 0;
+    int nScriptType = 0;
     bool fIsOwner = false;
-    if (!script.IsTokenScript(nType, fIsOwner)) {
+    if (!script.IsTokenScript(nType, nScriptType, fIsOwner)) {
         return false;
     }
 
     txnouttype type = txnouttype(nType);
+    txnouttype scriptType = txnouttype(nScriptType);
+    data.scriptType = scriptType;
 
     // Get the New Token or Transfer Token from the scriptPubKey
     if (type == TX_NEW_TOKEN && !fIsOwner) {
@@ -3008,13 +3017,13 @@ void GetTxOutTokenTypes(const std::vector<CTxOut>& vout, int& issues, int& reiss
     }
 }
 
-bool ParseTokenScript(CScript scriptPubKey, uint160 &hashBytes, std::string &tokenName, CAmount &tokenAmount, uint32_t &nTokenLockTime) {
+bool ParseTokenScript(CScript scriptPubKey, uint160 &hashBytes, int& nScriptType, std::string &tokenName, CAmount &tokenAmount, uint32_t &nTokenLockTime) {
     int nType;
     bool fIsOwner;
     int _nStartingPoint;
     std::string _strAddress;
     bool isToken = false;
-    if (scriptPubKey.IsTokenScript(nType, fIsOwner, _nStartingPoint)) {
+    if (scriptPubKey.IsTokenScript(nType, nScriptType, fIsOwner, _nStartingPoint)) {
         if (nType == TX_NEW_TOKEN) {
             if (fIsOwner) {
                 if (OwnerTokenFromScript(scriptPubKey, tokenName, _strAddress)) {
@@ -3055,13 +3064,19 @@ bool ParseTokenScript(CScript scriptPubKey, uint160 &hashBytes, std::string &tok
         } else {
             LogPrintf("%s : Unsupported token type: %s", __func__, nType);
         }
-    } else {
-//        LogPrintf("%s : Found no token in script: %s", __func__, HexStr(scriptPubKey));
     }
+
     if (isToken) {
-//        LogPrintf("%s : Found tokens in script at address %s : %s (%s)", __func__, _strAddress, tokenName, tokenAmount);
-        hashBytes = uint160(std::vector <unsigned char>(scriptPubKey.begin()+3, scriptPubKey.begin()+23));
+        if (nScriptType == TX_SCRIPTHASH) {
+            hashBytes = uint160(std::vector <unsigned char>(scriptPubKey.begin() + 2, scriptPubKey.begin() + 22));
+        } else if (nScriptType == TX_PUBKEYHASH) {
+            hashBytes = uint160(std::vector <unsigned char>(scriptPubKey.begin() + 3, scriptPubKey.begin() + 23));
+        } else {
+            return false;
+        }
+
         return true;
     }
+
     return false;
 }

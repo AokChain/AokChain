@@ -202,6 +202,7 @@ struct COutputEntry
 struct CTokenOutputEntry
 {
     txnouttype type;
+    txnouttype scriptType;
     std::string tokenName;
     CTxDestination destination;
     CAmount nAmount;

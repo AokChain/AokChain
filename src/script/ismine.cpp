@@ -55,7 +55,8 @@ isminetype IsMine(const CKeyStore &keystore, const CScript& scriptPubKey, CBlock
 
     std::vector<valtype> vSolutions;
     txnouttype whichType;
-    if (!Solver(scriptPubKey, whichType, vSolutions)) {
+    txnouttype scriptType;
+    if (!Solver(scriptPubKey, whichType, scriptType, vSolutions)) {
         if (keystore.HaveWatchOnly(scriptPubKey))
             return ISMINE_WATCH_UNSOLVABLE;
         return ISMINE_NO;
@@ -171,52 +172,33 @@ isminetype IsMine(const CKeyStore &keystore, const CScript& scriptPubKey, CBlock
             }
         }
         /** TOKENS START */
-        case TX_NEW_TOKEN: {
-            if (!AreTokensDeployed())
-                return ISMINE_NO;
-            keyID = CKeyID(uint160(vSolutions[0]));
-            if (sigversion != SIGVERSION_BASE) {
-                CPubKey pubkey;
-                if (keystore.GetPubKey(keyID, pubkey) && !pubkey.IsCompressed()) {
-                    isInvalid = true;
-                    return ISMINE_NO;
-                }
-            }
-            if (keystore.HaveKey(keyID))
-                return ISMINE_SPENDABLE;
-            break;
-
-        }
-
-        case TX_TRANSFER_TOKEN: {
-            if (!AreTokensDeployed())
-                return ISMINE_NO;
-            keyID = CKeyID(uint160(vSolutions[0]));
-            if (sigversion != SIGVERSION_BASE) {
-                CPubKey pubkey;
-                if (keystore.GetPubKey(keyID, pubkey) && !pubkey.IsCompressed()) {
-                    isInvalid = true;
-                    return ISMINE_NO;
-                }
-            }
-            if (keystore.HaveKey(keyID))
-                return ISMINE_SPENDABLE;
-            break;
-        }
-
+        case TX_NEW_TOKEN:
+        case TX_TRANSFER_TOKEN:
         case TX_REISSUE_TOKEN: {
             if (!AreTokensDeployed())
                 return ISMINE_NO;
-            keyID = CKeyID(uint160(vSolutions[0]));
-            if (sigversion != SIGVERSION_BASE) {
-                CPubKey pubkey;
-                if (keystore.GetPubKey(keyID, pubkey) && !pubkey.IsCompressed()) {
-                    isInvalid = true;
-                    return ISMINE_NO;
+
+            if (scriptType == TX_PUBKEYHASH) {
+                keyID = CKeyID(uint160(vSolutions[0]));
+                if (sigversion != SIGVERSION_BASE) {
+                    CPubKey pubkey;
+                    if (keystore.GetPubKey(keyID, pubkey) && !pubkey.IsCompressed()) {
+                        isInvalid = true;
+                        return ISMINE_NO;
+                    }
+                }
+                if (keystore.HaveKey(keyID))
+                    return ISMINE_SPENDABLE;
+
+            } else if (scriptType == TX_SCRIPTHASH) {
+                CScriptID scriptID = CScriptID(uint160(vSolutions[0]));
+                CScript subscript;
+                if (keystore.GetCScript(scriptID, subscript)) {
+                    isminetype ret = IsMine(keystore, subscript, bestBlock, isInvalid);
+                    if (ret == ISMINE_SPENDABLE || ret == ISMINE_WATCH_SOLVABLE || (ret == ISMINE_NO && isInvalid))
+                        return ret;
                 }
             }
-            if (keystore.HaveKey(keyID))
-                return ISMINE_SPENDABLE;
             break;
         }
         /** TOKENS END*/
@@ -233,15 +215,16 @@ isminetype IsMine(const CKeyStore &keystore, const CScript& scriptPubKey, CBlock
 bool IsTimeLock(const CKeyStore &keystore, const CScript& scriptPubKey, CScriptNum& nLockTime)
 {
     std::vector<valtype> vSolutions;
+    txnouttype whichScriptType;
     txnouttype whichType;
-    if (Solver(scriptPubKey, whichType, vSolutions))
+    if (Solver(scriptPubKey, whichType, whichScriptType, vSolutions))
     {
         if (whichType == TX_SCRIPTHASH)
         {
             CScriptID scriptID = CScriptID(uint160(vSolutions[0]));
             CScript subscript;
             if (keystore.GetCScript(scriptID, subscript))
-                Solver(subscript, whichType, vSolutions);
+                Solver(subscript, whichType, whichScriptType, vSolutions);
         }
 
         if (whichType == TX_CLTV)
@@ -257,8 +240,9 @@ bool IsTimeLock(const CKeyStore &keystore, const CScript& scriptPubKey, CScriptN
 bool IsTimeLock(const CScript& scriptPubKey, CScriptNum& nLockTime)
 {
     std::vector<valtype> vSolutions;
+    txnouttype whichScriptType;
     txnouttype whichType;
-    if (Solver(scriptPubKey, whichType, vSolutions))
+    if (Solver(scriptPubKey, whichType, whichScriptType, vSolutions))
     {
         if (whichType == TX_CLTV)
         {

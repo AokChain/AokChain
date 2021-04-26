@@ -194,10 +194,16 @@ bool CheckTransaction(const CTransaction& tx, CValidationState &state, CTokensCa
 
         /** TOKENS START */
         bool isToken = false;
-        int nType;
-        bool fIsOwner;
-        if (txout.scriptPubKey.IsTokenScript(nType, fIsOwner))
+        int nType = 0;
+        int nScriptType = 0;
+        bool fIsOwner = false;
+        if (txout.scriptPubKey.IsTokenScript(nType, nScriptType, fIsOwner))
             isToken = true;
+
+        if (isToken && nScriptType == TX_SCRIPTHASH) {
+            if (!AreTokensP2SHDeployed())
+                return state.DoS(0, false, REJECT_INVALID, "bad-txns-p2sh-token-not-active");
+        }
 
         // Make sure that all token tx have a nValue of zero AOK
         if (isToken && txout.nValue != 0)
@@ -345,8 +351,9 @@ bool CheckTransaction(const CTransaction& tx, CValidationState &state, CTokensCa
                 // above transaction types.  Also fail if it contains OP_TOKEN_SCRIPT opcode but wasn't a valid script.
                 for (auto out : tx.vout) {
                     int nType;
+                    int nScriptType;
                     bool _isOwner;
-                    if (out.scriptPubKey.IsTokenScript(nType, _isOwner)) {
+                    if (out.scriptPubKey.IsTokenScript(nType, nScriptType, _isOwner)) {
                         if (nType != TX_TRANSFER_TOKEN) {
                             return state.DoS(100, false, REJECT_INVALID, "bad-txns-bad-token-transaction");
                         }
