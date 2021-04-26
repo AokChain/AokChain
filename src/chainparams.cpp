@@ -364,6 +364,8 @@ public:
         consensus.defaultAssumeValid = uint256S("0x00");
 
         consensus.nLastPOWBlock = 1440 * 1000;
+        consensus.nTokensDeploymentHeight = 10;
+        consensus.nTokensP2SHDeploymentHeight = 10;
 
         pchMessageStart[0] = 0x43;
         pchMessageStart[1] = 0x52;
@@ -412,6 +414,9 @@ public:
         nFeeAmountUnique = 100 * COIN;
         nFeeAmountSub = 100 * COIN;
         nFeeAmountUsername = 1 * COIN;
+
+        // Fee Addresse
+        strTokenFeeAddress = "n3XzBy9gndByXLeAgz5qG5xJkNNw31ULXy";
 
         nMaxReorganizationDepth = 60; // 60 at 1 minute block timespan is +/- 60 minutes.
         /** TOKENS END **/
