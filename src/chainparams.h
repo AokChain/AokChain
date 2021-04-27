@@ -91,8 +91,11 @@ public:
     bool CSVEnabled() const;
 
     /** TOKENS START **/
-    const CAmount& MainFeeAmount() const { return nFeeAmountMain; }
-    const CAmount& SecondaryFeeAmount() const { return nFeeAmountSecondary; }
+    const CAmount& RootFeeAmount() const { return nFeeAmountRoot; }
+    const CAmount& ReissueFeeAmount() const { return nFeeAmountReissue; }
+    const CAmount& UniqueFeeAmount() const { return nFeeAmountUnique; }
+    const CAmount& SubFeeAmount() const { return nFeeAmountSub; }
+    const CAmount& UsernameFeeAmount() const { return nFeeAmountUsername; }
 
     const std::string& IssueTokenBurnAddress() const { return strTokenFeeAddress; }
     const std::string& ReissueTokenBurnAddress() const { return strTokenFeeAddress; }
@@ -123,8 +126,11 @@ protected:
 
     /** TOKENS START **/
     // Burn Amounts
-    CAmount nFeeAmountMain;
-    CAmount nFeeAmountSecondary;
+    CAmount nFeeAmountRoot;
+    CAmount nFeeAmountReissue;
+    CAmount nFeeAmountUnique;
+    CAmount nFeeAmountSub;
+    CAmount nFeeAmountUsername;
 
     // Burn Addresses
     std::string strTokenFeeAddress;

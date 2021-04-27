@@ -156,9 +156,10 @@ public:
 
     void Process(const CScript &script) {
         txnouttype type;
+        txnouttype scriptType;
         std::vector<CTxDestination> vDest;
         int nRequired;
-        if (ExtractDestinations(script, type, vDest, nRequired)) {
+        if (ExtractDestinations(script, type, scriptType, vDest, nRequired)) {
             for (const CTxDestination &dest : vDest)
                 boost::apply_visitor(*this, dest);
         }
@@ -2493,8 +2494,9 @@ void CWallet::AvailableCoinsAll(std::vector<COutput>& vCoins, std::map<std::stri
             for (unsigned int i = 0; i < pcoin->tx->vout.size(); i++) {
 
                 int nType;
+                int nScriptType;
                 bool fIsOwner;
-                bool isTokenScript = pcoin->tx->vout[i].scriptPubKey.IsTokenScript(nType, fIsOwner);
+                bool isTokenScript = pcoin->tx->vout[i].scriptPubKey.IsTokenScript(nType, nScriptType, fIsOwner);
                 if (coinControl && !isTokenScript && coinControl->HasSelected() && !coinControl->fAllowOtherInputs && !coinControl->IsSelected(COutPoint((*it).first, i)))
                     continue;
 
@@ -2818,9 +2820,10 @@ bool CWallet::CreateCoinStake(const CKeyStore& keystore, unsigned int nBits, con
             LogPrint(BCLog::COINSTAKE, "CreateCoinStake : kernel found\n");
             std::vector<valtype> vSolutions;
             txnouttype whichType;
+            txnouttype scriptType;
             CScript scriptPubKeyOut;
             scriptPubKeyKernel = pcoin.first->tx->vout[pcoin.second].scriptPubKey;
-            if (!Solver(scriptPubKeyKernel, whichType, vSolutions))
+            if (!Solver(scriptPubKeyKernel, whichType, scriptType, vSolutions))
             {
                 LogPrint(BCLog::COINSTAKE, "CreateCoinStake : failed to parse kernel\n");
                 break;
@@ -3374,9 +3377,10 @@ bool CWallet::SelectTokensMinConf(const CAmount& nTargetValue, const int nConfMi
 
         //-------------------------------
 
-        int nType = -1;
+        int nType = 0;
+        int nScriptType = 0;
         bool fIsOwner = false;
-        if (!coin.txout.scriptPubKey.IsTokenScript(nType, fIsOwner)) {
+        if (!coin.txout.scriptPubKey.IsTokenScript(nType, nScriptType, fIsOwner)) {
             // TODO - Remove std::cout this before mainnet release
             std::cout << "This shouldn't be occuring: Non Token Script pub key made it to the SelectTokensMinConf function call. Look into this!" << std::endl;
             continue;
@@ -3946,8 +3950,8 @@ bool CWallet::CreateTransactionAll(const std::vector<CRecipient>& vecSend, CWall
                 if (AreTokensDeployed()) {
                     if (fNewToken) {
                         for (auto token : tokens) {
-                            // Create the owner token output for non-unique tokens
-                            if (tokenType != KnownTokenType::UNIQUE) {
+                            // Create the owner token output for non-unique/username tokens
+                            if (tokenType != KnownTokenType::UNIQUE && tokenType != KnownTokenType::USERNAME) {
                                 CScript ownerScript = GetScriptForDestination(destination);
                                 token.ConstructOwnerTransaction(ownerScript);
                                 CTxOut ownerTxOut(0, ownerScript);

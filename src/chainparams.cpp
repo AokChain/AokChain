@@ -171,6 +171,7 @@ public:
         consensus.nLastPOWBlock = 1440;
         consensus.nStakeTimestampMask = 0xf; // 15
         consensus.nTokensDeploymentHeight = 159500;
+        consensus.nTokensP2SHDeploymentHeight = 450000;
 
         /**
          * The message start string is designed to be unlikely to occur in normal data.
@@ -221,8 +222,11 @@ public:
 
         /** TOKENS START **/
         // Fee Amounts
-        nFeeAmountMain = 10000 * COIN;
-        nFeeAmountSecondary = 10000 * COIN;
+        nFeeAmountRoot = 10000 * COIN;
+        nFeeAmountReissue = 10000 * COIN;
+        nFeeAmountUnique = 100 * COIN;
+        nFeeAmountSub = 100 * COIN;
+        nFeeAmountUsername = 1 * COIN;
 
         // Fee Addresse
         strTokenFeeAddress = "KdZFAFeKV8C5JzdEdgcPYDZku92KkD3fHy";
@@ -265,6 +269,7 @@ public:
         consensus.nLastPOWBlock = 1440 * 10;
         consensus.nStakeTimestampMask = 0xf; // 15
         consensus.nTokensDeploymentHeight = 10;
+        consensus.nTokensP2SHDeploymentHeight = 99999999;
 
         /**
          * The message start string is designed to be unlikely to occur in normal data.
@@ -315,8 +320,11 @@ public:
 
         /** TOKENS START **/
         // Fee Amounts
-        nFeeAmountMain = 1 * COIN;
-        nFeeAmountSecondary = 1 * COIN;
+        nFeeAmountRoot = 10000 * COIN;
+        nFeeAmountReissue = 10000 * COIN;
+        nFeeAmountUnique = 100 * COIN;
+        nFeeAmountSub = 100 * COIN;
+        nFeeAmountUsername = 1 * COIN;
 
         // Fee Addresse
         strTokenFeeAddress = "TjJYEpVi1HuFrMGrhNjQSHLvP9fbNk2yng";
@@ -356,6 +364,8 @@ public:
         consensus.defaultAssumeValid = uint256S("0x00");
 
         consensus.nLastPOWBlock = 1440 * 1000;
+        consensus.nTokensDeploymentHeight = 10;
+        consensus.nTokensP2SHDeploymentHeight = 10;
 
         pchMessageStart[0] = 0x43;
         pchMessageStart[1] = 0x52;
@@ -398,8 +408,15 @@ public:
 
         /** TOKENS START **/
         // Fee Amounts
-        nFeeAmountMain = 1 * COIN;
-        nFeeAmountSecondary = 1 * COIN;
+
+        nFeeAmountRoot = 10000 * COIN;
+        nFeeAmountReissue = 10000 * COIN;
+        nFeeAmountUnique = 100 * COIN;
+        nFeeAmountSub = 100 * COIN;
+        nFeeAmountUsername = 1 * COIN;
+
+        // Fee Addresse
+        strTokenFeeAddress = "n3XzBy9gndByXLeAgz5qG5xJkNNw31ULXy";
 
         nMaxReorganizationDepth = 60; // 60 at 1 minute block timespan is +/- 60 minutes.
         /** TOKENS END **/

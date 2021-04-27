@@ -257,54 +257,82 @@ bool CScript::IsPayToScriptHash() const
 bool CScript::IsTokenScript() const
 {
     int nType = 0;
+    int nScriptType = 0;
     bool isOwner = false;
     int start = 0;
-    return IsTokenScript(nType, isOwner, start);
+    return IsTokenScript(nType, nScriptType, isOwner, start);
 }
 
-bool CScript::IsTokenScript(int& nType, bool& isOwner) const
+bool CScript::IsTokenScript(int& nType, bool& fIsOwner) const
 {
     int start = 0;
-    return IsTokenScript(nType, isOwner, start);
+    int nScriptType = 0;
+    return IsTokenScript(nType, nScriptType, fIsOwner, start);
 }
 
-bool CScript::IsTokenScript(int& nType, bool& fIsOwner, int& nStartingIndex) const
+bool CScript::IsTokenScript(int& nType, int& nScriptType, bool& isOwner) const
 {
-    if (this->size() > 30) {
-        if ((*this)[25] == OP_TOKEN_SCRIPT) { // OP_TOKEN_SCRIPT is always in the 25 index of the script if it exists
-            int index = -1;
-            if ((*this)[27] == TOKEN_AOK) { // Check to see if TOKEN_AOK starts at 27 ( this->size() < 105)
-                if ((*this)[28] == TOKEN_LOCAL)
-                    if ((*this)[29] == TOKEN_PAYMENT)
-                        index = 30;
-            } else {
-                if ((*this)[28] == TOKEN_AOK) // Check to see if TOKEN_AOK starts at 28 ( this->size() >= 105)
-                    if ((*this)[29] == TOKEN_LOCAL)
-                        if ((*this)[30] == TOKEN_PAYMENT)
-                            index = 31;
-            }
+    int start = 0;
+    return IsTokenScript(nType, nScriptType, isOwner, start);
+}
 
-            if (index > 0) {
-                nStartingIndex = index + 1; // Set the index where the token data begins. Use to serialize the token data into token objects
-                if ((*this)[index] == TOKEN_TRANSFER) { // Transfer first anticipating more transfers than other tokens operations
-                    nType = TX_TRANSFER_TOKEN;
-                    return true;
-                } else if ((*this)[index] == TOKEN_ISSUE && this->size() > 39) {
-                    nType = TX_NEW_TOKEN;
-                    fIsOwner = false;
-                    return true;
-                } else if ((*this)[index] == TOKEN_OWNER_KEY) {
-                    nType = TX_NEW_TOKEN;
-                    fIsOwner = true;
-                    return true;
-                } else if ((*this)[index] == TOKEN_AOK) {
-                    nType = TX_REISSUE_TOKEN;
-                    return true;
-                }
+bool CScript::IsTokenScript(int& nType, int& nScriptType, bool& fIsOwner, int& nStartingIndex) const
+{
+    if (this->size() > 31) {
+        // Extra-fast test for pay-to-script-hash CScripts:
+        if ( (*this)[0] == OP_HASH160 && (*this)[1] == 0x14 && (*this)[22] == OP_EQUAL) {
+
+            // If this is of the P2SH type, we need to return this type so we know how to interact and solve it
+            nScriptType = TX_SCRIPTHASH;
+        } else {
+            // If this is of the P2PKH type, we need to return this type so we know how to interact and solve it
+            nScriptType = TX_PUBKEYHASH;
+        }
+
+        // Initialize the index
+        int index = -1;
+
+        // OP_TOKEN_SCRIPT is always in the 23 index of the P2SH script if it exists
+        if (nScriptType == TX_SCRIPTHASH && (*this)[23] == OP_TOKEN_SCRIPT) {
+            // We have a potential asset interacting with a P2SH
+            index = SearchForToken(*this, 25);
+
+        }
+        else if ((*this)[25] == OP_TOKEN_SCRIPT) { // OP_TOKEN_SCRIPT is always in the 25 index of the P2PKH script if it exists
+            // We have a potential asset interacting with a P2PKH
+            index = SearchForToken(*this, 27);
+        }
+
+        if (index > 0) {
+            nStartingIndex = index + 1; // Set the index where the token data begins. Use to serialize the token data into token objects
+            if ((*this)[index] == TOKEN_TRANSFER) { // Transfer first anticipating more transfers than other tokens operations
+                nType = TX_TRANSFER_TOKEN;
+                return true;
+            } else if ((*this)[index] == TOKEN_ISSUE && this->size() > 39) {
+                nType = TX_NEW_TOKEN;
+                fIsOwner = false;
+                return true;
+            } else if ((*this)[index] == TOKEN_OWNER_KEY) {
+                nType = TX_NEW_TOKEN;
+                fIsOwner = true;
+                return true;
+            } else if ((*this)[index] == TOKEN_AOK) {
+                nType = TX_REISSUE_TOKEN;
+                return true;
             }
         }
     }
+
     return false;
+}
+
+bool CScript::IsP2SHTokenScript() const
+{
+    int nType = 0;
+    int nScriptType = 0;
+    bool isOwner = false;
+    IsTokenScript(nType, nScriptType, isOwner);
+    return nScriptType == TX_SCRIPTHASH;
 }
 
 bool CScript::IsNewToken() const
@@ -456,8 +484,9 @@ bool GetTokenAmountFromScript(const CScript& script, CAmount& nAmount)
     std::string tokenName = "";
 
     int nType = 0;
+    int nScriptType = 0;
     bool fIsOwner = false;
-    if (!script.IsTokenScript(nType, fIsOwner)) {
+    if (!script.IsTokenScript(nType, nScriptType, fIsOwner)) {
         return false;
     }
 
@@ -487,8 +516,9 @@ bool GetTokenAmountFromScript(const CScript& script, CAmount& nAmount)
 bool ScriptNewToken(const CScript& scriptPubKey, int& nStartingIndex)
 {
     int nType = 0;
-    bool fIsOwner =false;
-    if (scriptPubKey.IsTokenScript(nType, fIsOwner, nStartingIndex)) {
+    int nScriptType = 0;
+    bool fIsOwner = false;
+    if (scriptPubKey.IsTokenScript(nType, nScriptType, fIsOwner, nStartingIndex)) {
         return nType == TX_NEW_TOKEN && !fIsOwner;
     }
 
@@ -498,8 +528,9 @@ bool ScriptNewToken(const CScript& scriptPubKey, int& nStartingIndex)
 bool ScriptTransferToken(const CScript& scriptPubKey, int& nStartingIndex)
 {
     int nType = 0;
-    bool fIsOwner =false;
-    if (scriptPubKey.IsTokenScript(nType, fIsOwner, nStartingIndex)) {
+    int nScriptType = 0;
+    bool fIsOwner = false;
+    if (scriptPubKey.IsTokenScript(nType, nScriptType, fIsOwner, nStartingIndex)) {
         return nType == TX_TRANSFER_TOKEN;
     }
 
@@ -509,12 +540,34 @@ bool ScriptTransferToken(const CScript& scriptPubKey, int& nStartingIndex)
 bool ScriptReissueToken(const CScript& scriptPubKey, int& nStartingIndex)
 {
     int nType = 0;
-    bool fIsOwner =false;
-    if (scriptPubKey.IsTokenScript(nType, fIsOwner, nStartingIndex)) {
+    int nScriptType = 0;
+    bool fIsOwner = false;
+    if (scriptPubKey.IsTokenScript(nType, nScriptType, fIsOwner, nStartingIndex)) {
         return nType == TX_REISSUE_TOKEN;
     }
 
     return false;
+}
+
+int SearchForToken(const CScript& script, const int startingValue) {
+
+    // Initialize the start value
+    int index = -1;
+
+    // Search for RVN at the two places in the script it can be depending on the size of the script
+    if (script[startingValue] == TOKEN_AOK) { // Check to see if RVN starts at the starting value ( this->size() < 105)
+        if (script[startingValue + 1] == TOKEN_LOCAL)
+            if (script[startingValue + 2] == TOKEN_PAYMENT)
+                index = startingValue + 3;
+    } else {
+        if (script[startingValue + 1] == TOKEN_AOK) // Check to see if RVN starts at starting value + 1 ( this->size() >= 105)
+            if (script[startingValue + 2] == TOKEN_LOCAL)
+                if (script[startingValue + 3] == TOKEN_PAYMENT)
+                    index = startingValue + 4;
+    }
+
+    return index;
+
 }
 
 

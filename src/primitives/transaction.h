@@ -354,7 +354,9 @@ public:
     bool IsNewToken() const;
     bool VerifyNewToken(std::string& strError) const;
     bool IsNewUniqueToken() const;
+    bool IsNewUsername() const;
     bool VerifyNewUniqueToken(std::string& strError) const;
+    bool VerifyNewUsername(std::string& strError) const;
     bool IsReissueToken() const;
     bool VerifyReissueToken(std::string& strError) const;
     /** TOKENS END */

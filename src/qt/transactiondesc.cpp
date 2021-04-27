@@ -279,7 +279,8 @@ QString TransactionDesc::toHTML(CWallet *wallet, CWalletTx &wtx, TransactionReco
     for (const CTxOut& txout : wtx.tx->vout) {
         std::vector<valtype> vSolutions;
         txnouttype whichType;
-        if (Solver(txout.scriptPubKey, whichType, vSolutions))
+        txnouttype scriptType;
+        if (Solver(txout.scriptPubKey, whichType, scriptType, vSolutions))
         {
             if (whichType == TX_CLTV)
             {

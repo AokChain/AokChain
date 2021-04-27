@@ -464,11 +464,19 @@ void CTxMemPool::addAddressIndex(const CTxMemPoolEntry &entry, const CCoinsViewC
                 CAmount tokenAmount;
                 uint32_t nTokenLockTime;
 
-                if (ParseTokenScript(prevout.scriptPubKey, hashBytes, tokenName, tokenAmount, nTokenLockTime)) {
-                    CMempoolAddressDeltaKey key(1, hashBytes, tokenName, txhash, j, 1);
-                    CMempoolAddressDelta delta(entry.GetTime(), tokenAmount * -1, input.prevout.hash, input.prevout.n);
-                    mapAddress.insert(std::make_pair(key, delta));
-                    inserted.push_back(key);
+                int nScriptType;
+                if (ParseTokenScript(prevout.scriptPubKey,hashBytes, nScriptType, tokenName, tokenAmount, nTokenLockTime)) {
+                    if (nScriptType == TX_SCRIPTHASH) {
+                        CMempoolAddressDeltaKey key(2, hashBytes, tokenName, txhash, j, 1);
+                        CMempoolAddressDelta delta(entry.GetTime(), tokenAmount * -1, input.prevout.hash, input.prevout.n);
+                        mapAddress.insert(std::make_pair(key, delta));
+                        inserted.push_back(key);
+                    } else if (nScriptType == TX_PUBKEYHASH) {
+                        CMempoolAddressDeltaKey key(1, hashBytes, tokenName, txhash, j, 1);
+                        CMempoolAddressDelta delta(entry.GetTime(), tokenAmount * -1, input.prevout.hash, input.prevout.n);
+                        mapAddress.insert(std::make_pair(key, delta));
+                        inserted.push_back(key);
+                    }
                 }
             }
             /** TOKENS END */
@@ -509,11 +517,17 @@ void CTxMemPool::addAddressIndex(const CTxMemPoolEntry &entry, const CCoinsViewC
                 CAmount tokenAmount;
                 uint32_t nTokenLockTime;
 
-                if (ParseTokenScript(out.scriptPubKey, hashBytes, tokenName, tokenAmount, nTokenLockTime)) {
-                    std::pair<addressDeltaMap::iterator, bool> ret;
-                    CMempoolAddressDeltaKey key(1, hashBytes, tokenName, txhash, k, 0);
-                    mapAddress.insert(std::make_pair(key, CMempoolAddressDelta(entry.GetTime(), tokenAmount)));
-                    inserted.push_back(key);
+                int nScriptType;
+                if (ParseTokenScript(out.scriptPubKey, hashBytes, nScriptType, tokenName, tokenAmount, nTokenLockTime)) {
+                    if (nScriptType == TX_SCRIPTHASH) {
+                        CMempoolAddressDeltaKey key(2, hashBytes, tokenName, txhash, k, 0);
+                        mapAddress.insert(std::make_pair(key, CMempoolAddressDelta(entry.GetTime(), tokenAmount * -1)));
+                        inserted.push_back(key);
+                    } else if (nScriptType == TX_PUBKEYHASH) {
+                        CMempoolAddressDeltaKey key(1, hashBytes, tokenName, txhash, k, 0);
+                        mapAddress.insert(std::make_pair(key, CMempoolAddressDelta(entry.GetTime(), tokenAmount * -1)));
+                        inserted.push_back(key);
+                    }
                 }
             }
             /** TOKENS END */

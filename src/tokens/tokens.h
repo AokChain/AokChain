@@ -245,6 +245,7 @@ CAmount GetIssueTokenBurnAmount();
 CAmount GetReissueTokenBurnAmount();
 CAmount GetIssueSubTokenBurnAmount();
 CAmount GetIssueUniqueTokenBurnAmount();
+CAmount GetIssueUsernameTokenBurnAmount();
 CAmount GetBurnAmount(const KnownTokenType type);
 CAmount GetBurnAmount(const int nType);
 std::string GetBurnAddress(const KnownTokenType type);
@@ -257,6 +258,8 @@ bool IsTokenNameValid(const std::string& name, KnownTokenType& tokenType);
 bool IsTokenNameValid(const std::string& name, KnownTokenType& tokenType, std::string& error);
 bool IsUniqueTagValid(const std::string& tag);
 bool IsTokenNameAnOwner(const std::string& name);
+bool IsUsernameValid(const std::string& name);
+
 std::string GetParentName(const std::string& name); // Gets the parent name of a subtoken TEST/TESTSUB would return TEST
 std::string GetUniqueTokenName(const std::string& parent, const std::string& tag);
 
@@ -268,6 +271,7 @@ bool TokenFromTransaction(const CTransaction& tx, CNewToken& token, std::string&
 bool OwnerFromTransaction(const CTransaction& tx, std::string& ownerName, std::string& strAddress);
 bool ReissueTokenFromTransaction(const CTransaction& tx, CReissueToken& reissue, std::string& strAddress);
 bool UniqueTokenFromTransaction(const CTransaction& tx, CNewToken& token, std::string& strAddress);
+bool UsernameFromTransaction(const CTransaction& tx, CNewToken& token, std::string& strAddress);
 
 bool TransferTokenFromScript(const CScript& scriptPubKey, CTokenTransfer& tokenTransfer, std::string& strAddress);
 bool TokenFromScript(const CScript& scriptPubKey, CNewToken& token, std::string& strAddress);
@@ -286,12 +290,14 @@ bool CheckTransferOwnerTx(const CTxOut& txOut);
 bool CheckAmountWithUnits(const CAmount& nAmount, const int8_t nUnits);
 
 bool IsScriptNewToken(const CScript& scriptPubKey, int& nStartingIndex);
+bool IsScriptNewUsername(const CScript& scriptPubKey, int& nStartingIndex);
 bool IsScriptNewUniqueToken(const CScript& scriptPubKey, int& nStartingIndex);
 bool IsScriptOwnerToken(const CScript& scriptPubKey, int& nStartingIndex);
 bool IsScriptReissueToken(const CScript& scriptPubKey, int& nStartingIndex);
 bool IsScriptTransferToken(const CScript& scriptPubKey, int& nStartingIndex);
 bool IsScriptNewToken(const CScript& scriptPubKey);
 bool IsScriptNewUniqueToken(const CScript& scriptPubKey);
+bool IsScriptNewUsername(const CScript& scriptPubKey);
 bool IsScriptOwnerToken(const CScript& scriptPubKey);
 bool IsScriptReissueToken(const CScript& scriptPubKey);
 bool IsScriptTransferToken(const CScript& scriptPubKey);
@@ -321,7 +327,7 @@ bool CreateTransferTokenTransaction(CWallet* pwallet, const CCoinControl& coinCo
 bool SendTokenTransaction(CWallet* pwallet, CWalletTx& transaction, CReserveKey& reserveKey, std::pair<int, std::string>& error, std::string& txid);
 
 /** Helper method for extracting address bytes, token name and amount from an token script */
-bool ParseTokenScript(CScript scriptPubKey, uint160 &hashBytes, std::string &tokenName, CAmount &tokenAmount, uint32_t &nTokenLockTime);
+bool ParseTokenScript(CScript scriptPubKey, uint160 &hashBytes, int& nScriptType, std::string &tokenName, CAmount &tokenAmount, uint32_t &nTokenLockTime);
 
 /** Wrappers **/
 bool GetAllMyTokenBalancesWallet(CWallet* pwallet, std::map<std::string, std::vector<COutput> >& outputs, std::map<std::string, CAmount>& amounts, const std::string& prefix = "");

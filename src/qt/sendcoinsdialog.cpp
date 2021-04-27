@@ -397,6 +397,10 @@ void SendCoinsDialog::on_sendButton_clicked()
             recipientElement = tr("%1 to %2").arg(amount, address);
         }
 
+        if (rcp.username.length() > 0) {
+            recipientElement.append(QString(" (%1)").arg(rcp.username));
+        }
+
         if (rcp.coinLockTime > 0) {
             recipientElement.append(tr(" locked till %1").arg(QDateTime::fromTime_t(rcp.coinLockTime).toString("yyyy.MM.dd HH:mm")));
         }
@@ -622,6 +626,9 @@ void SendCoinsDialog::processSendCoinsReturn(const WalletModel::SendCoinsReturn 
     {
     case WalletModel::InvalidAddress:
         msgParams.first = tr("The recipient address is not valid. Please recheck.");
+        break;
+    case WalletModel::InvalidUsername:
+        msgParams.first = tr("There is no address associated with username you specified. Please recheck.");
         break;
     case WalletModel::InvalidAmount:
         msgParams.first = tr("The amount to pay must be larger than 0.");

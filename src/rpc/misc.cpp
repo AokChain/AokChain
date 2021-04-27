@@ -27,6 +27,8 @@
 #endif
 #include "warnings.h"
 
+#include <tokens/tokens.h>
+
 #include <stdint.h>
 #ifdef HAVE_MALLOC_INFO
 #include <malloc.h>
@@ -62,8 +64,9 @@ public:
         if (pwallet && pwallet->GetCScript(scriptID, subscript)) {
             std::vector<CTxDestination> addresses;
             txnouttype whichType;
+            txnouttype scriptType;
             int nRequired;
-            ExtractDestinations(subscript, whichType, addresses, nRequired);
+            ExtractDestinations(subscript, whichType, scriptType, addresses, nRequired);
             obj.pushKV("script", GetTxnOutputType(whichType));
             obj.pushKV("hex", HexStr(subscript.begin(), subscript.end()));
             UniValue a(UniValue::VARR);
@@ -584,12 +587,22 @@ bool getAddressFromIndex(const int &type, const uint160 &hash, std::string &addr
 static bool getAddressesFromParams(const UniValue& params, std::vector<std::pair<uint160, int> > &addresses)
 {
     if (params[0].isStr()) {
-        CAokChainAddress address(params[0].get_str());
+        std::string address = params[0].get_str();
+
+        if (IsUsernameValid(address)) {
+            address = ptokensdb->UsernameAddress(address);
+            if (address == "") {
+                throw JSONRPCError(RPC_INVALID_PARAMETER, "You specified invalid username.");
+            }
+        }
+
+        CAokChainAddress dest(address);
         uint160 hashBytes;
         int type = 0;
-        if (!address.GetIndexKey(hashBytes, type)) {
+        if (!dest.GetIndexKey(hashBytes, type)) {
             throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Invalid address");
         }
+
         addresses.push_back(std::make_pair(hashBytes, type));
     } else {
         throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Invalid address");

@@ -17,6 +17,8 @@
 #include "tokencontroldialog.h"
 #include "guiconstants.h"
 
+#include <tokens/tokens.h>
+
 #include "wallet/coincontrol.h"
 
 #include <QApplication>
@@ -225,7 +227,7 @@ bool SendTokensEntry::validate()
     if (recipient.paymentRequest.IsInitialized())
         return retval;
 
-    if (!model->validateAddress(ui->payTo->text()))
+    if (!model->validateAddress(ui->payTo->text()) && !IsUsernameValid(ui->payTo->text().toStdString()))
     {
         ui->payTo->setValid(false);
         retval = false;
@@ -260,7 +262,15 @@ SendTokensRecipient SendTokensEntry::getValue()
 
     // Normal payment
     recipient.tokenName = ui->tokenSelectionBox->currentText();
-    recipient.address = ui->payTo->text();
+    
+    if (IsUsernameValid(ui->payTo->text().toStdString()))
+    {
+        recipient.username = ui->payTo->text();
+        recipient.address = QString::fromStdString(ptokensdb->UsernameAddress(ui->payTo->text().toStdString()));
+    } else {
+        recipient.address = ui->payTo->text();
+    }
+
     recipient.label = ui->addAsLabel->text();
 
     if (ui->useLockTime->checkState() == Qt::Checked) {

@@ -666,9 +666,11 @@ public:
 
     /** TOKENS START */
     enum class txnouttype;
-    bool IsTokenScript(int& nType, bool& fIsOwner, int& nStartingIndex) const;
-    bool IsTokenScript(int& nType, bool& fIsOwner) const;
     bool IsTokenScript() const;
+    bool IsTokenScript(int& nType, bool& fIsOwner) const;
+    bool IsTokenScript(int& nType, int& nScriptType, bool& fIsOwner) const;
+    bool IsTokenScript(int& nTXType, int& nScriptType, bool& fIsOwner, int& nStartingIndex) const;
+    bool IsP2SHTokenScript() const;
     bool IsNewToken() const;
     bool IsOwnerToken() const;
     bool IsReissueToken() const;
@@ -736,5 +738,7 @@ bool AmountFromReissueScript(const CScript& scriptPubKey, CAmount& nAmount);
 bool ScriptNewToken(const CScript& scriptPubKey, int& nStartingIndex);
 bool ScriptTransferToken(const CScript& scriptPubKey, int& nStartingIndex);
 bool ScriptReissueToken(const CScript& scriptPubKey, int& nStartingIndex);
+
+int SearchForToken(const CScript& script, const int startingValue);
 
 #endif // AOKCHAIN_SCRIPT_SCRIPT_H
