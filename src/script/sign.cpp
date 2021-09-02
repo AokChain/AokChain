@@ -185,7 +185,7 @@ bool ProduceSignature(const BaseSignatureCreator& creator, const CScript& fromPu
     CScript script = fromPubKey;
     CScript modifiedScript = fromPubKey;
 
-    // If this is a P2SH Asset Script, grab the P2SH section of the script
+    // If this is a P2SH Token Script, grab the P2SH section of the script
     if(fromPubKey.IsP2SHTokenScript()) {
         modifiedScript = CScript(fromPubKey.begin(), fromPubKey.begin() + 23);
         script = modifiedScript;
@@ -477,7 +477,7 @@ SignatureData CombineSignatures(const CScript& scriptPubKey, const BaseSignature
     std::vector<std::vector<unsigned char> > vSolutions;
     CScript modifiedScript = scriptPubKey;
 
-    // If this is a P2SH Asset Script, grab the P2SH section of the script
+    // If this is a P2SH Token Script, grab the P2SH section of the script
     if(scriptPubKey.IsP2SHTokenScript()) {
         modifiedScript = CScript(scriptPubKey.begin(), scriptPubKey.begin() + 23);
     }

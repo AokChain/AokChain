@@ -215,6 +215,9 @@ void ScriptPubKeyToUniv(const CScript& scriptPubKey,
                         if (TokenFromScript(scriptPubKey, token, _tokenAddress)) {
                             tokenInfo.pushKV("units", token.units);
                             tokenInfo.pushKV("reissuable", token.nReissuable > 0 ? true : false);
+                            if (token.nHasIPFS > 0) {
+                                tokenInfo.pushKV("ipfs_hash", EncodeIPFS(token.strIPFSHash));
+                            }
                         }
                     }
                     break;
@@ -227,6 +230,9 @@ void ScriptPubKeyToUniv(const CScript& scriptPubKey,
                             tokenInfo.pushKV("units", token.nUnits);
                         }
                         tokenInfo.pushKV("reissuable", token.nReissuable > 0 ? true : false);
+                        if (!token.strIPFSHash.empty()) {
+                            tokenInfo.pushKV("ipfs_hash", EncodeIPFS(token.strIPFSHash));
+                        }
                     }
                     break;
             }

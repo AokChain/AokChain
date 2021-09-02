@@ -33,6 +33,35 @@ enum class KnownTokenType
 int IntFromTokenType(KnownTokenType type);
 KnownTokenType TokenTypeFromInt(int nType);
 
+const char IPFS_SHA2_256 = 0x12;
+const char IPFS_SHA2_256_LEN = 0x20;
+
+template <typename Stream, typename Operation>
+void ReadWriteIPFSHash(Stream& s, Operation ser_action, std::string& strIPFSHash)
+{
+    // assuming 34-byte IPFS SHA2-256 decoded hash (0x12, 0x20, 32 more bytes)
+    if (ser_action.ForRead())
+    {
+        strIPFSHash = "";
+        if (!s.empty() and s.size() >= 34) {
+            char _sha2_256;
+            ::Unserialize(s, _sha2_256);
+            std::basic_string<char> hash;
+            ::Unserialize(s, hash);
+            std::ostringstream os;
+            os << IPFS_SHA2_256 << IPFS_SHA2_256_LEN << hash.substr(0, 32);
+            strIPFSHash = os.str();
+        }
+    }
+    else
+    {
+        if (strIPFSHash.length() == 34) {
+            ::Serialize(s, IPFS_SHA2_256);
+            ::Serialize(s, strIPFSHash.substr(2));
+        }
+    }
+}
+
 class CNewToken
 {
 public:
@@ -40,13 +69,15 @@ public:
     CAmount nAmount;     // 8 Bytes
     int8_t units;        // 1 Byte
     int8_t nReissuable;  // 1 Byte
+    int8_t nHasIPFS;     // 1 Byte
+    std::string strIPFSHash; // MAX 40 Bytes
 
     CNewToken()
     {
         SetNull();
     }
 
-    CNewToken(const std::string& strName, const CAmount& nAmount, const int& units, const int& nReissuable);
+    CNewToken(const std::string& strName, const CAmount& nAmount, const int& units, const int& nReissuable, const int& nHasIPFS, const std::string& strIPFSHash);
     CNewToken(const std::string& strName, const CAmount& nAmount);
 
     CNewToken(const CNewToken& token);
@@ -58,6 +89,8 @@ public:
         nAmount = 0;
         units = int8_t(MAX_UNIT);
         nReissuable = int8_t(0);
+        nHasIPFS = int8_t(0);
+        strIPFSHash = "";
     }
 
     bool IsNull() const;
@@ -74,13 +107,14 @@ public:
     template <typename Stream, typename Operation>
     inline void SerializationOp(Stream& s, Operation ser_action)
     {
-        int8_t empty = 0;
-
         READWRITE(strName);
         READWRITE(nAmount);
         READWRITE(units);
         READWRITE(nReissuable);
-        READWRITE(empty);
+        READWRITE(nHasIPFS);
+        if (nHasIPFS == 1) {
+            ReadWriteIPFSHash(s, ser_action, strIPFSHash);
+        }
     }
 };
 
@@ -162,6 +196,7 @@ public:
     CAmount nAmount;
     int8_t nUnits;
     int8_t nReissuable;
+    std::string strIPFSHash;
 
     CReissueToken()
     {
@@ -174,6 +209,7 @@ public:
         strName = "";
         nUnits = 0;
         nReissuable = 1;
+        strIPFSHash = "";
     }
 
     ADD_SERIALIZE_METHODS;
@@ -185,9 +221,10 @@ public:
         READWRITE(nAmount);
         READWRITE(nUnits);
         READWRITE(nReissuable);
+        ReadWriteIPFSHash(s, ser_action, strIPFSHash);
     }
 
-    CReissueToken(const std::string& strTokenName, const CAmount& nAmount, const int& nUnits, const int& nReissuable);
+    CReissueToken(const std::string& strTokenName, const CAmount& nAmount, const int& nUnits, const int& nReissuable, const std::string& strIPFSHash);
     bool IsValid(std::string& strError, CTokensCache& tokenCache, bool fForceCheckPrimaryTokenExists = true) const;
     void ConstructTransaction(CScript& script) const;
     bool IsNull() const;

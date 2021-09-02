@@ -26,6 +26,8 @@
 
 #define DEFAULT_UNITS 0
 #define DEFAULT_REISSUABLE 1
+#define DEFAULT_HAS_IPFS 0
+#define DEFAULT_IPFS ""
 #define MIN_TOKEN_LENGTH 3
 #define MAX_TOKEN_LENGTH 32
 #define OWNER_TAG "!"
@@ -287,6 +289,8 @@ bool CheckOwnerDataTx(const CTxOut& txOut);
 bool CheckReissueDataTx(const CTxOut& txOut);
 bool CheckTransferOwnerTx(const CTxOut& txOut);
 
+bool CheckEncodedIPFS(const std::string& hash, std::string& strError);
+
 bool CheckAmountWithUnits(const CAmount& nAmount, const int8_t nUnits);
 
 bool IsScriptNewToken(const CScript& scriptPubKey, int& nStartingIndex);
@@ -319,6 +323,9 @@ bool GetAllMyLockedTokenBalances(std::map<std::string, std::vector<COutput> >& o
 
 /** Verifies that this wallet owns the give token */
 bool VerifyWalletHasToken(CWallet* pwallet, const std::string& token_name, std::pair<int, std::string>& pairError);
+
+std::string DecodeIPFS(std::string encoded);
+std::string EncodeIPFS(std::string decoded);
 
 bool CreateTokenTransaction(CWallet* pwallet, CCoinControl& coinControl, const CNewToken& token, const std::string& address, std::pair<int, std::string>& error, CWalletTx& wtxNew, CReserveKey& reservekey, CAmount& nFeeRequired);
 bool CreateTokenTransaction(CWallet* pwallet, CCoinControl& coinControl, const std::vector<CNewToken> tokens, const std::string& address, std::pair<int, std::string>& error, CWalletTx& wtxNew, CReserveKey& reservekey, CAmount& nFeeRequired);

@@ -405,6 +405,8 @@ UniValue createrawtransaction(const JSONRPCRequest& request)
             "               \"token_quantity\":n,         (number, required) the number of raw units to issue\n"
             "               \"units\":[1-8],              (number, required) display units, between 1 (integral) to 8 (max precision)\n"
             "               \"reissuable\":[0-1],         (number, required) 1=reissuable token\n"
+            "               \"has_ipfs\":[0-1],           (number, required) 1=passing ipfs_hash\n"
+            "               \"ipfs_hash\":\"hash\"          (string, optional) an ipfs hash for discovering token metadata\n"
             "             }\n"
             "         }\n"
             "           or\n"
@@ -413,6 +415,7 @@ UniValue createrawtransaction(const JSONRPCRequest& request)
             "             {\n"
             "               \"root_name\":\"root-name\",         (string, required) name of the token the unique token(s) are being issued under\n"
             "               \"token_tags\":[\"token_tag\", ...], (array, required) the unique tag for each token which is to be issued\n"
+            "               \"ipfs_hashes\":[\"hash\", ...],     (array, optional) ipfs hashes corresponding to each supplied tag (should be same size as \"token_tags\")\n"
             "             }\n"
             "         }\n"
             "           or\n"
@@ -422,6 +425,9 @@ UniValue createrawtransaction(const JSONRPCRequest& request)
             "               \"token_name\":\"token-name\",  (string, required) name of token to be reissued\n"
             "               \"token_quantity\":n,         (number, required) the number of raw units to issue\n"
             "               \"reissuable\":[0-1],         (number, optional) default is 1, 1=reissuable token\n"
+            "               \"ipfs_hashes\":[\"hash\", ...],     (array, optional) ipfs hashes corresponding to each supplied tag (should be same size as \"token_tags\")\n"
+            "             }\n"
+            "         }\n"
             "             }\n"
             "         }\n"
             "         or\n"
@@ -562,10 +568,21 @@ UniValue createrawtransaction(const JSONRPCRequest& request)
                     if (!reissuable.isNum())
                         throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid parameter, missing token metadata for key: reissuable");
 
+                    const UniValue& has_ipfs = find_value(tokenData, "has_ipfs");
+                    if (!has_ipfs.isNum())
+                        throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid parameter, missing token metadata for key: has_ipfs");
+
+                    UniValue ipfs_hash = "";
+                    if (has_ipfs.get_int() == 1) {
+                        ipfs_hash = find_value(tokenData, "ipfs_hash");
+                        if (!ipfs_hash.isStr())
+                            throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid parameter, missing token metadata for key: has_ipfs");
+                    }
+
                     CAmount nAmount = AmountFromValue(token_quantity);
 
                     // Create a new token
-                    CNewToken token(token_name.get_str(), nAmount, units.get_int(), reissuable.get_int());
+                    CNewToken token(token_name.get_str(), nAmount, units.get_int(), reissuable.get_int(), has_ipfs.get_int(), DecodeIPFS(ipfs_hash.get_str()));
 
                     // Verify that data
                     std::string strError = "";
@@ -611,6 +628,15 @@ UniValue createrawtransaction(const JSONRPCRequest& request)
                     if (!token_tags.isArray() || token_tags.size() < 1)
                         throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid parameter, missing token data for key: token_tags");
 
+                    const UniValue& ipfs_hashes = find_value(tokenData, "ipfs_hashes");
+                    if (!ipfs_hashes.isNull()) {
+                        if (!ipfs_hashes.isArray() || ipfs_hashes.size() != token_tags.size()) {
+                            if (!ipfs_hashes.isNum())
+                                throw JSONRPCError(RPC_INVALID_PARAMETER,
+                                                   "Invalid parameter, missing token metadata for key: units");
+                        }
+                    }
+
                     // Create the scripts for the change of the ownership token
                     CScript scriptTransferOwnerToken = GetScriptForDestination(destination);
                     CTokenTransfer tokenTransfer(root_name.get_str() + OWNER_TAG, OWNER_TOKEN_AMOUNT, 0);
@@ -625,8 +651,15 @@ UniValue createrawtransaction(const JSONRPCRequest& request)
 
                         // Create a new token
                         CNewToken token;
-                        token = CNewToken(GetUniqueTokenName(root_name.get_str(), token_tags[i].get_str()),
-                                              UNIQUE_TOKEN_AMOUNT,  UNIQUE_TOKEN_UNITS, UNIQUE_TOKENS_REISSUABLE);
+
+                        if (ipfs_hashes.isNull()) {
+                            token = CNewToken(GetUniqueTokenName(root_name.get_str(), token_tags[i].get_str()),
+                                                UNIQUE_TOKEN_AMOUNT,  UNIQUE_TOKEN_UNITS, UNIQUE_TOKENS_REISSUABLE, 0, "");
+                        } else {
+                            token = CNewToken(GetUniqueTokenName(root_name.get_str(), token_tags[i].get_str()),
+                                                UNIQUE_TOKEN_AMOUNT,  UNIQUE_TOKEN_UNITS, UNIQUE_TOKENS_REISSUABLE,
+                                                1, DecodeIPFS(ipfs_hashes[i].get_str()));
+                        }
 
                         // Verify that data
                         std::string strError = "";
@@ -674,6 +707,14 @@ UniValue createrawtransaction(const JSONRPCRequest& request)
                                                "Invalid parameter, reissuable data must be a 0 or 1");
 
                         reissueObj.nReissuable = int8_t(nReissuable);
+                    }
+
+                    const UniValue& ipfs_hash = find_value(reissueData, "ipfs_hash");
+                    if (!ipfs_hash.isNull()) {
+                        if (!ipfs_hash.isStr())
+                            throw JSONRPCError(RPC_INVALID_PARAMETER,
+                                               "Invalid parameter, missing reissue metadata for key: ipfs_hash");
+                        reissueObj.strIPFSHash = DecodeIPFS(ipfs_hash.get_str());
                     }
 
                     // Add the received data into the reissue object
@@ -850,6 +891,9 @@ UniValue decodescript(const JSONRPCRequest& request)
             "  \"amount\":\"x.xx\",          (numeric) The amount of tokens interacted with.\n"
             "  \"units\": n,                (numeric) The units of the token. (Only appears in the type (new_token))\n"
             "  \"reissuable\": true|false, (boolean) If this token is reissuable. (Only appears in type (new_token|reissue_token))\n"
+            "  \"hasIPFS\": true|false,    (boolean) If this token has an IPFS hash. (Only appears in type (new_token if hasIPFS is true))\n"
+            "  \"ipfs_hash\": \"hash\",      (string) The ipfs hash for the new token. (Only appears in type (new_token))\n"
+            "  \"new_ipfs_hash\":\"hash\",    (string) If new ipfs hash (Only appears in type. (reissue_token))\n"
             "}\n"
             "\nExamples:\n"
             + HelpExampleCli("decodescript", "\"hexstring\"")
@@ -907,6 +951,9 @@ UniValue decodescript(const JSONRPCRequest& request)
         bool reissuable = reissue.nReissuable ? true : false;
         r.pushKV("reissuable", reissuable);
 
+        if (reissue.strIPFSHash != "")
+            r.pushKV("new_ipfs_hash", EncodeIPFS(reissue.strIPFSHash));
+
     } else if (type.isStr() && type.get_str() == TOKEN_NEW_STRING) {
         if (!AreTokensDeployed())
             throw JSONRPCError(RPC_DESERIALIZATION_ERROR, "Tokens are not active");
@@ -922,6 +969,12 @@ UniValue decodescript(const JSONRPCRequest& request)
 
             bool reissuable = token.nReissuable ? true : false;
             r.pushKV("reissuable", reissuable);
+
+            bool hasIPFS = token.nHasIPFS ? true : false;
+            r.pushKV("hasIPFS", hasIPFS);
+
+            if (hasIPFS)
+                r.pushKV("ipfs_hash", EncodeIPFS(token.strIPFSHash));
         }
         else if (OwnerTokenFromScript(script, ownerToken, address))
         {

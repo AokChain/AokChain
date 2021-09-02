@@ -64,6 +64,7 @@ private:
 
     bool checkedAvailablity = false;
 
+    void toggleIPFSText();
     void setUpValues();
     void showMessage(QString string);
     void showValidMessage(QString string);
@@ -87,10 +88,15 @@ private:
     void updateFeeMinimizedLabel();
     void minimizeFeeSection(bool fMinimize);
 
+    //Validation
+    bool checkIPFSHash(QString hash);
+
 private Q_SLOTS:
+    void ipfsStateChanged();
     void checkAvailabilityClicked();
     void onNameChanged(QString name);
     void onAddressNameChanged(QString address);
+    void onIPFSHashChanged(QString hash);
     void onCreateTokenClicked();
     void onUnitChanged(int value);
     void onChangeAddressChanged(QString changeAddress);

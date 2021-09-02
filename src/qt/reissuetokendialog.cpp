@@ -51,6 +51,8 @@ ReissueTokenDialog::ReissueTokenDialog(const PlatformStyle *_platformStyle, QWid
     setWindowTitle("Reissue Tokens");
     connect(ui->comboBox, SIGNAL(activated(int)), this, SLOT(onTokenSelected(int)));
     connect(ui->quantitySpinBox, SIGNAL(valueChanged(double)), this, SLOT(onQuantityChanged(double)));
+    connect(ui->ipfsBox, SIGNAL(clicked()), this, SLOT(onIPFSStateChanged()));
+    connect(ui->ipfsText, SIGNAL(textChanged(QString)), this, SLOT(onIPFSHashChanged(QString)));
     connect(ui->addressText, SIGNAL(textChanged(QString)), this, SLOT(onAddressNameChanged(QString)));
     connect(ui->reissueTokenButton, SIGNAL(clicked()), this, SLOT(onReissueTokenClicked()));
     connect(ui->reissuableBox, SIGNAL(clicked()), this, SLOT(onReissueBoxChanged()));
@@ -321,6 +323,8 @@ void ReissueTokenDialog::setupTokenDataView(const PlatformStyle *platformStyle)
 
     ui->reissuableBox->setStyleSheet(QString(".QCheckBox{ %1; }").arg(STRING_LABEL_COLOR));
 
+    ui->ipfsBox->setStyleSheet(QString(".QCheckBox{ %1; }").arg(STRING_LABEL_COLOR));
+
     ui->frame_3->setStyleSheet(QString(".QFrame {background-color: %1; padding-top: 10px; padding-right: 5px; border: none;}").arg(platformStyle->WidgetBackGroundColor().name()));
 
     ui->frame_2->setStyleSheet(QString(".QFrame {background-color: %1; padding-top: 10px; padding-right: 5px; border: none;}").arg(platformStyle->WidgetBackGroundColor().name()));
@@ -394,6 +398,18 @@ void ReissueTokenDialog::updateDisplayUnit()
     updateSmartFeeLabel();
 }
 
+void ReissueTokenDialog::toggleIPFSText()
+{
+    if (ui->ipfsBox->isChecked()) {
+        ui->ipfsText->setDisabled(false);
+    } else {
+        ui->ipfsText->setDisabled(true);
+    }
+
+    buildUpdatedData();
+    CheckFormState();
+}
+
 void ReissueTokenDialog::showMessage(QString string)
 {
     ui->messageLabel->setStyleSheet("color: red");
@@ -446,6 +462,16 @@ void ReissueTokenDialog::CheckFormState()
             showMessage(tr("Invalid AokChain Destination Address"));
             return;
         }
+    }
+
+    if (ui->ipfsBox->isChecked())
+        if (!checkIPFSHash(ui->ipfsText->text()))
+            return;
+
+    // Keep the button disabled if no changes have been made
+    if ((!ui->ipfsBox->isChecked() || (ui->ipfsBox->isChecked() && ui->ipfsText->text().isEmpty())) && ui->reissuableBox->isChecked() && ui->quantitySpinBox->value() == 0 && ui->unitSpinBox->value() == token->units) {
+        hideMessage();
+        return;
     }
 
     enableReissueButton();
@@ -503,11 +529,19 @@ void ReissueTokenDialog::buildUpdatedData()
     else
         reissue = formatGreen.arg(tr("Can Reisssue"), ":", reissuable) + "\n";
 
+    QString ipfs;
+    if (token->nHasIPFS && (!ui->ipfsBox->isChecked() || (ui->ipfsBox->isChecked() && ui->ipfsText->text().isEmpty())))
+        ipfs = formatBlack.arg(tr("IPFS Hash"), ":", QString::fromStdString(EncodeIPFS(token->strIPFSHash))) + "\n";
+    else if (ui->ipfsBox->isChecked() && !ui->ipfsText->text().isEmpty()) {
+        ipfs = formatGreen.arg(tr("IPFS Hash"), ":", ui->ipfsText->text()) + "\n";
+    }
+
     ui->updatedTokenData->clear();
     ui->updatedTokenData->append(name);
     ui->updatedTokenData->append(quantity);
     ui->updatedTokenData->append(units);
     ui->updatedTokenData->append(reissue);
+    ui->updatedTokenData->append(ipfs);
     ui->updatedTokenData->show();
     ui->updatedTokenData->setFixedHeight(ui->updatedTokenData->document()->size().height());
 }
@@ -558,11 +592,15 @@ void ReissueTokenDialog::onTokenSelected(int index)
         QString quantity = formatBlack.arg(tr("Current Quantity"), ":", QString::fromStdString(ss.str())) + "\n";
         QString units = formatBlack.arg(tr("Current Units"), ":", QString::number(ui->unitSpinBox->value()));
         QString reissue = formatBlack.arg(tr("Can Reissue"), ":", tr("Yes")) + "\n";
+        QString ipfs;
+        if (token->nHasIPFS)
+            ipfs = formatBlack.arg(tr("IPFS Hash"), ":", QString::fromStdString(EncodeIPFS(token->strIPFSHash))) + "\n";
 
         ui->currentTokenData->append(name);
         ui->currentTokenData->append(quantity);
         ui->currentTokenData->append(units);
         ui->currentTokenData->append(reissue);
+        ui->currentTokenData->append(ipfs);
         ui->currentTokenData->setFixedHeight(ui->currentTokenData->document()->size().height());
 
         buildUpdatedData();
@@ -579,6 +617,49 @@ void ReissueTokenDialog::onQuantityChanged(double qty)
 {
     buildUpdatedData();
     CheckFormState();
+}
+
+void ReissueTokenDialog::onIPFSStateChanged()
+{
+    toggleIPFSText();
+}
+
+bool ReissueTokenDialog::checkIPFSHash(QString hash)
+{
+    if (!hash.isEmpty()) {
+        std::string error;
+        if (!CheckEncodedIPFS(hash.toStdString(), error)) {
+            ui->ipfsText->setStyleSheet(STYLE_INVALID);
+            showMessage(tr("IPFS Hash must start with 'Qm'"));
+            disableReissueButton();
+            return false;
+        } else if (hash.size() != 46) {
+            ui->ipfsText->setStyleSheet(STYLE_INVALID);
+            showMessage(tr("IPFS Hash must have size of 46 characters"));
+            disableReissueButton();
+            return false;
+        } else if (DecodeIPFS(ui->ipfsText->text().toStdString()).empty()) {
+            ui->ipfsText->setStyleSheet(STYLE_INVALID);
+            showMessage(tr("IPFS hash is not valid. Please use a valid IPFS hash"));
+            disableReissueButton();
+            return false;
+        }
+    }
+
+    // No problems where found with the hash, reset the border, and hide the messages.
+    hideMessage();
+    ui->ipfsText->setStyleSheet("");
+
+    return true;
+}
+
+void ReissueTokenDialog::onIPFSHashChanged(QString hash)
+{
+
+    if (checkIPFSHash(hash))
+        CheckFormState();
+
+    buildUpdatedData();
 }
 
 void ReissueTokenDialog::onAddressNameChanged(QString address)
@@ -627,6 +708,7 @@ void ReissueTokenDialog::onReissueTokenClicked()
     QString name = ui->comboBox->currentText();
     CAmount quantity = ui->quantitySpinBox->value() * COIN;
     bool reissuable = ui->reissuableBox->isChecked();
+    bool hasIPFS = ui->ipfsBox->isChecked() && !ui->ipfsText->text().isEmpty();
 
     int unit = ui->unitSpinBox->value();
     if (unit == token->units)
@@ -639,7 +721,11 @@ void ReissueTokenDialog::onReissueTokenClicked()
 
     updateCoinControlState(ctrl);
 
-    CReissueToken reissueToken(name.toStdString(), quantity, unit, reissuable ? 1 : 0);
+    std::string ipfsDecoded = "";
+    if (hasIPFS)
+        ipfsDecoded = DecodeIPFS(ui->ipfsText->text().toStdString());
+
+    CReissueToken reissueToken(name.toStdString(), quantity, unit, reissuable ? 1 : 0, ipfsDecoded);
 
     CWalletTx tx;
     CReserveKey reservekey(model->getWallet());

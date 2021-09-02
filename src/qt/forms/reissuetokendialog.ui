@@ -755,6 +755,16 @@
               <property name="rightMargin">
                <number>15</number>
               </property>
+              <item>
+               <widget class="QCheckBox" name="ipfsBox">
+                <property name="layoutDirection">
+                 <enum>Qt::LeftToRight</enum>
+                </property>
+                <property name="text">
+                 <string>Change IPFS Hash</string>
+                </property>
+               </widget>
+              </item>
              </layout>
             </item>
             <item>
@@ -765,6 +775,28 @@
               <property name="spacing">
                <number>10</number>
               </property>
+              <item>
+               <widget class="QLineEdit" name="ipfsText">
+                <property name="sizePolicy">
+                 <sizepolicy hsizetype="Expanding" vsizetype="Preferred">
+                  <horstretch>0</horstretch>
+                  <verstretch>0</verstretch>
+                 </sizepolicy>
+                </property>
+                <property name="toolTip">
+                 <string>The ipfs hash that contains information about the token</string>
+                </property>
+                <property name="maxLength">
+                 <number>46</number>
+                </property>
+                <property name="placeholderText">
+                 <string>The IPFS Hash that is associated with the token being created (e.g. QmU4h365LYMHx...)</string>
+                </property>
+                <property name="clearButtonEnabled">
+                 <bool>true</bool>
+                </property>
+               </widget>
+              </item>
              </layout>
             </item>
            </layout>

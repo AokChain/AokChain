@@ -20,7 +20,9 @@ class CDatabasedTokenData;
 
 struct CBlockTokenUndo
 {
+    bool fChangedIPFS;
     bool fChangedUnits;
+    std::string strIPFS;
     int nUnits;
 
     ADD_SERIALIZE_METHODS;
@@ -28,6 +30,8 @@ struct CBlockTokenUndo
     template <typename Stream, typename Operation>
     inline void SerializationOp(Stream& s, Operation ser_action) {
         READWRITE(fChangedUnits);
+        READWRITE(fChangedIPFS);
+        READWRITE(strIPFS);
         READWRITE(nUnits);
     }
 };

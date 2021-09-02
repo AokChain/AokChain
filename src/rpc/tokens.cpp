@@ -77,7 +77,7 @@ UniValue issue(const JSONRPCRequest& request)
 {
     if (request.fHelp || !AreTokensDeployed() || request.params.size() < 1 || request.params.size() > 8)
         throw std::runtime_error(
-            "issue \"token_name\" qty \"( to_address )\" \"( change_address )\" ( units ) ( reissuable )\n"
+            "issue \"token_name\" qty \"( to_address )\" \"( change_address )\" ( units ) ( reissuable ) ( has_ipfs ) \"( ipfs_hash )\n"
             + TokenActivationWarning() +
             "\nIssue an token, subtoken or unique token.\n"
             "Token name must not conflict with any existing token.\n"
@@ -92,6 +92,8 @@ UniValue issue(const JSONRPCRequest& request)
             "4. \"change_address\"        (string), optional, default=\"\"), address the the AOK change will be sent to, if it is empty, change address will be generated for you\n"
             "5. \"units\"                 (integer, optional, default=0, min=0, max=8), the number of decimals precision for the token (0 for whole units (\"1\"), 8 for max precision (\"1.00000000\")\n"
             "6. \"reissuable\"            (boolean, optional, default=true (false for unique tokens)), whether future reissuance is allowed\n"
+            "7. \"has_ipfs\"              (boolean, optional, default=false), whether ifps hash is going to be added to the token\n"
+            "8. \"ipfs_hash\"             (string, optional but required if has_ipfs = 1), an ipfs hash (only sha2-256 hashes currently supported -- Qm...)\n"
 
             "\nResult:\n"
             "\"txid\"                     (string) The transaction id\n"
@@ -101,7 +103,7 @@ UniValue issue(const JSONRPCRequest& request)
             + HelpExampleCli("issue", "\"TOKEN_NAME\" 1000 \"myaddress\"")
             + HelpExampleCli("issue", "\"TOKEN_NAME\" 1000 \"myaddress\" \"changeaddress\" 4")
             + HelpExampleCli("issue", "\"TOKEN_NAME\" 1000 \"myaddress\" \"changeaddress\" 2 true")
-            + HelpExampleCli("issue", "\"TOKEN_NAME\" 1000 \"myaddress\" \"changeaddress\" 8 false true")
+            + HelpExampleCli("issue", "\"TOKEN_NAME\" 1000 \"myaddress\" \"changeaddress\" 8 false true QmTqu3Lk3gmTsQVtjU7rYYM37EAW4xNmbuEAp2Mjr4AV7E")
             + HelpExampleCli("issue", "\"TOKEN_NAME/SUB_TOKEN\" 1000 \"myaddress\" \"changeaddress\" 2 true")
             + HelpExampleCli("issue", "\"TOKEN_NAME#uniquetag\"")
         );
@@ -187,6 +189,19 @@ UniValue issue(const JSONRPCRequest& request)
     if (request.params.size() > 5)
         reissuable = request.params[5].get_bool();
 
+    bool has_ipfs = false;
+    if (request.params.size() > 6)
+        has_ipfs = request.params[6].get_bool();
+
+    std::string ipfs_hash = "";
+    if (request.params.size() > 7 && has_ipfs) {
+        ipfs_hash = request.params[7].get_str();
+        if (ipfs_hash.length() != 46)
+            throw JSONRPCError(RPC_INVALID_PARAMS, std::string("Invalid IPFS hash (must be 46 characters)"));
+        if (ipfs_hash.substr(0,2) != "Qm")
+            throw JSONRPCError(RPC_INVALID_PARAMS, std::string("Invalid IPFS hash (doesn't start with 'Qm')"));
+    }
+
     // check for required unique token params
     if (tokenType == KnownTokenType::UNIQUE && (nAmount != COIN || units != 0 || reissuable)) {
         throw JSONRPCError(RPC_INVALID_PARAMETER, std::string("Invalid parameters for issuing a unique token."));
@@ -197,7 +212,7 @@ UniValue issue(const JSONRPCRequest& request)
         throw JSONRPCError(RPC_INVALID_PARAMETER, std::string("Invalid parameters for issuing an username."));
     }
 
-    CNewToken token(tokenName, nAmount, units, reissuable ? 1 : 0);
+    CNewToken token(tokenName, nAmount, units, reissuable ? 1 : 0, has_ipfs ? 1 : 0, DecodeIPFS(ipfs_hash));
 
     CReserveKey reservekey(pwallet);
     CWalletTx transaction;
@@ -291,7 +306,7 @@ UniValue registerusername(const JSONRPCRequest& request)
         address = EncodeDestination(keyID);
     }
 
-    CNewToken token(tokenName, COIN, 0, 0);
+    CNewToken token(tokenName, COIN, 0, 0, 0, "");
 
     CReserveKey reservekey(pwallet);
     CWalletTx transaction;
@@ -321,18 +336,20 @@ UniValue issueunique(const JSONRPCRequest& request)
 {
     if (request.fHelp || !AreTokensDeployed() || request.params.size() < 2 || request.params.size() > 5)
         throw std::runtime_error(
-                "issueunique \"root_name\" [token_tags] \"( to_address )\" \"( change_address )\"\n"
+                "issueunique \"root_name\" [token_tags] ( [ipfs_hashes] ) \"( to_address )\" \"( change_address )\"\n"
                 + TokenActivationWarning() +
                 "\nIssue unique token(s).\n"
                 "root_name must be an token you own.\n"
                 "An token will be created for each element of token_tags.\n"
-                "Five (5) AOK will be burned for each token created.\n"
+                "If provided ipfs_hashes must be the same length as token_tags.\n"
+                "Hunderd (100) AOK will be burned for each token created.\n"
 
                 "\nArguments:\n"
                 "1. \"root_name\"             (string, required) name of the token the unique token(s) are being issued under\n"
                 "2. \"token_tags\"            (array, required) the unique tag for each token which is to be issued\n"
-                "3. \"to_address\"            (string, optional, default=\"\"), address tokens will be sent to, if it is empty, address will be generated for you\n"
-                "4. \"change_address\"        (string, optional, default=\"\"), address the the AOK change will be sent to, if it is empty, change address will be generated for you\n"
+                "3. \"ipfs_hashes\"           (array, optional) ipfs hashes corresponding to each supplied tag (should be same size as \"token_tags\") (only sha2-256 hashes currently supported -- Qm...)\n"
+                "4. \"to_address\"            (string, optional, default=\"\"), address tokens will be sent to, if it is empty, address will be generated for you\n"
+                "5. \"change_address\"        (string, optional, default=\"\"), address the the AOK change will be sent to, if it is empty, change address will be generated for you\n"
 
                 "\nResult:\n"
                 "\"txid\"                     (string) The transaction id\n"
@@ -368,9 +385,16 @@ UniValue issueunique(const JSONRPCRequest& request)
         throw JSONRPCError(RPC_INVALID_PARAMETER, std::string("Token tags must be a non-empty array."));
     }
 
+    const UniValue& ipfsHashes = request.params[2];
+    if (!ipfsHashes.isNull()) {
+        if (!ipfsHashes.isArray() || ipfsHashes.size() != tokenTags.size()) {
+            throw JSONRPCError(RPC_INVALID_PARAMETER, std::string("If provided, IPFS hashes must be an array of the same size as the token tags array."));
+        }
+    }
+
     std::string address = "";
-    if (request.params.size() > 2)
-        address = request.params[2].get_str();
+    if (request.params.size() > 3)
+        address = request.params[3].get_str();
 
     if (!address.empty()) {
         CTxDestination destination = DecodeDestination(address);
@@ -398,8 +422,8 @@ UniValue issueunique(const JSONRPCRequest& request)
     }
 
     std::string changeAddress = "";
-    if (request.params.size() > 3)
-        changeAddress = request.params[3].get_str();
+    if (request.params.size() > 4)
+        changeAddress = request.params[4].get_str();
     if (!changeAddress.empty()) {
         CTxDestination destination = DecodeDestination(changeAddress);
         if (!IsValidDestination(destination)) {
@@ -419,7 +443,12 @@ UniValue issueunique(const JSONRPCRequest& request)
         std::string tokenName = GetUniqueTokenName(rootName, tag);
         CNewToken token;
 
-        token = CNewToken(tokenName, UNIQUE_TOKEN_AMOUNT, UNIQUE_TOKEN_UNITS, UNIQUE_TOKENS_REISSUABLE);
+        if (ipfsHashes.isNull()) {
+            token = CNewToken(tokenName, UNIQUE_TOKEN_AMOUNT, UNIQUE_TOKEN_UNITS, UNIQUE_TOKENS_REISSUABLE, 0, "");
+        } else {
+            token = CNewToken(tokenName, UNIQUE_TOKEN_AMOUNT, UNIQUE_TOKEN_UNITS, UNIQUE_TOKENS_REISSUABLE, 1,
+                              DecodeIPFS(ipfsHashes[i].get_str()));
+        }
 
         tokens.push_back(token);
     }
@@ -543,6 +572,8 @@ UniValue gettokendata(const JSONRPCRequest& request)
                 "  amount: (number),\n"
                 "  units: (number),\n"
                 "  reissuable: (number),\n"
+                "  has_ipfs: (number),\n"
+                "  ipfs_hash: (hash) (only if has_ipfs = 1)\n"
                 "}\n"
 
                 "\nExamples:\n"
@@ -565,6 +596,9 @@ UniValue gettokendata(const JSONRPCRequest& request)
         result.pushKV("amount", UnitValueFromAmount(token.nAmount, token.strName));
         result.pushKV("units", token.units);
         result.pushKV("reissuable", token.nReissuable);
+        result.pushKV("has_ipfs", token.nHasIPFS);
+        if (token.nHasIPFS)
+            result.pushKV("ipfs_hash", EncodeIPFS(token.strIPFSHash));
 
         return result;
     }
@@ -1379,10 +1413,11 @@ UniValue reissue(const JSONRPCRequest& request)
 {
     if (request.fHelp || !AreTokensDeployed() || request.params.size() > 7 || request.params.size() < 3)
         throw std::runtime_error(
-                "reissue \"token_name\" qty \"to_address\" \"change_address\" ( reissuable ) ( new_unit ) \n"
+                "reissue \"token_name\" qty \"to_address\" \"change_address\" ( reissuable ) ( new_unit ) \"( new_ipfs )\" \n"
                 + TokenActivationWarning() +
                 "\nReissues a quantity of an token to an owned address if you own the Owner Token"
                 "\nCan change the reissuable flag during reissuance"
+                "\nCan change the ipfs hash during reissuance"
 
                 "\nArguments:\n"
                 "1. \"token_name\"               (string, required) name of token that is being reissued\n"
@@ -1391,6 +1426,7 @@ UniValue reissue(const JSONRPCRequest& request)
                 "4. \"change_address\"           (string, optional) address that the change of the transaction will be sent to\n"
                 "5. \"reissuable\"               (boolean, optional, default=true), whether future reissuance is allowed\n"
                 "6. \"new_unit\"                 (numeric, optional, default=-1), the new units that will be associated with the token\n"
+                "7. \"new_ifps\"                 (string, optional, default=\"\"), whether to update the current ipfshash (only sha2-256 hashes currently supported -- Qm...)\n"
 
                 "\nResult:\n"
                 "\"txid\"                     (string) The transaction id\n"
@@ -1430,7 +1466,18 @@ UniValue reissue(const JSONRPCRequest& request)
         newUnits = request.params[5].get_int();
     }
 
-    CReissueToken reissueToken(token_name, nAmount, newUnits, reissuable);
+    std::string newipfs = "";
+    if (request.params.size() > 6) {
+        newipfs = request.params[6].get_str();
+        if (newipfs.length() != 46)
+            throw JSONRPCError(RPC_INVALID_PARAMS, std::string("Invalid IPFS hash (must be 46 characters)"));
+        if (newipfs.substr(0,2) != "Qm")
+            throw JSONRPCError(RPC_INVALID_PARAMS, std::string("Invalid IPFS hash (doesn't start with 'Qm')"));
+        if (DecodeIPFS(newipfs).empty())
+            throw JSONRPCError(RPC_INVALID_PARAMS, std::string("Invalid IPFS hash (contains invalid characters)"));
+    }
+
+    CReissueToken reissueToken(token_name, nAmount, newUnits, reissuable, DecodeIPFS(newipfs));
 
     std::pair<int, std::string> error;
     CReserveKey reservekey(pwallet);
@@ -1482,6 +1529,8 @@ UniValue listtokens(const JSONRPCRequest& request)
                 "      amount: (number),\n"
                 "      units: (number),\n"
                 "      reissuable: (number),\n"
+                "      has_ipfs: (number),\n"
+                "      ipfs_hash: (hash) (only if has_ipfs = 1)\n"
                 "    },\n"
                 "  {...}, {...}\n"
                 "}\n"
@@ -1535,8 +1584,12 @@ UniValue listtokens(const JSONRPCRequest& request)
             detail.pushKV("amount", UnitValueFromAmount(token.nAmount, token.strName));
             detail.pushKV("units", token.units);
             detail.pushKV("reissuable", token.nReissuable);
+            detail.pushKV("has_ipfs", token.nHasIPFS);
             detail.pushKV("block_height", data.nHeight);
             detail.pushKV("blockhash", data.blockHash.GetHex());
+            if (token.nHasIPFS)
+                detail.pushKV("ipfs_hash", EncodeIPFS(token.strIPFSHash));
+
             result.pushKV(token.strName, detail);
         } else {
             result.push_back(token.strName);
@@ -1631,8 +1684,8 @@ UniValue getusernameaddress(const JSONRPCRequest& request)
 static const CRPCCommand commands[] =
 { //  category    name                          actor (function)             argNames
   //  ----------- ------------------------      -----------------------      ----------
-    { "tokens",   "issue",                      &issue,                      {"token_name","qty","to_address","change_address","units","reissuable"} },
-    { "tokens",   "issueunique",                &issueunique,                {"root_name", "token_tags", "to_address", "change_address"}},
+    { "tokens",   "issue",                      &issue,                      {"token_name","qty","to_address","change_address","units","reissuable","has_ipfs","ipfs_hash"} },
+    { "tokens",   "issueunique",                &issueunique,                {"root_name", "token_tags", "ipfs_hashes", "to_address", "change_address"}},
     { "tokens",   "registerusername",           &registerusername,           {"username","to_address"} },
     { "tokens",   "getusernameaddress",         &getusernameaddress,         {"username"} },
     { "tokens",   "listtokenbalancesbyaddress", &listtokenbalancesbyaddress, {"address", "onlytotal", "count", "start"} },
@@ -1644,7 +1697,7 @@ static const CRPCCommand commands[] =
     { "tokens",   "transfermany",               &transfermany,               {"token_name", "amounts"}},
     { "tokens",   "transfermanyoutputs",        &transfermanyoutputs,        {"outputs"}},
     { "tokens",   "transferfromaddress",        &transferfromaddress,        {"address", "token_name", "qty", "to_address", "token_lock_time"}},
-    { "tokens",   "reissue",                    &reissue,                    {"token_name", "qty", "to_address", "change_address", "reissuable", "new_unit"}},
+    { "tokens",   "reissue",                    &reissue,                    {"token_name", "qty", "to_address", "change_address", "reissuable", "new_unit", "new_ipfs"}},
     { "tokens",   "listtokens",                 &listtokens,                 {"token", "verbose", "count", "start"}},
     { "tokens",   "getcacheinfo",               &getcacheinfo,               {}}
 };

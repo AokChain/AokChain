@@ -62,6 +62,7 @@ private:
 
     CNewToken *token;
 
+    void toggleIPFSText();
     void setUpValues();
     void showMessage(QString string);
     void showValidMessage(QString string);
@@ -82,9 +83,14 @@ private:
     void updateFeeMinimizedLabel();
     void minimizeFeeSection(bool fMinimize);
 
+    //Validation of IPFS
+    bool checkIPFSHash(QString hash);
+
 private Q_SLOTS:
     void onTokenSelected(int index);
     void onQuantityChanged(double qty);
+    void onIPFSStateChanged();
+    void onIPFSHashChanged(QString hash);
     void onAddressNameChanged(QString address);
     void onReissueTokenClicked();
     void onReissueBoxChanged();
