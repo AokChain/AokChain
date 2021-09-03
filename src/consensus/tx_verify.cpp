@@ -295,6 +295,9 @@ bool CheckTransaction(const CTransaction& tx, CValidationState &state, CTokensCa
                 if (!token.IsValid(strError, *tokenCache, fMemPoolCheck, fCheckTokenDuplicate, fForceDuplicateCheck))
                     return state.DoS(100, error("%s: %s", __func__, strError), REJECT_INVALID, "bad-txns-issue-" + strError);
 
+                if (!AreTokensIPFSDeployed() && token.strIPFSHash != "")
+                    return state.DoS(100, false, REJECT_INVALID, "bad-txns-ipfs-not-enabled");
+
             } else if (tx.IsReissueToken()) {
                 /** Verify the reissue tokens data */
                 std::string strError;
@@ -309,6 +312,9 @@ bool CheckTransaction(const CTransaction& tx, CValidationState &state, CTokensCa
                 if (!reissue.IsValid(strError, *tokenCache, false)) {
                     return state.DoS(100, false, REJECT_INVALID, "bad-txns-reissue-" + strError);
                 }
+
+                if (!AreTokensIPFSDeployed() && reissue.strIPFSHash != "")
+                    return state.DoS(100, false, REJECT_INVALID, "bad-txns-ipfs-not-enabled");
 
             } else if (tx.IsNewUniqueToken()) {
 
@@ -329,6 +335,9 @@ bool CheckTransaction(const CTransaction& tx, CValidationState &state, CTokensCa
 
                         if (!token.IsValid(strError, *tokenCache, fMemPoolCheck, fCheckTokenDuplicate, fForceDuplicateCheck))
                             return state.DoS(100, false, REJECT_INVALID, "bad-txns-" + strError);
+
+                        if (!AreTokensIPFSDeployed() && token.strIPFSHash != "")
+                            return state.DoS(100, false, REJECT_INVALID, "bad-txns-ipfs-not-enabled");
                     }
                 }
             } else if (tx.IsNewUsername()) {
@@ -345,6 +354,9 @@ bool CheckTransaction(const CTransaction& tx, CValidationState &state, CTokensCa
 
                 if (!token.IsValid(strError, *tokenCache, fMemPoolCheck, fCheckTokenDuplicate, fForceDuplicateCheck))
                     return state.DoS(100, error("%s: %s", __func__, strError), REJECT_INVALID, "bad-txns-issue-" + strError);
+
+                if (!AreTokensIPFSDeployed() && token.strIPFSHash != "")
+                    return state.DoS(100, false, REJECT_INVALID, "bad-txns-ipfs-not-enabled");
 
             } else {
                 // Fail if transaction contains any non-transfer token scripts and hasn't conformed to one of the

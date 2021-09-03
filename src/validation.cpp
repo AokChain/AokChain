@@ -625,10 +625,11 @@ static bool AcceptToMemoryPoolWorker(const CChainParams& chainparams, CTxMemPool
         }
 
         if (!AreTokensP2SHDeployed()) {
-            for (auto out : tx.vout)
+            for (auto out : tx.vout) {
                 if (IsScriptNewUsername(out.scriptPubKey)) {
                     return state.DoS(100, false, REJECT_INVALID, "bad-txns-contained-username-when-not-active");
                 }
+            }
         }
 
         if (AreTokensDeployed()) {
@@ -2124,6 +2125,9 @@ int32_t ComputeBlockVersion(const CBlockIndex* pindexPrev, const Consensus::Para
     /** If the tokens are deployed now. We need to use the correct block version */
     if (AreTokensDeployed())
         nVersion = VERSIONBITS_TOP_BITS_TOKENS;
+
+    if (AreTokensIPFSDeployed())
+        nVersion = VERSIONBITS_TOP_BITS_IPFS;
 
     for (int i = 0; i < (int)Consensus::MAX_VERSION_BITS_DEPLOYMENTS; i++) {
         ThresholdState state = VersionBitsState(pindexPrev, params, static_cast<Consensus::DeploymentPos>(i), versionbitscache);
@@ -4076,6 +4080,11 @@ static bool ContextualCheckBlockHeader(const CBlock& block, CValidationState& st
         return state.Invalid(false, REJECT_OBSOLETE, strprintf("bad-version(0x%08x)", block.nVersion), strprintf("rejected nVersion=0x%08x block", block.nVersion));
     }
 
+    // Reject outdated veresion blocks onces IPFS are active.
+    if (AreTokensIPFSDeployed() && block.nVersion < VERSIONBITS_TOP_BITS_IPFS) {
+        return state.Invalid(false, REJECT_OBSOLETE, strprintf("bad-version(0x%08x)", block.nVersion), strprintf("rejected nVersion=0x%08x block", block.nVersion));
+    }
+
     return true;
 }
 
@@ -5666,6 +5675,15 @@ bool AreTokensDeployed() {
 bool AreTokensP2SHDeployed() {
     const int nHeight = chainActive.Height() + 1;
     if (nHeight >= Params().GetConsensus().nTokensP2SHDeploymentHeight) {
+        return true;
+    } else {
+        return false;
+    }
+}
+
+bool AreTokensIPFSDeployed() {
+    const int nHeight = chainActive.Height() + 1;
+    if (nHeight >= Params().GetConsensus().nTokensIPFSDeploymentHeight) {
         return true;
     } else {
         return false;

@@ -73,6 +73,7 @@ struct Params {
     int nSubsidyHalvingInterval;
     int nTokensDeploymentHeight;
     int nTokensP2SHDeploymentHeight;
+    int nTokensIPFSDeploymentHeight;
 
     int nStakeTimestampMask;
 };
