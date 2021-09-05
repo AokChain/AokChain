@@ -2344,15 +2344,6 @@ static bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockInd
 
         nInputs += tx.vin.size();
 
-        if (tx.IsCoinStake()) {
-            for (auto vout : tx.vout) {
-                if (vout.scriptPubKey.IsTokenScript()) {
-                    return state.DoS(0, error("%s: coinstake contains token transaction", __func__),
-                                     REJECT_INVALID, "bad-txns-coinstake-contains-token-txes");
-                }
-            }
-        }
-
         if (!tx.IsCoinBase())
         {
             CAmount txfee = 0;
