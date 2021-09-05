@@ -205,10 +205,6 @@ bool CheckTransaction(const CTransaction& tx, CValidationState &state, CTokensCa
                 return state.DoS(0, false, REJECT_INVALID, "bad-txns-p2sh-token-not-active");
         }
 
-        // Make sure that all token tx have a nValue of zero AOK
-        if (isToken && txout.nValue != 0)
-            return state.DoS(100, false, REJECT_INVALID, "bad-txns-token-tx-amount-isn't-zero");
-
         if (!AreTokensDeployed() && isToken && !fReindex)
             return state.DoS(100, false, REJECT_INVALID, "bad-txns-is-token-and-token-not-active");
 
@@ -239,6 +235,24 @@ bool CheckTransaction(const CTransaction& tx, CValidationState &state, CTokensCa
                         if (transfer.nAmount != UNIQUE_TOKEN_AMOUNT)
                             return state.DoS(100, false, REJECT_INVALID, "bad-txns-transfer-unique-amount-was-not-1");
                     }
+
+                    // Make sure token transfer amount is zero AOK
+                    if (txout.nValue != 0) {
+                        return state.DoS(100, false, REJECT_INVALID, "bad-txns-token-transfer-amount-not-zero");
+                    }
+                } else if (nType == TX_NEW_TOKEN) {
+                    // Make sure new token amount is zero AOK
+                    if (txout.nValue != 0) {
+                        return state.DoS(100, false, REJECT_INVALID, "bad-txns-new-token-amount-not-zero");
+                    }
+                } else if (nType == TX_REISSUE_TOKEN) {
+                    // Make sure reissue token amount is zero AOK
+                    if (txout.nValue != 0) {
+                        return state.DoS(100, false, REJECT_INVALID, "bad-txns-reissue-token-amount-not-zero");
+                    }
+                } else {
+                    // Failsafe
+                    return state.DoS(0, false, REJECT_INVALID, "bad-token-type");
                 }
             }
         }
