@@ -157,6 +157,7 @@ public:
         consensus.nTargetSpacing = 64;
         consensus.nRuleChangeActivationThreshold = 1814; // Approx 90% of 2016
         consensus.nMinerConfirmationWindow = 2016; // nTargetTimespan / nTargetSpacing
+        consensus.fPowNoRetargeting = false;
         consensus.vDeployments[Consensus::DEPLOYMENT_TESTDUMMY].bit = 28;
         consensus.vDeployments[Consensus::DEPLOYMENT_TESTDUMMY].nStartTime = 1199145601; // January 1, 2008
         consensus.vDeployments[Consensus::DEPLOYMENT_TESTDUMMY].nTimeout = 1230767999; // December 31, 2008
@@ -170,6 +171,8 @@ public:
         // Proof-of-Stake
         consensus.nLastPOWBlock = 1440;
         consensus.nStakeTimestampMask = 0xf; // 15
+
+        // Deployments
         consensus.nTokensDeploymentHeight = 159500;
         consensus.nTokensP2SHDeploymentHeight = 450000;
         consensus.nTokensIPFSDeploymentHeight = std::numeric_limits<int>::max();
@@ -253,7 +256,7 @@ public:
         strNetworkID = "test";
         consensus.nSubsidyHalvingInterval = 525960;
         consensus.nBIP34Enabled = true;
-        consensus.nBIP65Enabled = true; // 000000000000000004c2b624ed5d7756c508d90fd0da2c7c679febfa6c4735f0
+        consensus.nBIP65Enabled = true;
         consensus.nBIP66Enabled = true;
         consensus.nSegwitEnabled = false;
         consensus.nCSVEnabled = true;
@@ -263,6 +266,7 @@ public:
         consensus.nTargetSpacing = 64;
         consensus.nRuleChangeActivationThreshold = 1814; // Approx 90% of 2016
         consensus.nMinerConfirmationWindow = 2016; // nTargetTimespan / nTargetSpacing
+        consensus.fPowNoRetargeting = true;
         consensus.vDeployments[Consensus::DEPLOYMENT_TESTDUMMY].bit = 28;
         consensus.vDeployments[Consensus::DEPLOYMENT_TESTDUMMY].nStartTime = 1199145601; // January 1, 2008
         consensus.vDeployments[Consensus::DEPLOYMENT_TESTDUMMY].nTimeout = 1230767999; // December 31, 2008
@@ -274,10 +278,13 @@ public:
         consensus.defaultAssumeValid = uint256S("0x00");
 
         // Proof-of-Stake
-        consensus.nLastPOWBlock = 1440 * 10;
+        consensus.nLastPOWBlock = 1440 * 1000;
         consensus.nStakeTimestampMask = 0xf; // 15
+
+        // Deployments
         consensus.nTokensDeploymentHeight = 10;
-        consensus.nTokensP2SHDeploymentHeight = 99999999;
+        consensus.nTokensP2SHDeploymentHeight = 15;
+        consensus.nTokensIPFSDeploymentHeight = 20;
 
         /**
          * The message start string is designed to be unlikely to occur in normal data.
@@ -291,12 +298,12 @@ public:
         nDefaultPort = 44551;
         nPruneAfterHeight = 100000;
 
-        const char* pszTimestamp = "Study: Our Sun is Less Active than Other Solar-Type Stars | May 1, 2020 Sci News";
+        const char* pszTimestamp = "Taliban Say International Flights From Kabul to Start Soon | Sep 6, 2021 Bloomberg";
 
-        genesis = CreateGenesisBlock(pszTimestamp, 1595461641, 1129, 0x1f3fffff, 1, 0);
+        genesis = CreateGenesisBlock(pszTimestamp, 1630926558, 1560, 0x1f3fffff, 1, 0);
         consensus.hashGenesisBlock = genesis.GetBlockHash();
-        assert(consensus.hashGenesisBlock == uint256S("0x0004085cdb309f20bc9e828ef8c1582a8476bed7b7ef2c719cbe05b782c661d6"));
-        assert(genesis.hashMerkleRoot == uint256S("0xe8c138d7a6be252769227dc6fa54604c3d6714027fb8e015581f68d7e5d52c6b"));
+        assert(consensus.hashGenesisBlock == uint256S("0x0024a6a18447e725d12da868d6d65b8046e1b53cfefc35354d4b2146dfad20d4"));
+        assert(genesis.hashMerkleRoot == uint256S("0xb4eeb7c62174581104292ae662bc456b7c3b26ead4c8290d0c27cd2cb29395e0"));
 
         base58Prefixes[PUBKEY_ADDRESS] = std::vector<unsigned char>(1,66);
         base58Prefixes[SCRIPT_ADDRESS] = std::vector<unsigned char>(1,128);
@@ -313,7 +320,7 @@ public:
 
         checkpointData = (CCheckpointData) {
             {
-                // { 535721, uint256S("0x000000000001217f58a594ca742c8635ecaaaf695d1a63f6ab06979f1c159e04")},
+
             }
         };
 
@@ -335,9 +342,9 @@ public:
         nFeeAmountUsername = 1 * COIN;
 
         // Fee Addresse
-        strTokenFeeAddress = "TjJYEpVi1HuFrMGrhNjQSHLvP9fbNk2yng";
+        strTokenFeeAddress = "TufvYmro3vSfDerUAjvjXMjYqUsFw6iWS7";
 
-        nMaxReorganizationDepth = 60; // 60 at 1 minute block timespan is +/- 60 minutes.
+        nMaxReorganizationDepth = 500; // 60 at 1 minute block timespan is +/- 60 minutes.
         /** TOKENS END **/
     }
 };

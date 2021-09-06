@@ -63,6 +63,7 @@ struct Params {
     int64_t nTargetSpacing;
     int64_t nTargetTimespan;
     int64_t DifficultyAdjustmentInterval() const { return nTargetTimespan / nTargetSpacing; }
+    bool fPowNoRetargeting;
     uint256 nMinimumChainWork;
     uint256 defaultAssumeValid;
     bool nSegwitEnabled;
