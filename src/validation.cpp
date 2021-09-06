@@ -4035,7 +4035,7 @@ static bool ContextualCheckBlockHeader(const CBlock& block, CValidationState& st
     bool fGreaterThanMaxReorg = chainActive.Height() - (nHeight - 1) >= nMaxReorgDepth;
 
     if (fGreaterThanMaxReorg) {
-        return state.DoS(1,
+        return state.DoS(25,
             error("%s: forked chain older than max reorganization depth (height %d)",__func__, nHeight),
             REJECT_MAXREORGDEPTH, "bad-fork-prior-to-maxreorgdepth"
         );
