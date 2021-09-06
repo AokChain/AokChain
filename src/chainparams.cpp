@@ -162,10 +162,10 @@ public:
         consensus.vDeployments[Consensus::DEPLOYMENT_TESTDUMMY].nTimeout = 1230767999; // December 31, 2008
 
         // The best chain should have at least this much work.
-        consensus.nMinimumChainWork = uint256S("0x00");
+        consensus.nMinimumChainWork = uint256S("0x000000000000000000000000000000000000000000000331d1ab12e374d430be");
 
         // By default assume that the signatures in ancestors of this block are valid.
-        consensus.defaultAssumeValid = uint256S("0x00");
+        consensus.defaultAssumeValid = uint256S("0x6a23569de30211b3b633d0ba3fb6fb8e64499b9a9f3d4d350ef077f25c32583b");
 
         // Proof-of-Stake
         consensus.nLastPOWBlock = 1440;
@@ -208,17 +208,24 @@ public:
 
         checkpointData = (CCheckpointData) {
             {
-                { 159247, uint256S("0x8273f1ceeeba86829ff7b927f97bad5942f1aa7e401eb75afad1a1d2ff16d0d4")},
+                { 10, uint256S("0x000e2bc4510332de2bc53002d5740f1c88b5147804a07af97c2c33873956275d")},
+                { 1440, uint256S("0xc0ada4a3eb592a12cd3a733d464ea01ca32a8e4801f0d35e0376c94173c55bba")},
+                { 100000, uint256S("0xcd8d0280e845e99cc24ba5592583a65b266cbc1b8c75ab539c457d7ff7b5664a")},
+                { 150000, uint256S("0x6e833229a550ade91d52edb85c3f3bedee1548cee17acee8612cfc7a44a41421")},
+                { 159500, uint256S("0x31723a8b8c68ef66ba3b55f823e65bb3f1346b7b07a6a34f6269fe3c3c0f1ca5")},
+                { 450000, uint256S("0xa5e0a4b29875100cfdc95eb83ae31ead1952c5f581dd88e33fdd46af347c3d8b")},
+                { 500000, uint256S("0xf0ab563c346b480257a79fcc21335160397557c4ef497a5a3cdcd785d8f7b750")},
+                { 550000, uint256S("0x6a23569de30211b3b633d0ba3fb6fb8e64499b9a9f3d4d350ef077f25c32583b")},
+                { 600000, uint256S("0x5a7500eea9a150530f51bd7cf75aff4224b0a42a7aed50193099841d7c1d47fe")},
             }
         };
 
         chainTxData = ChainTxData{
-            // Update as we know more about the contents of the AokChain chain
-            // Stats as of 000000000000a72545994ce72b25042ea63707fca169ca4deb7f9dab4f1b1798 window size 43200
-            0, // * UNIX timestamp of last known number of transactions
-            0,    // * total number of transactions between genesis and that timestamp
-                        //   (the tx=... number in the SetBestChain debug.log lines)
-            0         // * estimated number of transactions per second after that timestamp
+            // Data from RPC: getchaintxstats 4096 5a7500eea9a150530f51bd7cf75aff4224b0a42a7aed50193099841d7c1d47fe
+            1630295312,         // * UNIX timestamp of last known number of transactions
+            2776389,            // * total number of transactions between genesis and that timestamp
+                                //   (the tx=... number in the SetBestChain debug.log lines)
+            0.03212183168029697 // * estimated number of transactions per second after that timestamp
         };
 
         /** TOKENS START **/
