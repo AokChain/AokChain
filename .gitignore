@@ -125,3 +125,4 @@ contrib/devtools/split-debug.sh
 cmake-build-debug
 
 CMakeLists.txt
+configure~
