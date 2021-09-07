@@ -103,7 +103,7 @@ UniValue issue(const JSONRPCRequest& request)
             + HelpExampleCli("issue", "\"TOKEN_NAME\" 1000 \"myaddress\"")
             + HelpExampleCli("issue", "\"TOKEN_NAME\" 1000 \"myaddress\" \"changeaddress\" 4")
             + HelpExampleCli("issue", "\"TOKEN_NAME\" 1000 \"myaddress\" \"changeaddress\" 2 true")
-            + HelpExampleCli("issue", "\"TOKEN_NAME\" 1000 \"myaddress\" \"changeaddress\" 8 false true QmTqu3Lk3gmTsQVtjU7rYYM37EAW4xNmbuEAp2Mjr4AV7E")
+            + HelpExampleCli("issue", "\"TOKEN_NAME\" 1000 \"myaddress\" \"changeaddress\" 8 false true Qma21aBaw7pZmt1nV5MZKuGGeamDiZY34UbErV949wv2pg")
             + HelpExampleCli("issue", "\"TOKEN_NAME/SUB_TOKEN\" 1000 \"myaddress\" \"changeaddress\" 2 true")
             + HelpExampleCli("issue", "\"TOKEN_NAME#uniquetag\"")
         );
@@ -1434,6 +1434,7 @@ UniValue reissue(const JSONRPCRequest& request)
                 "\nExamples:\n"
                 + HelpExampleCli("reissue", "\"TOKEN_NAME\" 20 \"address\"")
                 + HelpExampleCli("reissue", "\"TOKEN_NAME\" 20 \"address\" \"change_address\" \"true\" 8")
+                + HelpExampleCli("reissue", "\"TOKEN_NAME\" 20 \"address\" \"change_address\" \"false\" 2 Qma21aBaw7pZmt1nV5MZKuGGeamDiZY34UbErV949wv2pg")
         );
 
     CWallet * const pwallet = GetWalletForJSONRPCRequest(request);
