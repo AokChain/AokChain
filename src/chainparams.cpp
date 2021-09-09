@@ -175,7 +175,7 @@ public:
         // Deployments
         consensus.nTokensDeploymentHeight = 159500;
         consensus.nTokensP2SHDeploymentHeight = 450000;
-        consensus.nTokensIPFSDeploymentHeight = std::numeric_limits<int>::max();
+        consensus.nTokensIPFSDeploymentHeight = 622000;
 
         /**
          * The message start string is designed to be unlikely to occur in normal data.
