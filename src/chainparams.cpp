@@ -196,6 +196,8 @@ public:
         assert(consensus.hashGenesisBlock == uint256S("0x000c513d39b0e3657b7b0ca79b2d4b9b18c1f03dacb394acf0e71f49064b3306"));
         assert(genesis.hashMerkleRoot == uint256S("0xe212c2a291da3a980cbddfbd663d58f2d4d1faa756deba27f3b77bf8df66df7c"));
 
+        vSeeds.emplace_back("dns.aok.network");
+
         base58Prefixes[PUBKEY_ADDRESS] = std::vector<unsigned char>(1,46);
         base58Prefixes[SCRIPT_ADDRESS] = std::vector<unsigned char>(1,108);
         base58Prefixes[SECRET_KEY] =     std::vector<unsigned char>(1,255);
