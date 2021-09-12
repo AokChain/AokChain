@@ -787,6 +787,8 @@ UniValue getaddressutxos(const JSONRPCRequest& request)
     UniValue utxos(UniValue::VARR);
     CAmount total = 0;
 
+    int nHeight = chainActive.Height();
+
     for (std::vector<std::pair<CAddressUnspentKey, CAddressUnspentValue> >::const_iterator it=unspentOutputs.begin(); it!=unspentOutputs.end(); it++) {
         if (requiredAmount > 0 && total >= requiredAmount) {
             break;
@@ -808,14 +810,13 @@ UniValue getaddressutxos(const JSONRPCRequest& request)
         }
 
         int64_t timeLock = (tokenName == "AOK") ? it->first.timeLock : nTokenLockTime;
-        if (timeLock < ((int64_t)timeLock < LOCKTIME_THRESHOLD ? (int64_t)it->second.blockHeight : (int64_t)chainActive.Tip()->GetMedianTimePast())) {
+        if (timeLock < ((int64_t)timeLock < LOCKTIME_THRESHOLD ? nHeight : (int64_t)chainActive.Tip()->GetMedianTimePast())) {
             output.pushKV("address", address);
             output.pushKV("token_name", tokenNameOut);
             output.pushKV("txid", it->first.txhash.GetHex());
             output.pushKV("outputIndex", (int)it->first.index);
             output.pushKV("script", HexStr(it->second.script.begin(), it->second.script.end()));
             output.pushKV("satoshis", it->second.satoshis);
-            output.pushKV("height", it->second.blockHeight);
             output.pushKV("height", it->second.blockHeight);
             output.pushKV("timelock", timeLock);
             utxos.push_back(output);

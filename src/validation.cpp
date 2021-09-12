@@ -2623,7 +2623,7 @@ static bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockInd
 
                             // record unspent output
                             addressUnspentIndex.push_back(
-                                    std::make_pair(CAddressUnspentKey(addressType, hashBytes, tokenName, txhash, k),
+                                    std::make_pair(CAddressUnspentKey(addressType, hashBytes, tokenName, txhash, k, nTokenLockTime),
                                                    CAddressUnspentValue(tokenAmount, out.scriptPubKey,
                                                                         pindex->nHeight, tx.nTime)));
                         }
