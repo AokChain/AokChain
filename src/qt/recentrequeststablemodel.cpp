@@ -23,8 +23,10 @@ RecentRequestsTableModel::RecentRequestsTableModel(CWallet *wallet, WalletModel 
     // Load entries from wallet
     std::vector<std::string> vReceiveRequests;
     parent->loadReceiveRequests(vReceiveRequests);
+
     for (const std::string& request : vReceiveRequests)
-        addNewRequest(request);
+        if (IsValidDestinationString(request))
+            addNewRequest(request);
 
     /* These columns must match the indices in the ColumnIndex enumeration */
     columns << tr("Date") << tr("Label") << tr("Message") << getAmountTitle();
