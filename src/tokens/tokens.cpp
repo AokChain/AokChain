@@ -343,6 +343,21 @@ bool CNewToken::IsValid(std::string& strError, CTokensCache& tokenCache, bool fC
         return false;
     }
 
+    if (nHasIPFS != 0 && nHasIPFS != 1) {
+        strError = _("Invalid parameter: has_ipfs must be 0 or 1.");
+        return false;
+    }
+
+    if (nHasIPFS && strIPFSHash.size() != 34) {
+        strError = _("Invalid parameter: ipfs_hash must be 34 bytes.");
+        return false;
+    }
+
+    if (nHasIPFS) {
+        if (!CheckEncodedIPFS(EncodeIPFS(strIPFSHash), strError))
+            return false;
+    }
+
     return true;
 }
 
