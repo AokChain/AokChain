@@ -3413,6 +3413,7 @@ UniValue listunspenttoken(const JSONRPCRequest& request)
                     continue;
 
                 UniValue entry(UniValue::VOBJ);
+                entry.pushKV("token", tokenName);
                 entry.pushKV("txid", out.tx->GetHash().GetHex());
                 entry.pushKV("vout", out.i);
                 entry.pushKV("address", address);
