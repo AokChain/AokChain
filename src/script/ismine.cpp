@@ -187,8 +187,13 @@ isminetype IsMine(const CKeyStore &keystore, const CScript& scriptPubKey, CBlock
                         return ISMINE_NO;
                     }
                 }
+
                 if (keystore.HaveKey(keyID))
                     return ISMINE_SPENDABLE;
+
+                CScript script = GetScriptForDestination(CKeyID(uint160(vSolutions[0])));
+                if (keystore.HaveWatchOnly(script))
+                    return ISMINE_WATCH_SOLVABLE;
 
             } else if (scriptType == TX_SCRIPTHASH) {
                 CScriptID scriptID = CScriptID(uint160(vSolutions[0]));
