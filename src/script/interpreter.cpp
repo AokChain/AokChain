@@ -1414,6 +1414,7 @@ bool TransactionSignatureChecker::CheckSig(const std::vector<unsigned char> &vch
 
 bool TransactionSignatureChecker::CheckLockTime(const CScriptNum &nLockTime) const
 {
+    std::cout << nLockTime.getint64() << "\n\n";
     // There are two kinds of nLockTime: lock-by-blockheight
     // and lock-by-blocktime, distinguished by whether
     // nLockTime < LOCKTIME_THRESHOLD.
@@ -1421,13 +1422,17 @@ bool TransactionSignatureChecker::CheckLockTime(const CScriptNum &nLockTime) con
     // We want to compare apples to apples, so fail the script
     // unless the type of nLockTime being tested is the same as
     // the nLockTime in the transaction.
-    if (!((txTo->nLockTime < LOCKTIME_THRESHOLD && nLockTime < LOCKTIME_THRESHOLD) || (txTo->nLockTime >= LOCKTIME_THRESHOLD && nLockTime >= LOCKTIME_THRESHOLD)))
+    if (!((txTo->nLockTime < LOCKTIME_THRESHOLD && nLockTime < LOCKTIME_THRESHOLD) || (txTo->nLockTime >= LOCKTIME_THRESHOLD && nLockTime >= LOCKTIME_THRESHOLD))) {
+        std::cout << "TEST1\n\n";
         return false;
+    }
 
     // Now that we know we're comparing apples-to-apples, the
     // comparison is a simple numeric one.
-    if (nLockTime > (int64_t) txTo->nLockTime)
+    if (nLockTime > (int64_t) txTo->nLockTime) {
+        std::cout << "TEST2\n\n";
         return false;
+    }
 
     // Finally the nLockTime feature can be disabled and thus
     // CHECKLOCKTIMEVERIFY bypassed if every txin has been
@@ -1439,8 +1444,10 @@ bool TransactionSignatureChecker::CheckLockTime(const CScriptNum &nLockTime) con
     // prevent this condition. Alternatively we could test all
     // inputs, but testing just this input minimizes the data
     // required to prove correct CHECKLOCKTIMEVERIFY execution.
-    if (CTxIn::SEQUENCE_FINAL == txTo->vin[nIn].nSequence)
+    if (CTxIn::SEQUENCE_FINAL == txTo->vin[nIn].nSequence) {
+        std::cout << "TEST3\n\n";
         return false;
+    }
 
     return true;
 }
