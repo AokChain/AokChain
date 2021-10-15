@@ -48,6 +48,7 @@
 #include <validationinterface.h>
 #include <tokens/tokens.h>
 #include <tokens/tokendb.h>
+#include <wallet/wallet.h>
 #include <warnings.h>
 #include <walletinitinterface.h>
 #include <tinyformat.h>
@@ -203,6 +204,14 @@ void Shutdown()
     /// Be sure that anything that writes files or flushes caches only does this if the respective
     /// module was initialized.
     RenameThread("aokchain-shutoff");
+
+#ifdef ENABLE_WALLET
+    // Force stop the stakers before any other components
+    for (auto pwallet : GetWallets()) {
+        pwallet->StopStake();
+    }
+#endif
+
     mempool.AddTransactionsUpdated(1);
 
     StopHTTPRPC();
