@@ -158,6 +158,7 @@ public:
         consensus.nRuleChangeActivationThreshold = 1814; // Approx 90% of 2016
         consensus.nMinerConfirmationWindow = 2016; // nTargetTimespan / nTargetSpacing
         consensus.fPowNoRetargeting = false;
+        consensus.fPosNoRetargeting = false;
         consensus.vDeployments[Consensus::DEPLOYMENT_TESTDUMMY].bit = 28;
         consensus.vDeployments[Consensus::DEPLOYMENT_TESTDUMMY].nStartTime = 1199145601; // January 1, 2008
         consensus.vDeployments[Consensus::DEPLOYMENT_TESTDUMMY].nTimeout = 1230767999; // December 31, 2008
@@ -269,6 +270,7 @@ public:
         consensus.nRuleChangeActivationThreshold = 1814; // Approx 90% of 2016
         consensus.nMinerConfirmationWindow = 2016; // nTargetTimespan / nTargetSpacing
         consensus.fPowNoRetargeting = true;
+        consensus.fPosNoRetargeting = true;
         consensus.vDeployments[Consensus::DEPLOYMENT_TESTDUMMY].bit = 28;
         consensus.vDeployments[Consensus::DEPLOYMENT_TESTDUMMY].nStartTime = 1199145601; // January 1, 2008
         consensus.vDeployments[Consensus::DEPLOYMENT_TESTDUMMY].nTimeout = 1230767999; // December 31, 2008
@@ -374,6 +376,7 @@ public:
         consensus.vDeployments[Consensus::DEPLOYMENT_TESTDUMMY].nStartTime = 0;
         consensus.vDeployments[Consensus::DEPLOYMENT_TESTDUMMY].nTimeout = 999999999999ULL;
         consensus.fPowNoRetargeting = true;
+        consensus.fPosNoRetargeting = true;
 
         // The best chain should have at least this much work.
         consensus.nMinimumChainWork = uint256S("0x00");

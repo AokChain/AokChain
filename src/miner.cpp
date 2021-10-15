@@ -680,12 +680,12 @@ void ThreadStakeMiner(CWallet *pwallet)
                 // Increase priority so we can build the full PoS block ASAP to ensure the timestamp doesn't expire
                 SetThreadPriority(THREAD_PRIORITY_ABOVE_NORMAL);
 
-                LogPrintf("Successfully signed block, now trying to check it: %s", pblock->GetBlockHash().ToString());
+                LogPrintf("Successfully signed block, now trying to check it: %s\n", pblock->GetBlockHash().ToString());
 
                 // Check timestamps
                 if (pblock->GetBlockTime() <= pindexPrev->GetBlockTime() ||
                     FutureDrift(pblock->GetBlockTime()) < pindexPrev->GetBlockTime()) {
-                    LogPrintf("ThreadStakeMiner(): Valid PoS block took too long to create and has expired");
+                    LogPrintf("ThreadStakeMiner(): Valid PoS block took too long to create and has expired\n");
                     continue; //timestamp too late, so ignore
                 }
 
