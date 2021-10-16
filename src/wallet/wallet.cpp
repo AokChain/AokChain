@@ -1488,7 +1488,7 @@ bool CWallet::IsMine(const CTransaction& tx) const
 
 bool CWallet::IsFromMe(const CTransaction& tx) const
 {
-    return (GetDebit(tx, ISMINE_ALL) || HasMyTokens(tx));
+    return (GetDebit(tx, ISMINE_ALL) > 0 || HasMyTokens(tx));
 }
 
 CAmount CWallet::HasMyTokens(const CTransaction& tx) const
