@@ -204,6 +204,7 @@ void ScriptPubKeyToUniv(const CScript& scriptPubKey,
         if (GetTokenInfoFromScript(scriptPubKey, name, amount, nTokenLockTime)) {
             tokenInfo.pushKV("name", name);
             tokenInfo.pushKV("amount", ValueFromAmount(amount));
+            tokenInfo.pushKV("satoshis", amount);
             tokenInfo.pushKV("token_lock_time", (int)nTokenLockTime);
 
             switch (type) {

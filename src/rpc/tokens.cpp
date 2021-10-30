@@ -773,6 +773,7 @@ UniValue listmytokens(const JSONRPCRequest &request)
                     txAmount = OWNER_TOKEN_AMOUNT;
                 }
                 tempOut.pushKV("amount", UnitValueFromAmount(txAmount, bal->first));
+                tempOut.pushKV("satoshis", txAmount);
                 if (nTokenLockTime > 0) {
                     tempOut.pushKV("token_lock_time", (int)nTokenLockTime);
                 }
@@ -947,6 +948,7 @@ UniValue listmylockedtokens(const JSONRPCRequest &request)
                     txAmount = OWNER_TOKEN_AMOUNT;
                 }
                 tempOut.pushKV("amount", UnitValueFromAmount(txAmount, bal->first));
+                tempOut.pushKV("satoshis", txAmount);
                 if (nTokenLockTime > 0) {
                     tempOut.pushKV("token_lock_time", (int)nTokenLockTime);
                 }
