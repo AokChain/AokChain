@@ -473,8 +473,17 @@ bool Consensus::CheckTxInputs(const CTransaction& tx, CValidationState& state, c
 }
 
 //! Check to make sure that the inputs and outputs CAmount match exactly.
-bool Consensus::CheckTxTokens(const CTransaction& tx, CValidationState& state, const CCoinsViewCache& inputs, int nSpendHeight, int64_t nSpendTime, std::vector<std::pair<std::string, uint256> >& vPairReissueTokens, const bool fRunningUnitTests)
+bool Consensus::CheckTxTokens(const CTransaction& tx, CValidationState& state, const CCoinsViewCache& inputs, int nSpendHeight, int64_t nSpendTime, std::vector<std::pair<std::string, uint256> >& vPairReissueTokens, const bool fRunningUnitTests, CTokensCache* tokensCache)
 {
+    if (!fRunningUnitTests) {
+        if (!tokensCache)
+            tokensCache = GetCurrentTokenCache();
+    }
+
+    if (!tokensCache && !fRunningUnitTests) {
+        return error("%s : Tokens Cache is null, failing", __func__);
+    }
+
     // are the actual inputs available?
     if (!inputs.HaveInputs(tx)) {
         return state.DoS(100, false, REJECT_INVALID, "bad-txns-inputs-missing-or-spent", false,
@@ -532,7 +541,6 @@ bool Consensus::CheckTxTokens(const CTransaction& tx, CValidationState& state, c
             else
                 totalOutputs.insert(make_pair(transfer.strName, transfer.nAmount));
 
-            auto currentActiveTokenCache = GetCurrentTokenCache();
             if (!fRunningUnitTests) {
                 if (IsTokenNameAnOwner(transfer.strName)) {
                     if (transfer.nAmount != OWNER_TOKEN_AMOUNT)
@@ -540,7 +548,7 @@ bool Consensus::CheckTxTokens(const CTransaction& tx, CValidationState& state, c
                 } else {
                     // For all other types of tokens, make sure they are sending the right type of units
                     CNewToken token;
-                    if (!currentActiveTokenCache->GetTokenMetaDataIfExists(transfer.strName, token))
+                    if (!tokensCache->GetTokenMetaDataIfExists(transfer.strName, token))
                         return state.DoS(100, false, REJECT_INVALID, "bad-txns-transfer-token-not-exist");
 
                     if (token.strName != transfer.strName)
@@ -557,9 +565,8 @@ bool Consensus::CheckTxTokens(const CTransaction& tx, CValidationState& state, c
                 return state.DoS(100, false, REJECT_INVALID, "bad-tx-token-reissue-bad-deserialize");
 
             if (!fRunningUnitTests) {
-                auto currentActiveTokenCache = GetCurrentTokenCache();
                 std::string strError;
-                if (!reissue.IsValid(strError, *currentActiveTokenCache)) {
+                if (!reissue.IsValid(strError, *tokensCache)) {
                     return state.DoS(100, false, REJECT_INVALID,
                                      "bad-txns" + strError);
                 }

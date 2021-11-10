@@ -36,7 +36,7 @@ namespace Consensus {
 bool CheckTxInputs(const CTransaction& tx, CValidationState& state, const CCoinsViewCache& inputs, int nSpendHeight, CAmount& txfee);
 
 /** TOKENS START */
-bool CheckTxTokens(const CTransaction& tx, CValidationState& state, const CCoinsViewCache& inputs, int nSpendHeight, int64_t nSpendTime, std::vector<std::pair<std::string, uint256> >& vPairReissueTokens, const bool fRunningUnitTests = false);
+bool CheckTxTokens(const CTransaction& tx, CValidationState& state, const CCoinsViewCache& inputs, int nSpendHeight, int64_t nSpendTime, std::vector<std::pair<std::string, uint256> >& vPairReissueTokens, const bool fRunningUnitTests = false, CTokensCache* tokensCache=nullptr);
 /** TOKENS END */
 } // namespace Consensus
 

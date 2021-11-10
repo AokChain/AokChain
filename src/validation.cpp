@@ -653,7 +653,8 @@ static bool AcceptToMemoryPoolWorker(const CChainParams& chainparams, CTxMemPool
         }
 
         if (AreTokensDeployed()) {
-            if (!Consensus::CheckTxTokens(tx, state, view, GetSpendHeight(view), GetSpendTime(view), vReissueTokens))
+            auto tokensCache = GetCurrentTokenCache();
+            if (!Consensus::CheckTxTokens(tx, state, view, GetSpendHeight(view), GetSpendTime(view), vReissueTokens, false, tokensCache))
                 return error("%s: Consensus::CheckTxTokens: %s, %s", __func__, tx.GetHash().ToString(),
                              FormatStateMessage(state));
         }
@@ -2389,7 +2390,7 @@ static bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockInd
 
             if (AreTokensDeployed()) {
                 std::vector<std::pair<std::string, uint256>> vReissueTokens;
-                if (!Consensus::CheckTxTokens(tx, state, view, pindex->nHeight, pindex->nTime, vReissueTokens)) {
+                if (!Consensus::CheckTxTokens(tx, state, view, pindex->nHeight, pindex->nTime, vReissueTokens, tokensCache)) {
                     return error("%s: Consensus::CheckTxTokens: %s, %s", __func__, tx.GetHash().ToString(),
                                  FormatStateMessage(state));
                 }
