@@ -76,6 +76,7 @@ struct Params {
     int nTokensDeploymentHeight;
     int nTokensP2SHDeploymentHeight;
     int nTokensIPFSDeploymentHeight;
+    int nDisableTimestampCheck;
 
     int nStakeTimestampMask;
 };

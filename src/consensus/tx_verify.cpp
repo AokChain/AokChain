@@ -405,6 +405,8 @@ bool CheckTransaction(const CTransaction& tx, CValidationState &state, CTokensCa
 
 bool Consensus::CheckTxInputs(const CTransaction& tx, CValidationState& state, const CCoinsViewCache& inputs, int nSpendHeight, CAmount& txfee)
 {
+    const Consensus::Params& consensusParams = CParams().GetConsensus();
+
     // are the actual inputs available?
     if (!inputs.HaveInputs(tx)) {
         return state.DoS(100, false, REJECT_INVALID, "bad-txns-inputs-missingorspent", false,
@@ -426,16 +428,18 @@ bool Consensus::CheckTxInputs(const CTransaction& tx, CValidationState& state, c
 
         // If prev is coinstake, check that it's matured
         // Will be fixed after tokens deployed
-        if (coin.IsCoinStake() && nSpendHeight - coin.nHeight < (coin.nHeight >= CParams().GetConsensus().nTokensDeploymentHeight ? COINSTAKE_MATURITY : COINBASE_MATURITY)) {
+        if (coin.IsCoinStake() && nSpendHeight - coin.nHeight < (coin.nHeight >= consensusParams.nTokensDeploymentHeight ? COINSTAKE_MATURITY : COINBASE_MATURITY)) {
             return state.Invalid(false,
                 REJECT_INVALID, "bad-txns-premature-spend-of-coinstake",
                 strprintf("tried to spend coinstake at depth %d, %d, %d", nSpendHeight, coin.nHeight, nSpendHeight - coin.nHeight));
         }
 
         // Check transaction timestamp
-        if (coin.nTime > tx.nTime) {
-            return state.DoS(100, error("CheckInputs() : transaction timestamp earlier than input transaction"),
-                REJECT_INVALID, "bad-txns-time-earlier-than-input");
+        if (nSpendHeight < consensusParams.nDisableTimestampCheck) {
+            if (coin.nTime > tx.nTime) {
+                return state.DoS(100, error("CheckInputs() : transaction timestamp earlier than input transaction"),
+                    REJECT_INVALID, "bad-txns-time-earlier-than-input");
+            }
         }
 
         // Check for negative or overflow input values
