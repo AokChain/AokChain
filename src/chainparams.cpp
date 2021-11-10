@@ -177,7 +177,7 @@ public:
         consensus.nTokensDeploymentHeight = 159500;
         consensus.nTokensP2SHDeploymentHeight = 450000;
         consensus.nTokensIPFSDeploymentHeight = 622000;
-        consensus.nDisableTimestampCheck = std::numeric_limits<int>::max();
+        consensus.nDisableTimestampCheck = 695000;
 
         /**
          * The message start string is designed to be unlikely to occur in normal data.
@@ -224,6 +224,8 @@ public:
                 { 500000, uint256S("0xf0ab563c346b480257a79fcc21335160397557c4ef497a5a3cdcd785d8f7b750")},
                 { 550000, uint256S("0x6a23569de30211b3b633d0ba3fb6fb8e64499b9a9f3d4d350ef077f25c32583b")},
                 { 600000, uint256S("0x5a7500eea9a150530f51bd7cf75aff4224b0a42a7aed50193099841d7c1d47fe")},
+                { 650000, uint256S("0xfc7f235ed46be4405aa0cc59124a6e13f8f022112e07f5726e81eb2f7bf1584d")},
+                { 692000, uint256S("0xd31a85bdef320f5f54e24e28fafb7f61e62ddb169846fcd8f7c4b2d5fab94651")},
             }
         };
 
