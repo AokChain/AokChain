@@ -51,6 +51,8 @@ static const int TIMEOUT_INTERVAL = 20 * 60;
 static const int FEELER_INTERVAL = 120;
 /** The maximum number of entries in an 'inv' protocol message */
 static const unsigned int MAX_INV_SZ = 50000;
+/** The maximum number of entries in a locator */
+static const unsigned int MAX_LOCATOR_SZ = 101;
 /** The maximum number of entries in an 'token inv' protocol message */
 static const unsigned int MAX_TOKEN_INV_SZ = 1024;
 /** The maximum number of new addresses to accumulate before announcing. */
