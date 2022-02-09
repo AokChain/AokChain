@@ -298,19 +298,20 @@ public:
          * The characters are rarely used upper ASCII, not valid as UTF-8, and produce
          * a large 32-bit integer with any alignment.
          */
-        pchMessageStart[0] = 0x43;
-        pchMessageStart[1] = 0x4a;
-        pchMessageStart[2] = 0x51;
-        pchMessageStart[3] = 0x03;
+        pchMessageStart[0] = 0x44;
+        pchMessageStart[1] = 0x4b;
+        pchMessageStart[2] = 0x52;
+        pchMessageStart[3] = 0x04;
         nDefaultPort = 44551;
         nPruneAfterHeight = 100000;
 
-        const char* pszTimestamp = "Taliban Say International Flights From Kabul to Start Soon | Sep 6, 2021 Bloomberg";
+        const char* pszTimestamp = "U.K.'s Johnson Plans to End Covid-19 Isolation Rules This Month | Feb 9, 2022 Bloomberg";
 
-        genesis = CreateGenesisBlock(pszTimestamp, 1630926558, 1560, 0x1f3fffff, 1, 0);
+        genesis = CreateGenesisBlock(pszTimestamp, 1630926558, 564, 0x1f3fffff, 1, 0);
         consensus.hashGenesisBlock = genesis.GetBlockHash();
-        assert(consensus.hashGenesisBlock == uint256S("0x0024a6a18447e725d12da868d6d65b8046e1b53cfefc35354d4b2146dfad20d4"));
-        assert(genesis.hashMerkleRoot == uint256S("0xb4eeb7c62174581104292ae662bc456b7c3b26ead4c8290d0c27cd2cb29395e0"));
+
+        assert(consensus.hashGenesisBlock == uint256S("0x0027badb24c5a6f882e1151a47ab22e974491f7247888f5e5f330899589ed17d"));
+        assert(genesis.hashMerkleRoot == uint256S("0x613e051eb2c8ad685200804b9c31f140e430f4b46555b316f0d22e7340b36680"));
 
         base58Prefixes[PUBKEY_ADDRESS] = std::vector<unsigned char>(1,66);
         base58Prefixes[SCRIPT_ADDRESS] = std::vector<unsigned char>(1,128);
@@ -342,10 +343,10 @@ public:
 
         /** TOKENS START **/
         // Fee Amounts
-        nFeeAmountRoot = 10000 * COIN;
-        nFeeAmountReissue = 10000 * COIN;
-        nFeeAmountUnique = 100 * COIN;
-        nFeeAmountSub = 100 * COIN;
+        nFeeAmountRoot = 1 * COIN;
+        nFeeAmountReissue = 1 * COIN;
+        nFeeAmountUnique = 1 * COIN;
+        nFeeAmountSub = 1 * COIN;
         nFeeAmountUsername = 1 * COIN;
 
         // Fee Addresse
