@@ -91,6 +91,8 @@ void EnsureWalletIsUnlocked(CWallet * const pwallet)
     if (pwallet->IsLocked()) {
         throw JSONRPCError(RPC_WALLET_UNLOCK_NEEDED, "Error: Please enter the wallet passphrase with walletpassphrase first.");
     }
+    if (fWalletUnlockStakingOnly)
+        throw JSONRPCError(RPC_WALLET_UNLOCK_NEEDED, "Error: Wallet is unlocked for staking only.");
 }
 
 void WalletTxToJSON(const CWalletTx& wtx, UniValue& entry)
@@ -400,6 +402,11 @@ static void SendMoney(CWallet * const pwallet, const CTxDestination &address, CA
 
     if (pwallet->GetBroadcastTransactions() && !g_connman) {
         throw JSONRPCError(RPC_CLIENT_P2P_DISABLED, "Error: Peer-to-peer functionality missing or disabled");
+    }
+
+    if (fWalletUnlockStakingOnly) {
+        std::string strError = _("Error: Wallet unlocked for staking only, unable to create transaction.");
+        throw JSONRPCError(RPC_WALLET_ERROR, strError);
     }
 
     // Parse AokChain address
@@ -2431,7 +2438,7 @@ UniValue walletpassphrase(const JSONRPCRequest& request)
         return NullUniValue;
     }
 
-    if (pwallet->IsCrypted() && (request.fHelp || request.params.size() != 2)) {
+    if (pwallet->IsCrypted() && (request.fHelp || request.params.size() < 2 || request.params.size() > 3)) {
         throw std::runtime_error(
             "walletpassphrase \"passphrase\" timeout\n"
             "\nStores the wallet decryption key in memory for 'timeout' seconds.\n"
@@ -2439,6 +2446,7 @@ UniValue walletpassphrase(const JSONRPCRequest& request)
             "\nArguments:\n"
             "1. \"passphrase\"     (string, required) The wallet passphrase\n"
             "2. timeout            (numeric, required) The time to keep the decryption key in seconds.\n"
+            "3. stakingonly        (bool, optional, default=false) Unlock wallet for staking only.\n"
             "\nNote:\n"
             "Issuing the walletpassphrase command while the wallet is already unlocked will set a new unlock\n"
             "time that overrides the old one.\n"
@@ -2483,6 +2491,12 @@ UniValue walletpassphrase(const JSONRPCRequest& request)
     int64_t nSleepTime = request.params[1].get_int64();
     pwallet->nRelockTime = GetTime() + nSleepTime;
     RPCRunLater(strprintf("lockwallet(%s)", pwallet->GetName()), boost::bind(LockWallet, pwallet), nSleepTime);
+
+    // ppcoin: if user OS account compromised prevent trivial sendmoney commands
+    if (request.params.size() > 2)
+        fWalletUnlockStakingOnly = request.params[2].get_bool();
+    else
+        fWalletUnlockStakingOnly = false;
 
     return NullUniValue;
 }
@@ -4058,7 +4072,7 @@ static const CRPCCommand commands[] =
     { "wallet",             "signmessage",              &signmessage,              {"address","message"} },
     { "wallet",             "walletlock",               &walletlock,               {} },
     { "wallet",             "walletpassphrasechange",   &walletpassphrasechange,   {"oldpassphrase","newpassphrase"} },
-    { "wallet",             "walletpassphrase",         &walletpassphrase,         {"passphrase","timeout"} },
+    { "wallet",             "walletpassphrase",         &walletpassphrase,         {"passphrase", "timeout", "stakingonly"} },
     { "wallet",             "removeprunedfunds",        &removeprunedfunds,        {"txid"} },
     { "wallet",             "rescanblockchain",         &rescanblockchain,         {"start_height", "stop_height"} },
 
