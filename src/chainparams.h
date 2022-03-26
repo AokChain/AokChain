@@ -102,6 +102,8 @@ public:
     const std::string& IssueSubTokenBurnAddress() const { return strTokenFeeAddress; }
     const std::string& IssueUniqueTokenBurnAddress() const { return strTokenFeeAddress; }
 
+    const std::string& GovernanceMasterAddress() const { return strMasterAddress; }
+
     int MaxReorganizationDepth() const { return nMaxReorganizationDepth; }
     /** TOKENS END **/
 
@@ -134,6 +136,9 @@ protected:
 
     // Burn Addresses
     std::string strTokenFeeAddress;
+
+    // Governance Master address
+    std::string strMasterAddress;
 
     int nMaxReorganizationDepth;
     /** TOKENS END **/

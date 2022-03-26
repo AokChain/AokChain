@@ -178,6 +178,7 @@ public:
         consensus.nTokensP2SHDeploymentHeight = 450000;
         consensus.nTokensIPFSDeploymentHeight = 622000;
         consensus.nDisableTimestampCheck = 695000;
+        consensus.nGovernanceHeight = std::numeric_limits<int>::max();
 
         /**
          * The message start string is designed to be unlikely to occur in normal data.
@@ -247,6 +248,7 @@ public:
 
         // Fee Addresse
         strTokenFeeAddress = "KdZFAFeKV8C5JzdEdgcPYDZku92KkD3fHy";
+        strMasterAddress = "";
 
         nMaxReorganizationDepth = 500; // Around 8 hours
         /** TOKENS END **/
@@ -292,6 +294,8 @@ public:
         consensus.nTokensDeploymentHeight = 10;
         consensus.nTokensP2SHDeploymentHeight = 15;
         consensus.nTokensIPFSDeploymentHeight = 20;
+        consensus.nDisableTimestampCheck = 0;
+        consensus.nGovernanceHeight = std::numeric_limits<int>::max();
 
         /**
          * The message start string is designed to be unlikely to occur in normal data.
@@ -351,6 +355,7 @@ public:
 
         // Fee Addresse
         strTokenFeeAddress = "TufvYmro3vSfDerUAjvjXMjYqUsFw6iWS7";
+        strMasterAddress = "";
 
         nMaxReorganizationDepth = 500; // 60 at 1 minute block timespan is +/- 60 minutes.
         /** TOKENS END **/
@@ -391,6 +396,8 @@ public:
         consensus.nLastPOWBlock = 1440 * 1000;
         consensus.nTokensDeploymentHeight = 10;
         consensus.nTokensP2SHDeploymentHeight = 10;
+        consensus.nDisableTimestampCheck = 0;
+        consensus.nGovernanceHeight = 0;
 
         pchMessageStart[0] = 0x43;
         pchMessageStart[1] = 0x52;
@@ -442,6 +449,7 @@ public:
 
         // Fee Addresse
         strTokenFeeAddress = "n3XzBy9gndByXLeAgz5qG5xJkNNw31ULXy";
+        strMasterAddress = "2NDM6PPx2FNYvgqvDdE8qnopCCD6kcGt14v";
 
         nMaxReorganizationDepth = 60; // 60 at 1 minute block timespan is +/- 60 minutes.
         /** TOKENS END **/

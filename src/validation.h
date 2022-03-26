@@ -37,6 +37,7 @@
 #include <atomic>
 #include <tokens/tokens.h>
 #include <tokens/tokendb.h>
+#include <governance/governance.h>
 
 class CBlockIndex;
 class CBlockTreeDB;
@@ -233,7 +234,7 @@ extern uint64_t nPruneTarget;
 static const unsigned int MIN_BLOCKS_TO_KEEP = 500;
 
 static const signed int DEFAULT_CHECKBLOCKS = 6;
-static const unsigned int DEFAULT_CHECKLEVEL = 3;
+static const unsigned int DEFAULT_CHECKLEVEL = 4;
 
 // Require that user allocate at least 550MB for block & undo files (blk???.dat and rev???.dat)
 // At 1MB per block, 288 blocks = 288MB.
@@ -498,6 +499,9 @@ extern std::unique_ptr<CCoinsViewCache> pcoinsTip;
 /** Global variable that points to the active block tree (protected by cs_main) */
 extern std::unique_ptr<CBlockTreeDB> pblocktree;
 
+/** Global variable that points to the governance db (protected by cs_main) */
+extern CGovernance *governance;
+
 /** TOKENS START */
 /** Global variable that point to the active tokens database (protexted by cs_main) */
 extern CTokensDB *ptokensdb;
@@ -549,6 +553,7 @@ bool LoadMempool();
 bool AreTokensDeployed();
 bool AreTokensP2SHDeployed();
 bool AreTokensIPFSDeployed();
+bool AreGovernanceDeployed();
 
 CTokensCache* GetCurrentTokenCache();
 /** TOKENS END */

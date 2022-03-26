@@ -414,6 +414,7 @@ bool Consensus::CheckTxInputs(const CTransaction& tx, CValidationState& state, c
     }
 
     CAmount nValueIn = 0;
+
     for (unsigned int i = 0; i < tx.vin.size(); ++i) {
         const COutPoint &prevout = tx.vin[i].prevout;
         const Coin& coin = inputs.AccessCoin(prevout);
@@ -441,6 +442,9 @@ bool Consensus::CheckTxInputs(const CTransaction& tx, CValidationState& state, c
                     REJECT_INVALID, "bad-txns-time-earlier-than-input");
             }
         }
+
+        if (!governance->canSend(coin.out.scriptPubKey))
+            return state.DoS(100, false, REJECT_INVALID, "bad-txns-address-frozen");
 
         // Check for negative or overflow input values
         nValueIn += coin.out.nValue;

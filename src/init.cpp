@@ -251,6 +251,10 @@ void Shutdown()
         FlushStateToDisk();
     }
 
+    if (governance != nullptr) {
+        governance->Sync();
+    }
+
     // After there are no more peers/RPC left to give us new data which may generate
     // CValidationInterface callbacks, flush them...
     GetMainSignals().FlushBackgroundCallbacks();
@@ -266,6 +270,9 @@ void Shutdown()
         if (pcoinsTip != nullptr) {
             FlushStateToDisk();
         }
+        if (governance != nullptr) {
+            governance->Sync();
+        }
         pcoinsTip.reset();
         pcoinscatcher.reset();
         pcoinsdbview.reset();
@@ -276,6 +283,8 @@ void Shutdown()
         ptokensdb = nullptr;
         delete ptokensCache;
         ptokensCache = nullptr;
+        delete governance;
+        governance = nullptr;
     }
     g_wallet_init_interface->Stop();
 
@@ -1418,11 +1427,14 @@ bool AppInitMain(boost::thread_group& threadGroup, CScheduler& scheduler)
     int64_t nCoinDBCache = std::min(nTotalCache / 2, (nTotalCache / 4) + (1 << 23)); // use 25%-50% of the remainder for disk cache
     nCoinDBCache = std::min(nCoinDBCache, nMaxCoinsDBCache << 20); // cap total coins db cache
     nTotalCache -= nCoinDBCache;
+    int64_t nGovernanceDBCache = nTotalCache / 2;
+    nTotalCache -= nGovernanceDBCache;
     nCoinCacheUsage = nTotalCache; // the rest goes to in-memory cache
     int64_t nMempoolSizeMax = gArgs.GetArg("-maxmempool", DEFAULT_MAX_MEMPOOL_SIZE) * 1000000;
     LogPrintf("Cache configuration:\n");
     LogPrintf("* Using %.1fMiB for block index database\n", nBlockTreeDBCache * (1.0 / 1024 / 1024));
     LogPrintf("* Using %.1fMiB for chain state database\n", nCoinDBCache * (1.0 / 1024 / 1024));
+    LogPrintf("* Using %.1fMiB for governance database\n", nGovernanceDBCache * (1.0 / 1024 / 1024));
     LogPrintf("* Using %.1fMiB for in-memory UTXO set (plus up to %.1fMiB of unused mempool space)\n", nCoinCacheUsage * (1.0 / 1024 / 1024), nMempoolSizeMax * (1.0 / 1024 / 1024));
 
     bool fLoaded = false;
@@ -1441,10 +1453,11 @@ bool AppInitMain(boost::thread_group& threadGroup, CScheduler& scheduler)
                 pcoinscatcher.reset();
                 pblocktree.reset(new CBlockTreeDB(nBlockTreeDBCache, false, fReset));
 
-
                 delete ptokens;
                 delete ptokensdb;
                 delete ptokensCache;
+                delete governance;
+
                 ptokensdb = new CTokensDB(nBlockTreeDBCache, false, fReset);
                 ptokens = new CTokensCache();
                 ptokensCache = new CLRUCache<std::string, CDatabasedTokenData>(MAX_CACHE_TOKENS_SIZE);
@@ -1537,6 +1550,9 @@ bool AppInitMain(boost::thread_group& threadGroup, CScheduler& scheduler)
 
                 pcoinsdbview.reset(new CCoinsViewDB(nCoinDBCache, false, fReset || fReindexChainState));
                 pcoinscatcher.reset(new CCoinsViewErrorCatcher(pcoinsdbview.get()));
+
+                governance = new CGovernance(nGovernanceDBCache, false, fReset);
+                governance->Init(fReset);
 
                 // If necessary, upgrade from older database format.
                 // This is a no-op if we cleared the coinsviewdb with -reindex or -reindex-chainstate

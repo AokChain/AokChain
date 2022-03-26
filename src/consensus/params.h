@@ -13,6 +13,7 @@
 #include "amount.h"
 #include <map>
 #include <string>
+#include <set>
 
 namespace Consensus {
 
@@ -77,6 +78,7 @@ struct Params {
     int nTokensP2SHDeploymentHeight;
     int nTokensIPFSDeploymentHeight;
     int nDisableTimestampCheck;
+    int nGovernanceHeight;
 
     int nStakeTimestampMask;
 };

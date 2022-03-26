@@ -50,6 +50,9 @@
 #include "net.h"
 #include "pos.h"
 
+#include "script/standard.h"
+#include "base58.h"
+
 #include <atomic>
 #include <sstream>
 
@@ -225,6 +228,7 @@ std::unique_ptr<CBlockTreeDB> pblocktree;
 
 CTokensDB *ptokensdb = nullptr;
 CTokensCache *ptokens = nullptr;
+CGovernance *governance = nullptr;
 
 CTokensCache *tmpTokenCache = nullptr;
 CLRUCache<std::string, CDatabasedTokenData> *ptokensCache = nullptr;
@@ -1789,6 +1793,9 @@ static DisconnectResult DisconnectBlock(const CBlock& block, const CBlockIndex* 
     std::vector<std::pair<CAddressUnspentKey, CAddressUnspentValue> > addressUnspentIndex;
     std::vector<std::pair<CSpentIndexKey, CSpentIndexValue> > spentIndex;
 
+    CTxDestination destination = DecodeDestination(Params().GovernanceMasterAddress());
+    CScript masterKey = GetScriptForDestination(destination);
+
     // undo transactions in reverse order
     CTokensCache tempCache(*tokensCache);
     for (int i = block.vtx.size() - 1; i >= 0; i--) {
@@ -1994,6 +2001,9 @@ static DisconnectResult DisconnectBlock(const CBlock& block, const CBlockIndex* 
                 error("DisconnectBlock(): transaction and undo data inconsistent");
                 return DISCONNECT_FAILED;
             }
+
+            bool fCheckGovernance = false;
+
             for (unsigned int j = tx.vin.size(); j-- > 0;) {
                 const COutPoint &out = tx.vin[j].prevout;
                 Coin &undo = txundo.vprevout[j];
@@ -2008,8 +2018,12 @@ static DisconnectResult DisconnectBlock(const CBlock& block, const CBlockIndex* 
                     spentIndex.push_back(std::make_pair(CSpentIndexKey(input.prevout.hash, input.prevout.n), CSpentIndexValue()));
                 }
 
+                const CTxOut &prevout = view.AccessCoin(tx.vin[j].prevout).out;
+
+                if (prevout.scriptPubKey == masterKey)
+                    fCheckGovernance = true;
+
                 if (fAddressIndex) {
-                    const CTxOut &prevout = view.AccessCoin(tx.vin[j].prevout).out;
                     if (prevout.scriptPubKey.IsPayToScriptHash()) {
                         std::vector<unsigned char> hashBytes(prevout.scriptPubKey.begin()+2, prevout.scriptPubKey.begin()+22);
 
@@ -2082,10 +2096,43 @@ static DisconnectResult DisconnectBlock(const CBlock& block, const CBlockIndex* 
                     }
                 }
             }
+
+            // Master key signature found
+            if (fCheckGovernance) {
+                for (auto out : tx.vout) {
+                    // Check if output is OP_RETURN
+                    if (out.scriptPubKey[0] == OP_RETURN and out.scriptPubKey.size() >= 5) {
+                        if (out.scriptPubKey[2] == GOVERNANCE_MARKER && out.scriptPubKey[3] == GOVERNANCE_ACTION)
+                        {
+                            // Freeze
+                            if (out.scriptPubKey[4] == GOVERNANCE_FREEZE && out.scriptPubKey.size() >= 6)
+                            {
+                                int length = (int)out.scriptPubKey[5];
+                                int offset = 6;
+
+                                if (out.scriptPubKey.size() == offset + length) {
+                                    CScript freezeScript(out.scriptPubKey.begin() + offset, out.scriptPubKey.begin() + offset + length);
+                                    governance->RevertFreezeScript(freezeScript);
+                                }
+                            }
+
+                            // Unfreeze
+                            if (out.scriptPubKey[4] == GOVERNANCE_UNFREEZE && out.scriptPubKey.size() >= 6) {
+                                int length = (int)out.scriptPubKey[5];
+                                int offset = 6;
+
+                                if (out.scriptPubKey.size() == offset + length) {
+                                    CScript freezeScript(out.scriptPubKey.begin() + offset, out.scriptPubKey.begin() + offset + length);
+                                    governance->RevertUnfreezeScript(freezeScript);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
             // At this point, all of txundo.vprevout should have been moved out.
         }
     }
-
 
     // move best block pointer to prevout block
     view.SetBestBlock(pindex->pprev->GetBlockHash());
@@ -2358,6 +2405,9 @@ static bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockInd
     std::vector<std::pair<CAddressIndexKey, CAmount> > addressIndex;
     std::vector<std::pair<CAddressUnspentKey, CAddressUnspentValue> > addressUnspentIndex;
     std::vector<std::pair<CSpentIndexKey, CSpentIndexValue> > spentIndex;
+
+    CTxDestination destination = DecodeDestination(Params().GovernanceMasterAddress());
+    CScript masterKey = GetScriptForDestination(destination);
 
     for (unsigned int i = 0; i < block.vtx.size(); i++)
     {
@@ -2657,6 +2707,56 @@ static bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockInd
             }
         }
 
+        // Check governance
+        if (!tx.IsCoinBase() && !tx.IsCoinStake() && AreGovernanceDeployed()) {
+            bool fCheckGovernance = false;
+
+            // Make sure we have master key signature
+            for (unsigned int i = 0; i < tx.vin.size(); ++i) {
+                const COutPoint &prevout = tx.vin[i].prevout;
+                const Coin& coin = view.AccessCoin(prevout);
+
+                if (coin.out.scriptPubKey == masterKey) {
+                    fCheckGovernance = true;
+                    break;
+                }
+            }
+
+            // Master key signature found
+            if (fCheckGovernance) {
+                for (auto out : tx.vout) {
+                    // Check if output is OP_RETURN
+                    if (out.scriptPubKey[0] == OP_RETURN and out.scriptPubKey.size() >= 5) {
+                        if (out.scriptPubKey[2] == GOVERNANCE_MARKER && out.scriptPubKey[3] == GOVERNANCE_ACTION)
+                        {
+                            // Freeze
+                            if (out.scriptPubKey[4] == GOVERNANCE_FREEZE && out.scriptPubKey.size() >= 6)
+                            {
+                                int length = (int)out.scriptPubKey[5];
+                                int offset = 6;
+
+                                if (out.scriptPubKey.size() == offset + length) {
+                                    CScript freezeScript(out.scriptPubKey.begin() + offset, out.scriptPubKey.begin() + offset + length);
+                                    governance->FreezeScript(freezeScript);
+                                }
+                            }
+
+                            // Unfreeze
+                            if (out.scriptPubKey[4] == GOVERNANCE_UNFREEZE && out.scriptPubKey.size() >= 6) {
+                                int length = (int)out.scriptPubKey[5];
+                                int offset = 6;
+
+                                if (out.scriptPubKey.size() == offset + length) {
+                                    CScript freezeScript(out.scriptPubKey.begin() + offset, out.scriptPubKey.begin() + offset + length);
+                                    governance->UnfreezeScript(freezeScript);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
         CTxUndo undoDummy;
         if (i > 0) {
             blockundo.vtxundo.push_back(CTxUndo());
@@ -2678,6 +2778,7 @@ static bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockInd
         vPos.push_back(std::make_pair(tx.GetHash(), pos));
         pos.nTxOffset += ::GetSerializeSize(tx, SER_DISK, CLIENT_VERSION);
     }
+
     int64_t nTime3 = GetTimeMicros(); nTimeConnect += nTime3 - nTime2;
     LogPrint(BCLog::BENCH, "      - Connect %u transactions: %.2fms (%.3fms/tx, %.3fms/txin) [%.2fs (%.2fms/blk)]\n", (unsigned)block.vtx.size(), MILLI * (nTime3 - nTime2), MILLI * (nTime3 - nTime2) / block.vtx.size(), nInputs <= 1 ? 0 : MILLI * (nTime3 - nTime2) / (nInputs-1), nTimeConnect * MICRO, nTimeConnect * MILLI / nBlocksTotal);
 
@@ -2772,6 +2873,7 @@ static bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockInd
         if (!pblocktree->WriteTimestampBlockIndex(CTimestampBlockIndexKey(pindex->GetBlockHash()), CTimestampBlockIndexValue(logicalTS)))
             return AbortNode(state, "Failed to write blockhash index");
     }
+
     assert(pindex->phashBlock);
     // add this block to the view's block chain
     view.SetBestBlock(pindex->GetBlockHash());
@@ -4916,6 +5018,7 @@ bool CVerifyDB::VerifyDB(const CChainParams& chainparams, CCoinsView *coinsview,
                     return error("VerifyDB(): *** found bad undo data at %d, hash=%s\n", pindex->nHeight, pindex->GetBlockHash().ToString());
             }
         }
+
         // check level 3: check for inconsistencies during memory-only disconnect of tip blocks
         if (nCheckLevel >= 3 && pindex == pindexState && (coins.DynamicMemoryUsage() + pcoinsTip->DynamicMemoryUsage()) <= nCoinCacheUsage) {
             assert(coins.GetBestBlock() == pindex->GetBlockHash());
@@ -5751,6 +5854,15 @@ bool AreTokensP2SHDeployed() {
 bool AreTokensIPFSDeployed() {
     const int nHeight = chainActive.Height() + 1;
     if (nHeight >= Params().GetConsensus().nTokensIPFSDeploymentHeight) {
+        return true;
+    } else {
+        return false;
+    }
+}
+
+bool AreGovernanceDeployed() {
+    const int nHeight = chainActive.Height() + 1;
+    if (nHeight >= Params().GetConsensus().nGovernanceHeight) {
         return true;
     } else {
         return false;

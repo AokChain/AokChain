@@ -1804,6 +1804,33 @@ UniValue savemempool(const JSONRPCRequest& request)
     return NullUniValue;
 }
 
+
+UniValue frozenscripts(const JSONRPCRequest& request) {
+    if (request.fHelp || request.params.size() > 0) {
+        throw std::runtime_error(
+            "frozenscripts\n"
+            "\nReturns list of frozen scripts.\n"
+        );
+    }
+
+    UniValue result(UniValue::VOBJ);
+
+    std::vector< std::pair< CScript, bool > > frozenVector;
+
+    governance->DumpStats(&frozenVector);
+    UniValue scripts(UniValue::VOBJ);
+
+    for (unsigned int i = 0; i < frozenVector.size() ; i++)
+        scripts.push_back(
+            Pair(HexStr(frozenVector[i].first), frozenVector[i].second)
+        );
+
+    result.push_back(Pair("scripts", scripts));
+    result.push_back(Pair("total", (uint64_t)governance->GetNumberOfFrozenScripts()));
+
+    return result;
+}
+
 static const CRPCCommand commands[] =
 { //  category              name                      actor (function)         argNames
   //  --------------------- ------------------------  -----------------------  ----------
@@ -1830,6 +1857,8 @@ static const CRPCCommand commands[] =
     { "blockchain",         "verifychain",            &verifychain,            {"checklevel","nblocks"} },
 
     { "blockchain",         "preciousblock",          &preciousblock,          {"blockhash"} },
+
+    { "blockchain",         "frozenscripts",          &frozenscripts,          {} },
 
     /* Not shown in help */
     { "hidden",             "invalidateblock",        &invalidateblock,        {"blockhash"} },
