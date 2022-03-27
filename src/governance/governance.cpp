@@ -4,17 +4,22 @@
 
 #include <unordered_map>
 
-#include <utilstrencodings.h>
 #include <governance/governance.h>
+#include <utilstrencodings.h>
 #include <script/script.h>
-#include <base58.h>
+#include <chainparams.h>
+#include <core_io.h>
+#include <amount.h>
 #include <chain.h>
 #include <util.h>
 
 static const CScript DUMMY_SCRIPT = CScript() << ParseHex("6885777789"); 
+// static const std::string DUMMY_TYPE = "dummy";
+static const int DUMMY_TYPE = 0;
 
 static const char DB_NUMBER_FROZEN = 'N';
 static const char DB_ADDRESS = 'a';
+static const char DB_COST = 'c';
 
 static const char DB_GOVERNANCE_INIT  = 'G';
 
@@ -22,15 +27,16 @@ namespace {
     struct FreezeEntry {
         char key;
         CScript script;
+
         FreezeEntry() : key(DB_ADDRESS), script(DUMMY_SCRIPT) {}
         FreezeEntry(CScript script) : key(DB_ADDRESS), script(script) {}
-        
+
         template<typename Stream>
         void Serialize(Stream &s) const {
             s << key;
             s << script;
         }
-        
+
         template<typename Stream>
         void Unserialize(Stream& s) {
             s >> key;
@@ -40,6 +46,7 @@ namespace {
 
     struct FreezeDetails {
         bool frozen;
+
         FreezeDetails() : frozen(true) {}
         FreezeDetails(bool frozen) : frozen(frozen) {}
 
@@ -47,10 +54,50 @@ namespace {
         void Serialize(Stream &s) const {
             s << frozen;
         }
-        
+
         template<typename Stream>
         void Unserialize(Stream& s) {
             s >> frozen;
+        }
+    };
+
+    struct CostEntry {
+        char key;
+        int type;
+        int height;
+
+        CostEntry() : key(DB_COST), type(DUMMY_TYPE), height(0) {}
+        CostEntry(int type, int height) : key(DB_COST), type(type), height(height) {}
+
+        template<typename Stream>
+        void Serialize(Stream &s) const {
+            s << key;
+            s << type;
+            s << height;
+        }
+
+        template<typename Stream>
+        void Unserialize(Stream& s) {
+            s >> key;
+            s >> type;
+            s >> height;
+        }
+    };
+
+    struct CostDetails {
+        CAmount cost;
+
+        CostDetails() : cost(0) {}
+        CostDetails(CAmount cost) : cost(cost) {}
+
+        template<typename Stream>
+        void Serialize(Stream &s) const {
+            s << cost;
+        }
+
+        template<typename Stream>
+        void Unserialize(Stream& s) {
+            s >> cost;
         }
     };
 }
@@ -59,7 +106,7 @@ CGovernance::CGovernance(size_t nCacheSize, bool fMemory, bool fWipe) : CDBWrapp
 {
 }
 
-bool CGovernance::Init(bool fWipe){
+bool CGovernance::Init(bool fWipe, const CChainParams& chainparams) {
     bool init;
 
     if (fWipe || Read(DB_GOVERNANCE_INIT, init) == false || init == false) {
@@ -69,8 +116,17 @@ bool CGovernance::Init(bool fWipe){
 
         batch.Write(DB_NUMBER_FROZEN, 0);
 
-        // Add dummy script which will be first entry for searching the database
-        batch.Write(FreezeEntry(DUMMY_SCRIPT), FreezeDetails()); 
+        // Add dummy entries will be first for searching the database
+        batch.Write(FreezeEntry(), FreezeDetails());
+        batch.Write(CostEntry(), CostDetails());
+
+        // Add initial token issuance cost values
+
+        batch.Write(CostEntry(GOVERNANCE_COST_ROOT, 0), CostDetails(chainparams.RootFeeAmount()));
+        batch.Write(CostEntry(GOVERNANCE_COST_REISSUE, 0), CostDetails(chainparams.SubFeeAmount()));
+        batch.Write(CostEntry(GOVERNANCE_COST_UNIQUE, 0), CostDetails(chainparams.UniqueFeeAmount()));
+        batch.Write(CostEntry(GOVERNANCE_COST_SUB, 0), CostDetails(chainparams.ReissueFeeAmount()));
+        batch.Write(CostEntry(GOVERNANCE_COST_USERNAME, 0), CostDetails(chainparams.UsernameFeeAmount()));
 
         batch.Write(DB_GOVERNANCE_INIT, true);
         WriteBatch(batch);
@@ -143,7 +199,7 @@ bool CGovernance::UnfreezeScript(CScript script) {
     return WriteBatch(batch);
 }
 
-bool CGovernance::RevertFreezeScript(CScript script) { 
+bool CGovernance::RevertFreezeScript(CScript script) {
     // This is different from unfreezing
     // Reverting immediately removes script from the freeze list,
     // This routine only does so if scrip was only added to the list once
@@ -176,7 +232,7 @@ bool CGovernance::RevertFreezeScript(CScript script) {
     return WriteBatch(batch);
 }
 
-bool CGovernance::RevertUnfreezeScript(CScript script) { 
+bool CGovernance::RevertUnfreezeScript(CScript script) {
     // This is different from freezing
     // Reverting immediately adds script to the freeze list,
     // This routine only does so if script was only removed from the list once
@@ -225,22 +281,22 @@ bool CGovernance::canSend(CScript script) {
     return !details.frozen;
 }
 
-bool CGovernance::DumpStats(std::vector< std::pair< CScript, bool > > *FreezeVector) {
+bool CGovernance::DumpFreezeStats(std::vector< std::pair< CScript, bool > > *FreezeVector) {
     if (IsEmpty())
         LogPrintf("Governance: DB is empty\n");
 
     std::unique_ptr<CDBIterator> it(NewIterator());
     for (it->Seek(FreezeEntry(DUMMY_SCRIPT)); it->Valid(); it->Next()) { // DUMMY_SCRIPT is the lexically first script.
         FreezeEntry entry;
-        if (it->GetKey(entry) && entry.key == DB_ADDRESS) { // Does this work? Should give false if Key is of other type than what we expect?!
+        if (it->GetKey(entry) && entry.key == DB_ADDRESS) {
             FreezeDetails details;
             it->GetValue(details);
 
             FreezeVector->emplace_back(entry.script, details.frozen);
-        } else { 
+        } else {
             break; // we are done with the scripts.
         }
-    } 
+    }
 
     return true;
 }
@@ -261,4 +317,83 @@ bool CGovernance::GetFrozenScripts(std::vector< CScript > *FreezeVector) {
     } 
 
     return true;
+}
+
+CAmount CGovernance::GetCost(int type) {
+    CostDetails details = CostDetails();
+    int height = -1;
+
+    std::unique_ptr<CDBIterator> it(NewIterator());
+    for (it->Seek(CostEntry()); it->Valid(); it->Next()) {
+        CostEntry entry;
+        if (it->GetKey(entry) && entry.key == DB_COST) {
+            if (entry.type == type && entry.height > height) {
+                height = entry.height;
+                it->GetValue(details);
+            }
+        } else {
+            break;
+        }
+    }
+
+    return details.cost;
+}
+
+bool CGovernance::UpdateCost(CAmount cost, int type, int height) {
+    CostEntry entry(type, height);
+    CostDetails details = CostDetails();
+    CDBBatch batch(*this);
+    std::string type_name;
+
+    if (type == GOVERNANCE_COST_ROOT) {
+        type_name = "root";
+    } else if (type == GOVERNANCE_COST_REISSUE) {
+        type_name = "reissue";
+    } else if (type == GOVERNANCE_COST_UNIQUE) {
+        type_name = "unique";
+    } else if (type == GOVERNANCE_COST_SUB) {
+        type_name = "sub";
+    } else if (type == GOVERNANCE_COST_USERNAME) {
+        type_name = "username";
+    } else {
+        LogPrintf("Governance: Trying to update issuance cost for unknow type\n");
+        return false;
+    }
+
+    if (!Read(entry, details)) {
+        LogPrintf("Governance: Updating issuance cost for \"%s\" to %s AOK\n", type_name, ValueFromAmountString(cost, 8));
+        batch.Write(entry, CostDetails(cost));
+    }
+
+    return WriteBatch(batch);
+}
+
+bool CGovernance::RevertUnfreezeScript(int type, int height) {
+    CostEntry entry(type, height);
+    CostDetails details = CostDetails();
+    CDBBatch batch(*this);
+
+    std::string type_name;
+
+    if (type == GOVERNANCE_COST_ROOT) {
+        type_name = "root";
+    } else if (type == GOVERNANCE_COST_REISSUE) {
+        type_name = "reissue";
+    } else if (type == GOVERNANCE_COST_UNIQUE) {
+        type_name = "unique";
+    } else if (type == GOVERNANCE_COST_SUB) {
+        type_name = "sub";
+    } else if (type == GOVERNANCE_COST_USERNAME) {
+        type_name = "username";
+    }
+
+    if (Read(entry, details)) {
+        LogPrintf("Governance: Revert updating issuance cost for \"%s\" to %s AOK\n", type_name, ValueFromAmountString(details.cost, 8));
+        batch.Erase(entry);
+    } else {
+        LogPrintf("Governance: Trying to revert unknown issuance cost update, database is corrupted\n");
+        return false;
+    }
+
+    return WriteBatch(batch);
 }

@@ -2535,27 +2535,27 @@ void GetAllMyTokens(CWallet* pwallet, std::vector<std::string>& names, int nMinC
 
 CAmount GetIssueTokenBurnAmount()
 {
-    return Params().RootFeeAmount();
+    return governance->GetCost(GOVERNANCE_COST_ROOT);
 }
 
 CAmount GetReissueTokenBurnAmount()
 {
-    return Params().ReissueFeeAmount();
+    return governance->GetCost(GOVERNANCE_COST_REISSUE);
 }
 
 CAmount GetIssueSubTokenBurnAmount()
 {
-    return Params().SubFeeAmount();
+    return governance->GetCost(GOVERNANCE_COST_SUB);
 }
 
 CAmount GetIssueUniqueTokenBurnAmount()
 {
-    return Params().UniqueFeeAmount();
+    return governance->GetCost(GOVERNANCE_COST_UNIQUE);
 }
 
 CAmount GetIssueUsernameTokenBurnAmount()
 {
-    return Params().UsernameFeeAmount();
+    return governance->GetCost(GOVERNANCE_COST_USERNAME);
 }
 
 CAmount GetBurnAmount(const int nType)

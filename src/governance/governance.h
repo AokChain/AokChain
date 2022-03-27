@@ -6,6 +6,7 @@
 #define ROZA_VALIDATORS_H
 
 #include <script/script.h>
+#include <chainparams.h>
 #include <dbwrapper.h>
 #include <chain.h>
 
@@ -13,12 +14,19 @@
 #define GOVERNANCE_ACTION 65
 #define GOVERNANCE_FREEZE 70
 #define GOVERNANCE_UNFREEZE 85
+#define GOVERNANCE_COST 67
+
+#define GOVERNANCE_COST_ROOT 1
+#define GOVERNANCE_COST_REISSUE 2
+#define GOVERNANCE_COST_UNIQUE 3
+#define GOVERNANCE_COST_SUB 4
+#define GOVERNANCE_COST_USERNAME 5
 
 class CGovernance : CDBWrapper 
 {
 public:
     CGovernance(size_t nCacheSize, bool fMemory, bool fWipe);
-    bool Init(bool fWipe);
+    bool Init(bool fWipe, const CChainParams& chainparams);
 
     // Statistics
     unsigned int GetNumberOfFrozenScripts();
@@ -31,8 +39,13 @@ public:
     bool ScriptExist(CScript script);
     bool canSend(CScript script);
 
-    bool DumpStats(std::vector< std::pair< CScript, bool > > *FreezeVector);
+    bool UpdateCost(CAmount cost, int type, int height);
+    bool RevertUnfreezeScript(int type, int height);
+
+    bool DumpFreezeStats(std::vector< std::pair< CScript, bool > > *FreezeVector);
     bool GetFrozenScripts(std::vector< CScript > *FreezeVector);
+
+    CAmount GetCost(int type);
 
     using CDBWrapper::Sync;
   

@@ -1552,7 +1552,7 @@ bool AppInitMain(boost::thread_group& threadGroup, CScheduler& scheduler)
                 pcoinscatcher.reset(new CCoinsViewErrorCatcher(pcoinsdbview.get()));
 
                 governance = new CGovernance(nGovernanceDBCache, false, fReset);
-                governance->Init(fReset);
+                governance->Init(fReset, chainparams);
 
                 // If necessary, upgrade from older database format.
                 // This is a no-op if we cleared the coinsviewdb with -reindex or -reindex-chainstate

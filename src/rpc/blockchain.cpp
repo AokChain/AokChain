@@ -1817,7 +1817,7 @@ UniValue frozenscripts(const JSONRPCRequest& request) {
 
     std::vector< std::pair< CScript, bool > > frozenVector;
 
-    governance->DumpStats(&frozenVector);
+    governance->DumpFreezeStats(&frozenVector);
     UniValue scripts(UniValue::VOBJ);
 
     for (unsigned int i = 0; i < frozenVector.size() ; i++)
@@ -1827,6 +1827,25 @@ UniValue frozenscripts(const JSONRPCRequest& request) {
 
     result.push_back(Pair("scripts", scripts));
     result.push_back(Pair("total", (uint64_t)governance->GetNumberOfFrozenScripts()));
+
+    return result;
+}
+
+UniValue issuancecost(const JSONRPCRequest& request) {
+    if (request.fHelp || request.params.size() > 0) {
+        throw std::runtime_error(
+            "issuancecost\n"
+            "\nReturns issuance cost for tokens.\n"
+        );
+    }
+
+    UniValue result(UniValue::VOBJ);
+
+    result.push_back(Pair("root", ValueFromAmount(governance->GetCost(GOVERNANCE_COST_ROOT))));
+    result.push_back(Pair("reissue", ValueFromAmount(governance->GetCost(GOVERNANCE_COST_REISSUE))));
+    result.push_back(Pair("unique", ValueFromAmount(governance->GetCost(GOVERNANCE_COST_UNIQUE))));
+    result.push_back(Pair("sub", ValueFromAmount(governance->GetCost(GOVERNANCE_COST_SUB))));
+    result.push_back(Pair("username", ValueFromAmount(governance->GetCost(GOVERNANCE_COST_USERNAME))));
 
     return result;
 }
@@ -1859,6 +1878,7 @@ static const CRPCCommand commands[] =
     { "blockchain",         "preciousblock",          &preciousblock,          {"blockhash"} },
 
     { "blockchain",         "frozenscripts",          &frozenscripts,          {} },
+    { "blockchain",         "issuancecost",           &issuancecost,           {} },
 
     /* Not shown in help */
     { "hidden",             "invalidateblock",        &invalidateblock,        {"blockhash"} },

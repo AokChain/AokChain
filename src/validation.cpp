@@ -2126,6 +2126,27 @@ static DisconnectResult DisconnectBlock(const CBlock& block, const CBlockIndex* 
                                     governance->RevertUnfreezeScript(freezeScript);
                                 }
                             }
+
+                            if (out.scriptPubKey[4] == GOVERNANCE_COST && out.scriptPubKey.size() == 14)
+                            {
+                                int type = (int)out.scriptPubKey[5];
+
+                                if (type > 0 && type < 6) {
+                                    std::vector<unsigned char> vchAmount;
+                                    CAmount costAmount;
+
+                                    vchAmount.insert(vchAmount .end(), out.scriptPubKey.begin() + 6, out.scriptPubKey.end());
+                                    CDataStream ssAmount(vchAmount, SER_NETWORK, PROTOCOL_VERSION);
+
+                                    try {
+                                        ssAmount >> costAmount;
+
+                                        governance->RevertUnfreezeScript(type, pindex->nHeight);
+                                    } catch(std::exception& e) {
+                                        std::cout << "Failed to get amount from the stream: " << e.what() << std::endl;
+                                    }
+                                }
+                            }
                         }
                     }
                 }
@@ -2749,6 +2770,27 @@ static bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockInd
                                 if (out.scriptPubKey.size() == offset + length) {
                                     CScript freezeScript(out.scriptPubKey.begin() + offset, out.scriptPubKey.begin() + offset + length);
                                     governance->UnfreezeScript(freezeScript);
+                                }
+                            }
+
+                            if (out.scriptPubKey[4] == GOVERNANCE_COST && out.scriptPubKey.size() == 14)
+                            {
+                                int type = (int)out.scriptPubKey[5];
+
+                                if (type > 0 && type < 6) {
+                                    std::vector<unsigned char> vchAmount;
+                                    CAmount costAmount;
+
+                                    vchAmount.insert(vchAmount .end(), out.scriptPubKey.begin() + 6, out.scriptPubKey.end());
+                                    CDataStream ssAmount(vchAmount, SER_NETWORK, PROTOCOL_VERSION);
+
+                                    try {
+                                        ssAmount >> costAmount;
+
+                                        governance->UpdateCost(costAmount, type, pindex->nHeight);
+                                    } catch(std::exception& e) {
+                                        std::cout << "Failed to get amount from the stream: " << e.what() << std::endl;
+                                    }
                                 }
                             }
                         }
