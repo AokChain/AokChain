@@ -176,6 +176,13 @@ public:
             vKeys.push_back(keyId);
     }
 
+    void operator()(const std::pair<CKeyID, CKeyID> &keyId) {
+        if (keystore.HaveKey(keyId.first))
+            vKeys.push_back(keyId.first);
+        if (keystore.HaveKey(keyId.second))
+            vKeys.push_back(keyId.second);
+    }
+
     void operator()(const CScriptID &scriptId) {
         CScript script;
         if (keystore.GetCScript(scriptId, script))
@@ -1910,6 +1917,17 @@ CAmount CWalletTx::GetDebit(const isminefilter& filter) const
             debit += nWatchDebitCached;
         }
     }
+    if (filter & ISMINE_STAKABLE)
+    {
+        if (fOfflineStakingDebitCached)
+            debit += nOfflineStakingDebitCached;
+        else
+        {
+            nOfflineStakingDebitCached = pwallet->GetDebit(*tx, ISMINE_STAKABLE);
+            fOfflineStakingDebitCached = true;
+            debit += nOfflineStakingDebitCached;
+        }
+    }
     return debit;
 }
 
@@ -1941,6 +1959,17 @@ CAmount CWalletTx::GetCredit(const isminefilter& filter) const
             nWatchCreditCached = pwallet->GetCredit(*tx, ISMINE_WATCH_ONLY);
             fWatchCreditCached = true;
             credit += nWatchCreditCached;
+        }
+    }
+    if (filter & ISMINE_STAKABLE)
+    {
+        if (fOfflineStakingCreditCached)
+            credit += nOfflineStakingCreditCached;
+        else
+        {
+            nOfflineStakingCreditCached = pwallet->GetCredit(*tx, ISMINE_STAKABLE);
+            fOfflineStakingCreditCached = true;
+            credit += nOfflineStakingCreditCached;
         }
     }
     return credit;
@@ -2034,6 +2063,31 @@ CAmount CWalletTx::GetLockedCredit(bool fUseCache) const
     return nCredit;
 }
 
+CAmount CWalletTx::GetAvailableStakableCredit() const
+{
+    if (pwallet == 0)
+        return 0;
+
+    // Must wait until coinbase is safely deep enough in the chain before valuing it
+    if ((IsCoinBase() || IsCoinStake()) && GetBlocksToMaturity() > 0)
+        return 0;
+
+    CAmount nCredit = 0;
+    uint256 hashTx = GetHash();
+    for (unsigned int i = 0; i < tx->vout.size(); i++)
+    {
+        if (!pwallet->IsSpent(hashTx, i))
+        {
+            const CTxOut &txout = tx->vout[i];
+            nCredit += pwallet->GetCredit(txout, ISMINE_STAKABLE);
+            if (!MoneyRange(nCredit))
+                throw std::runtime_error("CWalletTx::GetAvailableCredit() : value out of range");
+        }
+    }
+
+    return nCredit;
+}
+
 CAmount CWalletTx::GetImmatureWatchOnlyCredit(const bool& fUseCache) const
 {
     if ((IsCoinBase() || IsCoinStake()) && GetBlocksToMaturity() > 0 && IsInMainChain())
@@ -2046,6 +2100,22 @@ CAmount CWalletTx::GetImmatureWatchOnlyCredit(const bool& fUseCache) const
     }
 
     return 0;
+}
+
+CAmount CWallet::GetOfflineStakingBalance() const
+{
+    CAmount nTotal = 0;
+    {
+        LOCK2(cs_main, cs_wallet);
+        for (std::map<uint256, CWalletTx>::const_iterator it = mapWallet.begin(); it != mapWallet.end(); ++it)
+        {
+            const CWalletTx* pcoin = &(*it).second;
+            if (pcoin->IsTrusted())
+                nTotal += pcoin->GetAvailableStakableCredit();
+        }
+    }
+
+    return nTotal;
 }
 
 CAmount CWalletTx::GetAvailableWatchOnlyCredit(const bool& fUseCache) const
@@ -2695,7 +2765,7 @@ void CWallet::AvailableCoinsForStaking(std::vector<COutput>& vCoins) const
             for (unsigned int i = 0; i < pcoin->tx->vout.size(); i++) {
                 isminetype mine = IsMine(pcoin->tx->vout[i]);
                 bool isTokenScript = pcoin->tx->vout[i].scriptPubKey.IsTokenScript();
-                bool solvable = (mine & (ISMINE_SPENDABLE | ISMINE_WATCH_SOLVABLE)) != ISMINE_NO;
+                bool solvable = (mine & (ISMINE_SPENDABLE | ISMINE_WATCH_SOLVABLE | ISMINE_STAKABLE)) != ISMINE_NO;
                 bool spendable = ((mine & ISMINE_SPENDABLE) != ISMINE_NO) || (((mine & ISMINE_WATCH_ONLY) != ISMINE_NO) && solvable);
                 if (!isTokenScript && !(IsSpent(wtxid, i)) && mine != ISMINE_NO &&
                     !IsLockedCoin((*it).first, i) && (pcoin->tx->vout[i].nValue > 0)) {
@@ -2761,7 +2831,7 @@ bool CWallet::CreateCoinStake(const CKeyStore& keystore, unsigned int nBits, con
     txNew.vout.push_back(CTxOut(0, scriptEmpty));
 
     // Choose coins to use
-    CAmount nBalance = GetBalance();
+    CAmount nBalance = GetBalance() + GetOfflineStakingBalance();
 
     if (nBalance <= nReserveBalance)
         return false;
@@ -2809,7 +2879,7 @@ bool CWallet::CreateCoinStake(const CKeyStore& keystore, unsigned int nBits, con
                 break;
             }
             LogPrint(BCLog::COINSTAKE, "CreateCoinStake : parsed kernel type=%d\n", whichType);
-            if (whichType != TX_PUBKEY && whichType != TX_PUBKEYHASH)
+            if (whichType != TX_PUBKEY && whichType != TX_PUBKEYHASH && whichType != TX_OFFLINE_STAKING)
             {
                 LogPrint(BCLog::COINSTAKE, "CreateCoinStake : no support for kernel type=%d\n", whichType);
                 break;  // only support pay to public key and pay to address
@@ -2845,6 +2915,22 @@ bool CWallet::CreateCoinStake(const CKeyStore& keystore, unsigned int nBits, con
                 }
 
                 scriptPubKeyOut = scriptPubKeyKernel;
+            }
+
+            if (whichType == TX_OFFLINE_STAKING) // offline staking
+            {
+                uint160 hash160(vSolutions[0]);
+                CKeyID pubKeyHash(hash160);
+
+                // try to find staking key
+                if (!keystore.GetKey(pubKeyHash, key))
+                {
+                    LogPrint(BCLog::COINSTAKE, "CreateCoinStake : failed to get key for kernel type=%d\n", whichType);
+                    break;  // unable to find corresponding public key
+                } else {
+                    // we keep the same script
+                    scriptPubKeyOut = scriptPubKeyKernel;
+                }
             }
 
             txNew.vin.push_back(CTxIn(pcoin.first->GetHash(), pcoin.second));
@@ -2924,7 +3010,7 @@ bool CWallet::CreateCoinStake(const CKeyStore& keystore, unsigned int nBits, con
     int nIn = 0;
     for(const CWalletTx* pcoin : vwtxPrev)
     {
-        if (!SignSignature(*this, *pcoin->tx, txNew, nIn++, SIGHASH_ALL))
+        if (!SignSignature(*this, *pcoin->tx, txNew, nIn++, SIGHASH_ALL, true))
             return error("CreateCoinStake : failed to sign coinstake");
     }
 
@@ -3962,16 +4048,14 @@ bool CWallet::CreateTransactionAll(const std::vector<CRecipient>& vecSend, CWall
                 // Note how the sequence number is set to non-maxint so that
                 // the nLockTime set above actually works.
                 //
-                // BIP125 defines opt-in RBF as any nSequence < maxint-1, so
-                // we use the highest possible value in that range (maxint-2)
-                // to avoid conflicting with other possible uses of nSequence,
-                // and in the spirit of "smallest possible change from prior
-                // behavior."
-//                const uint32_t nSequence = coin_control.signalRbf ? MAX_BIP125_RBF_SEQUENCE : (CTxIn::SEQUENCE_FINAL - 1);
                 const uint32_t nSequence = CTxIn::SEQUENCE_FINAL - 1;
                 for (const auto& coin : setCoins) {
                     txNew.vin.push_back(CTxIn(coin.outpoint,CScript(),
                                               nSequence));
+
+                    // Mark fSpendsOfflineStaking true if transactions spend offline staking UTXO 
+                    if (coin.txout.scriptPubKey.IsOfflineStaking())
+                        wtxNew.fSpendsOfflineStaking = true;
 
                     // If the input is a CLTV lock-by-blocktime then update the txNew.nLockTime
                     CScriptNum nLockTime(0);
@@ -4207,7 +4291,7 @@ bool CWallet::CommitTransaction(CWalletTx& wtxNew, CReserveKey& reservekey, CCon
 uint64_t CWallet::GetStakeWeight() const
 {
     // Choose coins to use
-    CAmount nBalance = GetBalance();
+    CAmount nBalance = GetBalance() + GetOfflineStakingBalance();
 
     if (nBalance <= nReserveBalance)
         return 0;

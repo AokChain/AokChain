@@ -71,7 +71,7 @@ static bool SignN(const std::vector<valtype>& multisigdata, const BaseSignatureC
  */
 static bool SignStep(const BaseSignatureCreator& creator, const CScript& scriptPubKey,
                      std::vector<valtype>& ret, txnouttype& whichTypeRet,
-                     txnouttype& whichScriptTypeRet, SigVersion sigversion)
+                     txnouttype& whichScriptTypeRet, SigVersion sigversion, bool fCoinStake = false)
 {
     CScript scriptRet;
     uint160 h160;
@@ -137,6 +137,17 @@ static bool SignStep(const BaseSignatureCreator& creator, const CScript& scriptP
             ret.push_back(ToByteVector(vch));
         }
         return true;
+    case TX_OFFLINE_STAKING:
+        keyID = CKeyID(uint160(fCoinStake ? vSolutions[0] : vSolutions[1]));
+        if (!Sign1(keyID, creator, scriptPubKey, ret, sigversion))
+            return false;
+        else
+        {
+            CPubKey vch;
+            creator.KeyStore().GetPubKey(keyID, vch);
+            ret.push_back(ToByteVector(vch));
+        }
+        return true;
     case TX_SCRIPTHASH:
         if (creator.KeyStore().GetCScript(uint160(vSolutions[0]), scriptRet)) {
             ret.push_back(std::vector<unsigned char>(scriptRet.begin(), scriptRet.end()));
@@ -180,7 +191,7 @@ static CScript PushAll(const std::vector<valtype>& values)
     return result;
 }
 
-bool ProduceSignature(const BaseSignatureCreator& creator, const CScript& fromPubKey, SignatureData& sigdata)
+bool ProduceSignature(const BaseSignatureCreator& creator, const CScript& fromPubKey, SignatureData& sigdata, bool fCoinStake)
 {
     CScript script = fromPubKey;
     CScript modifiedScript = fromPubKey;
@@ -194,7 +205,7 @@ bool ProduceSignature(const BaseSignatureCreator& creator, const CScript& fromPu
     std::vector<valtype> result;
     txnouttype whichType;
     txnouttype whichScriptType;
-    bool solved = SignStep(creator, script, result, whichType, whichScriptType, SIGVERSION_BASE);
+    bool solved = SignStep(creator, script, result, whichType, whichScriptType, SIGVERSION_BASE, fCoinStake);
     bool P2SH = false;
     CScript subscript;
     sigdata.scriptWitness.stack.clear();
@@ -263,7 +274,7 @@ void UpdateTransaction(CMutableTransaction& tx, unsigned int nIn, const Signatur
     tx.vin[nIn].scriptWitness = data.scriptWitness;
 }
 
-bool SignSignature(const CKeyStore &keystore, const CScript& fromPubKey, CMutableTransaction& txTo, unsigned int nIn, const CAmount& amount, int nHashType)
+bool SignSignature(const CKeyStore &keystore, const CScript& fromPubKey, CMutableTransaction& txTo, unsigned int nIn, const CAmount& amount, int nHashType, bool fCoinStake)
 {
     assert(nIn < txTo.vin.size());
 
@@ -271,19 +282,19 @@ bool SignSignature(const CKeyStore &keystore, const CScript& fromPubKey, CMutabl
     TransactionSignatureCreator creator(&keystore, &txToConst, nIn, amount, nHashType);
 
     SignatureData sigdata;
-    bool ret = ProduceSignature(creator, fromPubKey, sigdata);
+    bool ret = ProduceSignature(creator, fromPubKey, sigdata, fCoinStake);
     UpdateTransaction(txTo, nIn, sigdata);
     return ret;
 }
 
-bool SignSignature(const CKeyStore &keystore, const CTransaction& txFrom, CMutableTransaction& txTo, unsigned int nIn, int nHashType)
+bool SignSignature(const CKeyStore &keystore, const CTransaction& txFrom, CMutableTransaction& txTo, unsigned int nIn, int nHashType, bool fCoinStake)
 {
     assert(nIn < txTo.vin.size());
     CTxIn& txin = txTo.vin[nIn];
     assert(txin.prevout.n < txFrom.vout.size());
     const CTxOut& txout = txFrom.vout[txin.prevout.n];
 
-    return SignSignature(keystore, txout.scriptPubKey, txTo, nIn, txout.nValue, nHashType);
+    return SignSignature(keystore, txout.scriptPubKey, txTo, nIn, txout.nValue, nHashType, fCoinStake);
 }
 
 bool VerifySignature(const Coin& coin, const uint256 txFromHash, const CTransaction& txTo, unsigned int nIn, unsigned int flags)
@@ -391,6 +402,7 @@ static Stacks CombineSignatures(const CScript& scriptPubKey, const BaseSignature
     case TX_CLTV:
     case TX_PUBKEY:
     case TX_PUBKEYHASH:
+    case TX_OFFLINE_STAKING:
         // Signatures are bigger than placeholders or empty scripts:
         if (sigs1.script.empty() || sigs1.script[0].empty())
             return sigs2;

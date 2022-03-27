@@ -77,7 +77,8 @@ enum txnouttype
     TX_REISSUE_TOKEN = 9,
     TX_TRANSFER_TOKEN = 10,
     /** TOKENS END */
-    TX_CLTV = 11
+    TX_CLTV = 11,
+    TX_OFFLINE_STAKING = 12
 };
 
 class CNoDestination {
@@ -93,7 +94,7 @@ public:
  *  * CScriptID: TX_SCRIPTHASH destination
  *  A CTxDestination is the internal data type encoded in a aokchain address
  */
-typedef boost::variant<CNoDestination, CKeyID, CScriptID> CTxDestination;
+typedef boost::variant<CNoDestination, CKeyID, CScriptID, std::pair<CKeyID, CKeyID>> CTxDestination;
 
 /** Check whether a CTxDestination is a CNoDestination. */
 bool IsValidDestination(const CTxDestination& dest);

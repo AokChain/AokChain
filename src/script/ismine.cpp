@@ -62,6 +62,7 @@ isminetype IsMine(const CKeyStore &keystore, const CScript& scriptPubKey, CBlock
         return ISMINE_NO;
     }
     CKeyID keyID;
+    CKeyID keyID2;
     switch (whichType) {
         case TX_NONSTANDARD:
         case TX_NULL_DATA:
@@ -100,6 +101,19 @@ isminetype IsMine(const CKeyStore &keystore, const CScript& scriptPubKey, CBlock
             if (keystore.HaveKey(keyID))
                 return ISMINE_SPENDABLE;
             break;
+        case TX_OFFLINE_STAKING: {
+            keyID = CKeyID(uint160(vSolutions[1]));
+            keyID2 = CKeyID(uint160(vSolutions[0]));
+            bool fSpendable = keystore.HaveKey(keyID);
+            bool fStakable = keystore.HaveKey(keyID2);
+            if (fSpendable && fStakable)
+                return ISMINE_SPENDABLE_STAKABLE;
+            else if (fSpendable)
+                return ISMINE_SPENDABLE;
+            else if (fStakable)
+                return ISMINE_STAKABLE;
+            break;
+        }
         case TX_SCRIPTHASH: {
             CScriptID scriptID = CScriptID(uint160(vSolutions[0]));
             CScript subscript;

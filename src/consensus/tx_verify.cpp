@@ -192,6 +192,9 @@ bool CheckTransaction(const CTransaction& tx, CValidationState &state, CTokensCa
         if (!MoneyRange(nValueOut))
             return state.DoS(100, false, REJECT_INVALID, "bad-txns-txouttotal-toolarge");
 
+        if (txout.scriptPubKey.IsOfflineStaking() && !AreGovernanceDeployed())
+            return state.DoS(100, false, REJECT_INVALID, "offline-staking-not-enabled");
+
         /** TOKENS START */
         bool isToken = false;
         int nType = 0;

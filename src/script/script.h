@@ -190,6 +190,7 @@ enum opcodetype
     OP_TOKEN_SCRIPT = 0xc0,
     /** TOKENS END */
 
+    OP_OFFLINE_STAKE = 0xc6,
 
     // template matching params
     OP_BIGINTEGER = 0xf0,
@@ -680,6 +681,7 @@ public:
 
     /** Used for obsolete pay-to-pubkey addresses indexing. */
     bool IsPayToPublicKey() const;
+    bool IsOfflineStaking() const;
     /** Called by IsStandardTx and P2SH/BIP62 VerifyScript (which makes it consensus-critical). */
     bool IsPushOnly(const_iterator pc) const;
     bool IsPushOnly() const;

@@ -156,6 +156,11 @@ public:
         return false;
     }
 
+    virtual bool IsCoinStake() const
+    {
+        return false;
+    }
+
     virtual ~BaseSignatureChecker() {}
 };
 
@@ -180,6 +185,10 @@ public:
     bool CheckLockTime(const CScriptNum &nLockTime) const override;
 
     bool CheckSequence(const CScriptNum &nSequence) const override;
+
+    bool IsCoinStake() const override {
+        return txTo->IsCoinStake();
+    }
 };
 
 class MutableTransactionSignatureChecker : public TransactionSignatureChecker

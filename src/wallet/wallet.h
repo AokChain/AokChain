@@ -352,9 +352,12 @@ public:
     mutable bool fLockedCreditCached;
     mutable bool fWatchDebitCached;
     mutable bool fWatchCreditCached;
+    mutable bool fOfflineStakingCreditCached;
+    mutable bool fOfflineStakingDebitCached;
     mutable bool fImmatureWatchCreditCached;
     mutable bool fAvailableWatchCreditCached;
     mutable bool fChangeCached;
+    mutable bool fSpendsOfflineStaking;
     mutable bool fInMempool;
     mutable CAmount nDebitCached;
     mutable CAmount nCreditCached;
@@ -364,6 +367,8 @@ public:
     mutable CAmount nLockedCreditCached;
     mutable CAmount nWatchDebitCached;
     mutable CAmount nWatchCreditCached;
+    mutable CAmount nOfflineStakingCreditCached;
+    mutable CAmount nOfflineStakingDebitCached;
     mutable CAmount nImmatureWatchCreditCached;
     mutable CAmount nAvailableWatchCreditCached;
     mutable CAmount nChangeCached;
@@ -397,14 +402,20 @@ public:
         fImmatureCreditCached = false;
         fWatchDebitCached = false;
         fWatchCreditCached = false;
+        fOfflineStakingCreditCached = false;
+        fOfflineStakingDebitCached = false;
         fImmatureWatchCreditCached = false;
         fAvailableWatchCreditCached = false;
+        fSpendsOfflineStaking = false;
         fChangeCached = false;
         fInMempool = false;
         nDebitCached = 0;
         nCreditCached = 0;
         nImmatureCreditCached = 0;
         nImmatureStakeCreditCached = 0;
+        nAvailableCreditCached = 0;
+        nOfflineStakingCreditCached = 0;
+        nOfflineStakingDebitCached = 0;
         nLockedCreditCached = 0;
         nWatchDebitCached = 0;
         nWatchCreditCached = 0;
@@ -461,6 +472,8 @@ public:
         fImmatureCreditCached = false;
         fWatchDebitCached = false;
         fWatchCreditCached = false;
+        fOfflineStakingCreditCached = false;
+        fOfflineStakingDebitCached = false;
         fAvailableWatchCreditCached = false;
         fImmatureWatchCreditCached = false;
         fDebitCached = false;
@@ -479,6 +492,7 @@ public:
     CAmount GetImmatureCredit(bool fUseCache=true) const;
     CAmount GetImmatureStakeCredit(bool fUseCache=true) const;
     CAmount GetAvailableCredit(bool fUseCache=true) const;
+    CAmount GetAvailableStakableCredit() const;
     CAmount GetLockedCredit(bool fUseCache=true) const;
     CAmount GetImmatureWatchOnlyCredit(const bool& fUseCache=true) const;
     CAmount GetAvailableWatchOnlyCredit(const bool& fUseCache=true) const;
@@ -1014,6 +1028,7 @@ public:
     // ResendWalletTransactionsBefore may only be called if fBroadcastTransactions!
     std::vector<uint256> ResendWalletTransactionsBefore(int64_t nTime, CConnman* connman);
     CAmount GetBalance() const;
+    CAmount GetOfflineStakingBalance() const;
     CAmount GetUnconfirmedBalance() const;
     CAmount GetImmatureBalance() const;
     CAmount GetWatchOnlyBalance() const;

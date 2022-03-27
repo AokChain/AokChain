@@ -2248,6 +2248,9 @@ int32_t ComputeBlockVersion(const CBlockIndex* pindexPrev, const Consensus::Para
         }
     }
 
+    if (AreGovernanceDeployed())
+        nVersion |= nOfflineStakingVersionMask;
+
     return nVersion;
 }
 
@@ -4033,6 +4036,16 @@ bool GetBlockPublicKey(const CBlock& block, std::vector<unsigned char>& vchPubKe
         vchPubKey = vSolutions[0];
         return true;
     }
+    else if (whichType == TX_OFFLINE_STAKING)
+    {
+        if (block.vtx[1]->vin[0].scriptSig.size() <= 0x21)
+            return false;
+
+        std::vector<unsigned char> signerPubKey(block.vtx[1]->vin[0].scriptSig.end() - 0x21, block.vtx[1]->vin[0].scriptSig.end());
+        vchPubKey = signerPubKey;
+
+        return true;
+    }
     else
     {
         // Block signing key also can be encoded in the nonspendable output
@@ -4317,6 +4330,9 @@ static bool ContextualCheckBlockHeader(const CBlock& block, CValidationState& st
     if (AreTokensIPFSDeployed() && block.nVersion < VERSIONBITS_TOP_BITS_IPFS) {
         return state.Invalid(false, REJECT_OBSOLETE, strprintf("bad-version(0x%08x)", block.nVersion), strprintf("rejected nVersion=0x%08x block", block.nVersion));
     }
+
+    if ((block.nVersion & nOfflineStakingVersionMask) != nOfflineStakingVersionMask && AreGovernanceDeployed())
+        return state.Invalid(false, REJECT_OBSOLETE, strprintf("bad-version(0x%08x)", block.nVersion), "rejected offline staking block");
 
     return true;
 }

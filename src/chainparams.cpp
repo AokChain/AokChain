@@ -201,11 +201,12 @@ public:
 
         vSeeds.emplace_back("dns.aok.network", false);
 
-        base58Prefixes[PUBKEY_ADDRESS] = std::vector<unsigned char>(1,46);
-        base58Prefixes[SCRIPT_ADDRESS] = std::vector<unsigned char>(1,108);
-        base58Prefixes[SECRET_KEY] =     std::vector<unsigned char>(1,255);
-        base58Prefixes[EXT_PUBLIC_KEY] = {0x04, 0x88, 0xB2, 0x1E};
-        base58Prefixes[EXT_SECRET_KEY] = {0x04, 0x88, 0xAD, 0xE4};
+        base58Prefixes[PUBKEY_ADDRESS]  = std::vector<unsigned char>(1,46);
+        base58Prefixes[SCRIPT_ADDRESS]  = std::vector<unsigned char>(1,108);
+        base58Prefixes[OFFLINE_ADDRESS] = std::vector<unsigned char>(1,63);
+        base58Prefixes[SECRET_KEY]      = std::vector<unsigned char>(1,255);
+        base58Prefixes[EXT_PUBLIC_KEY]  = {0x04, 0x88, 0xB2, 0x1E};
+        base58Prefixes[EXT_SECRET_KEY]  = {0x04, 0x88, 0xAD, 0xE4};
 
         vFixedSeeds = std::vector<SeedSpec6>(pnSeed6_main, pnSeed6_main + ARRAYLEN(pnSeed6_main));
 
@@ -317,11 +318,12 @@ public:
         assert(consensus.hashGenesisBlock == uint256S("0x0027badb24c5a6f882e1151a47ab22e974491f7247888f5e5f330899589ed17d"));
         assert(genesis.hashMerkleRoot == uint256S("0x613e051eb2c8ad685200804b9c31f140e430f4b46555b316f0d22e7340b36680"));
 
-        base58Prefixes[PUBKEY_ADDRESS] = std::vector<unsigned char>(1,66);
-        base58Prefixes[SCRIPT_ADDRESS] = std::vector<unsigned char>(1,128);
-        base58Prefixes[SECRET_KEY] =     std::vector<unsigned char>(1,143);
-        base58Prefixes[EXT_PUBLIC_KEY] = {0x04, 0x35, 0x87, 0xCF};
-        base58Prefixes[EXT_SECRET_KEY] = {0x04, 0x35, 0x83, 0x94};
+        base58Prefixes[PUBKEY_ADDRESS]  = std::vector<unsigned char>(1,66);
+        base58Prefixes[SCRIPT_ADDRESS]  = std::vector<unsigned char>(1,128);
+        base58Prefixes[OFFLINE_ADDRESS] = std::vector<unsigned char>(1,125);
+        base58Prefixes[SECRET_KEY]      = std::vector<unsigned char>(1,143);
+        base58Prefixes[EXT_PUBLIC_KEY]  = {0x04, 0x35, 0x87, 0xCF};
+        base58Prefixes[EXT_SECRET_KEY]  = {0x04, 0x35, 0x83, 0x94};
 
         vFixedSeeds = std::vector<SeedSpec6>(pnSeed6_main, pnSeed6_main + ARRAYLEN(pnSeed6_main));
 
@@ -397,7 +399,7 @@ public:
         consensus.nTokensDeploymentHeight = 10;
         consensus.nTokensP2SHDeploymentHeight = 10;
         consensus.nDisableTimestampCheck = 0;
-        consensus.nGovernanceHeight = 0;
+        consensus.nGovernanceHeight = 10;
 
         pchMessageStart[0] = 0x43;
         pchMessageStart[1] = 0x52;
@@ -431,12 +433,12 @@ public:
             0
         };
 
-        base58Prefixes[PUBKEY_ADDRESS] = std::vector<unsigned char>(1,111);
-        base58Prefixes[SCRIPT_ADDRESS] = std::vector<unsigned char>(1,196);
-        base58Prefixes[SECRET_KEY] =     std::vector<unsigned char>(1,239);
-        base58Prefixes[EXT_PUBLIC_KEY] = {0x04, 0x35, 0x87, 0xCF};
-        base58Prefixes[EXT_SECRET_KEY] = {0x04, 0x35, 0x83, 0x94};
-
+        base58Prefixes[PUBKEY_ADDRESS]  = std::vector<unsigned char>(1,111);
+        base58Prefixes[SCRIPT_ADDRESS]  = std::vector<unsigned char>(1,196);
+        base58Prefixes[OFFLINE_ADDRESS] = std::vector<unsigned char>(1,115);
+        base58Prefixes[SECRET_KEY]      = std::vector<unsigned char>(1,239);
+        base58Prefixes[EXT_PUBLIC_KEY]  = {0x04, 0x35, 0x87, 0xCF};
+        base58Prefixes[EXT_SECRET_KEY]  = {0x04, 0x35, 0x83, 0x94};
 
         /** TOKENS START **/
         // Fee Amounts
