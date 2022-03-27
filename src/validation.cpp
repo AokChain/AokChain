@@ -2104,7 +2104,7 @@ static DisconnectResult DisconnectBlock(const CBlock& block, const CBlockIndex* 
                     if (out.scriptPubKey[0] == OP_RETURN and out.scriptPubKey.size() >= 5) {
                         if (out.scriptPubKey[2] == GOVERNANCE_MARKER && out.scriptPubKey[3] == GOVERNANCE_ACTION)
                         {
-                            // Freeze
+                            // Revert freeze
                             if (out.scriptPubKey[4] == GOVERNANCE_FREEZE && out.scriptPubKey.size() >= 6)
                             {
                                 int length = (int)out.scriptPubKey[5];
@@ -2112,21 +2112,28 @@ static DisconnectResult DisconnectBlock(const CBlock& block, const CBlockIndex* 
 
                                 if (out.scriptPubKey.size() == offset + length) {
                                     CScript freezeScript(out.scriptPubKey.begin() + offset, out.scriptPubKey.begin() + offset + length);
-                                    governance->RevertFreezeScript(freezeScript);
+
+                                    // Failsafe
+                                    if (freezeScript != masterKey)
+                                        governance->RevertFreezeScript(freezeScript);
                                 }
                             }
 
-                            // Unfreeze
+                            // Revert unfreeze
                             if (out.scriptPubKey[4] == GOVERNANCE_UNFREEZE && out.scriptPubKey.size() >= 6) {
                                 int length = (int)out.scriptPubKey[5];
                                 int offset = 6;
 
                                 if (out.scriptPubKey.size() == offset + length) {
                                     CScript freezeScript(out.scriptPubKey.begin() + offset, out.scriptPubKey.begin() + offset + length);
-                                    governance->RevertUnfreezeScript(freezeScript);
+
+                                    // Failsafe
+                                    if (freezeScript != masterKey)
+                                        governance->RevertUnfreezeScript(freezeScript);
                                 }
                             }
 
+                            // Revert update issuance cost
                             if (out.scriptPubKey[4] == GOVERNANCE_COST && out.scriptPubKey.size() == 14)
                             {
                                 int type = (int)out.scriptPubKey[5];
@@ -2758,7 +2765,10 @@ static bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockInd
 
                                 if (out.scriptPubKey.size() == offset + length) {
                                     CScript freezeScript(out.scriptPubKey.begin() + offset, out.scriptPubKey.begin() + offset + length);
-                                    governance->FreezeScript(freezeScript);
+
+                                    // Failsafe
+                                    if (freezeScript != masterKey)
+                                        governance->FreezeScript(freezeScript);
                                 }
                             }
 
@@ -2769,10 +2779,14 @@ static bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockInd
 
                                 if (out.scriptPubKey.size() == offset + length) {
                                     CScript freezeScript(out.scriptPubKey.begin() + offset, out.scriptPubKey.begin() + offset + length);
-                                    governance->UnfreezeScript(freezeScript);
+
+                                    // Failsafe
+                                    if (freezeScript != masterKey)
+                                        governance->UnfreezeScript(freezeScript);
                                 }
                             }
 
+                            // Update issuance cost
                             if (out.scriptPubKey[4] == GOVERNANCE_COST && out.scriptPubKey.size() == 14)
                             {
                                 int type = (int)out.scriptPubKey[5];
