@@ -2051,20 +2051,16 @@ bool IsTokenUnitsValid(const CAmount& units)
 bool CheckIssueBurnTx(const CTxOut& txOut, const KnownTokenType& type, const int numberIssued)
 {
     CAmount burnAmount = 0;
-    std::string burnAddress = "";
+    std::string burnAddress = GetTokenFeeAddress();
 
     if (type == KnownTokenType::SUB) {
         burnAmount = GetIssueSubTokenBurnAmount();
-        burnAddress = Params().IssueSubTokenBurnAddress();
     } else if (type == KnownTokenType::ROOT) {
         burnAmount = GetIssueTokenBurnAmount();
-        burnAddress = Params().IssueTokenBurnAddress();
     } else if (type == KnownTokenType::UNIQUE) {
         burnAmount = GetIssueUniqueTokenBurnAmount();
-        burnAddress = Params().IssueUniqueTokenBurnAddress();
     } else if (type == KnownTokenType::USERNAME) {
         burnAmount = GetIssueUsernameTokenBurnAmount();
-        burnAddress = Params().IssueTokenBurnAddress();
     } else {
         return false;
     }
@@ -2114,7 +2110,7 @@ bool CheckReissueBurnTx(const CTxOut& txOut)
         return false;
 
     // Check destination address is the correct burn address
-    if (EncodeDestination(destination) != Params().ReissueTokenBurnAddress())
+    if (EncodeDestination(destination) != GetTokenFeeAddress())
         return false;
 
     return true;
@@ -2563,6 +2559,18 @@ CAmount GetBurnAmount(const int nType)
     return GetBurnAmount((KnownTokenType(nType)));
 }
 
+std::string GetTokenFeeAddress()
+{
+    CScript feeScript = governance->GetFeeScript();
+    std::string address = "";
+
+    CTxDestination dest;
+    if (ExtractDestination(governance->GetFeeScript(), dest))
+        address = EncodeDestination(dest);
+
+    return address;
+}
+
 CAmount GetBurnAmount(const KnownTokenType type)
 {
     switch (type) {
@@ -2592,17 +2600,17 @@ std::string GetBurnAddress(const KnownTokenType type)
 {
     switch (type) {
         case KnownTokenType::ROOT:
-            return Params().IssueTokenBurnAddress();
+            return GetTokenFeeAddress();
         case KnownTokenType::SUB:
-            return Params().IssueSubTokenBurnAddress();
+            return GetTokenFeeAddress();
         case KnownTokenType::OWNER:
             return "";
         case KnownTokenType::UNIQUE:
-            return Params().IssueUniqueTokenBurnAddress();
+            return GetTokenFeeAddress();
         case KnownTokenType::USERNAME:
-            return Params().IssueTokenBurnAddress();
+            return GetTokenFeeAddress();
         case KnownTokenType::REISSUE:
-            return Params().ReissueTokenBurnAddress();
+            return GetTokenFeeAddress();
         default:
             return "";
     }
@@ -2936,7 +2944,7 @@ bool CreateReissueTokenTransaction(CWallet* pwallet, CCoinControl& coinControl, 
     tokenTransfer.ConstructTransaction(scriptTransferOwnerToken);
 
     // Get the script for the burn address
-    CScript scriptPubKeyBurn = GetScriptForDestination(DecodeDestination(Params().ReissueTokenBurnAddress()));
+    CScript scriptPubKeyBurn = GetScriptForDestination(DecodeDestination(GetTokenFeeAddress()));
 
     // Create and send the transaction
     std::string strTxError;

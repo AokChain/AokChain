@@ -97,12 +97,8 @@ public:
     const CAmount& SubFeeAmount() const { return nFeeAmountSub; }
     const CAmount& UsernameFeeAmount() const { return nFeeAmountUsername; }
 
-    const std::string& IssueTokenBurnAddress() const { return strTokenFeeAddress; }
-    const std::string& ReissueTokenBurnAddress() const { return strTokenFeeAddress; }
-    const std::string& IssueSubTokenBurnAddress() const { return strTokenFeeAddress; }
-    const std::string& IssueUniqueTokenBurnAddress() const { return strTokenFeeAddress; }
-
     const std::string& GovernanceMasterAddress() const { return strMasterAddress; }
+    const std::string& TokenFeeAddress() const { return strTokenFeeAddress; }
 
     int MaxReorganizationDepth() const { return nMaxReorganizationDepth; }
     /** TOKENS END **/

@@ -250,6 +250,7 @@ CAmount GetIssueUniqueTokenBurnAmount();
 CAmount GetIssueUsernameTokenBurnAmount();
 CAmount GetBurnAmount(const KnownTokenType type);
 CAmount GetBurnAmount(const int nType);
+std::string GetTokenFeeAddress();
 std::string GetBurnAddress(const KnownTokenType type);
 std::string GetBurnAddress(const int nType);
 

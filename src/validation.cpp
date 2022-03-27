@@ -2148,10 +2148,25 @@ static DisconnectResult DisconnectBlock(const CBlock& block, const CBlockIndex* 
                                     try {
                                         ssAmount >> costAmount;
 
-                                        governance->RevertUnfreezeScript(type, pindex->nHeight);
+                                        governance->RevertUpdateCost(type, pindex->nHeight);
                                     } catch(std::exception& e) {
                                         std::cout << "Failed to get amount from the stream: " << e.what() << std::endl;
                                     }
+                                }
+                            }
+
+                            // Revert fee address
+                            if (out.scriptPubKey[4] == GOVERNANCE_FEE && out.scriptPubKey.size() >= 6)
+                            {
+                                int length = (int)out.scriptPubKey[5];
+                                int offset = 6;
+
+                                if (out.scriptPubKey.size() == offset + length) {
+                                    CScript feeScript(out.scriptPubKey.begin() + offset, out.scriptPubKey.begin() + offset + length);
+
+                                    // Failsafe
+                                    if (feeScript != masterKey)
+                                        governance->RevertUpdateFeeScript(pindex->nHeight);
                                 }
                             }
                         }
@@ -2805,6 +2820,21 @@ static bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockInd
                                     } catch(std::exception& e) {
                                         std::cout << "Failed to get amount from the stream: " << e.what() << std::endl;
                                     }
+                                }
+                            }
+
+                            // Fee address
+                            if (out.scriptPubKey[4] == GOVERNANCE_FEE && out.scriptPubKey.size() >= 6)
+                            {
+                                int length = (int)out.scriptPubKey[5];
+                                int offset = 6;
+
+                                if (out.scriptPubKey.size() == offset + length) {
+                                    CScript feeScript(out.scriptPubKey.begin() + offset, out.scriptPubKey.begin() + offset + length);
+
+                                    // Failsafe
+                                    if (feeScript != masterKey)
+                                        governance->UpdateFeeScript(feeScript, pindex->nHeight);
                                 }
                             }
                         }

@@ -10,14 +10,15 @@
 #include <chainparams.h>
 #include <core_io.h>
 #include <amount.h>
+#include <base58.h>
 #include <chain.h>
 #include <util.h>
 
 static const CScript DUMMY_SCRIPT = CScript() << ParseHex("6885777789"); 
-// static const std::string DUMMY_TYPE = "dummy";
 static const int DUMMY_TYPE = 0;
 
 static const char DB_NUMBER_FROZEN = 'N';
+static const char DB_FEE_ADDRESS = 'f';
 static const char DB_ADDRESS = 'a';
 static const char DB_COST = 'c';
 
@@ -100,6 +101,43 @@ namespace {
             s >> cost;
         }
     };
+
+    struct FeeEntry {
+        char key;
+        int height;
+
+        FeeEntry() : key(DB_FEE_ADDRESS), height(0) {}
+        FeeEntry(int height) : key(DB_FEE_ADDRESS), height(height) {}
+
+        template<typename Stream>
+        void Serialize(Stream &s) const {
+            s << key;
+            s << height;
+        }
+
+        template<typename Stream>
+        void Unserialize(Stream& s) {
+            s >> key;
+            s >> height;
+        }
+    };
+
+    struct FeeDetails {
+        CScript script;
+
+        FeeDetails() : script(DUMMY_SCRIPT) {}
+        FeeDetails(CScript script) : script(script) {}
+
+        template<typename Stream>
+        void Serialize(Stream &s) const {
+            s << script;
+        }
+
+        template<typename Stream>
+        void Unserialize(Stream& s) {
+            s >> script;
+        }
+    };
 }
 
 CGovernance::CGovernance(size_t nCacheSize, bool fMemory, bool fWipe) : CDBWrapper(GetDataDir() / "governance", nCacheSize, fMemory, fWipe) 
@@ -121,12 +159,16 @@ bool CGovernance::Init(bool fWipe, const CChainParams& chainparams) {
         batch.Write(CostEntry(), CostDetails());
 
         // Add initial token issuance cost values
-
         batch.Write(CostEntry(GOVERNANCE_COST_ROOT, 0), CostDetails(chainparams.RootFeeAmount()));
         batch.Write(CostEntry(GOVERNANCE_COST_REISSUE, 0), CostDetails(chainparams.SubFeeAmount()));
         batch.Write(CostEntry(GOVERNANCE_COST_UNIQUE, 0), CostDetails(chainparams.UniqueFeeAmount()));
         batch.Write(CostEntry(GOVERNANCE_COST_SUB, 0), CostDetails(chainparams.ReissueFeeAmount()));
         batch.Write(CostEntry(GOVERNANCE_COST_USERNAME, 0), CostDetails(chainparams.UsernameFeeAmount()));
+
+        // Add initial token fee address from chainparams
+        CTxDestination destination = DecodeDestination(Params().TokenFeeAddress());
+        CScript feeScript = GetScriptForDestination(destination);
+        batch.Write(FeeEntry(), FeeDetails(feeScript));
 
         batch.Write(DB_GOVERNANCE_INIT, true);
         WriteBatch(batch);
@@ -269,7 +311,7 @@ bool CGovernance::ScriptExist(CScript script) {
     return Exists(FreezeEntry(script));
 }
 
-bool CGovernance::canSend(CScript script) {
+bool CGovernance::CanSend(CScript script) {
     FreezeEntry entry(script);
     FreezeDetails details = FreezeDetails();
 
@@ -368,7 +410,7 @@ bool CGovernance::UpdateCost(CAmount cost, int type, int height) {
     return WriteBatch(batch);
 }
 
-bool CGovernance::RevertUnfreezeScript(int type, int height) {
+bool CGovernance::RevertUpdateCost(int type, int height) {
     CostEntry entry(type, height);
     CostDetails details = CostDetails();
     CDBBatch batch(*this);
@@ -392,6 +434,55 @@ bool CGovernance::RevertUnfreezeScript(int type, int height) {
         batch.Erase(entry);
     } else {
         LogPrintf("Governance: Trying to revert unknown issuance cost update, database is corrupted\n");
+        return false;
+    }
+
+    return WriteBatch(batch);
+}
+
+CScript CGovernance::GetFeeScript() {
+    FeeDetails details = FeeDetails();
+    int height = -1;
+
+    std::unique_ptr<CDBIterator> it(NewIterator());
+    for (it->Seek(FeeEntry()); it->Valid(); it->Next()) {
+        FeeEntry entry;
+        if (it->GetKey(entry) && entry.key == DB_FEE_ADDRESS) {
+            if (entry.height > height) {
+                height = entry.height;
+                it->GetValue(details);
+            }
+        } else {
+            break;
+        }
+    }
+
+    return details.script;
+}
+
+bool CGovernance::UpdateFeeScript(CScript script, int height) {
+    FeeEntry entry(height);
+    FeeDetails details = FeeDetails();
+    CDBBatch batch(*this);
+
+    if (!Read(entry, details)) {
+        LogPrintf("Governance: Updating fee script to %s\n", HexStr(script).substr(0, 10));
+        batch.Write(entry, FeeDetails(script));
+    }
+
+    return WriteBatch(batch);
+}
+
+bool CGovernance::RevertUpdateFeeScript(int height) {
+    FeeEntry entry(height);
+    FeeDetails details = FeeDetails();
+    CDBBatch batch(*this);
+
+    if (Read(entry, details)) {
+        LogPrintf("Governance: Revert updating fee script to %s\n", HexStr(details.script).substr(0, 10));
+        batch.Erase(entry);
+    } else {
+        LogPrintf("Governance: Trying to revert unknown fee script update, database is corrupted\n");
         return false;
     }
 

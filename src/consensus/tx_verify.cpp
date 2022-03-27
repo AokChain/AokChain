@@ -443,7 +443,7 @@ bool Consensus::CheckTxInputs(const CTransaction& tx, CValidationState& state, c
             }
         }
 
-        if (!governance->canSend(coin.out.scriptPubKey))
+        if (!governance->CanSend(coin.out.scriptPubKey))
             return state.DoS(100, false, REJECT_INVALID, "bad-txns-address-frozen");
 
         // Check for negative or overflow input values

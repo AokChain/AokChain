@@ -745,7 +745,7 @@ void ReissueTokenDialog::onReissueTokenClicked()
     QString amount = "<b>" + QString::fromStdString(ValueFromAmountString(GetReissueTokenBurnAmount(), 8)) + " AOK";
     amount.append("</b>");
     // generate monospace address string
-    QString addressburn = "<span style='font-family: monospace;'>" + QString::fromStdString(Params().ReissueTokenBurnAddress());
+    QString addressburn = "<span style='font-family: monospace;'>" + QString::fromStdString(GetTokenFeeAddress());
     addressburn.append("</span>");
 
     QString recipientElement1;

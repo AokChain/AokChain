@@ -15,6 +15,7 @@
 #define GOVERNANCE_FREEZE 70
 #define GOVERNANCE_UNFREEZE 85
 #define GOVERNANCE_COST 67
+#define GOVERNANCE_FEE 102
 
 #define GOVERNANCE_COST_ROOT 1
 #define GOVERNANCE_COST_REISSUE 2
@@ -37,15 +38,18 @@ public:
     bool RevertFreezeScript(CScript script);
     bool RevertUnfreezeScript(CScript script);
     bool ScriptExist(CScript script);
-    bool canSend(CScript script);
+    bool CanSend(CScript script);
 
     bool UpdateCost(CAmount cost, int type, int height);
-    bool RevertUnfreezeScript(int type, int height);
+    bool RevertUpdateCost(int type, int height);
+    CAmount GetCost(int type);
+
+    bool UpdateFeeScript(CScript script, int height);
+    bool RevertUpdateFeeScript(int height);
+    CScript GetFeeScript();
 
     bool DumpFreezeStats(std::vector< std::pair< CScript, bool > > *FreezeVector);
     bool GetFrozenScripts(std::vector< CScript > *FreezeVector);
-
-    CAmount GetCost(int type);
 
     using CDBWrapper::Sync;
   
