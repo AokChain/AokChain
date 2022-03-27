@@ -195,17 +195,17 @@ bool CGovernance::FreezeScript(CScript script) {
 
     if (Read(entry, details)) {
         if (!details.frozen) {
-            LogPrintf("Governance: Adding script %s back to freeze list\n", HexStr(script).substr(0, 10));
+            LogPrintf("Governance: Adding script %s back to freeze list\n", HexStr(script));
 
             details.frozen = true;
             batch.Write(entry, details);
             batch.Write(DB_NUMBER_FROZEN, number + 1);
         } else {
-            LogPrintf("Governance: Script %s already frozen\n", HexStr(script).substr(0, 10));
+            LogPrintf("Governance: Script %s already frozen\n", HexStr(script));
             batch.Write(entry, details);
         }
     } else {
-        LogPrintf("Governance: Freezing previously unknown script %s\n", HexStr(script).substr(0, 10));
+        LogPrintf("Governance: Freezing previously unknown script %s\n", HexStr(script));
 
         batch.Write(entry, FreezeDetails());
         batch.Write(DB_NUMBER_FROZEN, number + 1);
@@ -224,17 +224,17 @@ bool CGovernance::UnfreezeScript(CScript script) {
 
     if (Read(entry, details)) {
         if (details.frozen) {
-            LogPrintf("Governance: Removing script %s from freeze list\n", HexStr(script).substr(0, 10));
+            LogPrintf("Governance: Removing script %s from freeze list\n", HexStr(script));
 
             details.frozen = false;
             batch.Write(entry, details);
             batch.Write(DB_NUMBER_FROZEN, number - 1);
         } else {
-            LogPrintf("Governance: Script %s already unfrozen\n", HexStr(script).substr(0, 10));
+            LogPrintf("Governance: Script %s already unfrozen\n", HexStr(script));
             batch.Write(entry, details);
         }
     } else {
-        LogPrintf("Governance: Unfreezing previously unknown script %s\n", HexStr(script).substr(0, 10));
+        LogPrintf("Governance: Unfreezing previously unknown script %s\n", HexStr(script));
         batch.Write(entry, FreezeDetails(false));
     }
 
@@ -255,9 +255,9 @@ bool CGovernance::RevertFreezeScript(CScript script) {
 
     if (Read(entry, details)) {
         if (details.frozen) {
-            LogPrintf("Governance: Revert adding of script %s to freeze list\n", HexStr(script).substr(0, 10));
+            LogPrintf("Governance: Revert adding of script %s to freeze list\n", HexStr(script));
 
-            LogPrintf("Governance: Unfreezing script %s\n", HexStr(script).substr(0, 10));
+            LogPrintf("Governance: Unfreezing script %s\n", HexStr(script));
             details.frozen = false;
             batch.Write(DB_NUMBER_FROZEN, number - 1);
 
@@ -288,9 +288,9 @@ bool CGovernance::RevertUnfreezeScript(CScript script) {
 
     if (Read(entry, details)) {
         if (!details.frozen) {
-            LogPrintf("Governance: Revert disabling of script %s\n", HexStr(script).substr(0, 10));
+            LogPrintf("Governance: Revert disabling of script %s\n", HexStr(script));
 
-            LogPrintf("Governance: Freezing script %s\n", HexStr(script).substr(0, 10));
+            LogPrintf("Governance: Freezing script %s\n", HexStr(script));
             details.frozen = true;
             batch.Write(DB_NUMBER_FROZEN, number + 1);
 
@@ -466,7 +466,7 @@ bool CGovernance::UpdateFeeScript(CScript script, int height) {
     CDBBatch batch(*this);
 
     if (!Read(entry, details)) {
-        LogPrintf("Governance: Updating fee script to %s\n", HexStr(script).substr(0, 10));
+        LogPrintf("Governance: Updating fee script to %s\n", HexStr(script));
         batch.Write(entry, FeeDetails(script));
     }
 
@@ -479,7 +479,7 @@ bool CGovernance::RevertUpdateFeeScript(int height) {
     CDBBatch batch(*this);
 
     if (Read(entry, details)) {
-        LogPrintf("Governance: Revert updating fee script to %s\n", HexStr(details.script).substr(0, 10));
+        LogPrintf("Governance: Revert updating fee script to %s\n", HexStr(details.script));
         batch.Erase(entry);
     } else {
         LogPrintf("Governance: Trying to revert unknown fee script update, database is corrupted\n");
