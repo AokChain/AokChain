@@ -178,7 +178,7 @@ public:
         consensus.nTokensP2SHDeploymentHeight = 450000;
         consensus.nTokensIPFSDeploymentHeight = 622000;
         consensus.nDisableTimestampCheck = 695000;
-        consensus.nGovernanceHeight = std::numeric_limits<int>::max();
+        consensus.nGovernanceHeight = 871500;
 
         /**
          * The message start string is designed to be unlikely to occur in normal data.
@@ -228,15 +228,19 @@ public:
                 { 600000, uint256S("0x5a7500eea9a150530f51bd7cf75aff4224b0a42a7aed50193099841d7c1d47fe")},
                 { 650000, uint256S("0xfc7f235ed46be4405aa0cc59124a6e13f8f022112e07f5726e81eb2f7bf1584d")},
                 { 692000, uint256S("0xd31a85bdef320f5f54e24e28fafb7f61e62ddb169846fcd8f7c4b2d5fab94651")},
+                { 700000, uint256S("0x37eb3f4b73df32d22c4a1c58e91f6e7f0bf58e34e448a8e59d6b2576eeb9c238")},
+                { 750000, uint256S("0x792c26585ef0d5d862093ebd7667a162bd8585c97084b620ba20c6f81c60fa9d")},
+                { 800000, uint256S("0x7e29e84d66d9c0576c27612cced6b2e7145c483b54c7219de82c8fceaab38ea7")},
+                { 860000, uint256S("0xf567c8244dcfe811ba15036d0b6fe7391663074bed12971c93327797bc763b4d")},
             }
         };
 
         chainTxData = ChainTxData{
-            // Data from RPC: getchaintxstats 4096 5a7500eea9a150530f51bd7cf75aff4224b0a42a7aed50193099841d7c1d47fe
-            1630295312,         // * UNIX timestamp of last known number of transactions
-            2776389,            // * total number of transactions between genesis and that timestamp
+            // Data from RPC: getchaintxstats 4096 f567c8244dcfe811ba15036d0b6fe7391663074bed12971c93327797bc763b4d
+            1647790464,         // * UNIX timestamp of last known number of transactions
+            3386376,            // * total number of transactions between genesis and that timestamp
                                 //   (the tx=... number in the SetBestChain debug.log lines)
-            0.03212183168029697 // * estimated number of transactions per second after that timestamp
+            0.2116489703051164  // * estimated number of transactions per second after that timestamp
         };
 
         /** TOKENS START **/
@@ -249,7 +253,7 @@ public:
 
         // Fee Addresse
         strTokenFeeAddress = "KdZFAFeKV8C5JzdEdgcPYDZku92KkD3fHy";
-        strMasterAddress = "";
+        strMasterAddress = "kp5eNwMzDfDgHXMG3XZw73c6rTA6WzFJEx";
 
         nMaxReorganizationDepth = 500; // Around 8 hours
         /** TOKENS END **/
