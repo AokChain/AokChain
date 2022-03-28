@@ -732,8 +732,11 @@ void ReissueTokenDialog::onReissueTokenClicked()
     std::pair<int, std::string> error;
     CAmount nFeeRequired;
 
+    // ToDo: transaction message
+    std::string txMessage;
+
     // Create the transaction
-    if (!CreateReissueTokenTransaction(model->getWallet(), ctrl, reissueToken, address.toStdString(), error, tx, reservekey, nFeeRequired)) {
+    if (!CreateReissueTokenTransaction(model->getWallet(), ctrl, reissueToken, address.toStdString(), error, tx, reservekey, nFeeRequired, txMessage)) {
         showMessage("Invalid: " + QString::fromStdString(error.second));
         return;
     }

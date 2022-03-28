@@ -18,6 +18,7 @@
 #include <iostream>
 
 static const int SERIALIZE_TRANSACTION_NO_WITNESS = 0x40000000;
+static const int32_t MESSAGE_VERSION = 2;
 
 class CCoinsViewCache;
 
@@ -227,6 +228,8 @@ inline void UnserializeTransaction(TxType& tx, Stream& s) {
     unsigned char flags = 0;
     tx.vin.clear();
     tx.vout.clear();
+    tx.nMessage.clear();
+
     /* Try to read the vin. In case the dummy is there, this will be read as an empty vector. */
     s >> tx.vin;
     if (tx.vin.size() == 0 && fAllowWitness) {
@@ -252,6 +255,9 @@ inline void UnserializeTransaction(TxType& tx, Stream& s) {
         throw std::ios_base::failure("Unknown transaction optional data");
     }
     s >> tx.nLockTime;
+    if (tx.nVersion >= MESSAGE_VERSION) {
+        s >> tx.nMessage;
+    }
 }
 
 template<typename Stream, typename TxType>
@@ -281,6 +287,9 @@ inline void SerializeTransaction(const TxType& tx, Stream& s) {
         }
     }
     s << tx.nLockTime;
+    if (tx.nVersion >= MESSAGE_VERSION) {
+        s << tx.nMessage;
+    }
 }
 
 
@@ -291,13 +300,13 @@ class CTransaction
 {
 public:
     // Default transaction version.
-    static const int32_t CURRENT_VERSION=1;
+    static const int32_t CURRENT_VERSION = 1;
 
     // Changing the default transaction version requires a two step process: first
     // adapting relay policy by bumping MAX_STANDARD_VERSION, and then later date
     // bumping the default CURRENT_VERSION at which point both CURRENT_VERSION and
     // MAX_STANDARD_VERSION will be equal.
-    static const int32_t MAX_STANDARD_VERSION=1;
+    static const int32_t MAX_STANDARD_VERSION = 2;
 
     // The local variables are made const to prevent unintended modification
     // without updating the cached hash value. However, CTransaction is not
@@ -309,6 +318,7 @@ public:
     const int32_t nVersion;
     const uint32_t nLockTime;
     const uint32_t nTime;
+    const std::string nMessage;
 
 private:
     /** Memory only. */
@@ -410,6 +420,7 @@ struct CMutableTransaction
     int32_t nVersion;
     uint32_t nLockTime;
     uint32_t nTime;
+    std::string nMessage;
 
     CMutableTransaction();
     CMutableTransaction(const CTransaction& tx);

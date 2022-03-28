@@ -244,9 +244,14 @@ WalletModel::SendCoinsReturn WalletModel::prepareTransaction(WalletModelTransact
     QSet<QString> setAddress; // Used to detect duplicates
     int nAddresses = 0;
 
+    std::string txMessage;
+
     // Pre-check input data for validity
     for (const SendCoinsRecipient &rcp : recipients)
     {
+        if (!rcp.tx_message.toStdString().empty())
+            txMessage = rcp.tx_message.toStdString();
+
         if (rcp.fSubtractFeeFromAmount)
             fSubtractFeeFromAmount = true;
 
@@ -318,7 +323,7 @@ WalletModel::SendCoinsReturn WalletModel::prepareTransaction(WalletModelTransact
 
         CWalletTx *newTx = transaction.getTransaction();
         CReserveKey *keyChange = transaction.getPossibleKeyChange();
-        bool fCreated = wallet->CreateTransaction(vecSend, *newTx, *keyChange, nFeeRequired, nChangePosRet, strFailReason, coinControl);
+        bool fCreated = wallet->CreateTransaction(vecSend, *newTx, *keyChange, nFeeRequired, txMessage, nChangePosRet, strFailReason, coinControl);
         transaction.setTransactionFee(nFeeRequired);
         if (fSubtractFeeFromAmount && fCreated)
             transaction.reassignAmounts(nChangePosRet);

@@ -69,6 +69,9 @@ QString TransactionDesc::toHTML(CWallet *wallet, CWalletTx &wtx, TransactionReco
     strHTML += "<br>";
     strHTML += "<b>" + tr("Date") + ":</b> " + (nTime ? GUIUtil::dateTimeStr(nTime) : "") + "<br>";
 
+    if (!wtx.tx->nMessage.empty())
+        strHTML += "<b>" + tr("Transaction message") + ":</b> " + GUIUtil::HtmlEscape(wtx.tx->nMessage) + "<br>";
+
     //
     // From
     //
@@ -323,6 +326,9 @@ QString TransactionDesc::toTokenHTML(CWallet *wallet, CWalletTx &wtx, Transactio
     strHTML += "<b>" + tr("Status") + ":</b> " + FormatTxStatus(wtx);
     strHTML += "<br>";
     strHTML += "<b>" + tr("Date") + ":</b> " + (nTime ? GUIUtil::dateTimeStr(nTime) : "") + "<br>";
+
+    if (!wtx.tx->nMessage.empty())
+        strHTML += "<b>" + tr("Transaction message") + ":</b> " + GUIUtil::HtmlEscape(wtx.tx->nMessage) + "<br>";
 
     //
     // From

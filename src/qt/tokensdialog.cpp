@@ -356,6 +356,9 @@ void TokensDialog::on_sendButton_clicked()
 
     std::vector< std::pair<CTokenTransfer, std::string> >vTransfers;
 
+    // ToDo: transaction message
+    std::string txMessage;
+
     for (auto recipient : recipients) {
         std::string recipientAddress = recipient.address.toStdString();
 
@@ -383,7 +386,7 @@ void TokensDialog::on_sendButton_clicked()
     std::pair<int, std::string> error;
     CAmount nFeeRequired;
 
-    if (!CreateTransferTokenTransaction(model->getWallet(), ctrl, vTransfers, "", error, tx, reservekey, nFeeRequired)) {
+    if (!CreateTransferTokenTransaction(model->getWallet(), ctrl, vTransfers, "", error, tx, reservekey, nFeeRequired, txMessage)) {
         QMessageBox msgBox;
         msgBox.setText(QString::fromStdString(error.second));
         msgBox.exec();

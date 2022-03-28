@@ -60,8 +60,8 @@ std::string CTxOut::ToString() const
     return strprintf("CTxOut(nValue=%d.%08d, scriptPubKey=%s)", nValue / COIN, nValue % COIN, HexStr(scriptPubKey).substr(0, 30));
 }
 
-CMutableTransaction::CMutableTransaction() : nVersion(CTransaction::CURRENT_VERSION), nTime(0), nLockTime(0) {}
-CMutableTransaction::CMutableTransaction(const CTransaction& tx) : vin(tx.vin), vout(tx.vout), nVersion(tx.nVersion), nLockTime(tx.nLockTime), nTime(tx.nTime) {}
+CMutableTransaction::CMutableTransaction() : nVersion(CTransaction::CURRENT_VERSION), nTime(0), nLockTime(0), nMessage() {}
+CMutableTransaction::CMutableTransaction(const CTransaction& tx) : vin(tx.vin), vout(tx.vout), nVersion(tx.nVersion), nLockTime(tx.nLockTime), nTime(tx.nTime), nMessage(tx.nMessage) {}
 
 uint256 CMutableTransaction::GetHash() const
 {
@@ -82,9 +82,9 @@ uint256 CTransaction::GetWitnessHash() const
 }
 
 /* For backward compatibility, the hash is initialized to 0. TODO: remove the need for this default constructor entirely. */
-CTransaction::CTransaction() : vin(), vout(), nVersion(CTransaction::CURRENT_VERSION), nLockTime(0), nTime(0), hash() {}
-CTransaction::CTransaction(const CMutableTransaction &tx) : vin(tx.vin), vout(tx.vout), nVersion(tx.nVersion), nLockTime(tx.nLockTime), nTime(tx.nTime), hash(ComputeHash()) {}
-CTransaction::CTransaction(CMutableTransaction &&tx) : vin(std::move(tx.vin)), vout(std::move(tx.vout)), nVersion(tx.nVersion), nLockTime(tx.nLockTime), nTime(tx.nTime), hash(ComputeHash()) {}
+CTransaction::CTransaction() : vin(), vout(), nVersion(CTransaction::CURRENT_VERSION), nLockTime(0), nTime(0), nMessage(), hash() {}
+CTransaction::CTransaction(const CMutableTransaction &tx) : vin(tx.vin), vout(tx.vout), nVersion(tx.nVersion), nLockTime(tx.nLockTime), nTime(tx.nTime), nMessage(tx.nMessage), hash(ComputeHash()) {}
+CTransaction::CTransaction(CMutableTransaction &&tx) : vin(std::move(tx.vin)), vout(std::move(tx.vout)), nVersion(tx.nVersion), nLockTime(tx.nLockTime), nTime(tx.nTime), nMessage(tx.nMessage), hash(ComputeHash()) {}
 
 CAmount CTransaction::GetValueOut() const
 {
@@ -114,13 +114,17 @@ uint32_t CTxOut::GetLockTime() const
 std::string CTransaction::ToString() const
 {
     std::string str;
-    str += strprintf("CTransaction(hash=%s, ver=%d, nTime=%u, vin.size=%u, vout.size=%u, nLockTime=%u)\n",
+    std::string message = !nMessage.empty() ? strprintf(", nMessage=%s", nMessage) : "";
+
+    str += strprintf("CTransaction(hash=%s, ver=%d, nTime=%u, vin.size=%u, vout.size=%u, nLockTime=%u%s)\n",
         GetHash().ToString(),
         nVersion,
         nTime,
         vin.size(),
         vout.size(),
-        nLockTime);
+        nLockTime,
+        message);
+
     for (const auto& tx_in : vin)
         str += "    " + tx_in.ToString() + "\n";
     for (const auto& tx_in : vin)

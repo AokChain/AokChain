@@ -59,6 +59,7 @@ public:
     QString message;
 
     int64_t coinLockTime; // memory only
+    QString tx_message; // memory only
 
     // If from a payment request, paymentRequest.IsInitialized() will be true
     PaymentRequestPlus paymentRequest;
@@ -126,6 +127,8 @@ public:
     uint32_t tokenLockTime;
     // If from a payment request, this is used for storing the memo
     QString message;
+
+    QString tx_message; // memory only
 
     // If from a payment request, paymentRequest.IsInitialized() will be true
     PaymentRequestPlus paymentRequest;

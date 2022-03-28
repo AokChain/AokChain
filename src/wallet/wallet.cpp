@@ -3663,7 +3663,10 @@ bool CWallet::FundTransaction(CMutableTransaction& tx, CAmount& nFeeRet, int& nC
 
     CReserveKey reservekey(this);
     CWalletTx wtx;
-    if (!CreateTransaction(vecSend, wtx, reservekey, nFeeRet, nChangePosInOut, strFailReason, coinControl, false)) {
+
+    std::string message;
+
+    if (!CreateTransaction(vecSend, wtx, reservekey, nFeeRet, message, nChangePosInOut, strFailReason, coinControl, false)) {
         return false;
     }
 
@@ -3693,32 +3696,32 @@ bool CWallet::FundTransaction(CMutableTransaction& tx, CAmount& nFeeRet, int& nC
     return true;
 }
 
-bool CWallet::CreateTransactionWithTokens(const std::vector<CRecipient>& vecSend, CWalletTx& wtxNew, CReserveKey& reservekey, CAmount& nFeeRet, int& nChangePosInOut,
+bool CWallet::CreateTransactionWithTokens(const std::vector<CRecipient>& vecSend, CWalletTx& wtxNew, CReserveKey& reservekey, CAmount& nFeeRet, std::string message, int& nChangePosInOut,
                                std::string& strFailReason, const CCoinControl& coin_control, const std::vector<CNewToken> tokens, const CTxDestination destination, const KnownTokenType& type, bool sign)
 {
     CReissueToken reissueToken;
-    return CreateTransactionAll(vecSend, wtxNew, reservekey, nFeeRet, nChangePosInOut, strFailReason, coin_control, true, tokens, destination, false, false, reissueToken, type, sign);
+    return CreateTransactionAll(vecSend, wtxNew, reservekey, nFeeRet, message, nChangePosInOut, strFailReason, coin_control, true, tokens, destination, false, false, reissueToken, type, sign);
 }
 
-bool CWallet::CreateTransactionWithTransferToken(const std::vector<CRecipient>& vecSend, CWalletTx& wtxNew, CReserveKey& reservekey, CAmount& nFeeRet, int& nChangePosInOut,
+bool CWallet::CreateTransactionWithTransferToken(const std::vector<CRecipient>& vecSend, CWalletTx& wtxNew, CReserveKey& reservekey, CAmount& nFeeRet, std::string message, int& nChangePosInOut,
                                          std::string& strFailReason, const CCoinControl& coin_control, bool sign)
 {
     CNewToken token;
     CReissueToken reissueToken;
     CTxDestination destination;
     KnownTokenType tokenType = KnownTokenType::INVALID;
-    return CreateTransactionAll(vecSend, wtxNew, reservekey, nFeeRet, nChangePosInOut, strFailReason, coin_control, false, token, destination, true, false, reissueToken, tokenType, sign);
+    return CreateTransactionAll(vecSend, wtxNew, reservekey, nFeeRet, message, nChangePosInOut, strFailReason, coin_control, false, token, destination, true, false, reissueToken, tokenType, sign);
 }
 
-bool CWallet::CreateTransactionWithReissueToken(const std::vector<CRecipient>& vecSend, CWalletTx& wtxNew, CReserveKey& reservekey, CAmount& nFeeRet, int& nChangePosInOut,
+bool CWallet::CreateTransactionWithReissueToken(const std::vector<CRecipient>& vecSend, CWalletTx& wtxNew, CReserveKey& reservekey, CAmount& nFeeRet, std::string message, int& nChangePosInOut,
                                          std::string& strFailReason, const CCoinControl& coin_control, const CReissueToken& reissueToken, const CTxDestination destination, bool sign)
 {
     CNewToken token;
     KnownTokenType tokenType = KnownTokenType::REISSUE;
-    return CreateTransactionAll(vecSend, wtxNew, reservekey, nFeeRet, nChangePosInOut, strFailReason, coin_control, false, token, destination, false, true, reissueToken, tokenType, sign);
+    return CreateTransactionAll(vecSend, wtxNew, reservekey, nFeeRet, message, nChangePosInOut, strFailReason, coin_control, false, token, destination, false, true, reissueToken, tokenType, sign);
 }
 
-bool CWallet::CreateTransaction(const std::vector<CRecipient>& vecSend, CWalletTx& wtxNew, CReserveKey& reservekey, CAmount& nFeeRet, int& nChangePosInOut,
+bool CWallet::CreateTransaction(const std::vector<CRecipient>& vecSend, CWalletTx& wtxNew, CReserveKey& reservekey, CAmount& nFeeRet, std::string message, int& nChangePosInOut,
                                         std::string& strFailReason, const CCoinControl& coin_control, bool sign)
 {
 
@@ -3726,24 +3729,24 @@ bool CWallet::CreateTransaction(const std::vector<CRecipient>& vecSend, CWalletT
     CReissueToken reissueToken;
     CTxDestination destination;
     KnownTokenType tokenType = KnownTokenType::INVALID;
-    return CreateTransactionAll(vecSend, wtxNew, reservekey, nFeeRet, nChangePosInOut, strFailReason, coin_control, false,  token, destination, false, false, reissueToken, tokenType, sign);
+    return CreateTransactionAll(vecSend, wtxNew, reservekey, nFeeRet, message, nChangePosInOut, strFailReason, coin_control, false,  token, destination, false, false, reissueToken, tokenType, sign);
 }
 
 bool CWallet::CreateTransactionAll(const std::vector<CRecipient>& vecSend, CWalletTx& wtxNew, CReserveKey& reservekey,
-                                   CAmount& nFeeRet, int& nChangePosInOut, std::string& strFailReason,
+                                   CAmount& nFeeRet, std::string message, int& nChangePosInOut, std::string& strFailReason,
                                    const CCoinControl& coin_control, bool fNewToken, const CNewToken& token,
                                    const CTxDestination destination, bool fTransferToken, bool fReissueToken,
                                    const CReissueToken& reissueToken, const KnownTokenType& tokenType, bool sign)
 {
     std::vector<CNewToken> tokens;
     tokens.push_back(token);
-    return CreateTransactionAll(vecSend, wtxNew, reservekey, nFeeRet, nChangePosInOut, strFailReason, coin_control,
+    return CreateTransactionAll(vecSend, wtxNew, reservekey, nFeeRet, message, nChangePosInOut, strFailReason, coin_control,
                                 fNewToken, tokens, destination, fTransferToken, fReissueToken, reissueToken, tokenType,
                                 sign);
 }
 
 bool CWallet::CreateTransactionAll(const std::vector<CRecipient>& vecSend, CWalletTx& wtxNew, CReserveKey& reservekey,
-                                   CAmount& nFeeRet, int& nChangePosInOut, std::string& strFailReason,
+                                   CAmount& nFeeRet, std::string message, int& nChangePosInOut, std::string& strFailReason,
                                    const CCoinControl& coin_control, bool fNewToken,
                                    const std::vector<CNewToken> tokens, const CTxDestination destination,
                                    bool fTransferToken, bool fReissueToken, const CReissueToken& reissueToken,
@@ -3830,6 +3833,11 @@ bool CWallet::CreateTransactionAll(const std::vector<CRecipient>& vecSend, CWall
     // nLockTime that preclude a fix later.
     txNew.nLockTime = chainActive.Height();
     txNew.nTime = GetAdjustedTime();
+
+    if (!message.empty()) {
+        txNew.nMessage = message;
+        txNew.nVersion = 2;
+    }
 
     // Secondly occasionally randomly pick a nLockTime even further back, so
     // that transactions that are delayed after signing for whatever reason,

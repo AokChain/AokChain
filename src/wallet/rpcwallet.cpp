@@ -118,6 +118,9 @@ void WalletTxToJSON(const CWalletTx& wtx, UniValue& entry)
     entry.pushKV("time", wtx.GetTxTime());
     entry.pushKV("timereceived", (int64_t)wtx.nTimeReceived);
 
+    if (!wtx.tx->nMessage.empty())
+        entry.pushKV("message", wtx.tx->nMessage);
+
     for (const std::pair<std::string, std::string>& item : wtx.mapValue)
         entry.pushKV(item.first, item.second);
 }
@@ -429,7 +432,7 @@ UniValue getaddressesbyaccount(const JSONRPCRequest& request)
     return ret;
 }
 
-static void SendMoney(CWallet * const pwallet, const CTxDestination &address, CAmount nValue, bool fSubtractFeeFromAmount, CWalletTx& wtxNew, const CCoinControl& coin_control, int64_t lockTime = 0)
+static void SendMoney(CWallet * const pwallet, const CTxDestination &address, CAmount nValue, bool fSubtractFeeFromAmount, CWalletTx& wtxNew, const CCoinControl& coin_control, int64_t lockTime = 0, std::string message = "")
 {
     CAmount curBalance = pwallet->GetBalance();
 
@@ -460,7 +463,7 @@ static void SendMoney(CWallet * const pwallet, const CTxDestination &address, CA
     int nChangePosRet = -1;
     CRecipient recipient = {scriptPubKey, nValue, fSubtractFeeFromAmount};
     vecSend.push_back(recipient);
-    if (!pwallet->CreateTransaction(vecSend, wtxNew, reservekey, nFeeRequired, nChangePosRet, strError, coin_control)) {
+    if (!pwallet->CreateTransaction(vecSend, wtxNew, reservekey, nFeeRequired, message, nChangePosRet, strError, coin_control)) {
         if (!fSubtractFeeFromAmount && nValue + nFeeRequired > curBalance)
             strError = strprintf("Error: This transaction requires a transaction fee of at least %s", FormatMoney(nFeeRequired));
         throw JSONRPCError(RPC_WALLET_ERROR, strError);
@@ -481,14 +484,14 @@ UniValue sendtoaddress(const JSONRPCRequest& request)
 
     if (request.fHelp || request.params.size() < 2 || request.params.size() > 8)
         throw std::runtime_error(
-            "sendtoaddress \"address\" amount ( \"comment\" \"comment_to\" subtractfeefromamount replaceable conf_target \"estimate_mode\")\n"
+            "sendtoaddress \"address\" amount ( \"message\" \"comment_to\" subtractfeefromamount replaceable conf_target \"estimate_mode\")\n"
             "\nSend an amount to a given address.\n"
             + HelpRequiringPassphrase(pwallet) +
             "\nArguments:\n"
             "1. \"address\"            (string, required) The aokchain address to send to.\n"
             "2. \"amount\"             (numeric or string, required) The amount in " + CURRENCY_UNIT + " to send. eg 0.1\n"
             "3. \"lock_time\"          (integer, optional, default=0) Locktime for transaction, could be height or timestamp\n"
-            "4. \"comment\"            (string, optional) A comment used to store what the transaction is for. \n"
+            "5. \"message\"            (string, optional, default="") Message attached to transaction.\n"
             "                             This is not part of the transaction, just kept in your wallet.\n"
             "5. \"comment_to\"         (string, optional) A comment to store the name of the person or organization \n"
             "                             to which you're sending the transaction. This is not part of the \n"
@@ -544,8 +547,19 @@ UniValue sendtoaddress(const JSONRPCRequest& request)
 
     // Wallet comments
     CWalletTx wtx;
-    if (!request.params[3].isNull() && !request.params[3].get_str().empty())
-        wtx.mapValue["comment"] = request.params[3].get_str();
+    std::string message;
+
+    // if (!request.params[3].isNull() && !request.params[3].get_str().empty())
+    //     wtx.mapValue["comment"] = request.params[3].get_str();
+
+    if (!request.params[3].isNull() && !request.params[3].get_str().empty()) {
+        message = request.params[3].get_str();
+
+        if (message.length() > MAX_MESSAGE_LEN)
+            throw JSONRPCError(RPC_TYPE_ERROR,
+                strprintf("Transaction message max length is %s", MAX_MESSAGE_LEN));
+    }
+
     if (!request.params[4].isNull() && !request.params[4].get_str().empty())
         wtx.mapValue["to"]      = request.params[4].get_str();
 
@@ -568,7 +582,7 @@ UniValue sendtoaddress(const JSONRPCRequest& request)
 
     EnsureWalletIsUnlocked(pwallet);
 
-    SendMoney(pwallet, dest, nAmount, fSubtractFeeFromAmount, wtx, coin_control, lockTime);
+    SendMoney(pwallet, dest, nAmount, fSubtractFeeFromAmount, wtx, coin_control, lockTime, message);
 
     return wtx.GetHash().GetHex();
 }
@@ -1087,7 +1101,7 @@ UniValue sendmany(const JSONRPCRequest& request)
 
     if (request.fHelp || request.params.size() < 2 || request.params.size() > 8)
         throw std::runtime_error(
-            "sendmany \"fromaccount\" {\"address\":amount,...} ( minconf \"comment\" [\"address\",...] replaceable conf_target \"estimate_mode\")\n"
+            "sendmany \"fromaccount\" {\"address\":amount,...} ( minconf \"message\" [\"address\",...] replaceable conf_target \"estimate_mode\")\n"
             "\nSend multiple times. Amounts are double-precision floating point numbers."
             + HelpRequiringPassphrase(pwallet) + "\n"
             "\nArguments:\n"
@@ -1098,7 +1112,7 @@ UniValue sendmany(const JSONRPCRequest& request)
             "      ,...\n"
             "    }\n"
             "3. minconf                 (numeric, optional, default=1) Only use the balance confirmed at least this many times.\n"
-            "4. \"comment\"             (string, optional) A comment\n"
+            "4. \"message\"             (string, optional, default="") Message attached to transaction.\n"
             "5. subtractfeefrom         (array, optional) A json array with addresses.\n"
             "                           The fee will be equally deducted from the amount of each selected address.\n"
             "                           Those recipients will receive less aokchains than you enter in their corresponding amount field.\n"
@@ -1147,8 +1161,18 @@ UniValue sendmany(const JSONRPCRequest& request)
 
     CWalletTx wtx;
     wtx.strFromAccount = strAccount;
-    if (!request.params[3].isNull() && !request.params[3].get_str().empty())
-        wtx.mapValue["comment"] = request.params[3].get_str();
+    std::string message;
+
+    // if (!request.params[3].isNull() && !request.params[3].get_str().empty())
+    //     wtx.mapValue["comment"] = request.params[3].get_str();
+
+    if (!request.params[3].isNull() && !request.params[3].get_str().empty()) {
+        message = request.params[3].get_str();
+
+        if (message.length() > MAX_MESSAGE_LEN)
+            throw JSONRPCError(RPC_TYPE_ERROR,
+                strprintf("Transaction message max length is %s", MAX_MESSAGE_LEN));
+    }
 
     UniValue subtractFeeFromAmount(UniValue::VARR);
     if (!request.params[4].isNull())
@@ -1220,7 +1244,7 @@ UniValue sendmany(const JSONRPCRequest& request)
     CAmount nFeeRequired = 0;
     int nChangePosRet = -1;
     std::string strFailReason;
-    bool fCreated = pwallet->CreateTransaction(vecSend, wtx, keyChange, nFeeRequired, nChangePosRet, strFailReason, coin_control);
+    bool fCreated = pwallet->CreateTransaction(vecSend, wtx, keyChange, nFeeRequired, message, nChangePosRet, strFailReason, coin_control);
     if (!fCreated)
         throw JSONRPCError(RPC_WALLET_INSUFFICIENT_FUNDS, strFailReason);
     CValidationState state;
@@ -1799,6 +1823,9 @@ void ListTransactions(CWallet* const pwallet, const CWalletTx& wtx, const std::s
                         entry.pushKV("locktime", (int64_t)data.nTokenLockTime);
                     }
 
+                    if (!wtx.tx->nMessage.empty())
+                        entry.pushKV("message", wtx.tx->nMessage);
+
                     retTokens.push_back(entry);
                 }
             }
@@ -1837,6 +1864,9 @@ void ListTransactions(CWallet* const pwallet, const CWalletTx& wtx, const std::s
 
                 entry.pushKV("time", wtx.GetTxTime());
                 entry.pushKV("timereceived", (int64_t)wtx.nTimeReceived);
+
+                if (!wtx.tx->nMessage.empty())
+                    entry.pushKV("message", wtx.tx->nMessage);
 
                 retTokens.push_back(entry);
             }
@@ -4112,8 +4142,8 @@ static const CRPCCommand commands[] =
     { "wallet",             "lockunspent",              &lockunspent,              {"unlock","transactions"} },
     // { "wallet",             "move",                     &movecmd,                  {"fromaccount","toaccount","amount","minconf","comment"} },
     { "wallet",             "sendfrom",                 &sendfrom,                 {"fromaccount","toaddress","amount","lock_time","minconf","comment","comment_to","subtractfeefromamount"} },
-    { "wallet",             "sendmany",                 &sendmany,                 {"fromaccount","amounts","minconf","comment","subtractfeefrom", "conf_target","estimate_mode"} },
-    { "wallet",             "sendtoaddress",            &sendtoaddress,            {"address","amount","lock_time","comment","comment_to","subtractfeefromamount", "conf_target","estimate_mode"} },
+    { "wallet",             "sendmany",                 &sendmany,                 {"fromaccount","amounts","minconf","message","subtractfeefrom", "conf_target","estimate_mode"} },
+    { "wallet",             "sendtoaddress",            &sendtoaddress,            {"address","amount","lock_time","message","comment_to","subtractfeefromamount", "conf_target","estimate_mode"} },
     // { "wallet",             "setlabel",                 &setlabel,                 {"address","label"} },
     // { "wallet",             "setaccount",               &setlabel,                 {"address","account"} },
     { "wallet",             "settxfee",                 &settxfee,                 {"amount"} },

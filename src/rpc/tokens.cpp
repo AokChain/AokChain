@@ -222,8 +222,11 @@ UniValue issue(const JSONRPCRequest& request)
     CCoinControl crtl;
     crtl.destChange = DecodeDestination(changeAddress);
 
+    // ToDo: transaction message
+    std::string message;
+
     // Create the Transaction
-    if (!CreateTokenTransaction(pwallet, crtl, token, address, error, transaction, reservekey, nRequiredFee))
+    if (!CreateTokenTransaction(pwallet, crtl, token, address, error, transaction, reservekey, nRequiredFee, message))
         throw JSONRPCError(error.first, error.second);
 
     // Send the Transaction to the network
@@ -318,8 +321,11 @@ UniValue registerusername(const JSONRPCRequest& request)
     CCoinControl crtl;
     crtl.destChange = DecodeDestination(changeAddress);
 
+    // ToDo: transaction message
+    std::string message;
+
     // Create the Transaction
-    if (!CreateTokenTransaction(pwallet, crtl, token, address, error, transaction, reservekey, nRequiredFee))
+    if (!CreateTokenTransaction(pwallet, crtl, token, address, error, transaction, reservekey, nRequiredFee, message))
         throw JSONRPCError(error.first, error.second);
 
     // Send the Transaction to the network
@@ -462,8 +468,11 @@ UniValue issueunique(const JSONRPCRequest& request)
 
     crtl.destChange = DecodeDestination(changeAddress);
 
+    // ToDo: transaction message
+    std::string message;
+
     // Create the Transaction
-    if (!CreateTokenTransaction(pwallet, crtl, tokens, address, error, transaction, reservekey, nRequiredFee))
+    if (!CreateTokenTransaction(pwallet, crtl, tokens, address, error, transaction, reservekey, nRequiredFee, message))
         throw JSONRPCError(error.first, error.second);
 
     // Send the Transaction to the network
@@ -1042,9 +1051,9 @@ UniValue listaddressesbytoken(const JSONRPCRequest &request)
 
 UniValue transfer(const JSONRPCRequest& request)
 {
-    if (request.fHelp || !AreTokensDeployed() || request.params.size() < 3 || request.params.size() > 4)
+    if (request.fHelp || !AreTokensDeployed() || request.params.size() < 3 || request.params.size() > 5)
         throw std::runtime_error(
-                "transfer \"token_name\" qty \"to_address\"\n"
+                "transfer \"token_name\" qty \"to_address\" \"token_lock_time\" \"message\"\n"
                 + TokenActivationWarning() +
                 "\nTransfers a quantity of an owned token to a given address"
 
@@ -1053,6 +1062,7 @@ UniValue transfer(const JSONRPCRequest& request)
                 "2. \"qty\"                      (numeric, required) number of tokens you want to send to the address\n"
                 "3. \"to_address\"               (string, required) address to send the token to\n"
                 "4. \"token_lock_time\"          (integer, optional, default=0) Locktime for token UTXOs, could be height or timestamp\n"
+                "5. \"message\"                  (string, optional, default="") Message attached to transaction.\n"
 
                 "\nResult:\n"
                 "txid"
@@ -1099,6 +1109,15 @@ UniValue transfer(const JSONRPCRequest& request)
         }
     }
 
+    std::string message;
+    if (request.params.size() > 4) {
+        message = request.params[4].get_str();
+
+        if (message.length() > MAX_MESSAGE_LEN)
+            throw JSONRPCError(RPC_TYPE_ERROR,
+                strprintf("Transaction message max length is %s", MAX_MESSAGE_LEN));
+    }
+
     vTransfers.emplace_back(std::make_pair(CTokenTransfer(token_name, nAmount, token_lock_time), address));
     CReserveKey reservekey(pwallet);
     CWalletTx transaction;
@@ -1107,7 +1126,7 @@ UniValue transfer(const JSONRPCRequest& request)
     CCoinControl ctrl;
 
     // Create the Transaction
-    if (!CreateTransferTokenTransaction(pwallet, ctrl, vTransfers, "", error, transaction, reservekey, nRequiredFee))
+    if (!CreateTransferTokenTransaction(pwallet, ctrl, vTransfers, "", error, transaction, reservekey, nRequiredFee, message))
         throw JSONRPCError(error.first, error.second);
 
     // Send the Transaction to the network
@@ -1123,9 +1142,9 @@ UniValue transfer(const JSONRPCRequest& request)
 
 UniValue transfermany(const JSONRPCRequest& request)
 {
-    if (request.fHelp || request.params.size() != 2)
+    if (request.fHelp || request.params.size() < 2 || request.params.size() > 3)
         throw std::runtime_error(
-            "transfermany \"token_name\" {\"address\":amount,...}\n"
+            "transfermany \"token_name\" {\"address\":amount,...} \"message\"\n"
             "\nSend multiple times. Amounts are double-precision floating point numbers."
             + TokenActivationWarning() +
             "\nArguments:\n"
@@ -1135,6 +1154,7 @@ UniValue transfermany(const JSONRPCRequest& request)
             "      \"address\":amount   (numeric or string) The aokchain address is the key, the numeric amount (can be string) in " + CURRENCY_UNIT + " is the value\n"
             "      ,...\n"
             "    }\n"
+            "3. \"message\"             (string, optional, default="") Message attached to transaction.\n"
             "\nResult:\n"
             "\"txid\"                   (string) The transaction id for the send. Only 1 transaction is created regardless of \n"
             "                                    the number of addresses.\n"
@@ -1195,6 +1215,15 @@ UniValue transfermany(const JSONRPCRequest& request)
         vTransfers.emplace_back(std::make_pair(CTokenTransfer(token_name, nAmount, token_lock_time), address));
     }
 
+    std::string message;
+    if (request.params.size() > 2) {
+        message = request.params[2].get_str();
+
+        if (message.length() > MAX_MESSAGE_LEN)
+            throw JSONRPCError(RPC_TYPE_ERROR,
+                strprintf("Transaction message max length is %s", MAX_MESSAGE_LEN));
+    }
+
     CReserveKey reservekey(pwallet);
     CWalletTx transaction;
     CAmount nRequiredFee;
@@ -1202,7 +1231,7 @@ UniValue transfermany(const JSONRPCRequest& request)
     CCoinControl ctrl;
 
     // Create the Transaction
-    if (!CreateTransferTokenTransaction(pwallet, ctrl, vTransfers, "", error, transaction, reservekey, nRequiredFee))
+    if (!CreateTransferTokenTransaction(pwallet, ctrl, vTransfers, "", error, transaction, reservekey, nRequiredFee, message))
         throw JSONRPCError(error.first, error.second);
 
     // Send the Transaction to the network
@@ -1292,6 +1321,9 @@ UniValue transfermanyoutputs(const JSONRPCRequest& request)
         vTransfers.emplace_back(std::make_pair(CTokenTransfer(token_name, nAmount, locktime), address));
     }
 
+    // ToDo: transaction message
+    std::string messsage;
+
     CReserveKey reservekey(pwallet);
     CWalletTx transaction;
     CAmount nRequiredFee;
@@ -1299,7 +1331,7 @@ UniValue transfermanyoutputs(const JSONRPCRequest& request)
     CCoinControl ctrl;
 
     // Create the Transaction
-    if (!CreateTransferTokenTransaction(pwallet, ctrl, vTransfers, "", error, transaction, reservekey, nRequiredFee))
+    if (!CreateTransferTokenTransaction(pwallet, ctrl, vTransfers, "", error, transaction, reservekey, nRequiredFee, messsage))
         throw JSONRPCError(error.first, error.second);
 
     // Send the Transaction to the network
@@ -1396,8 +1428,11 @@ UniValue transferfromaddress(const JSONRPCRequest& request)
         throw JSONRPCError(RPC_INVALID_PARAMETER, std::string("Account has insufficient token funds"));
     }
 
+    // ToDo: transaciton message
+    std::string message;
+
     // Create the Transaction
-    if (!CreateTransferTokenTransaction(pwallet, ctrl, vTransfers, "", error, transaction, reservekey, nRequiredFee))
+    if (!CreateTransferTokenTransaction(pwallet, ctrl, vTransfers, "", error, transaction, reservekey, nRequiredFee, message))
         throw JSONRPCError(error.first, error.second);
 
     // Send the Transaction to the network
