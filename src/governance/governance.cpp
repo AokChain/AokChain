@@ -147,6 +147,22 @@ CGovernance::CGovernance(size_t nCacheSize, bool fMemory, bool fWipe) : CDBWrapp
 bool CGovernance::Init(bool fWipe, const CChainParams& chainparams) {
     bool init;
 
+    // Bug fix
+    CostEntry fix_entry = CostEntry(GOVERNANCE_COST_REISSUE, 0);
+    if (Exists(fix_entry)) {
+        CostDetails details = CostDetails();
+        Read(fix_entry, details);
+        if (details.cost != chainparams.ReissueFeeAmount()) {
+            LogPrintf("Governance: Found cost bug, fixing it\n");
+            CDBBatch fix_batch(*this);
+            fix_batch.Erase(CostEntry(GOVERNANCE_COST_REISSUE, 0));
+            fix_batch.Erase(CostEntry(GOVERNANCE_COST_SUB, 0));
+            fix_batch.Write(CostEntry(GOVERNANCE_COST_REISSUE, 0), CostDetails(chainparams.ReissueFeeAmount()));
+            fix_batch.Write(CostEntry(GOVERNANCE_COST_SUB, 0), CostDetails(chainparams.SubFeeAmount()));
+            WriteBatch(fix_batch);
+        }
+    }
+
     if (fWipe || Read(DB_GOVERNANCE_INIT, init) == false || init == false) {
         LogPrintf("Governance: Creating new database\n");
 
@@ -160,9 +176,9 @@ bool CGovernance::Init(bool fWipe, const CChainParams& chainparams) {
 
         // Add initial token issuance cost values
         batch.Write(CostEntry(GOVERNANCE_COST_ROOT, 0), CostDetails(chainparams.RootFeeAmount()));
-        batch.Write(CostEntry(GOVERNANCE_COST_REISSUE, 0), CostDetails(chainparams.SubFeeAmount()));
+        batch.Write(CostEntry(GOVERNANCE_COST_REISSUE, 0), CostDetails(chainparams.ReissueFeeAmount()));
         batch.Write(CostEntry(GOVERNANCE_COST_UNIQUE, 0), CostDetails(chainparams.UniqueFeeAmount()));
-        batch.Write(CostEntry(GOVERNANCE_COST_SUB, 0), CostDetails(chainparams.ReissueFeeAmount()));
+        batch.Write(CostEntry(GOVERNANCE_COST_SUB, 0), CostDetails(chainparams.SubFeeAmount()));
         batch.Write(CostEntry(GOVERNANCE_COST_USERNAME, 0), CostDetails(chainparams.UsernameFeeAmount()));
 
         // Add initial token fee address from chainparams
