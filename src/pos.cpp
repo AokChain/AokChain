@@ -172,12 +172,14 @@ bool CheckProofOfStake(CBlockIndex* pindexPrev, CValidationState& state, const C
         return state.DoS(1, error("CheckProofOfStake() : INFO: check kernel failed on coinstake %s, hashProof=%s", tx.GetHash().ToString(), hashProofOfStake.ToString())); // may occur during initial download or if behind on block chain sync
     }
 
-    if (coinPrev.out.scriptPubKey.IsOfflineStaking())
-        for (unsigned int i = 1; i < tx.vout.size() - 1; i++)
+    // Check offline stake script
+    if (coinPrev.out.scriptPubKey.IsOfflineStaking()) {
+        for (unsigned int i = 1; i < tx.vout.size(); i++) {
             if (tx.vout[i].scriptPubKey != coinPrev.out.scriptPubKey) {
-                return error("%s: Coinstake output %d tried to move offline staking coins to a non authorised script",
-                             __func__, i);
+                return state.DoS(100, error("CheckProofOfStake(): Coinstake output %d tried to move offline staking coins to a non authorised script", i));
             }
+        }
+    }
 
     return true;
 }
