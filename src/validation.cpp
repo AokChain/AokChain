@@ -2333,7 +2333,7 @@ static int64_t nBlocksTotal = 0;
  *  Validity checks that depend on the UTXO set are also done; ConnectBlock()
  *  can fail if those validity checks fail (among other reasons). */
 static bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockIndex* pindex,
-                  CCoinsViewCache& view, const CChainParams& chainparams, CTokensCache* tokensCache = nullptr, bool fJustCheck = false, bool ignoreAddressIndex = false)
+                  CCoinsViewCache& view, const CChainParams& chainparams, CTokensCache* tokensCache = nullptr, bool fJustCheck = false, bool ignoreAddressIndex = false, bool ignoreTokenDuplicate = false)
 {
     const uint256& hash = block.GetBlockHash();
 
@@ -2350,9 +2350,13 @@ static bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockInd
     }
 
     // Check it again in case a previous version let a bad block in
-    if (!CheckBlock(block, state, hash, chainparams.GetConsensus(), !fJustCheck, !fJustCheck, !fJustCheck,
-                    !fJustCheck)) // Force the check of token duplicates when connecting the block
+    if (!CheckBlock(block, state, hash, chainparams.GetConsensus(), !fJustCheck, !fJustCheck,
+            !(fJustCheck || ignoreTokenDuplicate), // Don't check fCheckTokenDuplicate when nCheckLevel >= 4
+            !fJustCheck // Force the check of token duplicates when connecting the block
+        ))
+    {
         return error("%s: Consensus::CheckBlock: %s", __func__, FormatStateMessage(state));
+    }
 
     // verify that the view's current state corresponds to the previous block
     uint256 hashPrevBlock = pindex->pprev == nullptr ? uint256() : pindex->pprev->GetBlockHash();
@@ -5170,7 +5174,7 @@ bool CVerifyDB::VerifyDB(const CChainParams& chainparams, CCoinsView *coinsview,
             CBlock block;
             if (!ReadBlockFromDisk(block, pindex, chainparams.GetConsensus()))
                 return error("VerifyDB(): *** ReadBlockFromDisk failed at %d, hash=%s", pindex->nHeight, pindex->GetBlockHash().ToString());
-            if (!ConnectBlock(block, state, pindex, coins, chainparams, &tokenCache, false, true))
+            if (!ConnectBlock(block, state, pindex, coins, chainparams, &tokenCache, false, true, true))
                 return error("VerifyDB(): *** found unconnectable block at %d, hash=%s", pindex->nHeight, pindex->GetBlockHash().ToString());
         }
     }
