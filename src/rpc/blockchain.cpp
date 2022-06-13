@@ -1835,6 +1835,28 @@ UniValue freezelist(const JSONRPCRequest& request) {
     return result;
 }
 
+
+
+UniValue checkfreeze(const JSONRPCRequest& request) {
+    if (request.fHelp || request.params.size() != 1) {
+        throw std::runtime_error(
+            "checkfreeze \"address\"\n"
+            "\nReturns freze status for address.\n"
+        );
+    }
+
+    std::string address = request.params[0].get_str();
+
+    CTxDestination dest = DecodeDestination(address);
+    if (!IsValidDestination(dest)) {
+        throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Invalid address");
+    }
+
+    return !governance->CanSend(GetScriptForDestination(dest));
+}
+
+
+
 UniValue issuanceinfo(const JSONRPCRequest& request) {
     if (request.fHelp || request.params.size() > 0) {
         throw std::runtime_error(
@@ -1889,8 +1911,9 @@ static const CRPCCommand commands[] =
 
     { "blockchain",         "preciousblock",          &preciousblock,          {"blockhash"} },
 
-    { "blockchain",         "freezelist",          &freezelist,          {} },
+    { "blockchain",         "freezelist",             &freezelist,             {} },
     { "blockchain",         "issuanceinfo",           &issuanceinfo,           {} },
+    { "blockchain",         "checkfreeze",            &checkfreeze,            {} },
 
     /* Not shown in help */
     { "hidden",             "invalidateblock",        &invalidateblock,        {"blockhash"} },

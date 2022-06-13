@@ -847,6 +847,7 @@ UniValue getaddressutxos(const JSONRPCRequest& request)
             output.pushKV("txid", it->first.txhash.GetHex());
             output.pushKV("outputIndex", (int)it->first.index);
             output.pushKV("script", HexStr(it->second.script.begin(), it->second.script.end()));
+            output.pushKV("asm", ScriptToAsmStr(it->second.script));
             output.pushKV("satoshis", it->second.satoshis);
             output.pushKV("height", it->second.blockHeight);
             output.pushKV("timelock", timeLock);
