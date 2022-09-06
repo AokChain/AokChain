@@ -2350,7 +2350,8 @@ static bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockInd
     }
 
     // Check it again in case a previous version let a bad block in
-    if (!CheckBlock(block, state, hash, chainparams.GetConsensus(), !fJustCheck, !fJustCheck,
+    if (!CheckBlock(block, state, hash, chainparams.GetConsensus(), !fJustCheck,
+            !(fJustCheck || ignoreTokenDuplicate),
             !(fJustCheck || ignoreTokenDuplicate), // Don't check fCheckTokenDuplicate when nCheckLevel >= 4
             !fJustCheck // Force the check of token duplicates when connecting the block
         ))
