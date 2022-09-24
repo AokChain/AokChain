@@ -1719,6 +1719,58 @@ UniValue getusernameaddress(const JSONRPCRequest& request)
     return result;
 }
 
+UniValue listuniquetokenholders(const JSONRPCRequest &request)
+{
+    if (!fTokenIndex) {
+        return "_This rpc call is not functional unless -tokenindex is enabled. To enable, please run the wallet with -tokenindex, this will require a reindex to occur";
+    }
+
+    if (request.fHelp || !AreTokensDeployed() || request.params.size() != 1)
+        throw std::runtime_error(
+                "listuniquetokenholders [\"TOKEN_NAME\"]\n"
+                + TokenActivationWarning() +
+                "\nReturns a list holders of unique"
+
+                "\nArguments:\n"
+                "1. \"tokens\"               (string, required) Array of token names\n"
+                "\nResult:\n"
+                "{\n"
+                "  (token_name) : (holders),\n"
+                "  ...\n"
+                "}\n"
+
+                "\nExamples:\n"
+                + HelpExampleCli("listuniquetokenholders", "[\"TOKEN_NAME\"]")
+        );
+
+    LOCK(cs_main);
+
+    UniValue tokens = request.params[0].get_array();
+    UniValue result(UniValue::VOBJ);
+
+    for (unsigned int i = 0; i < tokens.size(); i++)
+    {
+        std::string token_name = tokens[i].get_str();
+
+        KnownTokenType tokenType;
+        if (!IsTokenNameValid(token_name, tokenType))
+            return "Not a valid token name";
+
+        if (tokenType != KnownTokenType::UNIQUE)
+            return "Token is not unique";
+
+        std::string holderAddress;
+        int nTotalEntries = 0;
+
+        if (!ptokensdb->TokenAddressDirUnique(holderAddress, token_name))
+            throw JSONRPCError(RPC_INTERNAL_ERROR, "couldn't retrieve address token directory.");
+
+        result.pushKV(token_name, holderAddress);
+    }
+
+    return result;
+}
+
 static const CRPCCommand commands[] =
 { //  category    name                          actor (function)             argNames
   //  ----------- ------------------------      -----------------------      ----------
@@ -1727,6 +1779,7 @@ static const CRPCCommand commands[] =
     { "tokens",   "registerusername",           &registerusername,           {"username","to_address"} },
     { "tokens",   "getusernameaddress",         &getusernameaddress,         {"username"} },
     { "tokens",   "listtokenbalancesbyaddress", &listtokenbalancesbyaddress, {"address", "onlytotal", "count", "start"} },
+    { "tokens",   "listuniquetokenholders",     &listuniquetokenholders,     {"tokens"} },
     { "tokens",   "gettokendata",               &gettokendata,               {"token_name"}},
     { "tokens",   "listmytokens",               &listmytokens,               {"token", "verbose", "count", "start"}},
     { "tokens",   "listmylockedtokens",         &listmylockedtokens,         {"token", "verbose", "count", "start"}},

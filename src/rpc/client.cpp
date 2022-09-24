@@ -202,6 +202,7 @@ static const CRPCConvertParam vRPCConvertParams[] =
     { "listtokenbalancesbyaddress", 3, "start"},
     { "setgenerate", 0, "generate" },
     { "setgenerate", 1, "genproclimit" },
+    { "listuniquetokenholders", 0, "tokens" },
 };
 
 class CRPCConvertTable
