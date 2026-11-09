@@ -10,12 +10,14 @@
 #include <string.h>
 #include <utilstrencodings.h>
 
+#include <iostream>
+
 int main(int argc, char **argv)
 {
     if (argc == 2)
     {
         std::vector<unsigned char> rawHeader = ParseHex(argv[1]);
-        std::cout << groestlhash(rawHeader.data(), rawHeader.data() + 80).GetHex();
+        std::cout << blake2b(rawHeader.data(), rawHeader.data() + 80).GetHex();
     } else
     {
         std::cerr << "Usage: test_aokchain_hash blockHex" << std::endl;

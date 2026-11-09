@@ -152,7 +152,7 @@ BOOST_FIXTURE_TEST_SUITE(token_tests, BasicTestingSetup)
 
         // Create the token scriptPubKey
         CTokenTransfer token("AOKCHAIN", 1000, 0);
-        CScript scriptPubKey = GetScriptForDestination(DecodeDestination(Params().GlobalBurnAddress()));
+        CScript scriptPubKey = GetScriptForDestination(DecodeDestination(Params().TokenFeeAddress()));
         token.ConstructTransaction(scriptPubKey);
 
         CTxOut txOut;
@@ -172,7 +172,7 @@ BOOST_FIXTURE_TEST_SUITE(token_tests, BasicTestingSetup)
 
         // Create the token scriptPubKey
         CNewToken token("AOKCHAIN", 1000, 8, 1, 0, "");
-        CScript scriptPubKey = GetScriptForDestination(DecodeDestination(Params().GlobalBurnAddress()));
+        CScript scriptPubKey = GetScriptForDestination(DecodeDestination(Params().TokenFeeAddress()));
         token.ConstructTransaction(scriptPubKey);
 
         CTxOut txOut;

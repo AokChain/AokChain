@@ -71,9 +71,9 @@ TestingSetup::TestingSetup(const std::string &chainName) : BasicTestingSetup(cha
     GetMainSignals().RegisterBackgroundSignalScheduler(scheduler);
 
     mempool.setSanityCheck(1.0);
-    pblocktree = new CBlockTreeDB(1 << 20, true);
+    pblocktree.reset(new CBlockTreeDB(1 << 20, true));
     pcoinsdbview = new CCoinsViewDB(1 << 23, true);
-    pcoinsTip = new CCoinsViewCache(pcoinsdbview);
+    pcoinsTip.reset(new CCoinsViewCache(pcoinsdbview));
     if (!LoadGenesisBlock(chainparams))
     {
         throw std::runtime_error("LoadGenesisBlock failed.");
@@ -104,9 +104,9 @@ TestingSetup::~TestingSetup()
     g_connman.reset();
     peerLogic.reset();
     UnloadBlockIndex();
-    delete pcoinsTip;
+    pcoinsTip.reset();
     delete pcoinsdbview;
-    delete pblocktree;
+    pblocktree.reset();
     delete ptokens;
     fs::remove_all(pathTemp);
 }

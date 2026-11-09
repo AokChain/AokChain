@@ -25,7 +25,7 @@ BOOST_FIXTURE_TEST_SUITE(token_tx_tests, BasicTestingSetup)
 
         // Create the token scriptPubKey
         CTokenTransfer token("AOKCHAIN", 1000, 0);
-        CScript scriptPubKey = GetScriptForDestination(DecodeDestination(Params().GlobalBurnAddress()));
+        CScript scriptPubKey = GetScriptForDestination(DecodeDestination(Params().TokenFeeAddress()));
         token.ConstructTransaction(scriptPubKey);
 
         CCoinsView view;
@@ -71,7 +71,7 @@ BOOST_FIXTURE_TEST_SUITE(token_tx_tests, BasicTestingSetup)
 
         // Create the token scriptPubKey
         CTokenTransfer token("AOKCHAIN", 1000, 0);
-        CScript scriptPubKey = GetScriptForDestination(DecodeDestination(Params().GlobalBurnAddress()));
+        CScript scriptPubKey = GetScriptForDestination(DecodeDestination(Params().TokenFeeAddress()));
         token.ConstructTransaction(scriptPubKey);
 
         CCoinsView view;
@@ -98,7 +98,7 @@ BOOST_FIXTURE_TEST_SUITE(token_tx_tests, BasicTestingSetup)
         // Create CTxOut that will only send 100 of the token
         // This should fail because 900 AOKCHAIN doesn't have a destination
         CTokenTransfer tokenTransfer("AOKCHAIN", 100, 0);
-        CScript scriptLess = GetScriptForDestination(DecodeDestination(Params().GlobalBurnAddress()));
+        CScript scriptLess = GetScriptForDestination(DecodeDestination(Params().TokenFeeAddress()));
         tokenTransfer.ConstructTransaction(scriptLess);
 
         CTxOut txOut2;
@@ -127,7 +127,7 @@ BOOST_FIXTURE_TEST_SUITE(token_tx_tests, BasicTestingSetup)
 
         // Create the token scriptPubKey
         CTokenTransfer token("AOKCHAIN", 1000, 0);
-        CScript scriptPubKey = GetScriptForDestination(DecodeDestination(Params().GlobalBurnAddress()));
+        CScript scriptPubKey = GetScriptForDestination(DecodeDestination(Params().TokenFeeAddress()));
         token.ConstructTransaction(scriptPubKey);
 
         CCoinsView view;
@@ -155,7 +155,7 @@ BOOST_FIXTURE_TEST_SUITE(token_tx_tests, BasicTestingSetup)
         for (int i = 0; i < 10; i++)
         {
             CTokenTransfer token2("AOKCHAIN", 100, 0);
-            CScript scriptPubKey2 = GetScriptForDestination(DecodeDestination(Params().GlobalBurnAddress()));
+            CScript scriptPubKey2 = GetScriptForDestination(DecodeDestination(Params().TokenFeeAddress()));
             token2.ConstructTransaction(scriptPubKey2);
 
             CTxOut txOut2;
@@ -187,7 +187,7 @@ BOOST_FIXTURE_TEST_SUITE(token_tx_tests, BasicTestingSetup)
 
         // Create the token scriptPubKey
         CTokenTransfer token("AOKCHAIN", 1000, 0);
-        CScript scriptPubKey = GetScriptForDestination(DecodeDestination(Params().GlobalBurnAddress()));
+        CScript scriptPubKey = GetScriptForDestination(DecodeDestination(Params().TokenFeeAddress()));
         token.ConstructTransaction(scriptPubKey);
 
         CCoinsView view;
@@ -215,7 +215,7 @@ BOOST_FIXTURE_TEST_SUITE(token_tx_tests, BasicTestingSetup)
         for (int i = 0; i < 12; i++)
         {
             CTokenTransfer token2("AOKCHAIN", 100, 0);
-            CScript scriptPubKey2 = GetScriptForDestination(DecodeDestination(Params().GlobalBurnAddress()));
+            CScript scriptPubKey2 = GetScriptForDestination(DecodeDestination(Params().TokenFeeAddress()));
             token2.ConstructTransaction(scriptPubKey2);
 
             CTxOut txOut2;
@@ -247,15 +247,15 @@ BOOST_FIXTURE_TEST_SUITE(token_tx_tests, BasicTestingSetup)
 
         // Create the token scriptPubKeys
         CTokenTransfer token("AOKCHAIN", 1000, 0);
-        CScript scriptPubKey = GetScriptForDestination(DecodeDestination(Params().GlobalBurnAddress()));
+        CScript scriptPubKey = GetScriptForDestination(DecodeDestination(Params().TokenFeeAddress()));
         token.ConstructTransaction(scriptPubKey);
 
         CTokenTransfer token2("AOKCHAINTEST", 1000, 0);
-        CScript scriptPubKey2 = GetScriptForDestination(DecodeDestination(Params().GlobalBurnAddress()));
+        CScript scriptPubKey2 = GetScriptForDestination(DecodeDestination(Params().TokenFeeAddress()));
         token2.ConstructTransaction(scriptPubKey2);
 
         CTokenTransfer token3("AOKCHAINTESTTEST", 1000, 0);
-        CScript scriptPubKey3 = GetScriptForDestination(DecodeDestination(Params().GlobalBurnAddress()));
+        CScript scriptPubKey3 = GetScriptForDestination(DecodeDestination(Params().TokenFeeAddress()));
         token3.ConstructTransaction(scriptPubKey3);
 
         CCoinsView view;
@@ -311,7 +311,7 @@ BOOST_FIXTURE_TEST_SUITE(token_tx_tests, BasicTestingSetup)
         {
             // Add the first token
             CTokenTransfer outToken("AOKCHAIN", 100, 0);
-            CScript outScript = GetScriptForDestination(DecodeDestination(Params().GlobalBurnAddress()));
+            CScript outScript = GetScriptForDestination(DecodeDestination(Params().TokenFeeAddress()));
             outToken.ConstructTransaction(outScript);
 
             CTxOut txOutNew;
@@ -322,7 +322,7 @@ BOOST_FIXTURE_TEST_SUITE(token_tx_tests, BasicTestingSetup)
 
             // Add the second token
             CTokenTransfer outToken2("AOKCHAINTEST", 100, 0);
-            CScript outScript2 = GetScriptForDestination(DecodeDestination(Params().GlobalBurnAddress()));
+            CScript outScript2 = GetScriptForDestination(DecodeDestination(Params().TokenFeeAddress()));
             outToken2.ConstructTransaction(outScript2);
 
             CTxOut txOutNew2;
@@ -333,7 +333,7 @@ BOOST_FIXTURE_TEST_SUITE(token_tx_tests, BasicTestingSetup)
 
             // Add the third token
             CTokenTransfer outToken3("AOKCHAINTESTTEST", 100, 0);
-            CScript outScript3 = GetScriptForDestination(DecodeDestination(Params().GlobalBurnAddress()));
+            CScript outScript3 = GetScriptForDestination(DecodeDestination(Params().TokenFeeAddress()));
             outToken3.ConstructTransaction(outScript3);
 
             CTxOut txOutNew3;
@@ -366,7 +366,7 @@ BOOST_FIXTURE_TEST_SUITE(token_tx_tests, BasicTestingSetup)
         {
             // Add the first token
             CTokenTransfer outToken("AOKCHAIN", 100, 0);
-            CScript outScript = GetScriptForDestination(DecodeDestination(Params().GlobalBurnAddress()));
+            CScript outScript = GetScriptForDestination(DecodeDestination(Params().TokenFeeAddress()));
             outToken.ConstructTransaction(outScript);
 
             CTxOut txOutNew;
@@ -377,7 +377,7 @@ BOOST_FIXTURE_TEST_SUITE(token_tx_tests, BasicTestingSetup)
 
             // Add the second token
             CTokenTransfer outToken2("AOKCHAINTEST", 100, 0);
-            CScript outScript2 = GetScriptForDestination(DecodeDestination(Params().GlobalBurnAddress()));
+            CScript outScript2 = GetScriptForDestination(DecodeDestination(Params().TokenFeeAddress()));
             outToken2.ConstructTransaction(outScript2);
 
             CTxOut txOutNew2;
@@ -388,7 +388,7 @@ BOOST_FIXTURE_TEST_SUITE(token_tx_tests, BasicTestingSetup)
 
             // Add the third token
             CTokenTransfer outToken3("AOKCHAINTESTTEST", 100, 0);
-            CScript outScript3 = GetScriptForDestination(DecodeDestination(Params().GlobalBurnAddress()));
+            CScript outScript3 = GetScriptForDestination(DecodeDestination(Params().TokenFeeAddress()));
             outToken3.ConstructTransaction(outScript3);
 
             CTxOut txOutNew3;

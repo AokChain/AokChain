@@ -12,7 +12,6 @@
 #include "tinyformat.h"
 #include "utilstrencodings.h"
 
-#include <script/ismine.h>
 
 std::string COutPoint::ToString() const
 {
@@ -100,15 +99,6 @@ CAmount CTransaction::GetValueOut() const
 unsigned int CTransaction::GetTotalSize() const
 {
     return ::GetSerializeSize(*this, SER_NETWORK, PROTOCOL_VERSION);
-}
-
-uint32_t CTxOut::GetLockTime() const
-{
-    CScriptNum nLockTime(0);
-
-    IsTimeLock(scriptPubKey, nLockTime);
-
-    return nLockTime.getint64();
 }
 
 std::string CTransaction::ToString() const

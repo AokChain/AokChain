@@ -44,7 +44,7 @@ typedef std::set<CInputCoin> CoinSet;
 
 BOOST_FIXTURE_TEST_SUITE(wallet_tests, WalletTestingSetup)
 
-    static const CWallet testWallet;
+    static const CWallet testWallet("dummy", CWalletDBWrapper::CreateDummy());
     static std::vector<COutput> vCoins;
 
     static void add_coin(const CAmount &nValue, int nAge = 6 * 24, bool fIsFromMe = false, int nInput = 0)
@@ -401,7 +401,7 @@ BOOST_FIXTURE_TEST_SUITE(wallet_tests, WalletTestingSetup)
         // Verify ScanForWalletTransactions picks up transactions in both the old
         // and new block files.
         {
-            CWallet wallet;
+            CWallet wallet("dummy", CWalletDBWrapper::CreateDummy());
             AddKey(wallet, coinbaseKey);
             BOOST_CHECK_EQUAL(nullBlock, wallet.ScanForWalletTransactions(oldTip, nullptr));
             BOOST_CHECK_EQUAL(wallet.GetImmatureBalance(), 10000 * COIN);
@@ -414,7 +414,7 @@ BOOST_FIXTURE_TEST_SUITE(wallet_tests, WalletTestingSetup)
         // Verify ScanForWalletTransactions only picks transactions in the new block
         // file.
         {
-            CWallet wallet;
+            CWallet wallet("dummy", CWalletDBWrapper::CreateDummy());
             AddKey(wallet, coinbaseKey);
             BOOST_CHECK_EQUAL(oldTip, wallet.ScanForWalletTransactions(oldTip, nullptr));
             BOOST_CHECK_EQUAL(wallet.GetImmatureBalance(), 5000 * COIN);
@@ -424,7 +424,7 @@ BOOST_FIXTURE_TEST_SUITE(wallet_tests, WalletTestingSetup)
         // before the missing block, and success for a key whose creation time is
         // after.
         {
-            CWallet wallet;
+            CWallet wallet("dummy", CWalletDBWrapper::CreateDummy());
             vpwallets.insert(vpwallets.begin(), &wallet);
             UniValue keys;
             keys.setArray();
@@ -486,7 +486,7 @@ BOOST_FIXTURE_TEST_SUITE(wallet_tests, WalletTestingSetup)
 
         // Import key into wallet and call dumpwallet to create backup file.
         {
-            CWallet wallet;
+            CWallet wallet("dummy", CWalletDBWrapper::CreateDummy());
             LOCK(wallet.cs_wallet);
             wallet.mapKeyMetadata[coinbaseKey.GetPubKey().GetID()].nCreateTime = KEY_TIME;
             wallet.AddKeyPubKey(coinbaseKey, coinbaseKey.GetPubKey());
@@ -501,7 +501,7 @@ BOOST_FIXTURE_TEST_SUITE(wallet_tests, WalletTestingSetup)
         // Call importwallet RPC and verify all blocks with timestamps >= BLOCK_TIME
         // were scanned, and no prior blocks were scanned.
         {
-            CWallet wallet;
+            CWallet wallet("dummy", CWalletDBWrapper::CreateDummy());
 
             JSONRPCRequest request;
             request.params.setArray();
@@ -533,7 +533,7 @@ BOOST_FIXTURE_TEST_SUITE(wallet_tests, WalletTestingSetup)
     {
         BOOST_TEST_MESSAGE("Running Coin Mark Dirty Immature Credit Test");
 
-        CWallet wallet;
+        CWallet wallet("dummy", CWalletDBWrapper::CreateDummy());
         CWalletTx wtx(&wallet, MakeTransactionRef(coinbaseTxns.back()));
         LOCK2(cs_main, wallet.cs_wallet);
         wtx.hashBlock = chainActive.Tip()->GetBlockHash();
@@ -581,7 +581,7 @@ BOOST_FIXTURE_TEST_SUITE(wallet_tests, WalletTestingSetup)
     {
         BOOST_TEST_MESSAGE("Running ComputeTimeSmart Test");
 
-        CWallet wallet;
+        CWallet wallet("dummy", CWalletDBWrapper::CreateDummy());
 
         // New transaction should use clock time if lower than block time.
         BOOST_CHECK_EQUAL(AddTx(wallet, 1, 100, 120), 100);
@@ -628,8 +628,7 @@ BOOST_FIXTURE_TEST_SUITE(wallet_tests, WalletTestingSetup)
         ListCoinsTestingSetup()
         {
             CreateAndProcessBlock({}, GetScriptForRawPubKey(coinbaseKey.GetPubKey()));
-            ::bitdb.MakeMock();
-            wallet.reset(new CWallet(std::unique_ptr<CWalletDBWrapper>(new CWalletDBWrapper(&bitdb, "wallet_test.dat"))));
+            wallet.reset(new CWallet("mock", CWalletDBWrapper::CreateMock()));
             bool firstRun;
             wallet->LoadWallet(firstRun);
             AddKey(*wallet, coinbaseKey);
@@ -639,8 +638,6 @@ BOOST_FIXTURE_TEST_SUITE(wallet_tests, WalletTestingSetup)
         ~ListCoinsTestingSetup()
         {
             wallet.reset();
-            ::bitdb.Flush(true);
-            ::bitdb.Reset();
         }
 
         CWalletTx &AddTx(CRecipient recipient)
@@ -651,7 +648,7 @@ BOOST_FIXTURE_TEST_SUITE(wallet_tests, WalletTestingSetup)
             int changePos = -1;
             std::string error;
             CCoinControl dummy;
-            BOOST_CHECK(wallet->CreateTransaction({recipient}, wtx, reservekey, fee, changePos, error, dummy));
+            BOOST_CHECK(wallet->CreateTransaction({recipient}, wtx, reservekey, fee, "" /* message */, changePos, error, dummy));
             CValidationState state;
             BOOST_CHECK(wallet->CommitTransaction(wtx, reservekey, nullptr, state));
             auto it = wallet->mapWallet.find(wtx.GetHash());
