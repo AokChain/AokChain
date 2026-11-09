@@ -122,6 +122,7 @@ BOOST_FIXTURE_TEST_SUITE(blockencodings_tests, RegtestingSetup)
         uint64_t nonce;
         std::vector<uint64_t> shorttxids;
         std::vector<PrefilledTransaction> prefilledtxn;
+        std::vector<unsigned char> vchBlockSig;
 
         explicit TestHeaderAndShortIDs(const CBlockHeaderAndShortTxIDs &orig)
         {
@@ -162,6 +163,7 @@ BOOST_FIXTURE_TEST_SUITE(blockencodings_tests, RegtestingSetup)
                 shorttxids[i] = (uint64_t(msb) << 32) | uint64_t(lsb);
             }
             READWRITE(prefilledtxn);
+            READWRITE(vchBlockSig);
         }
     };
 

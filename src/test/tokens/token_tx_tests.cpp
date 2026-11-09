@@ -24,7 +24,7 @@ BOOST_FIXTURE_TEST_SUITE(token_tx_tests, BasicTestingSetup)
         SelectParams(CBaseChainParams::MAIN);
 
         // Create the token scriptPubKey
-        CTokenTransfer token("AOKCHAIN", 1000, 0);
+        CTokenTransfer token("AOKTOKEN", 1000, 0);
         CScript scriptPubKey = GetScriptForDestination(DecodeDestination(Params().TokenFeeAddress()));
         token.ConstructTransaction(scriptPubKey);
 
@@ -60,7 +60,7 @@ BOOST_FIXTURE_TEST_SUITE(token_tx_tests, BasicTestingSetup)
         // The outputs are assigning a destination to 1000 Tokens
         // This test should pass because all tokens are assigned a destination
         std::vector<std::pair<std::string, uint256>> vReissueTokens;
-        BOOST_CHECK_MESSAGE(Consensus::CheckTxTokens(tx, state, coins, 100000, 100, vReissueTokens, true), "CheckTxTokens Failed");
+        BOOST_CHECK_MESSAGE(Consensus::CheckTxTokens(tx, state, coins, 100000, 100, vReissueTokens, true), "CheckTxTokens failed: " + state.GetRejectReason());
     }
 
     BOOST_AUTO_TEST_CASE(token_tx_not_valid_test)
@@ -70,7 +70,7 @@ BOOST_FIXTURE_TEST_SUITE(token_tx_tests, BasicTestingSetup)
         SelectParams(CBaseChainParams::MAIN);
 
         // Create the token scriptPubKey
-        CTokenTransfer token("AOKCHAIN", 1000, 0);
+        CTokenTransfer token("AOKTOKEN", 1000, 0);
         CScript scriptPubKey = GetScriptForDestination(DecodeDestination(Params().TokenFeeAddress()));
         token.ConstructTransaction(scriptPubKey);
 
@@ -97,7 +97,7 @@ BOOST_FIXTURE_TEST_SUITE(token_tx_tests, BasicTestingSetup)
 
         // Create CTxOut that will only send 100 of the token
         // This should fail because 900 AOKCHAIN doesn't have a destination
-        CTokenTransfer tokenTransfer("AOKCHAIN", 100, 0);
+        CTokenTransfer tokenTransfer("AOKTOKEN", 100, 0);
         CScript scriptLess = GetScriptForDestination(DecodeDestination(Params().TokenFeeAddress()));
         tokenTransfer.ConstructTransaction(scriptLess);
 
@@ -126,7 +126,7 @@ BOOST_FIXTURE_TEST_SUITE(token_tx_tests, BasicTestingSetup)
         SelectParams(CBaseChainParams::MAIN);
 
         // Create the token scriptPubKey
-        CTokenTransfer token("AOKCHAIN", 1000, 0);
+        CTokenTransfer token("AOKTOKEN", 1000, 0);
         CScript scriptPubKey = GetScriptForDestination(DecodeDestination(Params().TokenFeeAddress()));
         token.ConstructTransaction(scriptPubKey);
 
@@ -154,7 +154,7 @@ BOOST_FIXTURE_TEST_SUITE(token_tx_tests, BasicTestingSetup)
         // Create CTxOut that will only send 100 of the token 10 times total = 1000
         for (int i = 0; i < 10; i++)
         {
-            CTokenTransfer token2("AOKCHAIN", 100, 0);
+            CTokenTransfer token2("AOKTOKEN", 100, 0);
             CScript scriptPubKey2 = GetScriptForDestination(DecodeDestination(Params().TokenFeeAddress()));
             token2.ConstructTransaction(scriptPubKey2);
 
@@ -176,7 +176,7 @@ BOOST_FIXTURE_TEST_SUITE(token_tx_tests, BasicTestingSetup)
         // The outputs are assigned 100 Tokens to 10 destinations (10 * 100) = 1000
         // This test should pass all tokens that are being spent are assigned to a destination
         std::vector<std::pair<std::string, uint256>> vReissueTokens;
-        BOOST_CHECK_MESSAGE(Consensus::CheckTxTokens(tx, state, coins, 100000, 100, vReissueTokens, true), "CheckTxTokens failed");
+        BOOST_CHECK_MESSAGE(Consensus::CheckTxTokens(tx, state, coins, 100000, 100, vReissueTokens, true), "CheckTxTokens failed: " + state.GetRejectReason());
     }
 
     BOOST_AUTO_TEST_CASE(token_tx_multiple_outs_invalid_test)
@@ -186,7 +186,7 @@ BOOST_FIXTURE_TEST_SUITE(token_tx_tests, BasicTestingSetup)
         SelectParams(CBaseChainParams::MAIN);
 
         // Create the token scriptPubKey
-        CTokenTransfer token("AOKCHAIN", 1000, 0);
+        CTokenTransfer token("AOKTOKEN", 1000, 0);
         CScript scriptPubKey = GetScriptForDestination(DecodeDestination(Params().TokenFeeAddress()));
         token.ConstructTransaction(scriptPubKey);
 
@@ -214,7 +214,7 @@ BOOST_FIXTURE_TEST_SUITE(token_tx_tests, BasicTestingSetup)
         // Create CTxOut that will only send 100 of the token 12 times, total = 1200
         for (int i = 0; i < 12; i++)
         {
-            CTokenTransfer token2("AOKCHAIN", 100, 0);
+            CTokenTransfer token2("AOKTOKEN", 100, 0);
             CScript scriptPubKey2 = GetScriptForDestination(DecodeDestination(Params().TokenFeeAddress()));
             token2.ConstructTransaction(scriptPubKey2);
 
@@ -246,7 +246,7 @@ BOOST_FIXTURE_TEST_SUITE(token_tx_tests, BasicTestingSetup)
         SelectParams(CBaseChainParams::MAIN);
 
         // Create the token scriptPubKeys
-        CTokenTransfer token("AOKCHAIN", 1000, 0);
+        CTokenTransfer token("AOKTOKEN", 1000, 0);
         CScript scriptPubKey = GetScriptForDestination(DecodeDestination(Params().TokenFeeAddress()));
         token.ConstructTransaction(scriptPubKey);
 
@@ -310,7 +310,7 @@ BOOST_FIXTURE_TEST_SUITE(token_tx_tests, BasicTestingSetup)
         for (int i = 0; i < 10; i++)
         {
             // Add the first token
-            CTokenTransfer outToken("AOKCHAIN", 100, 0);
+            CTokenTransfer outToken("AOKTOKEN", 100, 0);
             CScript outScript = GetScriptForDestination(DecodeDestination(Params().TokenFeeAddress()));
             outToken.ConstructTransaction(outScript);
 
@@ -355,7 +355,7 @@ BOOST_FIXTURE_TEST_SUITE(token_tx_tests, BasicTestingSetup)
         // The outputs are spending 100 Tokens to 10 destinations (10 * 100 = 1000) (of each AOKCHAIN, AOKCHAINTEST, AOKCHAINTESTTEST)
         // This test should pass because for each token that is spent. It is assigned a destination
         std::vector<std::pair<std::string, uint256>> vReissueTokens;
-        BOOST_CHECK_MESSAGE(Consensus::CheckTxTokens(tx, state, coins, 100000, 100, vReissueTokens, true), "CheckTxTokens Failed");
+        BOOST_CHECK_MESSAGE(Consensus::CheckTxTokens(tx, state, coins, 100000, 100, vReissueTokens, true), "CheckTxTokens failed: " + state.GetRejectReason());
 
 
         // Try it not but only spend 900 of each token instead of 1000
@@ -365,7 +365,7 @@ BOOST_FIXTURE_TEST_SUITE(token_tx_tests, BasicTestingSetup)
         for (int i = 0; i < 9; i++)
         {
             // Add the first token
-            CTokenTransfer outToken("AOKCHAIN", 100, 0);
+            CTokenTransfer outToken("AOKTOKEN", 100, 0);
             CScript outScript = GetScriptForDestination(DecodeDestination(Params().TokenFeeAddress()));
             outToken.ConstructTransaction(outScript);
 

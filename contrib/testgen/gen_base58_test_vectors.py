@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 # Copyright (c) 2012-2016 The Bitcoin Core developers
 # Copyright (c) 2017 The AokChain Core developers
 # Distributed under the MIT software license, see the accompanying
@@ -18,13 +18,15 @@ from base58 import b58encode_chk, b58decode_chk, b58chars
 import random
 from binascii import b2a_hex
 
-# key types
-PUBKEY_ADDRESS = 0
-SCRIPT_ADDRESS = 5
-PUBKEY_ADDRESS_TEST = 111
-SCRIPT_ADDRESS_TEST = 196
-PRIVKEY = 128
-PRIVKEY_TEST = 239
+# key types (must match base58Prefixes in src/chainparams.cpp)
+PUBKEY_ADDRESS = 46
+SCRIPT_ADDRESS = 108
+OFFLINE_ADDRESS = 63
+PUBKEY_ADDRESS_TEST = 66
+SCRIPT_ADDRESS_TEST = 128
+OFFLINE_ADDRESS_TEST = 125
+PRIVKEY = 255
+PRIVKEY_TEST = 143
 
 metadata_keys = ['isPrivkey', 'isTestnet', 'addrType', 'isCompressed']
 # templates for valid sequences
@@ -41,14 +43,21 @@ templates = [
   ((PRIVKEY_TEST,),        32, (1,), (True,  True,  None,  True))
 ]
 
+# formats that are valid for the node but are not emitted as valid vectors
+# (offline staking addresses: two concatenated 20-byte key ids)
+extra_valid_templates = [
+  ((OFFLINE_ADDRESS,),      40, (), None),
+  ((OFFLINE_ADDRESS_TEST,), 40, (), None),
+]
+
 def is_valid(v):
     '''Check vector v for validity'''
     result = b58decode_chk(v)
     if result is None:
         return False
-    for template in templates:
-        prefix = str(bytearray(template[0]))
-        suffix = str(bytearray(template[2]))
+    for template in templates + extra_valid_templates:
+        prefix = bytes(template[0])
+        suffix = bytes(template[2])
         if result.startswith(prefix) and result.endswith(suffix):
             if (len(result) - len(prefix) - len(suffix)) == template[1]:
                 return True
@@ -58,21 +67,21 @@ def gen_valid_vectors():
     '''Generate valid test vectors'''
     while True:
         for template in templates:
-            prefix = str(bytearray(template[0]))
-            payload = os.urandom(template[1]) 
-            suffix = str(bytearray(template[2]))
+            prefix = bytes(template[0])
+            payload = os.urandom(template[1])
+            suffix = bytes(template[2])
             rv = b58encode_chk(prefix + payload + suffix)
             assert is_valid(rv)
             metadata = dict([(x,y) for (x,y) in zip(metadata_keys,template[3]) if y is not None])
-            yield (rv, b2a_hex(payload), metadata)
+            yield (rv, b2a_hex(payload).decode('ascii'), metadata)
 
 def gen_invalid_vector(template, corrupt_prefix, randomize_payload_size, corrupt_suffix):
     '''Generate possibly invalid vector'''
     if corrupt_prefix:
         prefix = os.urandom(1)
     else:
-        prefix = str(bytearray(template[0]))
-    
+        prefix = bytes(template[0])
+
     if randomize_payload_size:
         payload = os.urandom(max(int(random.expovariate(0.5)), 50))
     else:
@@ -81,7 +90,7 @@ def gen_invalid_vector(template, corrupt_prefix, randomize_payload_size, corrupt
     if corrupt_suffix:
         suffix = os.urandom(len(template[2]))
     else:
-        suffix = str(bytearray(template[2]))
+        suffix = bytes(template[2])
 
     return b58encode_chk(prefix + payload + suffix)
 

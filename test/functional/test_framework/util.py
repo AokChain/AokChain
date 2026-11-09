@@ -213,7 +213,7 @@ def hash256(byte_str):
     sha256d.update(sha256.digest())
     return sha256d.digest()[::-1]
 
-x16r_hash_cmd = os.path.dirname(os.path.reaokath(__file__)) + "/../../../src/test/test_aokchain_hash"
+x16r_hash_cmd = os.path.dirname(os.path.realpath(__file__)) + "/../../../src/test/test_aokchain_hash"
 def hash_block(hex_str):
     cmd = [x16r_hash_cmd, hex_str]
     hash = subprocess.run(cmd, stdout=subprocess.PIPE, check=True).stdout.decode('ascii')

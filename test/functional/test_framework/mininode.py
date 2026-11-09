@@ -82,7 +82,7 @@ def ripemd160(s):
 def hash256(s):
     return sha256(sha256(s))
 
-x16r_hash_cmd = os.path.dirname(os.path.reaokath(__file__)) + "/../../../src/test/test_aokchain_hash"
+x16r_hash_cmd = os.path.dirname(os.path.realpath(__file__)) + "/../../../src/test/test_aokchain_hash"
 def hash_x16r(s):
     cmd = [x16r_hash_cmd, s]
     hash = subprocess.run(cmd, stdout=subprocess.PIPE, check=True).stdout.decode('ascii')

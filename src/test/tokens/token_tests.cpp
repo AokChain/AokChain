@@ -54,10 +54,12 @@ BOOST_FIXTURE_TEST_SUITE(token_tests, BasicTestingSetup)
         BOOST_CHECK(!IsTokenNameValid("A._BC", type));
         BOOST_CHECK(!IsTokenNameValid("AB_.C", type));
 
-        //- Versions of AOKCHAINCOIN NOT allowed
+        //- Protected names NOT allowed (see PROTECTED_NAMES in tokens/tokens.cpp)
         BOOST_CHECK(!IsTokenNameValid("AOK", type));
         BOOST_CHECK(!IsTokenNameValid("AOKCHAIN", type));
-        BOOST_CHECK(!IsTokenNameValid("AOKCHAINCOIN", type));
+        BOOST_CHECK(!IsTokenNameValid("AOKCOIN", type));
+        BOOST_CHECK(!IsTokenNameValid("AOKHACOIN", type));
+        BOOST_CHECK(!IsTokenNameValid("AOKHACHAIN", type));
 
         //- Versions of AOKCHAINCOIN ALLOWED
         BOOST_CHECK(IsTokenNameValid("AOKCHAIN.COIN", type));
