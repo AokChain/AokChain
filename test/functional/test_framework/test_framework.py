@@ -435,10 +435,11 @@ class AokChainTestFramework():
             self.nodes = []
             self.disable_mocktime()
             for i in range(MAX_NODES):
-                os.remove(log_filename(self.options.cachedir, i, "debug.log"))
-                os.remove(log_filename(self.options.cachedir, i, "db.log"))
-                os.remove(log_filename(self.options.cachedir, i, "peers.dat"))
-                os.remove(log_filename(self.options.cachedir, i, "fee_estimates.dat"))
+                for entry in ["debug.log", "db.log", "peers.dat", "fee_estimates.dat"]:
+                    try:
+                        os.remove(log_filename(self.options.cachedir, i, entry))
+                    except FileNotFoundError:
+                        pass  # e.g. db.log now lives under wallets/
 
         for i in range(self.num_nodes):
             from_dir = os.path.join(self.options.cachedir, "node" + str(i))
