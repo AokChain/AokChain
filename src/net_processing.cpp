@@ -2596,6 +2596,13 @@ bool static ProcessMessage(CNode* pfrom, const std::string& strCommand, CDataStr
             }
 
             PartiallyDownloadedBlock& partialBlock = *it->second.second->partialBlock;
+            if (partialBlock.header.IsNull()) {
+                // FillBlock() was already called for this block (it nulls the
+                // header); calling it again would hit an assert. See
+                // CVE-2024-35202.
+                LogPrint(BCLog::NET, "Peer %d sent us block transactions for a block we already tried to fill\n", pfrom->GetId());
+                return true;
+            }
             ReadStatus status = partialBlock.FillBlock(*pblock, resp.txn);
             if (status == READ_STATUS_INVALID) {
                 MarkBlockAsReceived(resp.blockhash); // Reset in-flight state in case of whitelist
@@ -2604,6 +2611,9 @@ bool static ProcessMessage(CNode* pfrom, const std::string& strCommand, CDataStr
                 return true;
             } else if (status == READ_STATUS_FAILED) {
                 // Might have collided, fall back to getdata now :(
+                // The partial block can not be filled again, so drop the
+                // in-flight state before requesting the full block.
+                MarkBlockAsReceived(resp.blockhash);
                 std::vector<CInv> invs;
                 invs.push_back(CInv(MSG_BLOCK | GetFetchFlags(pfrom), resp.blockhash));
                 connman->PushMessage(pfrom, msgMaker.Make(NetMsgType::GETDATA, invs));
