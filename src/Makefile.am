@@ -458,15 +458,31 @@ if TARGET_WINDOWS
 aokchain_tx_SOURCES += aokchain-tx-res.rc
 endif
 
-aokchain_tx_LDADD = \
-  $(LIBUNIVALUE) \
+# Token support lives in libaokchain_server but is referenced from objects in
+# libaokchain_common/libaokchain_consensus (coins.cpp, core_write.cpp,
+# primitives/transaction.cpp), so aokchain-tx needs the same libraries as
+# aokchaind and the static archives must be scanned twice to resolve the
+# circular references. libtool drops duplicate archive names (and moves
+# -Wl,--start-group to the front), so the second pass uses ./-prefixed paths.
+AOKCHAIN_TX_LIBS = \
+  $(LIBAOKCHAIN_SERVER) \
   $(LIBAOKCHAIN_COMMON) \
   $(LIBAOKCHAIN_UTIL) \
+  $(LIBAOKCHAIN_WALLET) \
+  $(LIBAOKCHAIN_ZMQ) \
   $(LIBAOKCHAIN_CONSENSUS) \
-  $(LIBAOKCHAIN_CRYPTO) \
+  $(LIBAOKCHAIN_CRYPTO)
+
+aokchain_tx_LDADD = \
+  $(AOKCHAIN_TX_LIBS) \
+  $(addprefix ./,$(AOKCHAIN_TX_LIBS)) \
+  $(LIBUNIVALUE) \
+  $(LIBLEVELDB) \
+  $(LIBLEVELDB_SSE42) \
+  $(LIBMEMENV) \
   $(LIBSECP256K1)
 
-aokchain_tx_LDADD += $(BOOST_LIBS) $(CRYPTO_LIBS)
+aokchain_tx_LDADD += $(BOOST_LIBS) $(BDB_LIBS) $(SSL_LIBS) $(CRYPTO_LIBS) $(MINIUPNPC_LIBS) $(EVENT_PTHREADS_LIBS) $(EVENT_LIBS) $(ZMQ_LIBS)
 #
 
 # aokchainconsensus library #
