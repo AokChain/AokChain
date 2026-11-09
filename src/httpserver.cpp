@@ -22,6 +22,7 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <signal.h>
+#include <deque>
 #include <future>
 
 #include <event2/thread.h>
