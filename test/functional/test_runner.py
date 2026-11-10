@@ -120,6 +120,7 @@ BASE_SCRIPTS= [
     'wallet_keypool.py',
     'wallet_listsinceblock.py',
     'wallet_zapwallettxes.py',
+    'wallet_spent_cache.py',
     'wallet_multiwallet.py',
     'interface_zmq.py',
     'rpc_invalidateblock.py',
