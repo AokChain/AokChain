@@ -16,6 +16,8 @@ import tempfile
 import time
 import traceback
 
+import test_framework.mininode
+
 from .authproxy import JSONRPCException
 from . import coverage
 from .test_node import TestNode
@@ -340,9 +342,11 @@ class AokChainTestFramework():
         NOTE: the timestamp should match time of genesis block.
         NOTE: the timestamp could be retrieved via "getblockhash 0" + "getblock <hash>"."""
         self.mocktime = 1524179366 + (201 * 1 * 60)
+        test_framework.mininode.MOCKTIME = self.mocktime
 
     def disable_mocktime(self):
         self.mocktime = 0
+        test_framework.mininode.MOCKTIME = 0
 
     # Private helper methods. These should not be accessed by the subclass test scripts.
 
