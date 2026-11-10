@@ -77,10 +77,15 @@ bool CheckCoinStakeTimestamp(int64_t nTimeBlock, int64_t nTimeTx)
     return (nTimeBlock == nTimeTx);
 }
 
-// Simplified version of CheckCoinStakeTimestamp() to check header-only timestamp
-bool CheckStakeBlockTimestamp(int64_t nTimeBlock)
+// Header-only check of a proof-of-stake block timestamp. Stakers already
+// round the time down to STAKE_TIMESTAMP_MASK (miner.cpp); from
+// nStakeTimestampMaskHeight on this is also enforced, as in BlackCoin.
+// Before that height this was a no-op (it compared the time with itself).
+bool CheckStakeBlockTimestamp(int64_t nTimeBlock, int nHeight, const Consensus::Params& params)
 {
-   return CheckCoinStakeTimestamp(nTimeBlock, nTimeBlock);
+    if (nHeight < params.nStakeTimestampMaskHeight)
+        return true;
+    return (nTimeBlock & params.nStakeTimestampMask) == 0;
 }
 
 bool CheckKernel(CBlockIndex* pindexPrev, unsigned int nBits, uint32_t nTimeBlock, const COutPoint& prevout, CCoinsViewCache& view)

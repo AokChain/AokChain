@@ -81,6 +81,10 @@ struct Params {
     int nGovernanceHeight;
 
     int nStakeTimestampMask;
+    /** Soft fork (doc/aokchain/07-upstream-backports.md S-05): from this
+     *  height proof-of-stake block times must be multiples of
+     *  nStakeTimestampMask + 1. INT_MAX = not scheduled. */
+    int nStakeTimestampMaskHeight;
 };
 } // namespace Consensus
 

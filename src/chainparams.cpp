@@ -179,6 +179,9 @@ public:
         consensus.nTokensIPFSDeploymentHeight = 622000;
         consensus.nDisableTimestampCheck = 695000;
         consensus.nGovernanceHeight = 871500;
+        // Soft fork S-05, not scheduled yet. Every mainnet PoS block up to
+        // 3030487 already satisfies it (contrib/aokchain/history_scan.py).
+        consensus.nStakeTimestampMaskHeight = std::numeric_limits<int>::max();
 
         /**
          * The message start string is designed to be unlikely to occur in normal data.
@@ -301,6 +304,7 @@ public:
         consensus.nTokensIPFSDeploymentHeight = 20;
         consensus.nDisableTimestampCheck = 0;
         consensus.nGovernanceHeight = std::numeric_limits<int>::max();
+        consensus.nStakeTimestampMaskHeight = std::numeric_limits<int>::max();
 
         /**
          * The message start string is designed to be unlikely to occur in normal data.
@@ -404,6 +408,8 @@ public:
         consensus.nTokensP2SHDeploymentHeight = 10;
         consensus.nDisableTimestampCheck = 0;
         consensus.nGovernanceHeight = 10;
+        consensus.nStakeTimestampMask = 0xf; // was left uninitialized on regtest
+        consensus.nStakeTimestampMaskHeight = 0;
 
         pchMessageStart[0] = 0x43;
         pchMessageStart[1] = 0x52;
