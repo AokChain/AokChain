@@ -1079,7 +1079,10 @@ bool CReissueToken::IsValid(std::string &strError, CTokensCache& tokenCache, boo
             return false;
         }
 
-        if (token.nAmount + this->nAmount > MAX_MONEY_TOKENS) {
+        // Written so that it cannot overflow; for amounts that did not
+        // overflow the result is the same as token.nAmount + nAmount > MAX.
+        // (A negative nAmount is rejected further below.)
+        if (this->nAmount > 0 && this->nAmount > MAX_MONEY_TOKENS - token.nAmount) {
             strError = _("Unable to reissue token: token_name '") + strName +
                        _("' the amount trying to reissue is to large");
             return false;
@@ -3074,7 +3077,14 @@ bool VerifyWalletHasToken(CWallet* pwallet, const std::string& token_name, std::
 // Return true if the amount is valid with the units passed in
 bool CheckAmountWithUnits(const CAmount& nAmount, const int8_t nUnits)
 {
-    return nAmount % int64_t(pow(10, (MAX_UNIT - nUnits))) == 0;
+    // Integer version of nAmount % 10^(MAX_UNIT - nUnits) == 0. For the valid
+    // range 0..MAX_UNIT the result is identical to the former pow() based
+    // code; out-of-range units (which would have divided by zero) fail.
+    static const int64_t POW10[] = {1, 10, 100, 1000, 10000, 100000, 1000000, 10000000, 100000000};
+    static_assert(MAX_UNIT == 8, "POW10 table assumes MAX_UNIT == 8");
+    if (nUnits < 0 || nUnits > MAX_UNIT)
+        return false;
+    return nAmount % POW10[MAX_UNIT - nUnits] == 0;
 }
 
 bool CheckEncodedIPFS(const std::string& hash, std::string& strError)

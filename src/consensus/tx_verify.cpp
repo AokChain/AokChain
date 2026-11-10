@@ -513,11 +513,16 @@ bool Consensus::CheckTxTokens(const CTransaction& tx, CValidationState& state, c
             if (!GetTokenInfoFromCoin(coin, strName, nAmount, nTokenLockTime))
                 return state.DoS(100, false, REJECT_INVALID, "bad-txns-failed-to-get-token-from-script");
 
-            // Add to the total value of tokens in the inputs
-            if (totalInputs.count(strName))
-                totalInputs.at(strName) += nAmount;
-            else
-                totalInputs.insert(make_pair(strName, nAmount));
+            // Add to the total value of tokens in the inputs. The sum must not
+            // overflow (signed overflow is undefined behaviour and allowed
+            // minting tokens; see doc/aokchain/04-security-audit.md SEC-02).
+            // No valid transaction in the chain comes close to these limits.
+            if (nAmount < 0 || nAmount > MAX_MONEY_TOKENS)
+                return state.DoS(100, false, REJECT_INVALID, "bad-txns-token-input-amount-out-of-range");
+            CAmount& nInputTotal = totalInputs[strName];
+            if (nInputTotal > MAX_MONEY_TOKENS - nAmount)
+                return state.DoS(100, false, REJECT_INVALID, "bad-txns-token-inputs-sum-out-of-range");
+            nInputTotal += nAmount;
 
             if ((int64_t)nTokenLockTime > ((int64_t)nTokenLockTime < LOCKTIME_THRESHOLD ? (int64_t)nSpendHeight : nSpendTime)) {
                 std::string errorMsg = strprintf("Tried to spend token before %d", nTokenLockTime);
@@ -542,11 +547,14 @@ bool Consensus::CheckTxTokens(const CTransaction& tx, CValidationState& state, c
                 return state.DoS(100, false, REJECT_INVALID, strError);
             }
 
-            // Add to the total value of tokens in the outputs
-            if (totalOutputs.count(transfer.strName))
-                totalOutputs.at(transfer.strName) += transfer.nAmount;
-            else
-                totalOutputs.insert(make_pair(transfer.strName, transfer.nAmount));
+            // Add to the total value of tokens in the outputs, without
+            // overflowing (SEC-02). IsValid() already requires nAmount > 0.
+            if (transfer.nAmount > MAX_MONEY_TOKENS)
+                return state.DoS(100, false, REJECT_INVALID, "bad-txns-token-transfer-amount-out-of-range");
+            CAmount& nOutputTotal = totalOutputs[transfer.strName];
+            if (nOutputTotal > MAX_MONEY_TOKENS - transfer.nAmount)
+                return state.DoS(100, false, REJECT_INVALID, "bad-txns-token-outputs-sum-out-of-range");
+            nOutputTotal += transfer.nAmount;
 
             if (!fRunningUnitTests) {
                 if (IsTokenNameAnOwner(transfer.strName)) {

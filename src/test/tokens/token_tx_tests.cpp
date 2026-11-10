@@ -17,6 +17,71 @@
 
 BOOST_FIXTURE_TEST_SUITE(token_tx_tests, BasicTestingSetup)
 
+    // SEC-02: output amounts that wrap around INT64_MAX must not be able to
+    // match the input amount (this used to mint tokens).
+    BOOST_AUTO_TEST_CASE(token_tx_overflow_test)
+    {
+        BOOST_TEST_MESSAGE("Running Token TX Overflow Test");
+
+        SelectParams(CBaseChainParams::MAIN);
+        CScript dest = GetScriptForDestination(DecodeDestination(Params().TokenFeeAddress()));
+
+        auto transfer_script = [&](CAmount amount) {
+            CTokenTransfer transfer("AOKTOKEN", amount, 0);
+            CScript script = dest;
+            transfer.ConstructTransaction(script);
+            return script;
+        };
+
+        CCoinsView view;
+        CCoinsViewCache coins(&view);
+
+        // One input holding 1000 tokens
+        CTxOut in_out(0, transfer_script(1000));
+        COutPoint outpoint(uint256S("BF50CB9A63BE0019171456252989A459A7D0A5F494735278290079D22AB704A3"), 1);
+        coins.AddCoin(outpoint, Coin(in_out, 10, 0, 0, 0), true);
+
+        auto check = [&](const std::vector<CAmount>& outputs, std::string& reason) {
+            CMutableTransaction mtx;
+            CTxIn in;
+            in.prevout = outpoint;
+            mtx.vin.emplace_back(in);
+            for (CAmount amount : outputs)
+                mtx.vout.emplace_back(CTxOut(0, transfer_script(amount)));
+            CTransaction tx(mtx);
+            CValidationState state;
+            std::vector<std::pair<std::string, uint256>> vReissueTokens;
+            bool ok = Consensus::CheckTxTokens(tx, state, coins, 100000, 100, vReissueTokens, true);
+            reason = state.GetRejectReason();
+            return ok;
+        };
+
+        std::string reason;
+        // Control: splitting 1000 into 400 + 600 is fine
+        BOOST_CHECK_MESSAGE(check({400, 600}, reason), "valid split rejected: " + reason);
+
+        // INT64_MAX + INT64_MAX + 1002 wraps to 1000
+        const CAmount max = std::numeric_limits<CAmount>::max();
+        BOOST_CHECK(!check({max, max, 1002}, reason));
+        BOOST_CHECK_EQUAL(reason, "bad-txns-token-transfer-amount-out-of-range");
+
+        // Amounts within MAX_MONEY_TOKENS whose sum overflows the limit
+        BOOST_CHECK(!check({MAX_MONEY_TOKENS, MAX_MONEY_TOKENS}, reason));
+        BOOST_CHECK_EQUAL(reason, "bad-txns-token-outputs-sum-out-of-range");
+    }
+
+    BOOST_AUTO_TEST_CASE(token_units_check_test)
+    {
+        BOOST_CHECK(CheckAmountWithUnits(1 * COIN, 0));
+        BOOST_CHECK(!CheckAmountWithUnits(COIN + 1, 0));
+        BOOST_CHECK(CheckAmountWithUnits(COIN + 10, 7));
+        BOOST_CHECK(!CheckAmountWithUnits(COIN + 1, 7));
+        BOOST_CHECK(CheckAmountWithUnits(1, 8));
+        // Out-of-range units used to divide by zero
+        BOOST_CHECK(!CheckAmountWithUnits(COIN, 9));
+        BOOST_CHECK(!CheckAmountWithUnits(COIN, -1));
+    }
+
     BOOST_AUTO_TEST_CASE(token_tx_valid_test)
     {
         BOOST_TEST_MESSAGE("Running Token TX Valid Test");
