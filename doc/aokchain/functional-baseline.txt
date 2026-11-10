@@ -1,4 +1,5 @@
 feature_bip68_sequence.py
+feature_block_script_checks.py
 feature_minchainwork.py
 feature_proxy.py
 feature_reindex.py

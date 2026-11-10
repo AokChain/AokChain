@@ -2453,6 +2453,11 @@ static bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockInd
     CBlockUndo blockundo;
     std::vector<std::pair<std::string, CBlockTokenUndo> > vUndoTokenData;
 
+    // txdata must outlive control: queued script checks hold pointers into it
+    // and may still run in ~CCheckQueueControl (CVE-2024-52911, upstream PR #31112).
+    std::vector<PrecomputedTransactionData> txdata;
+    txdata.reserve(block.vtx.size()); // Required so that pointers to individual PrecomputedTransactionData don't get invalidated
+
     CCheckQueueControl<CScriptCheck> control(fScriptChecks && nScriptCheckThreads ? &scriptcheckqueue : nullptr);
 
     std::vector<int> prevheights;
@@ -2464,8 +2469,6 @@ static bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockInd
     std::vector<std::pair<uint256, CDiskTxPos> > vPos;
     vPos.reserve(block.vtx.size());
     blockundo.vtxundo.reserve(block.vtx.size() - 1);
-    std::vector<PrecomputedTransactionData> txdata;
-    txdata.reserve(block.vtx.size()); // Required so that pointers to individual PrecomputedTransactionData don't get invalidated
 
     std::vector<std::pair<CAddressIndexKey, CAmount> > addressIndex;
     std::vector<std::pair<CAddressUnspentKey, CAddressUnspentValue> > addressUnspentIndex;
@@ -2914,9 +2917,16 @@ static bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockInd
                            REJECT_INVALID, "bad-cs-amount");
     }
 
-    // if (!control.Wait())
-        // return state.DoS(100, error("%s: CheckQueue failed", __func__), REJECT_INVALID, "block-validation-failed");
-    
+    // Script checks queued to the worker threads (-par > 1, the default on
+    // multi-core machines) are only verified here. This check was commented
+    // out in 290f3c1 ("Tokens hardfork"), so such nodes accepted blocks with
+    // invalid scripts. A full mainnet validation with -par=1 -assumevalid=0
+    // (which verifies scripts inline) found no such block in the main chain,
+    // so restoring it does not change the valid chain.
+    // See doc/aokchain/04-security-audit.md SEC-01.
+    if (!control.Wait())
+        return state.DoS(100, error("%s: CheckQueue failed", __func__), REJECT_INVALID, "block-validation-failed");
+
     int64_t nTime4 = GetTimeMicros(); nTimeVerify += nTime4 - nTime2;
     LogPrint(BCLog::BENCH, "    - Verify %u txins: %.2fms (%.3fms/txin) [%.2fs (%.2fms/blk)]\n", nInputs - 1, MILLI * (nTime4 - nTime2), nInputs <= 1 ? 0 : MILLI * (nTime4 - nTime2) / (nInputs-1), nTimeVerify * MICRO, nTimeVerify * MILLI / nBlocksTotal);
 
