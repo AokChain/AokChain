@@ -1458,7 +1458,12 @@ bool AppInitMain(boost::thread_group& threadGroup, CScheduler& scheduler)
                 delete ptokensCache;
                 delete governance;
 
-                ptokensdb = new CTokensDB(nBlockTreeDBCache, false, fReset);
+                // The token and governance databases are derived from the
+                // connected blocks, like the chainstate, so they must be wiped
+                // on -reindex-chainstate too. Otherwise reconnecting the chain
+                // fails at the first token issuance ("token_name ... has
+                // already been used") and marks a valid block invalid.
+                ptokensdb = new CTokensDB(nBlockTreeDBCache, false, fReset || fReindexChainState);
                 ptokens = new CTokensCache();
                 ptokensCache = new CLRUCache<std::string, CDatabasedTokenData>(MAX_CACHE_TOKENS_SIZE);
 
@@ -1551,8 +1556,8 @@ bool AppInitMain(boost::thread_group& threadGroup, CScheduler& scheduler)
                 pcoinsdbview.reset(new CCoinsViewDB(nCoinDBCache, false, fReset || fReindexChainState));
                 pcoinscatcher.reset(new CCoinsViewErrorCatcher(pcoinsdbview.get()));
 
-                governance = new CGovernance(nGovernanceDBCache, false, fReset);
-                governance->Init(fReset, chainparams);
+                governance = new CGovernance(nGovernanceDBCache, false, fReset || fReindexChainState);
+                governance->Init(fReset || fReindexChainState, chainparams);
 
                 // If necessary, upgrade from older database format.
                 // This is a no-op if we cleared the coinsviewdb with -reindex or -reindex-chainstate

@@ -3,6 +3,7 @@ feature_block_script_checks.py
 feature_minchainwork.py
 feature_proxy.py
 feature_reindex.py
+feature_reindex_tokens.py
 interface_http.py
 mempool_persist.py
 mining_getblocktemplate_longpoll.py
