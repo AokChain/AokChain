@@ -1082,7 +1082,7 @@ bool CReissueToken::IsValid(std::string &strError, CTokensCache& tokenCache, boo
         // Written so that it cannot overflow; for amounts that did not
         // overflow the result is the same as token.nAmount + nAmount > MAX.
         // (A negative nAmount is rejected further below.)
-        if (this->nAmount > 0 && this->nAmount > MAX_MONEY_TOKENS - token.nAmount) {
+        if (token.nAmount < 0 || token.nAmount > MAX_MONEY_TOKENS || this->nAmount > MAX_MONEY_TOKENS - token.nAmount) {
             strError = _("Unable to reissue token: token_name '") + strName +
                        _("' the amount trying to reissue is to large");
             return false;

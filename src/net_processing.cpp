@@ -1715,7 +1715,7 @@ bool static ProcessMessage(CNode* pfrom, const std::string& strCommand, CDataStr
                 connman->PushMessage(pfrom, CNetMsgMaker(nSendVersion).Make(NetMsgType::GETADDR));
                 pfrom->fGetAddr = true;
                 // Allow the full response to our getaddr through the rate limiter.
-                pfrom->m_addr_token_bucket += MAX_ADDR_PROCESSING_TOKEN_BUCKET;
+                pfrom->m_addr_token_bucket += ADDRMAN_GETADDR_MAX;
             }
             connman->MarkAddressGood(pfrom->addr);
         }
@@ -2656,9 +2656,9 @@ bool static ProcessMessage(CNode* pfrom, const std::string& strCommand, CDataStr
                 return true;
             } else if (status == READ_STATUS_FAILED) {
                 // Might have collided, fall back to getdata now :(
-                // The partial block can not be filled again, so drop the
-                // in-flight state before requesting the full block.
-                MarkBlockAsReceived(resp.blockhash);
+                // The block stays in flight (so the full block is processed as
+                // requested); a second BLOCKTXN is ignored by the header check
+                // above.
                 std::vector<CInv> invs;
                 invs.push_back(CInv(MSG_BLOCK | GetFetchFlags(pfrom), resp.blockhash));
                 connman->PushMessage(pfrom, msgMaker.Make(NetMsgType::GETDATA, invs));
@@ -2758,6 +2758,10 @@ bool static ProcessMessage(CNode* pfrom, const std::string& strCommand, CDataStr
                 LOCK(cs_main);
                 Misbehaving(pfrom->GetId(), 100);
                 LogPrint(BCLog::NET, "received mutated block %s from peer=%d\n", hash.ToString(), pfrom->GetId());
+                // Only clear the request if it was made to this peer.
+                auto it = mapBlocksInFlight.find(hash);
+                if (it != mapBlocksInFlight.end() && it->second.first == pfrom->GetId())
+                    MarkBlockAsReceived(hash);
                 return true;
             }
         }
