@@ -1721,7 +1721,11 @@ bool static ProcessMessage(CNode* pfrom, const std::string& strCommand, CDataStr
                   pfrom->nStartingHeight, addrMe.ToString(), pfrom->GetId(),
                   remoteAddr);
 
-        int64_t nTimeOffset = nTime - GetTime();
+        // Clamp the peer's claimed time to the range a block timestamp can
+        // hold so that the offset, and the median of offsets in
+        // AddTimeData(), cannot overflow (CVE-2024-52912).
+        const int64_t nPeerTime = std::max<int64_t>(0, std::min<int64_t>(nTime, std::numeric_limits<uint32_t>::max()));
+        int64_t nTimeOffset = nPeerTime - GetTime();
         pfrom->nTimeOffset = nTimeOffset;
         AddTimeData(pfrom->addr, nTimeOffset);
 
@@ -1893,6 +1897,10 @@ bool static ProcessMessage(CNode* pfrom, const std::string& strCommand, CDataStr
 
         uint32_t nFetchFlags = GetFetchFlags(pfrom);
 
+        // Send at most one getheaders per inv message, for the last unknown
+        // block announced (CVE-2024-52915; upstream PR #18962).
+        const uint256* best_block{nullptr};
+
         for (CInv &inv : vInv)
         {
             if (interruptMsgProc)
@@ -1913,8 +1921,7 @@ bool static ProcessMessage(CNode* pfrom, const std::string& strCommand, CDataStr
                     // fell back to inv we probably have a reorg which we should get the headers for first,
                     // we now only provide a getheaders response here. When we receive the headers, we will
                     // then ask for the blocks we need.
-                    connman->PushMessage(pfrom, msgMaker.Make(NetMsgType::GETHEADERS, chainActive.GetLocator(pindexBestHeader), inv.hash));
-                    LogPrint(BCLog::NET, "getheaders (%d) %s to peer=%d\n", pindexBestHeader->nHeight, inv.hash.ToString(), pfrom->GetId());
+                    best_block = &inv.hash;
                 }
             }
             else
@@ -1926,6 +1933,11 @@ bool static ProcessMessage(CNode* pfrom, const std::string& strCommand, CDataStr
                     pfrom->AskFor(inv);
                 }
             }
+        }
+
+        if (best_block != nullptr) {
+            connman->PushMessage(pfrom, msgMaker.Make(NetMsgType::GETHEADERS, chainActive.GetLocator(pindexBestHeader), *best_block));
+            LogPrint(BCLog::NET, "getheaders (%d) %s to peer=%d\n", pindexBestHeader->nHeight, best_block->ToString(), pfrom->GetId());
         }
     }
 
