@@ -5668,10 +5668,15 @@ bool LoadExternalBlockFile(const CChainParams& chainparams, FILE* fileIn, CDiskB
                                     head.ToString());
                             LOCK(cs_main);
                             CValidationState dummy;
-                            if (AcceptBlock(pblockrecursive, dummy, chainparams, nullptr, true, &it->second, nullptr, hash))
+                            // Pass the child's own hash. This used to pass the parent's
+                            // hash, so AcceptBlock() found the parent ("already have")
+                            // and the out-of-order child was never indexed: -reindex
+                            // stopped at the first block stored before its parent.
+                            const uint256 hashRecursive = pblockrecursive->GetBlockHash();
+                            if (AcceptBlock(pblockrecursive, dummy, chainparams, nullptr, true, &it->second, nullptr, hashRecursive))
                             {
                                 nLoaded++;
-                                queue.push_back(pblockrecursive->GetBlockHash());
+                                queue.push_back(hashRecursive);
                             }
                         }
                         range.first++;
