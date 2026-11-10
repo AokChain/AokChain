@@ -4557,77 +4557,64 @@ bool ProcessNewBlockHeaders(const std::vector<CBlockHeader>& headers, CValidatio
  * stake on any fork within the reorg limit cost nothing to produce but are
  * stored (see doc/aokchain/04-security-audit.md SEC-06).
  *
- * This only rejects (and marks invalid) blocks that ConnectBlock() would also
- * reject for the same reason. Blocks whose stake cannot be verified yet are
- * not stored, but are neither marked invalid nor penalized (fDeferred).
+ * It only rejects (and marks invalid) a block when it can evaluate exactly
+ * what ConnectBlock() will evaluate, and the block fails. In every other case
+ * it returns true and the block is stored as before.
+ *
+ * In particular the kernel hash depends on pprev->nStakeModifier, which is
+ * only computed when pprev is connected (ConnectBlock()). So the check is
+ * limited to blocks whose parent is on the active chain. (An earlier version
+ * also checked fork blocks whose parent was not connected yet, used a null
+ * stake modifier and rejected a valid mainnet block, 3030580 cfce995c.)
  */
-static bool CheckBlockStakeBeforeStorage(const CBlock& block, const CBlockIndex* pindex, CValidationState& state, const Consensus::Params& consensusParams, bool& fDeferred)
+static bool CheckBlockStakeBeforeStorage(const CBlock& block, const CBlockIndex* pindex, CValidationState& state, const Consensus::Params& consensusParams)
 {
     AssertLockHeld(cs_main);
-    fDeferred = false;
 
     if (!block.IsProofOfStake() || pindex->pprev == nullptr)
         return true;
 
     const CBlockIndex* pindexPrev = pindex->pprev;
-    const CBlockIndex* pindexTip = chainActive.Tip();
+    // Parent not connected (side branch, or ahead of the tip during initial
+    // block download): its stake modifier and UTXO set are unknown here.
+    if (!chainActive.Contains(pindexPrev) || pindexPrev->nStakeModifier.IsNull())
+        return true;
+
     const COutPoint& prevout = block.vtx[1]->vin[0].prevout;
 
-    // A block further ahead of the tip on the active branch (e.g. during
-    // initial block download) may stake coins created in blocks that are not
-    // connected yet; leave it to ConnectBlock().
-    if (pindexTip && pindexPrev != pindexTip && pindexPrev->nHeight > pindexTip->nHeight &&
-            pindexPrev->GetAncestor(pindexTip->nHeight) == pindexTip) {
+    // Same lookup ConnectBlock() uses for the kernel transaction.
+    CTransactionRef txPrev;
+    uint256 hashBlock;
+    if (!GetTransaction(prevout.hash, txPrev, consensusParams, hashBlock, false) || prevout.n >= txPrev->vout.size())
         return true;
-    }
 
     int nCoinHeight;
-    if (pindexPrev == pindexTip) {
-        // Same view ConnectBlock() will use.
+    CAmount nValueIn;
+    if (pindexPrev == chainActive.Tip()) {
+        // Same UTXO view ConnectBlock() will use.
         const Coin& coin = pcoinsTip->AccessCoin(prevout);
         if (coin.IsSpent())
             return state.DoS(100, error("%s: kernel input unavailable", __func__),
                              REJECT_INVALID, "bad-cs-kernel");
         nCoinHeight = coin.nHeight;
+        nValueIn = coin.out.nValue;
     } else {
-        // Fork block: we cannot cheaply tell whether the kernel is unspent on
-        // that branch, but we can require that it exists in an ancestor of the
-        // block and that the kernel hash meets the target.
-        CTransactionRef txKernel;
-        uint256 hashKernelBlock;
-        if (!GetTransaction(prevout.hash, txKernel, consensusParams, hashKernelBlock, false) || hashKernelBlock.IsNull()) {
-            fDeferred = true;
-            return state.DoS(0, error("%s: cannot verify stake of fork block %s yet", __func__, pindex->GetBlockHash().ToString()),
-                             REJECT_INVALID, "stake-unverifiable", true);
-        }
-        BlockMap::const_iterator mi = mapBlockIndex.find(hashKernelBlock);
-        if (mi == mapBlockIndex.end() || pindexPrev->GetAncestor(mi->second->nHeight) != mi->second) {
-            fDeferred = true;
-            return state.DoS(0, error("%s: kernel of fork block %s is not in its ancestry", __func__, pindex->GetBlockHash().ToString()),
-                             REJECT_INVALID, "stake-unverifiable", true);
-        }
-        if (prevout.n >= txKernel->vout.size())
-            return state.DoS(100, error("%s: kernel input unavailable", __func__),
-                             REJECT_INVALID, "bad-cs-kernel");
+        // Parent is an older block of the active chain (a fork of it). We
+        // cannot cheaply tell whether the kernel is unspent at pprev, so only
+        // the maturity and kernel hash are checked, and only if the kernel
+        // transaction is confirmed in an ancestor of pprev.
+        BlockMap::const_iterator mi = mapBlockIndex.find(hashBlock);
+        if (hashBlock.IsNull() || mi == mapBlockIndex.end() || pindexPrev->GetAncestor(mi->second->nHeight) != mi->second)
+            return true;
         nCoinHeight = mi->second->nHeight;
+        nValueIn = txPrev->vout[prevout.n].nValue;
     }
 
     if (pindex->nHeight - nCoinHeight < COINSTAKE_MATURITY)
         return state.DoS(100, error("%s: tried to stake at depth %d", __func__, pindex->nHeight - nCoinHeight),
                          REJECT_INVALID, "bad-cs-premature");
 
-    // Same lookup and kernel check as ConnectBlock().
-    CTransactionRef txPrev;
-    uint256 hashBlock;
-    if (!GetTransaction(prevout.hash, txPrev, consensusParams, hashBlock, false)) {
-        fDeferred = true;
-        return state.DoS(0, error("%s: read txPrev failed", __func__), REJECT_INVALID, "read-txprev-failed", true);
-    }
-    if (prevout.n >= txPrev->vout.size())
-        return state.DoS(100, error("%s: kernel input unavailable", __func__),
-                         REJECT_INVALID, "bad-cs-kernel");
-
-    if (!CheckStakeKernelHash(pindexPrev, block.nBits, txPrev->vout[prevout.n].nValue, prevout, block.vtx[1]->nTime, txPrev->nTime))
+    if (!CheckStakeKernelHash(pindexPrev, block.nBits, nValueIn, prevout, block.vtx[1]->nTime, txPrev->nTime))
         return state.DoS(100, error("%s: proof-of-stake hash doesn't match nBits", __func__),
                          REJECT_INVALID, "bad-cs-proofhash");
 
@@ -4694,9 +4681,8 @@ static bool AcceptBlock(const std::shared_ptr<const CBlock>& pblock, CValidation
     // Blocks read back from our own disk (reindex, -loadblock) were either
     // checked when first received or will be fully checked by ConnectBlock().
     if (dbp == nullptr && !fReindex && !fImporting) {
-        bool fDeferred = false;
-        if (!CheckBlockStakeBeforeStorage(block, pindex, state, chainparams.GetConsensus(), fDeferred)) {
-            if (!fDeferred && state.IsInvalid() && !state.CorruptionPossible()) {
+        if (!CheckBlockStakeBeforeStorage(block, pindex, state, chainparams.GetConsensus())) {
+            if (state.IsInvalid() && !state.CorruptionPossible()) {
                 pindex->nStatus |= BLOCK_FAILED_VALID;
                 setDirtyBlockIndex.insert(pindex);
             }

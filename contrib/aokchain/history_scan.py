@@ -41,9 +41,14 @@ TOKENS_HEIGHT = 159500         # mainnet token activation
 
 
 class RPC:
-    def __init__(self, host, port, auth):
-        self.host, self.port, self.auth = host, port, auth
+    def __init__(self, host, port, cookie_path):
+        self.host, self.port, self.cookie_path = host, port, cookie_path
         self.local = threading.local()
+
+    def _auth(self):
+        # Re-read every time: the cookie changes when the node restarts.
+        with open(self.cookie_path) as f:
+            return base64.b64encode(f.read().strip().encode()).decode()
 
     def _conn(self):
         if getattr(self.local, "conn", None) is None:
@@ -53,16 +58,19 @@ class RPC:
     def batch(self, calls):
         body = json.dumps([{"jsonrpc": "1.0", "id": i, "method": m, "params": p}
                            for i, (m, p) in enumerate(calls)])
-        headers = {"Authorization": "Basic " + self.auth, "Content-Type": "application/json"}
-        for attempt in range(5):
+        for attempt in range(30):
             try:
+                headers = {"Authorization": "Basic " + self._auth(), "Content-Type": "application/json"}
                 conn = self._conn()
                 conn.request("POST", "/", body, headers)
                 resp = json.loads(conn.getresponse().read())
-                break
-            except (http.client.HTTPException, OSError):
-                self.local.conn = None
-                time.sleep(1 + attempt)
+                if isinstance(resp, list):
+                    break
+            except (http.client.HTTPException, OSError, ValueError):
+                # node restarting, warming up (-28), or auth cookie rotated
+                pass
+            self.local.conn = None
+            time.sleep(min(2 + attempt, 30))
         else:
             raise RuntimeError("RPC batch failed")
         resp.sort(key=lambda r: r["id"])
@@ -140,9 +148,7 @@ def main():
     ap.add_argument("--out", required=True)
     args = ap.parse_args()
 
-    with open(os.path.join(args.datadir, ".cookie")) as f:
-        auth = base64.b64encode(f.read().strip().encode()).decode()
-    rpc = RPC("127.0.0.1", args.rpcport, auth)
+    rpc = RPC("127.0.0.1", args.rpcport, os.path.join(args.datadir, ".cookie"))
     tip = rpc.call("getblockcount")
     end = args.end if args.end is not None else tip + 1
     units = {name: info["units"] for name, info in rpc.call("listtokens", "*", True).items()}
