@@ -2105,7 +2105,7 @@ static DisconnectResult DisconnectBlock(const CBlock& block, const CBlockIndex* 
             if (fCheckGovernance) {
                 for (auto out : tx.vout) {
                     // Check if output is OP_RETURN
-                    if (out.scriptPubKey[0] == OP_RETURN and out.scriptPubKey.size() >= 5) {
+                    if (out.scriptPubKey.size() >= 5 && out.scriptPubKey[0] == OP_RETURN) {
                         if (out.scriptPubKey[2] == GOVERNANCE_MARKER && out.scriptPubKey[3] == GOVERNANCE_ACTION)
                         {
                             // Revert freeze
@@ -2794,11 +2794,22 @@ static bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockInd
                 }
             }
 
+            // The governance actions below are written to the governance
+            // database right away, but with -par > 1 the scripts of this
+            // transaction have only been queued so far. Verify them now, so a
+            // forged spend of a master-address output cannot change governance
+            // state in a block that is then rejected by control.Wait().
+            if (fCheckGovernance && fScriptChecks && nScriptCheckThreads) {
+                if (!CheckInputs(tx, state, view, true, flags, false, false, txdata[i], nullptr))
+                    return error("ConnectBlock(): governance transaction %s failed script checks: %s",
+                        tx.GetHash().ToString(), FormatStateMessage(state));
+            }
+
             // Master key signature found
             if (fCheckGovernance) {
                 for (auto out : tx.vout) {
                     // Check if output is OP_RETURN
-                    if (out.scriptPubKey[0] == OP_RETURN and out.scriptPubKey.size() >= 5) {
+                    if (out.scriptPubKey.size() >= 5 && out.scriptPubKey[0] == OP_RETURN) {
                         if (out.scriptPubKey[2] == GOVERNANCE_MARKER && out.scriptPubKey[3] == GOVERNANCE_ACTION)
                         {
                             // Freeze
@@ -2948,13 +2959,16 @@ static bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockInd
             pindex->nStatus |= BLOCK_HAVE_UNDO;
         }
 
-        if (vUndoTokenData.size()) {
-            if (!ptokensdb->WriteBlockUndoTokenData(block.GetBlockHash(), vUndoTokenData))
-                return AbortNode(state, "Failed to write token undo data");
-        }
-
         pindex->RaiseValidity(BLOCK_VALID_SCRIPTS);
         setDirtyBlockIndex.insert(pindex);
+    }
+
+    // The token undo data lives in the token database, which is wiped on
+    // -reindex-chainstate while the block index (and its undo position) is
+    // kept. Write it whenever a block is connected; it is keyed by block hash.
+    if (vUndoTokenData.size()) {
+        if (!ptokensdb->WriteBlockUndoTokenData(block.GetBlockHash(), vUndoTokenData))
+            return AbortNode(state, "Failed to write token undo data");
     }
 
     if (fTxIndex)

@@ -153,6 +153,7 @@ BASE_SCRIPTS= [
     'p2p_mempool.py',
     'feature_block_script_checks.py',
     'feature_reindex_tokens.py',
+    'feature_governance_forged.py',
     'rpc_named_arguments.py',
     'rpc_uptime.py',
     # Don't append tests at the end to avoid merge conflicts
