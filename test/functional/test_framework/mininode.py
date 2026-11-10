@@ -509,9 +509,10 @@ class CTxWitness():
         return True
 
 
-# AokChain transactions carry an nTime field. Consensus rejects a
-# transaction whose nTime is older than any of its inputs, and the mempool
-# rejects one too far in the future, so default it to the node clock.
+# AokChain transactions carry an nTime field. The mempool rejects one too far
+# in the future, and below consensus.nDisableTimestampCheck (mainnet 695000;
+# 0 on testnet/regtest) consensus also rejects a transaction older than its
+# inputs, so default it to the node clock.
 # test_framework.enable_mocktime()/disable_mocktime() keep this in sync.
 MOCKTIME = 0
 
