@@ -673,6 +673,10 @@ public:
     std::vector<CAddress> vAddrToSend;
     CRollingBloomFilter addrKnown;
     bool fGetAddr;
+    /** Addr rate limiting (upstream PR #22387): number of addresses that can
+     *  still be processed from this peer, and when it was last updated. */
+    double m_addr_token_bucket{1.0};
+    int64_t m_addr_token_timestamp{GetTimeMicros()};
     std::set<uint256> setKnown;
     int64_t nNextAddrSend;
     int64_t nNextLocalAddrSend;

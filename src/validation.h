@@ -449,6 +449,9 @@ bool ReadBlockFromDisk(CBlock& block, const CBlockIndex* pindex, const Consensus
 /** Context-independent validity checks */
 bool CheckBlock(const CBlock& block, CValidationState& state, const uint256& hash, const Consensus::Params& consensusParams, bool fCheckPOW = false, bool fCheckMerkleRoot = true, bool fCheckTokenDuplicate = true, bool fForceDuplicateCheck = true, bool fCheckSig = true);
 
+/** Check the block signature (vchBlockSig; must be empty for proof-of-work blocks) */
+bool CheckBlockSignature(const CBlock& block, const uint256& hash);
+
 /** Check a block is completely valid from start to finish (only works on top of our current best block, with cs_main held) */
 bool TestBlockValidity(CValidationState& state, const CChainParams& chainparams, const CBlock& block, CBlockIndex* pindexPrev, bool fCheckPOW = false, bool fCheckMerkleRoot = true, bool fCheckSig = true);
 

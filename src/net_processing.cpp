@@ -11,6 +11,7 @@
 #include "arith_uint256.h"
 #include "blockencodings.h"
 #include "chainparams.h"
+#include "consensus/merkle.h"
 #include "consensus/validation.h"
 #include "hash.h"
 #include "init.h"
@@ -71,6 +72,11 @@ static const int STALE_RELAY_AGE_LIMIT = 30 * 24 * 60 * 60;
 /// Age after which a block is considered historical for purposes of rate
 /// limiting block relay. Set to one week, denominated in seconds.
 static const int HISTORICAL_BLOCK_AGE = 7 * 24 * 60 * 60;
+
+/** Average rate of addresses processed per peer per second (upstream PR #22387) */
+static constexpr double MAX_ADDR_RATE_PER_SECOND{0.1};
+/** Maximum burst of addresses processed per peer; matches the addr message size limit */
+static constexpr double MAX_ADDR_PROCESSING_TOKEN_BUCKET{1000};
 
 // Internal stuff
 namespace {
@@ -1708,6 +1714,8 @@ bool static ProcessMessage(CNode* pfrom, const std::string& strCommand, CDataStr
             {
                 connman->PushMessage(pfrom, CNetMsgMaker(nSendVersion).Make(NetMsgType::GETADDR));
                 pfrom->fGetAddr = true;
+                // Allow the full response to our getaddr through the rate limiter.
+                pfrom->m_addr_token_bucket += MAX_ADDR_PROCESSING_TOKEN_BUCKET;
             }
             connman->MarkAddressGood(pfrom->addr);
         }
@@ -1811,6 +1819,18 @@ bool static ProcessMessage(CNode* pfrom, const std::string& strCommand, CDataStr
             return error("message addr size() = %u", vAddr.size());
         }
 
+        // Refill the addr rate limiting bucket (upstream PR #22387; also limits
+        // the address churn behind CVE-2024-52919).
+        const int64_t nNowMicros = GetTimeMicros();
+        if (pfrom->m_addr_token_bucket < MAX_ADDR_PROCESSING_TOKEN_BUCKET) {
+            const int64_t nElapsed = std::max<int64_t>(nNowMicros - pfrom->m_addr_token_timestamp, 0);
+            const double nIncrement = nElapsed / 1000000.0 * MAX_ADDR_RATE_PER_SECOND;
+            pfrom->m_addr_token_bucket = std::min<double>(pfrom->m_addr_token_bucket + nIncrement, MAX_ADDR_PROCESSING_TOKEN_BUCKET);
+        }
+        pfrom->m_addr_token_timestamp = nNowMicros;
+        const bool fRateLimited = !pfrom->fWhitelisted;
+        uint64_t nRateLimited = 0;
+
         // Store the new addresses
         std::vector<CAddress> vAddrOk;
         int64_t nNow = GetAdjustedTime();
@@ -1819,6 +1839,16 @@ bool static ProcessMessage(CNode* pfrom, const std::string& strCommand, CDataStr
         {
             if (interruptMsgProc)
                 return true;
+
+            // Apply rate limiting.
+            if (pfrom->m_addr_token_bucket < 1.0) {
+                if (fRateLimited) {
+                    ++nRateLimited;
+                    continue;
+                }
+            } else {
+                pfrom->m_addr_token_bucket -= 1.0;
+            }
 
             // We only bother storing full nodes, though this may include
             // things which we would not make an outbound connection to, in
@@ -1838,6 +1868,9 @@ bool static ProcessMessage(CNode* pfrom, const std::string& strCommand, CDataStr
             // Do not store addresses outside our network
             if (fReachable)
                 vAddrOk.push_back(addr);
+        }
+        if (nRateLimited > 0) {
+            LogPrint(BCLog::NET, "Rate limited %u of %u addresses from peer=%d\n", nRateLimited, vAddr.size(), pfrom->GetId());
         }
         connman->AddNewAddresses(vAddrOk, pfrom->addr, 2 * 60 * 60);
         if (vAddr.size() < 1000)
@@ -2711,6 +2744,24 @@ bool static ProcessMessage(CNode* pfrom, const std::string& strCommand, CDataStr
 
         bool forceProcessing = false;
         const uint256 hash(pblock->GetBlockHash());
+
+        // A block whose transactions or signature do not match its hash is a
+        // mutation (the signature is not committed to by the hash, so changing
+        // it is free). Reject it before touching the download state, so that a
+        // peer cannot cancel the in-flight request we made to another peer
+        // (CVE-2024-52921, upstream PR #27608). Such blocks would be rejected
+        // by CheckBlock() in ProcessNewBlock() anyway.
+        {
+            bool fMutated = false;
+            const uint256 merkle_root = BlockMerkleRoot(*pblock, &fMutated);
+            if (merkle_root != pblock->hashMerkleRoot || fMutated || !CheckBlockSignature(*pblock, hash)) {
+                LOCK(cs_main);
+                Misbehaving(pfrom->GetId(), 100);
+                LogPrint(BCLog::NET, "received mutated block %s from peer=%d\n", hash.ToString(), pfrom->GetId());
+                return true;
+            }
+        }
+
         {
             LOCK(cs_main);
             // Also always process if we requested the block explicitly, as we may
