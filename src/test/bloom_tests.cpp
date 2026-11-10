@@ -92,7 +92,7 @@ BOOST_FIXTURE_TEST_SUITE(bloom_tests, BasicTestingSetup)
     {
         BOOST_TEST_MESSAGE("Running Bloom Create Insert Key Test");
 
-        std::string strSecret = std::string("5Kg1gnAjaLfKiwhhPpGS3QfRg2m6awQvaj98JCZBZQ5SuS2F15C");
+        std::string strSecret = std::string("9aYZ6EAnoNZ5r8WGXS6LB8omyWyJ9NS8Wu8oHDv2ocvhaS8XAYN");
         CAokChainSecret vchSecret;
         BOOST_CHECK(vchSecret.SetString(strSecret));
 
