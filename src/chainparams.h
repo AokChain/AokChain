@@ -81,6 +81,8 @@ public:
     const CCheckpointData& Checkpoints() const { return checkpointData; }
     const ChainTxData& TxData() const { return chainTxData; }
     void UpdateVersionBitsParameters(Consensus::DeploymentPos d, int64_t nStartTime, int64_t nTimeout);
+
+    void UpdateLastPOWBlock(int nHeight);
     void TurnOffSegwit();
     void TurnOffCSV();
     void TurnOffBIP34();
@@ -165,6 +167,12 @@ void SelectParams(const std::string& chain);
  * Allows modifying the Version Bits regtest parameters.
  */
 void UpdateVersionBitsParameters(Consensus::DeploymentPos d, int64_t nStartTime, int64_t nTimeout);
+
+/**
+ * Allows overriding the height of the last proof-of-work block (regtest-only),
+ * so that tests can reach the proof-of-stake phase.
+ */
+void UpdateLastPOWBlock(int nHeight);
 
 void TurnOffSegwit();
 

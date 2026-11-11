@@ -93,6 +93,11 @@ void CChainParams::UpdateVersionBitsParameters(Consensus::DeploymentPos d, int64
     consensus.vDeployments[d].nTimeout = nTimeout;
 }
 
+void CChainParams::UpdateLastPOWBlock(int nHeight)
+{
+    consensus.nLastPOWBlock = nHeight;
+}
+
 void CChainParams::TurnOffSegwit() {
 	consensus.nSegwitEnabled = false;
 }
@@ -499,6 +504,11 @@ void SelectParams(const std::string& network)
 void UpdateVersionBitsParameters(Consensus::DeploymentPos d, int64_t nStartTime, int64_t nTimeout)
 {
     globalChainParams->UpdateVersionBitsParameters(d, nStartTime, nTimeout);
+}
+
+void UpdateLastPOWBlock(int nHeight)
+{
+    globalChainParams->UpdateLastPOWBlock(nHeight);
 }
 
 void TurnOffSegwit(){

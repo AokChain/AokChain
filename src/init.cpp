@@ -483,6 +483,7 @@ std::string HelpMessage(HelpMessageMode mode)
         strUsage += HelpMessageOpt("-limitancestorsize=<n>", strprintf("Do not accept transactions whose size with all in-mempool ancestors exceeds <n> kilobytes (default: %u)", DEFAULT_ANCESTOR_SIZE_LIMIT));
         strUsage += HelpMessageOpt("-limitdescendantcount=<n>", strprintf("Do not accept transactions if any ancestor would have <n> or more in-mempool descendants (default: %u)", DEFAULT_DESCENDANT_LIMIT));
         strUsage += HelpMessageOpt("-limitdescendantsize=<n>", strprintf("Do not accept transactions if any ancestor would have more than <n> kilobytes of in-mempool descendants (default: %u).", DEFAULT_DESCENDANT_SIZE_LIMIT));
+        strUsage += HelpMessageOpt("-lastpowblock=<height>", "Height of the last proof-of-work block; later blocks must be proof-of-stake (regtest-only)");
         strUsage += HelpMessageOpt("-vbparams=deployment:start:end", "Use given start/end times for specified version bits deployment (regtest-only)");
     }
     strUsage += HelpMessageOpt("-debug=<category>", strprintf(_("Output debugging information (default: %u, supplying <category> is optional)"), 0) + ". " +
@@ -1146,6 +1147,19 @@ bool AppInitParameterInteraction()
         std::vector<std::string> vstrReplacementModes;
         boost::split(vstrReplacementModes, strReplacementModeList, boost::is_any_of(","));
         fEnableReplacement = (std::find(vstrReplacementModes.begin(), vstrReplacementModes.end(), "fee") != vstrReplacementModes.end());
+    }
+
+    if (gArgs.IsArgSet("-lastpowblock")) {
+        // Allow tests to reach the proof-of-stake phase
+        if (!chainparams.MineBlocksOnDemand()) {
+            return InitError("The last proof-of-work height may only be overridden on regtest.");
+        }
+        int64_t nLastPOW = gArgs.GetArg("-lastpowblock", 0);
+        if (nLastPOW < COINSTAKE_MATURITY || nLastPOW > std::numeric_limits<int>::max()) {
+            return InitError(strprintf("Invalid -lastpowblock (%d), must be at least %d", nLastPOW, COINSTAKE_MATURITY));
+        }
+        UpdateLastPOWBlock((int)nLastPOW);
+        LogPrintf("Setting last proof-of-work block height to %d\n", nLastPOW);
     }
 
     if (gArgs.IsArgSet("-vbparams")) {
