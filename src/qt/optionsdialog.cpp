@@ -540,7 +540,7 @@ void OptionsDialog::languageChosen()
         if (!localNotice.isEmpty())
             chosen = QString("%1 / Restart to apply").arg(localNotice);
         if (!localButton.isEmpty())
-            button = QString("%1 / Restart now").arg(localButton);
+            button = localButton; // the line below says it in English as well
     }
     languageNotice->setText(chosen);
     languageNotice->show();
