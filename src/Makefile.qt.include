@@ -170,6 +170,7 @@ QT_MOC_CPP = \
   qt/moc_walletframe.cpp \
   qt/moc_walletmodel.cpp \
   qt/moc_walletview.cpp \
+  qt/moc_explorerpage.cpp \
   qt/moc_tokensdialog.cpp \
   qt/moc_createtokendialog.cpp \
   qt/moc_reissuetokendialog.cpp \
@@ -258,6 +259,7 @@ AOKCHAIN_QT_H = \
   qt/walletmodel.h \
   qt/walletmodeltransaction.h \
   qt/walletview.h \
+  qt/explorerpage.h \
   qt/winshutdownmonitor.h
 
 RES_ICONS = \
@@ -412,7 +414,8 @@ AOKCHAIN_QT_WALLET_CPP = \
   qt/walletframe.cpp \
   qt/walletmodel.cpp \
   qt/walletmodeltransaction.cpp \
-  qt/walletview.cpp
+  qt/walletview.cpp \
+  qt/explorerpage.cpp
 
 AOKCHAIN_QT_CPP = $(AOKCHAIN_QT_BASE_CPP)
 if TARGET_WINDOWS
