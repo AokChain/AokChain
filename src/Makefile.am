@@ -172,6 +172,8 @@ AOKCHAIN_CORE_H = \
   utilmoneystr.h \
   utiltime.h \
   validation.h \
+  bootstrap.h \
+  gunzip.h \
   validationinterface.h \
   versionbits.h \
   walletinitinterface.h \
@@ -245,6 +247,8 @@ libaokchain_server_a_SOURCES = \
   txmempool.cpp \
   ui_interface.cpp \
   validation.cpp \
+  bootstrap.cpp \
+  gunzip.cpp \
   validationinterface.cpp \
   versionbits.cpp \
   $(AOKCHAIN_CORE_H)

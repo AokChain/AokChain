@@ -12,6 +12,7 @@
 #include <init.h>
 
 #include <addrman.h>
+#include <bootstrap.h>
 #include <amount.h>
 #include <chain.h>
 #include <chainparams.h>
@@ -384,6 +385,10 @@ std::string HelpMessage(HelpMessageMode mode)
     if (showDebug)
         strUsage += HelpMessageOpt("-feefilter", strprintf("Tell other nodes to filter invs to us by our mempool min fee (default: %u)", DEFAULT_FEEFILTER));
     strUsage += HelpMessageOpt("-loadblock=<file>", _("Imports blocks from external blk000??.dat file on startup"));
+    strUsage += HelpMessageOpt("-bootstrapurl=<url>", strprintf(_("Fetch the blocks as archives from this address when the node is far behind, instead of from peers. Every block is validated as usual. Can be given several times: mirrors, tried in this order. (default: none; on the main network the GUI wallet uses %s)"), DEFAULT_BOOTSTRAP_URL_MAIN));
+    strUsage += HelpMessageOpt("-bootstrapdir=<dir>", _("Import the block archives (manifest.json and the files it lists) from this folder, which is only read. Every block is validated as usual."));
+    strUsage += HelpMessageOpt("-bootstrap", strprintf(_("Use the block archives of -bootstrapurl or -bootstrapdir (default: %u)"), DEFAULT_BOOTSTRAP));
+    strUsage += HelpMessageOpt("-bootstrapminblocks=<n>", strprintf(_("Use the block archives only when the node is at least this many blocks behind them (default: %u)"), DEFAULT_BOOTSTRAP_MIN_BLOCKS));
     strUsage += HelpMessageOpt("-maxreorg=<n>", strprintf(_("Set the Maximum reorg depth (default: %u)"), defaultChainParams->MaxReorganizationDepth()));
     strUsage += HelpMessageOpt("-maxorphantx=<n>", strprintf(_("Keep at most <n> unconnectable transactions in memory (default: %u)"), DEFAULT_MAX_ORPHAN_TRANSACTIONS));
     strUsage += HelpMessageOpt("-maxmempool=<n>", strprintf(_("Keep the transaction memory pool below <n> megabytes (default: %u)"), DEFAULT_MAX_MEMPOOL_SIZE));
@@ -1724,6 +1729,9 @@ bool AppInitMain(boost::thread_group& threadGroup, CScheduler& scheduler)
     }
 
     threadGroup.create_thread(boost::bind(&ThreadImport, vImportFiles));
+
+    // -bootstrapurl: fetch the blocks as archives when the node is far behind (off without the option)
+    StartBootstrap(threadGroup);
 
     // Wait for genesis block to be processed
     {

@@ -8,6 +8,8 @@
 
 #include "rpc/blockchain.h"
 
+#include "bootstrap.h"
+
 #include "amount.h"
 #include "base58.h"
 #include "chain.h"
@@ -1884,10 +1886,82 @@ UniValue issuanceinfo(const JSONRPCRequest& request) {
     return result;
 }
 
+UniValue getbootstrapinfo(const JSONRPCRequest& request)
+{
+    if (request.fHelp || request.params.size() != 0)
+        throw std::runtime_error(
+            "getbootstrapinfo\n"
+            "\nState of the block bootstrap (-bootstrapurl): block archives that are fetched over HTTP and imported.\n"
+            "\nResult:\n"
+            "{\n"
+            "  \"configured\": true|false,   (boolean) -bootstrapurl is set and -bootstrap is not 0\n"
+            "  \"url\": \"...\",             (string) where the archives come from\n"
+            "  \"state\": \"...\",           (string) off, starting, manifest, running, done, notneeded, failed or skipped\n"
+            "  \"active\": true|false,       (boolean) blocks are not requested from peers meanwhile\n"
+            "  \"chunks\": n,                (numeric) archives that this node needs\n"
+            "  \"chunks_downloaded\": n,     (numeric)\n"
+            "  \"chunks_imported\": n,       (numeric)\n"
+            "  \"bytes_total\": n,           (numeric) bytes to download\n"
+            "  \"bytes_downloaded\": n,      (numeric)\n"
+            "  \"start_height\": n,          (numeric) height when the bootstrap began\n"
+            "  \"target_height\": n,         (numeric) last height of the archives\n"
+            "  \"height\": n,                (numeric) current height\n"
+            "  \"seconds_download\": n,      (numeric) time spent downloading\n"
+            "  \"seconds_import\": n,        (numeric) time spent decompressing and validating\n"
+            "  \"seconds_total\": n,         (numeric)\n"
+            "  \"message\": \"...\"          (string) what it is doing, or why it failed\n"
+            "}\n"
+            "\nExamples:\n"
+            + HelpExampleCli("getbootstrapinfo", "")
+            + HelpExampleRpc("getbootstrapinfo", "")
+        );
+    const BootstrapInfo info = GetBootstrapInfo();
+    UniValue result(UniValue::VOBJ);
+    result.pushKV("configured", info.configured);
+    result.pushKV("url", info.url);
+    result.pushKV("state", info.state);
+    result.pushKV("active", info.active);
+    result.pushKV("chunks", info.chunks);
+    result.pushKV("chunks_downloaded", info.chunksDownloaded);
+    result.pushKV("chunks_imported", info.chunksImported);
+    result.pushKV("bytes_total", (uint64_t)info.bytesTotal);
+    result.pushKV("bytes_downloaded", (uint64_t)info.bytesDownloaded);
+    result.pushKV("start_height", info.startHeight);
+    result.pushKV("target_height", info.targetHeight);
+    {
+        LOCK(cs_main);
+        result.pushKV("height", chainActive.Height());
+    }
+    result.pushKV("seconds_download", info.secondsDownload);
+    result.pushKV("seconds_import", info.secondsImport);
+    result.pushKV("seconds_total", info.secondsTotal);
+    result.pushKV("message", info.message);
+    return result;
+}
+
+UniValue skipbootstrap(const JSONRPCRequest& request)
+{
+    if (request.fHelp || request.params.size() != 0)
+        throw std::runtime_error(
+            "skipbootstrap\n"
+            "\nGive the block bootstrap up and get the blocks from the peers.\n"
+            "\nResult:\n"
+            "true|false    (boolean) whether a bootstrap was running\n"
+            "\nExamples:\n"
+            + HelpExampleCli("skipbootstrap", "")
+            + HelpExampleRpc("skipbootstrap", "")
+        );
+    const bool active = BootstrapHoldsBlockDownload();
+    SkipBootstrap();
+    return active;
+}
+
 static const CRPCCommand commands[] =
 { //  category              name                      actor (function)         argNames
   //  --------------------- ------------------------  -----------------------  ----------
     { "blockchain",         "getblockchaininfo",      &getblockchaininfo,      {} },
+    { "blockchain",         "getbootstrapinfo",       &getbootstrapinfo,       {} },
+    { "blockchain",         "skipbootstrap",          &skipbootstrap,          {} },
     { "blockchain",         "getchaintxstats",        &getchaintxstats,        {"nblocks", "blockhash"} },
     { "blockchain",         "getbestblockhash",       &getbestblockhash,       {} },
     { "blockchain",         "getblockcount",          &getblockcount,          {} },

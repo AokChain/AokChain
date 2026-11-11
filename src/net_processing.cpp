@@ -7,6 +7,8 @@
 
 #include "net_processing.h"
 
+#include "bootstrap.h"
+
 #include "addrman.h"
 #include "arith_uint256.h"
 #include "blockencodings.h"
@@ -3780,7 +3782,8 @@ bool PeerLogicValidation::SendMessages(CNode* pto, std::atomic<bool>& interruptM
         // Message: getdata (blocks)
         //
         std::vector<CInv> vGetData;
-        if (!pto->fClient && (fFetch || !IsInitialBlockDownload()) && state.nBlocksInFlight < MAX_BLOCKS_IN_TRANSIT_PER_PEER) {
+        // While the block bootstrap runs, the blocks come from its archives: peers are asked for headers only.
+        if (!pto->fClient && !BootstrapHoldsBlockDownload() && (fFetch || !IsInitialBlockDownload()) && state.nBlocksInFlight < MAX_BLOCKS_IN_TRANSIT_PER_PEER) {
             std::vector<const CBlockIndex*> vToDownload;
             NodeId staller = -1;
             FindNextBlocksToDownload(pto->GetId(), MAX_BLOCKS_IN_TRANSIT_PER_PEER - state.nBlocksInFlight, vToDownload, staller, consensusParams);
