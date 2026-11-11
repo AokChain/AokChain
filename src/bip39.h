@@ -41,6 +41,24 @@ bool ParsePath(const std::string& path, std::vector<uint32_t>& out);
 /** Format a BIP32 path. */
 std::string FormatPath(const std::vector<uint32_t>& path);
 
+/** A place where wallets keep keys: the children 0..nCount-1 of a path. */
+struct PathLayout {
+    std::vector<uint32_t> parent;
+    uint32_t nCount;
+    bool fHardened; //!< the children are hardened
+};
+
+/**
+ * The key layouts that wallets commonly use, most likely first: simple
+ * layouts without a coin type (m/k, m/0'/0'/k' and the like, 100 children),
+ * then BIP44 (m/44'/coin'/account'/change/k, accounts 0 and 1, 20 children)
+ * and the same under the BIP49 and BIP84 purposes for the common coin types.
+ * With fAllCoinTypes, BIP44 is listed for every coin type from 0 to 2047
+ * (about a quarter of a million keys); without it only for the common ones
+ * (about seven thousand keys).
+ */
+std::vector<PathLayout> CandidateLayouts(bool fAllCoinTypes);
+
 } // namespace bip39
 
 #endif // AOKCHAIN_BIP39_H

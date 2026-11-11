@@ -59,7 +59,7 @@ bool PastBlocks::offer(QWidget *parent, const QString& purpose)
         return false;
     if (GetPastBlocksInfo().fetching) {
         QMessageBox::information(parent, tr("Past blocks"),
-                                 tr("%1 needs the past blocks. They are being downloaded: Settings shows how far the download is. Try again when it has finished.").arg(purpose));
+                                 tr("%1 needs the past blocks. They are being downloaded: Settings, Network settings shows how far the download is. Try again when it has finished.").arg(purpose));
         return true;
     }
     const QString size = sizeText();
@@ -76,7 +76,7 @@ bool PastBlocks::offer(QWidget *parent, const QString& purpose)
     box.exec();
     if (box.clickedButton() != yes) {
         QMessageBox::information(parent, tr("Past blocks"),
-                                 tr("Without the past blocks this is not available. You can download them at any time under Settings."));
+                                 tr("Without the past blocks this is not available. You can download them at any time under Settings, Network settings."));
         return false;
     }
     return startDownload(parent);

@@ -1147,7 +1147,7 @@ void ExplorerPage::lookupDone(const QString& query, const QString& json)
                            "Rebuilding the index takes a while."), true);
         } else if (PastBlocks::missing()) {
             // a wallet that started from a chain state snapshot: old transactions are in blocks that it does not have
-            showMessage(tr("Not found"), tr("This node knows no transaction and no block with this ID among the blocks that it has. It started from a snapshot of the chain state: transactions from before the snapshot can be looked up when the past blocks have been downloaded (Settings)."), true);
+            showMessage(tr("Not found"), tr("This node knows no transaction and no block with this ID among the blocks that it has. It started from a snapshot of the chain state: transactions from before the snapshot can be looked up when the past blocks have been downloaded (Settings, Network settings)."), true);
             // (asked once: the ID may as well be mistyped)
             static bool asked = false;
             if (!asked) {

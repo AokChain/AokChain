@@ -51,6 +51,10 @@ public:
     void setOptionsModel(OptionsModel *optionsModel);
     /** Show the list inside a page of the main window instead of as a window of its own */
     void embedAsPage();
+    /** One of two lists side by side: addresses as 4…4 with the whole address as tool tip, short buttons */
+    void setCompact();
+    /** Number of addresses in the list (after the search) */
+    int addressCount() const;
     const QString &getReturnValue() const { return returnValue; }
 
 public Q_SLOTS:
@@ -101,6 +105,7 @@ private Q_SLOTS:
 
 Q_SIGNALS:
     void sendCoins(QString addr);
+    void countChanged();
 };
 
 #endif // AOKCHAIN_QT_ADDRESSBOOKPAGE_H

@@ -1550,6 +1550,16 @@ void AokChainGUI::setEncryptionStatus(int status)
         changePassphraseAction->setEnabled(true);
         encryptWalletAction->setEnabled(false); // TODO: decrypt currently not supported
         break;
+    case WalletModel::UnlockedForStaking:
+        labelWalletEncryptionIcon->show();
+        labelWalletEncryptionIcon->setPixmap(platformStyle->SingleColorIcon(":/icons/lock_open").pixmap(STATUSBAR_ICONSIZE,STATUSBAR_ICONSIZE));
+        labelWalletEncryptionIcon->setToolTip(tr("Wallet is <b>encrypted</b> and currently <b>unlocked for staking only</b>"));
+        if (sidebar)
+            sidebar->setWalletState(tr("Unlocked for staking only"), labelWalletEncryptionIcon->toolTip());
+        encryptWalletAction->setChecked(true);
+        changePassphraseAction->setEnabled(true);
+        encryptWalletAction->setEnabled(false);
+        break;
     case WalletModel::Locked:
         labelWalletEncryptionIcon->show();
         labelWalletEncryptionIcon->setPixmap(platformStyle->SingleColorIcon(":/icons/lock_closed").pixmap(STATUSBAR_ICONSIZE,STATUSBAR_ICONSIZE));
@@ -1740,7 +1750,7 @@ void AokChainGUI::toggleStakingActive()
     this->nStaking = !this->nStaking;
 
     if (this->nStaking) {
-        walletFrame->unlockWallet();
+        walletFrame->unlockWalletForStaking();
         if (walletFrame->isWalletUnlocked()) {
             for (CWallet* pwallet : vpwallets) {
                 pwallet->StartStake();
@@ -1754,6 +1764,7 @@ void AokChainGUI::toggleStakingActive()
         for (CWallet* pwallet : vpwallets) {
             pwallet->StopStake();
         }
+        walletFrame->lockWalletAfterStaking();
         updateStakingIcon();
     }
 }

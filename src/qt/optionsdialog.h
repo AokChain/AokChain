@@ -56,6 +56,12 @@ public:
     void addCard(QWidget *card);
     /** A card with a title, as the page uses them */
     static QFrame *makeCard(const QString &title, QWidget *parent, QVBoxLayout **body);
+    /** The note about options overridden on the command line, for the end of the information card (page only) */
+    QWidget *overrideBlock();
+
+public Q_SLOTS:
+    /** The network options (port mapping, incoming connections, proxy, fast synchronization) in a window of their own */
+    void showNetworkDialog();
 
 public Q_SLOTS:
     void done(int retval) override;
@@ -92,6 +98,9 @@ private:
     bool walletEnabled;
     bool embedded;
     QVBoxLayout *extraColumn;
+    QDialog *networkDialog;
+    QLabel *networkStatus;
+    QPushButton *networkSave;
 };
 
 #endif // AOKCHAIN_QT_OPTIONSDIALOG_H
