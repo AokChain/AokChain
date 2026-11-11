@@ -21,6 +21,7 @@
 #include <QApplication>
 #include <QClipboard>
 #include <QHBoxLayout>
+#include <QHeaderView>
 #include <QLabel>
 #include <QPushButton>
 #include <QVBoxLayout>
@@ -235,6 +236,9 @@ void ReceiveCoinsDialog::buildLayout()
         ui->frame->layout()->setContentsMargins(24, 18, 24, 16);
     ui->recentRequestsView->setFrameShape(QFrame::NoFrame);
     ui->recentRequestsView->setStyleSheet("QTableView { border: none; }");
+    // a style sheet on the view makes Windows fall back to a system font for the header: name it again
+    ui->recentRequestsView->setFont(GUIUtil::getSubLabelFont());
+    ui->recentRequestsView->horizontalHeader()->setFont(GUIUtil::appFont(12, QFont::Medium));
     ui->recentRequestsView->setShowGrid(false);
     ui->recentRequestsView->setMinimumHeight(90);
     page->addWidget(ui->frame, 1);
