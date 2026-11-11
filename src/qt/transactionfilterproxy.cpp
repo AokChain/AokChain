@@ -61,8 +61,17 @@ bool TransactionFilterProxy::filterAcceptsRow(int sourceRow, const QModelIndex &
         return false;
     if(!tokenName.contains(tokenNamePrefix, Qt::CaseInsensitive))
         return false;
-    if(!assetName.isEmpty() && tokenName != assetName && tokenName != assetName + "!")
-        return false;
+    // A root token stands for itself, its owner token and everything below it:
+    // "SERG" matches "SERG", "SERG!", "SERG/..." and "SERG#...", but not "SERGX".
+    if(!assetName.isEmpty()) {
+        if (!tokenName.startsWith(assetName))
+            return false;
+        if (tokenName.size() > assetName.size()) {
+            const QChar next = tokenName[assetName.size()];
+            if (next != '/' && next != '#' && next != '!')
+                return false;
+        }
+    }
 
     return true;
 }

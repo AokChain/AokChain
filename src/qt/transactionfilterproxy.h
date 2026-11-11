@@ -39,7 +39,8 @@ public:
     void setDateRange(const QDateTime &from, const QDateTime &to);
     void setAddressPrefix(const QString &addrPrefix);
     void setTokenNamePrefix(const QString &tokenNamePrefix);
-    /** Only the transactions of this asset ("AOK" or a token; an owner token counts for its token); empty for all */
+    /** Only the transactions of this asset: "AOK" or a root token, which stands for itself, its owner
+        token and all sub and unique tokens below it; empty for all */
     void setAssetName(const QString &assetName);
     /**
       @note Type filter takes a bit field created with TYPE() or ALL_TYPES

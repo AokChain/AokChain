@@ -223,7 +223,7 @@ TransactionView::TransactionView(const PlatformStyle *platformStyle, QWidget *pa
     assetWidget = new QComboBox(this);
     assetWidget->setFixedSize(170, 48);
     assetWidget->addItem(tr("All assets"), QString());
-    assetWidget->setToolTip(tr("Show only the transactions of one coin or token"));
+    assetWidget->setToolTip(tr("Show only the transactions of one coin or of one token with its sub tokens"));
     hlayout->addWidget(assetWidget);
     assetListTimer = new QTimer(this);
     assetListTimer->setSingleShot(true);
@@ -631,7 +631,9 @@ void TransactionView::changedTokenName()
     transactionProxyModel->setAssetName(assetWidget->currentData().toString());
 }
 
-/** Fill the asset filter with what occurs in the transactions: AOK first, then the tokens by name. */
+/** Fill the asset filter with what occurs in the transactions: AOK first, then the root tokens by
+    name. Sub and unique tokens are not listed (there can be tens of thousands); choosing a root
+    shows them as well. */
 void TransactionView::updateAssetList()
 {
     if (!model || !model->getTransactionTableModel())
@@ -640,7 +642,13 @@ void TransactionView::updateAssetList()
     QSet<QString> names;
     const int rows = ttm->rowCount(QModelIndex());
     for (int row = 0; row < rows; ++row)
-        names.insert(ttm->index(row, 0).data(TransactionTableModel::AssetNameRole).toString());
+    {
+        const QString name = ttm->index(row, 0).data(TransactionTableModel::AssetNameRole).toString();
+        int end = 0;
+        while (end < name.size() && name[end] != '/' && name[end] != '#' && name[end] != '!')
+            ++end;
+        names.insert(name.left(end));
+    }
     names.remove(QString());
     QStringList tokens = names.values();
     tokens.removeAll("AOK");
