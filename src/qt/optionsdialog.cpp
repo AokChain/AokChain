@@ -246,21 +246,23 @@ void OptionsDialog::embedAsPage()
         ui->langLabel->hide();
         ui->lang->setParent(languageCard);
         ui->lang->setFixedHeight(42);
-        ui->lang->setMinimumWidth(260);
-        row->addWidget(ui->lang);
+        ui->lang->setMinimumWidth(180);
+        ui->lang->setMaximumWidth(360);
+        row->addWidget(ui->lang, 1);
+        row->addStretch(1);
+        // (the notice goes below the row: the row must not make the page wider than the window)
         languageNotice = new QLabel(languageCard);
         languageNotice->setProperty("role", "secondary");
         languageNotice->hide();
-        row->addWidget(languageNotice);
-        row->addStretch(1);
         languageRestart = new QPushButton(languageCard);
         languageRestart->setProperty("primary", true);
         languageRestart->setFixedHeight(40);
-        languageRestart->setMinimumWidth(190);
+
         languageRestart->setAutoDefault(false);
         languageRestart->hide();
         row->addWidget(languageRestart);
         cardBody->addLayout(row);
+        cardBody->addWidget(languageNotice);
         whole->addWidget(languageCard);
         QWidget *columnsHost = new QWidget(body);
         columnsHost->setObjectName("settingsColumns");
