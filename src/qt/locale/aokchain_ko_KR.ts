@@ -1270,6 +1270,14 @@
         <source>Choose a token and enter a valid address and a quantity for every recipient.</source>
         <translation>토큰을 고르고, 받는 사람마다 올바른 주소와 수량을 입력하세요.</translation>
     </message>
+    <message>
+        <source>Choose a sub token or unique token of this root</source>
+        <translation>이 토큰의 하위 토큰이나 고유 토큰을 고릅니다</translation>
+    </message>
+    <message>
+        <source>%1 sub tokens</source>
+        <translation>하위 토큰 %1개</translation>
+    </message>
 </context>
 <context>
     <name>TokensDialog</name>
@@ -1992,6 +2000,42 @@
     <message>
         <source>Mempool %1</source>
         <translation>멤풀 %1</translation>
+    </message>
+    <message>
+        <source>Search a transaction ID, an address or a block height</source>
+        <translation>거래 ID, 주소, 블록 높이 검색</translation>
+    </message>
+    <message>
+        <source>Look up</source>
+        <translation>조회</translation>
+    </message>
+    <message>
+        <source>Block height</source>
+        <translation>블록 높이</translation>
+    </message>
+    <message>
+        <source>Difficulty</source>
+        <translation>난이도</translation>
+    </message>
+    <message>
+        <source>Network stake weight</source>
+        <translation>네트워크 스테이킹 가중치</translation>
+    </message>
+    <message>
+        <source>Connected peers</source>
+        <translation>연결된 피어</translation>
+    </message>
+    <message>
+        <source>Waiting in the memory pool</source>
+        <translation>멤풀 대기 거래</translation>
+    </message>
+    <message>
+        <source>State of the chain as this node sees it. The memory pool opens the explorer.</source>
+        <translation>이 노드가 보는 체인 상태입니다. 멤풀을 누르면 탐색기가 열립니다.</translation>
+    </message>
+    <message>
+        <source>Show the %1 sub tokens</source>
+        <translation>하위 토큰 %1개 보기</translation>
     </message>
 </context>
 <context>
@@ -4119,6 +4163,10 @@
         <source>Past year</source>
         <translation>최근 1년</translation>
     </message>
+    <message>
+        <source>Show only the transactions of one coin or of one token with its sub tokens</source>
+        <translation>코인 하나, 또는 토큰 하나와 그 하위 토큰의 거래만 표시합니다</translation>
+    </message>
 </context>
 <context>
     <name>UnitDisplayStatusBarControl</name>
@@ -5447,6 +5495,10 @@
         <source>Locked</source>
         <translation>잠김</translation>
     </message>
+    <message>
+        <source>%1 below</source>
+        <translation>하위 %1</translation>
+    </message>
 </context>
 <context>
     <name>TxViewDelegate</name>
@@ -5507,6 +5559,10 @@
     <message>
         <source>Search tokens</source>
         <translation>토큰 검색</translation>
+    </message>
+    <message>
+        <source>Search all tokens of the wallet, also sub tokens and unique tokens</source>
+        <translation>지갑의 모든 토큰 검색 (하위·고유 토큰 포함)</translation>
     </message>
 </context>
 <context>
@@ -5590,6 +5646,97 @@
     <message>
         <source>%1 and more</source>
         <translation>%1종 이상</translation>
+    </message>
+    <message>
+        <source>Root tokens that exist on the AokChain block chain, as this node knows them, with their total supply. Search to find sub tokens.</source>
+        <translation>AokChain 블록체인에 있는 루트 토큰과 총 발행량입니다(이 노드 기준). 하위 토큰은 검색으로 찾습니다.</translation>
+    </message>
+    <message>
+        <source>%1 sub tokens</source>
+        <translation>하위 토큰 %1개</translation>
+    </message>
+    <message>
+        <source>Show the sub tokens and unique tokens of this token that the wallet holds</source>
+        <translation>지갑이 가진 이 토큰의 하위 토큰과 고유 토큰을 봅니다</translation>
+    </message>
+    <message>
+        <source>%1 kinds, the first %2 shown</source>
+        <translation>%1종 중 처음 %2종 표시</translation>
+    </message>
+</context>
+<context>
+    <name>TokenListDialog</name>
+    <message>
+        <source>None held</source>
+        <translation>보유 없음</translation>
+    </message>
+    <message>
+        <source>Unique token</source>
+        <translation>고유 토큰</translation>
+    </message>
+    <message>
+        <source>Sub token</source>
+        <translation>하위 토큰</translation>
+    </message>
+    <message>
+        <source>Owner</source>
+        <translation>관리 권한</translation>
+    </message>
+    <message>
+        <source>%1 below</source>
+        <translation>하위 %1</translation>
+    </message>
+    <message>
+        <source>Choose a token</source>
+        <translation>토큰 선택</translation>
+    </message>
+    <message>
+        <source>Sub tokens of %1</source>
+        <translation>%1의 하위 토큰</translation>
+    </message>
+    <message>
+        <source>%1 sub and unique tokens held</source>
+        <translation>하위·고유 토큰 %1개 보유</translation>
+    </message>
+    <message>
+        <source>Search tokens, also sub and unique tokens</source>
+        <translation>토큰 검색 (하위·고유 토큰 포함)</translation>
+    </message>
+    <message>
+        <source>Search within %1</source>
+        <translation>%1 안에서 검색</translation>
+    </message>
+    <message>
+        <source>Cancel</source>
+        <translation>취소</translation>
+    </message>
+    <message>
+        <source>Close</source>
+        <translation>닫기</translation>
+    </message>
+    <message>
+        <source>Choose</source>
+        <translation>선택</translation>
+    </message>
+    <message>
+        <source>Send</source>
+        <translation>보내기</translation>
+    </message>
+    <message>
+        <source>The first %1 are shown. Type more to narrow the list.</source>
+        <translation>처음 %1개만 표시합니다. 더 입력해 범위를 좁히세요.</translation>
+    </message>
+    <message>
+        <source>Nothing found.</source>
+        <translation>찾은 것이 없습니다.</translation>
+    </message>
+    <message>
+        <source>Root tokens. Type to find sub tokens and unique tokens as well.</source>
+        <translation>루트 토큰입니다. 입력하면 하위 토큰과 고유 토큰도 찾습니다.</translation>
+    </message>
+    <message>
+        <source>%1 found</source>
+        <translation>%1개</translation>
     </message>
 </context>
 </TS>
