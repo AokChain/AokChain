@@ -1060,8 +1060,12 @@ void AokChainGUI::setNumBlocks(int count, const QDateTime& blockDate, double nVe
         tooltip += tr("Last received block was generated %1 ago.").arg(timeBehindText);
         tooltip += QString("<br>");
         tooltip += tr("Transactions after this will not yet be visible.");
-        if (sidebar)
-            sidebar->setSyncState(sideStatus, tr("%1 left").arg(timeBehindText), nVerificationProgress, true, QString("<nobr>") + tooltip + QString("</nobr>"));
+        if (sidebar) {
+            // the side bar is narrow: years only when the chain is more than a year behind
+            const qint64 year = 31556952;
+            const QString sideBehind = secs >= year ? QObject::tr("%n year(s)", "", secs / year) : timeBehindText;
+            sidebar->setSyncState(sideStatus, tr("%1 left").arg(sideBehind), nVerificationProgress, true, QString("<nobr>") + tooltip + QString("</nobr>"));
+        }
     }
 
     // Don't word-wrap this (fixed-width) tooltip
