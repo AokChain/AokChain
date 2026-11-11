@@ -98,6 +98,7 @@ private:
     QComboBox *pageSizeWidget;
     QString selectedHash;
     void gotoPage(int page);
+    void firstPage();
     void updatePageControls();
     void rememberSelection();
     void restoreSelection();

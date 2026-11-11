@@ -653,40 +653,40 @@ void TransactionView::chooseDate(int idx)
     switch(dateWidget->itemData(idx).toInt())
     {
     case All:
-        transactionProxyModel->setDateRange(
+        firstPage(), transactionProxyModel->setDateRange(
                 TransactionFilterProxy::MIN_DATE,
                 TransactionFilterProxy::MAX_DATE);
         break;
     case Today:
-        transactionProxyModel->setDateRange(
+        firstPage(), transactionProxyModel->setDateRange(
                 QDateTime(current),
                 TransactionFilterProxy::MAX_DATE);
         break;
     case ThisWeek: {
         // Find last Monday
         QDate startOfWeek = current.addDays(-(current.dayOfWeek()-1));
-        transactionProxyModel->setDateRange(
+        firstPage(), transactionProxyModel->setDateRange(
                 QDateTime(startOfWeek),
                 TransactionFilterProxy::MAX_DATE);
 
         } break;
     case ThisMonth:
-        transactionProxyModel->setDateRange(
+        firstPage(), transactionProxyModel->setDateRange(
                 QDateTime(QDate(current.year(), current.month(), 1)),
                 TransactionFilterProxy::MAX_DATE);
         break;
     case LastMonth:
-        transactionProxyModel->setDateRange(
+        firstPage(), transactionProxyModel->setDateRange(
                 QDateTime(QDate(current.year(), current.month(), 1).addMonths(-1)),
                 QDateTime(QDate(current.year(), current.month(), 1)));
         break;
     case PastYear:
-        transactionProxyModel->setDateRange(
+        firstPage(), transactionProxyModel->setDateRange(
                 QDateTime::currentDateTime().addYears(-1),
                 TransactionFilterProxy::MAX_DATE);
         break;
     case ThisYear:
-        transactionProxyModel->setDateRange(
+        firstPage(), transactionProxyModel->setDateRange(
                 QDateTime(QDate(current.year(), 1, 1)),
                 TransactionFilterProxy::MAX_DATE);
         break;
@@ -701,7 +701,7 @@ void TransactionView::chooseType(int idx)
 {
     if(!transactionProxyModel)
         return;
-    transactionProxyModel->setTypeFilter(
+    firstPage(), transactionProxyModel->setTypeFilter(
         typeWidget->itemData(idx).toInt());
     // the segmented control shows a choice only when it made it
     typeButtons->setExclusive(false);
@@ -714,7 +714,7 @@ void TransactionView::chooseTypeSegment(int id)
 {
     if(!transactionProxyModel || !typeButtons->button(id))
         return;
-    transactionProxyModel->setTypeFilter(typeButtons->button(id)->property("typeFilter").toUInt());
+    firstPage(), transactionProxyModel->setTypeFilter(typeButtons->button(id)->property("typeFilter").toUInt());
     typeWidget->setCurrentIndex(0);
 }
 
@@ -736,7 +736,7 @@ void TransactionView::chooseWatchonly(int idx)
 {
     if(!transactionProxyModel)
         return;
-    transactionProxyModel->setWatchOnlyFilter(
+    firstPage(), transactionProxyModel->setWatchOnlyFilter(
         static_cast<TransactionFilterProxy::WatchOnlyFilter>(watchOnlyWidget->itemData(idx).toInt()));
 }
 
@@ -744,7 +744,7 @@ void TransactionView::changedPrefix()
 {
     if(!transactionProxyModel)
         return;
-    transactionProxyModel->setAddressPrefix(addressWidget->text());
+    firstPage(), transactionProxyModel->setAddressPrefix(addressWidget->text());
 }
 
 void TransactionView::changedAmount()
@@ -753,11 +753,11 @@ void TransactionView::changedAmount()
         return;
     CAmount amount_parsed = 0;
     if (AokChainUnits::parse(model->getOptionsModel()->getDisplayUnit(), amountWidget->text(), &amount_parsed)) {
-        transactionProxyModel->setMinAmount(amount_parsed);
+        firstPage(), transactionProxyModel->setMinAmount(amount_parsed);
     }
     else
     {
-        transactionProxyModel->setMinAmount(0);
+        firstPage(), transactionProxyModel->setMinAmount(0);
     }
 }
 
@@ -765,7 +765,7 @@ void TransactionView::changedTokenName()
 {
     if (!transactionProxyModel)
         return;
-    transactionProxyModel->setAssetName(assetWidget->currentData().toString());
+    firstPage(), transactionProxyModel->setAssetName(assetWidget->currentData().toString());
 }
 
 /** Remember the root of the asset of a row of the transaction table. */
@@ -1098,7 +1098,7 @@ void TransactionView::dateRangeChanged()
 {
     if(!transactionProxyModel)
         return;
-    transactionProxyModel->setDateRange(
+    firstPage(), transactionProxyModel->setDateRange(
             QDateTime(dateFrom->date()),
             QDateTime(dateTo->date()).addDays(1));
 }
@@ -1111,6 +1111,15 @@ void TransactionView::gotoPage(int page)
     pageProxy->setPage(page);
     updatePageControls();
     transactionView->scrollToTop();
+}
+
+/** A change of the filter starts at the first page again. */
+void TransactionView::firstPage()
+{
+    if (!pageProxy)
+        return;
+    selectedHash.clear();
+    pageProxy->setPage(0);
 }
 
 void TransactionView::pageSizeChosen(int idx)
