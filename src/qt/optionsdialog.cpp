@@ -246,7 +246,7 @@ void OptionsDialog::embedAsPage()
         ui->langLabel->hide();
         ui->lang->setParent(languageCard);
         ui->lang->setFixedHeight(42);
-        ui->lang->setMinimumWidth(300);
+        ui->lang->setMinimumWidth(260);
         row->addWidget(ui->lang);
         languageNotice = new QLabel(languageCard);
         languageNotice->setProperty("role", "secondary");
@@ -256,7 +256,7 @@ void OptionsDialog::embedAsPage()
         languageRestart = new QPushButton(languageCard);
         languageRestart->setProperty("primary", true);
         languageRestart->setFixedHeight(40);
-        languageRestart->setMinimumWidth(240);
+        languageRestart->setMinimumWidth(190);
         languageRestart->setAutoDefault(false);
         languageRestart->hide();
         row->addWidget(languageRestart);

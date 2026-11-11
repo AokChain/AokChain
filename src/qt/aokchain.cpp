@@ -562,6 +562,12 @@ WId AokChainApplication::getMainWinId() const
 #ifndef AOKCHAIN_QT_TEST
 int main(int argc, char *argv[])
 {
+    if (qEnvironmentVariableIsSet("AOKCHAIN_RESTART_DELAY")) {
+        // started by "Restart now": let the previous process end first
+        qunsetenv("AOKCHAIN_RESTART_DELAY");
+        QThread::msleep(3000);
+    }
+
     SetupEnvironment();
 
     /// 1. Parse command-line options. These take precedence over anything else.
@@ -758,6 +764,9 @@ int main(int argc, char *argv[])
         const QString program = QCoreApplication::applicationFilePath();
         if (!arguments.isEmpty())
             arguments.removeFirst();
+        // the new process waits a moment: on Windows the lock of the data directory is only
+        // released when this process has ended
+        qputenv("AOKCHAIN_RESTART_DELAY", "1");
         QProcess::startDetached(program, arguments);
     }
     return rv;
