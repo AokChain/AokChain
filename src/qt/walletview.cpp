@@ -12,6 +12,7 @@
 
 #include "addressbookpage.h"
 #include "askpassphrasedialog.h"
+#include "mnemonicdialog.h"
 #include "aokchaingui.h"
 #include "clientmodel.h"
 #include "guiutil.h"
@@ -41,6 +42,7 @@
 #include <QFileDialog>
 #include <QStringList>
 #include <QRegExp>
+#include <QResizeEvent>
 #include <QGridLayout>
 #include <QButtonGroup>
 #include <QHBoxLayout>
@@ -101,25 +103,37 @@ WalletView::WalletView(const PlatformStyle *_platformStyle, QWidget *parent):
     explorerPage = new ExplorerPage(platformStyle);
     explorerShell = addPage(explorerPage, tr("Explorer"), explorerPage->headerWidget());
 
-    // Address book: the receiving and the sending addresses are two tabs of one page
+    // Address book: the receiving and the sending addresses side by side, both in view at once.
+    // In a narrow window the two lists are one above the other.
     usedSendingAddressesPage = new AddressBookPage(platformStyle, AddressBookPage::ForEditing, AddressBookPage::SendingTab, this);
     usedReceivingAddressesPage = new AddressBookPage(platformStyle, AddressBookPage::ForEditing, AddressBookPage::ReceivingTab, this);
-    usedSendingAddressesPage->embedAsPage();
-    usedReceivingAddressesPage->embedAsPage();
     QWidget *addressContainer = new QWidget(this);
-    QVBoxLayout *addressLayout = new QVBoxLayout(addressContainer);
-    addressLayout->setSpacing(14);
-    addressLayout->addWidget(makeTabs({tr("Receiving addresses"), tr("Sending addresses")}, &addressTabs, addressContainer));
-    QFrame *addressCard = new QFrame(addressContainer);
-    addressCard->setProperty("role", "card");
-    QVBoxLayout *addressCardLayout = new QVBoxLayout(addressCard);
-    addressCardLayout->setContentsMargins(20, 16, 20, 16);
-    addressStack = new QStackedWidget(addressCard);
-    addressStack->addWidget(usedReceivingAddressesPage);
-    addressStack->addWidget(usedSendingAddressesPage);
-    addressCardLayout->addWidget(addressStack);
-    addressLayout->addWidget(addressCard, 1);
-    connect(addressTabs, SIGNAL(buttonClicked(int)), this, SLOT(showAddressTab(int)));
+    addressColumns = new QBoxLayout(QBoxLayout::LeftToRight, addressContainer);
+    addressColumns->setSpacing(16);
+    for (AddressBookPage *list : {usedReceivingAddressesPage, usedSendingAddressesPage}) {
+        list->embedAsPage();
+        list->setCompact();
+        QFrame *card = new QFrame(addressContainer);
+        card->setProperty("role", "card");
+        QVBoxLayout *cardLayout = new QVBoxLayout(card);
+        cardLayout->setContentsMargins(18, 14, 18, 14);
+        cardLayout->setSpacing(10);
+        QHBoxLayout *head = new QHBoxLayout();
+        head->setSpacing(8);
+        QLabel *title = new QLabel(list == usedReceivingAddressesPage ? tr("Receiving addresses") : tr("Sending addresses"), card);
+        title->setProperty("role", "title");
+        head->addWidget(title);
+        QLabel *count = new QLabel("0", card);
+        count->setProperty("role", "tag");
+        count->setFont(GUIUtil::monoFont(11, QFont::Medium));
+        head->addWidget(count);
+        head->addStretch();
+        cardLayout->addLayout(head);
+        cardLayout->addWidget(list, 1);
+        connect(list, &AddressBookPage::countChanged, count, [list, count] { count->setText(QString::number(list->addressCount())); });
+        addressColumns->addWidget(card, 1);
+    }
+    addressContainer->installEventFilter(this);
     addressBookShell = addPage(addressContainer, tr("Address book"));
 
     // Sign: prove an address, check a signature, multisig wallets
@@ -305,16 +319,31 @@ void WalletView::setAokChainGUI(AokChainGUI *gui)
 
         // Settings page: what the menus of the window offered
         QVBoxLayout *body = nullptr;
-        QFrame *walletCard = OptionsDialog::makeCard(tr("Wallet management"), settingsPage, &body);
-        QLabel *walletHint = new QLabel(tr("Encrypt the wallet with a passphrase and keep a backup of the wallet file in a safe place."), walletCard);
-        walletHint->setProperty("role", "secondary");
-        walletHint->setWordWrap(true);
-        body->addWidget(walletHint);
-        QHBoxLayout *walletButtons = new QHBoxLayout();
+        QFrame *walletCard = OptionsDialog::makeCard(tr("Wallet security"), settingsPage, &body);
+        const std::pair<QString, QString> securityNotes[] = {
+            {tr("Encryption"), tr("A passphrase locks the keys in the wallet file. Someone who copies the file or uses this computer cannot send your coins without it. The passphrase cannot be recovered: if it is lost, the coins are lost.")},
+            {tr("Backup"), tr("A copy of the wallet file. If this computer breaks or is lost, the backup brings the coins back. Keep it on a USB drive or another computer, and make a new one after adding keys.")},
+            {tr("Recovery words"), tr("The 12 or 24 words of another wallet, such as a mobile wallet. Restoring adds the keys of that wallet to this one, so its coins can be used here.")},
+        };
+        for (const std::pair<QString, QString> &note : securityNotes) {
+            QLabel *label = new QLabel(QString("<b>%1</b> &nbsp;%2").arg(note.first, note.second), walletCard);
+            label->setProperty("role", "secondary");
+            label->setWordWrap(true);
+            body->addWidget(label);
+        }
+        QGridLayout *walletButtons = new QGridLayout();
         walletButtons->setSpacing(8);
-        for (QAction *action : gui->settingsActions(0))
-            walletButtons->addWidget(actionButton(action, walletCard));
-        walletButtons->addStretch();
+        int n = 0;
+        for (QAction *action : gui->settingsActions(0)) {
+            walletButtons->addWidget(actionButton(action, walletCard), n / 2, n % 2);
+            ++n;
+        }
+        QPushButton *restoreButton = new QPushButton(tr("Restore from recovery words"), walletCard);
+        restoreButton->setFixedHeight(38);
+        restoreButton->setCursor(Qt::PointingHandCursor);
+        restoreButton->setToolTip(tr("Add the keys of another wallet to this wallet, from its 12 or 24 recovery words"));
+        connect(restoreButton, SIGNAL(clicked()), this, SLOT(restoreFromMnemonic()));
+        walletButtons->addWidget(restoreButton, n / 2, n % 2);
         body->addLayout(walletButtons);
         settingsPage->addCard(walletCard);
 
@@ -326,12 +355,23 @@ void WalletView::setAokChainGUI(AokChainGUI *gui)
         body->addWidget(versionLabel);
         QGridLayout *infoButtons = new QGridLayout();
         infoButtons->setSpacing(8);
-        int n = 0;
+        n = 0;
+        // the network options are for few people: a window of their own instead of a card
+        QPushButton *networkButton = new QPushButton(tr("Network settings"), infoCard);
+        networkButton->setFixedHeight(38);
+        networkButton->setCursor(Qt::PointingHandCursor);
+        networkButton->setToolTip(tr("Port mapping, incoming connections, proxy and fast synchronization"));
+        connect(networkButton, SIGNAL(clicked()), settingsPage, SLOT(showNetworkDialog()));
+        infoButtons->addWidget(networkButton, 0, 0);
+        ++n;
         for (QAction *action : gui->settingsActions(1)) {
             infoButtons->addWidget(actionButton(action, infoCard), n / 3, n % 3);
             ++n;
         }
         body->addLayout(infoButtons);
+        // options given on the command line win over those of this page: small, at the end
+        if (QWidget *overrides = settingsPage->overrideBlock())
+            body->addWidget(overrides);
         settingsPage->addCard(infoCard);
         if (clientModel)
             versionLabel->setText(tr(PACKAGE_NAME) + " " + clientModel->formatFullVersion());
@@ -489,9 +529,20 @@ void WalletView::gotoVerifyMessageTab(QString addr)
 
 void WalletView::showAddressTab(int tab)
 {
-    addressStack->setCurrentIndex(tab);
-    if (addressTabs->button(tab))
-        addressTabs->button(tab)->setChecked(true);
+    // both lists are on the page: put the keyboard into the one that was asked for
+    (tab == 1 ? usedSendingAddressesPage : usedReceivingAddressesPage)->setFocus();
+}
+
+bool WalletView::eventFilter(QObject *object, QEvent *event)
+{
+    if (event->type() == QEvent::Resize && addressColumns && object == addressColumns->parentWidget()) {
+        // two lists need room: below this width they are stacked
+        const bool narrow = static_cast<QResizeEvent*>(event)->size().width() < 700;
+        const QBoxLayout::Direction wanted = narrow ? QBoxLayout::TopToBottom : QBoxLayout::LeftToRight;
+        if (addressColumns->direction() != wanted)
+            addressColumns->setDirection(wanted);
+    }
+    return QStackedWidget::eventFilter(object, event);
 }
 
 void WalletView::gotoSettingsPage()
@@ -556,12 +607,42 @@ void WalletView::unlockWallet()
     if (!walletModel)
         return;
     // Unlock wallet when requested by wallet model
-    if (walletModel->getEncryptionStatus() == WalletModel::Locked)
+    // (unlocked for staking only is locked as far as sending and signing go)
+    const WalletModel::EncryptionStatus status = walletModel->getEncryptionStatus();
+    if (status == WalletModel::Locked || status == WalletModel::UnlockedForStaking)
     {
         AskPassphraseDialog dlg(AskPassphraseDialog::Unlock, this);
         dlg.setModel(walletModel);
         dlg.exec();
     }
+}
+
+void WalletView::unlockWalletForStaking()
+{
+    if (!walletModel)
+        return;
+    if (walletModel->getEncryptionStatus() == WalletModel::Locked)
+    {
+        AskPassphraseDialog dlg(AskPassphraseDialog::UnlockStaking, this);
+        dlg.setModel(walletModel);
+        dlg.exec();
+    }
+}
+
+void WalletView::lockWalletAfterStaking()
+{
+    // the wallet was open for the staking thread only: with staking off there is no reason to keep it open
+    if (walletModel && walletModel->getEncryptionStatus() == WalletModel::UnlockedForStaking)
+        walletModel->setWalletLocked(true);
+}
+
+void WalletView::restoreFromMnemonic()
+{
+    if (!walletModel)
+        return;
+    MnemonicDialog dialog(walletModel, this);
+    connect(&dialog, SIGNAL(backupRequested()), this, SLOT(backupWallet()));
+    dialog.exec();
 }
 
 bool WalletView::isWalletUnlocked()

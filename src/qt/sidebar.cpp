@@ -4,6 +4,8 @@
 
 #include "sidebar.h"
 
+#include "clientversion.h"
+
 #include "guiutil.h"
 
 #include <QAction>
@@ -260,6 +262,15 @@ Sidebar::Sidebar(QWidget* parent) : QWidget(parent)
     noticeLabel->setWordWrap(true);
     noticeLabel->hide();
     layout->addWidget(noticeLabel);
+
+    // which build this is: small, at the very bottom
+    QLabel* versionLabel = new QLabel(QString::fromStdString(FormatFullVersion()));
+    versionLabel->setFont(GUIUtil::monoFont(10));
+    versionLabel->setStyleSheet(QString("color: %1; background: transparent;").arg(t.sideText.darker(135).name()));
+    versionLabel->setContentsMargins(8, 8, 8, 0);
+    versionLabel->setToolTip(tr("Version of this program"));
+    versionLabel->setTextInteractionFlags(Qt::TextSelectableByMouse);
+    layout->addWidget(versionLabel);
 }
 
 void Sidebar::addPage(QAction* action, const QString& iconName)

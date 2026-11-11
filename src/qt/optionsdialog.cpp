@@ -20,7 +20,9 @@
 #include "netbase.h"
 #include "txdb.h" // for -dbcache defaults
 
+#include <QAbstractButton>
 #include <QDataWidgetMapper>
+#include <QLineEdit>
 #include <QDir>
 #include <QTranslator>
 #include <QApplication>
@@ -49,7 +51,10 @@ OptionsDialog::OptionsDialog(QWidget *parent, bool enableWallet) :
     languageRestart(nullptr),
     walletEnabled(enableWallet),
     embedded(false),
-    extraColumn(0)
+    extraColumn(0),
+    networkDialog(nullptr),
+    networkStatus(nullptr),
+    networkSave(nullptr)
 {
     ui->setupUi(this);
 
@@ -298,9 +303,52 @@ void OptionsDialog::embedAsPage()
             column->addWidget(card);
     };
     addPages(left, tr("General"), {ui->tabMain});
-    addPages(left, tr("Network"), {ui->tabNetwork});
+    // The network options are not for everyone: they are in a window that the information card opens.
+    if (pages.contains(ui->tabNetwork)) {
+        networkDialog = new QDialog(this);
+        networkDialog->setWindowTitle(tr("Network settings"));
+        networkDialog->setMinimumWidth(620);
+        QVBoxLayout *dialogLayout = new QVBoxLayout(networkDialog);
+        dialogLayout->setContentsMargins(24, 22, 24, 18);
+        dialogLayout->setSpacing(12);
+        QLabel *title = new QLabel(tr("Network settings"), networkDialog);
+        title->setProperty("role", "title");
+        dialogLayout->addWidget(title);
+        QLabel *hint = new QLabel(tr("The defaults work for most people. Change these only if you know that your network needs it."), networkDialog);
+        hint->setProperty("role", "secondary");
+        hint->setWordWrap(true);
+        dialogLayout->addWidget(hint);
+        if (QLayout *pageLayout = ui->tabNetwork->layout()) {
+            pageLayout->setContentsMargins(0, 0, 0, 0);
+            for (int i = pageLayout->count() - 1; i >= 0; --i) {
+                if (pageLayout->itemAt(i)->spacerItem())
+                    delete pageLayout->takeAt(i);
+            }
+        }
+        dialogLayout->addWidget(ui->tabNetwork);
+        ui->tabNetwork->show();
+        networkStatus = new QLabel(networkDialog);
+        networkStatus->setProperty("role", "warning");
+        networkStatus->setWordWrap(true);
+        networkStatus->hide();
+        dialogLayout->addWidget(networkStatus);
+        QHBoxLayout *buttons = new QHBoxLayout();
+        buttons->addStretch();
+        QPushButton *cancel = new QPushButton(tr("Cancel"), networkDialog);
+        networkSave = new QPushButton(tr("Save"), networkDialog);
+        networkSave->setProperty("primary", true);
+        networkSave->setDefault(true);
+        for (QPushButton *button : {cancel, networkSave}) {
+            button->setFixedHeight(40);
+            button->setMinimumWidth(110);
+            buttons->addWidget(button);
+        }
+        dialogLayout->addLayout(buttons);
+        connect(cancel, SIGNAL(clicked()), networkDialog, SLOT(reject()));
+        connect(networkSave, SIGNAL(clicked()), networkDialog, SLOT(accept()));
+    }
+    addPages(left, tr("Display"), {ui->tabDisplay, ui->tabWindow});
     addPages(extraColumn, tr("Wallet"), {ui->tabWallet});
-    addPages(extraColumn, tr("Display"), {ui->tabDisplay, ui->tabWindow});
 
     // the cards share the width: long lists do not widen a column
     for (QComboBox *combo : {(QComboBox*)ui->lang, (QComboBox*)ui->unit}) {
@@ -313,17 +361,20 @@ void OptionsDialog::embedAsPage()
     ui->proxyPortTor->setMinimumWidth(76);
     body->setMinimumWidth(0);
 
-    // command-line options that override the options above
-    QVBoxLayout *overrideBody = nullptr;
-    QFrame *overrideCard = makeCard(QString(), this, &overrideBody);
+    // command-line options that override the options above: the information card of the page takes
+    // this note (overrideBlock()); it is hidden when there are none
     ui->frame->setFrameShape(QFrame::NoFrame);
-    if (ui->frame->layout())
-        ui->frame->layout()->setContentsMargins(0, 0, 0, 0);
-    ui->overriddenByCommandLineInfoLabel->setProperty("role", "fieldLabel");
-    ui->overriddenByCommandLineLabel->setFont(GUIUtil::monoFont(12));
+    if (ui->frame->layout()) {
+        ui->frame->layout()->setContentsMargins(0, 4, 0, 0);
+        ui->frame->layout()->setSpacing(2);
+    }
+    ui->overriddenByCommandLineInfoLabel->setProperty("role", "caption");
+    ui->overriddenByCommandLineLabel->setFont(GUIUtil::monoFont(11));
+    ui->overriddenByCommandLineLabel->setProperty("role", "caption");
     ui->overriddenByCommandLineLabel->setWordWrap(true);
-    overrideBody->addWidget(ui->frame);
-    left->addWidget(overrideCard);
+    ui->overriddenByCommandLineLabel->setTextInteractionFlags(Qt::TextSelectableByMouse);
+    ui->frame->setParent(this);
+    ui->frame->hide();
     left->addStretch(1);
     extraColumn->addStretch(1);
     ui->verticalLayout->addWidget(scroll, 1);
@@ -358,6 +409,45 @@ void OptionsDialog::embedAsPage()
 // tr("Restart to apply") and tr("Restart now") are looked up in the translation of the chosen language
 static const char *languageStrings[] = {QT_TRANSLATE_NOOP("OptionsDialog", "Restart to apply"), QT_TRANSLATE_NOOP("OptionsDialog", "Restart now")};
 
+QWidget *OptionsDialog::overrideBlock()
+{
+    return embedded ? ui->frame : nullptr;
+}
+
+void OptionsDialog::showNetworkDialog()
+{
+    if (!networkDialog || !model)
+        return;
+    // what the fields hold now, so that "Cancel" leaves other unsaved changes of the page alone
+    const QList<QWidget*> fields = ui->tabNetwork->findChildren<QWidget*>();
+    QList<QPair<QWidget*, QVariant> > before;
+    for (QWidget *field : fields) {
+        if (QAbstractButton *button = qobject_cast<QAbstractButton*>(field)) {
+            if (button->isCheckable())
+                before.append(qMakePair(field, QVariant(button->isChecked())));
+        } else if (QLineEdit *edit = qobject_cast<QLineEdit*>(field)) {
+            before.append(qMakePair(field, QVariant(edit->text())));
+        } else if (QPlainTextEdit *text = qobject_cast<QPlainTextEdit*>(field)) {
+            before.append(qMakePair(field, QVariant(text->toPlainText())));
+        }
+    }
+    networkStatus->hide();
+    if (networkDialog->exec() == QDialog::Accepted) {
+        // the same as "Save" of the page
+        on_okButton_clicked();
+        return;
+    }
+    for (const QPair<QWidget*, QVariant> &entry : before) {
+        if (QAbstractButton *button = qobject_cast<QAbstractButton*>(entry.first))
+            button->setChecked(entry.second.toBool());
+        else if (QLineEdit *edit = qobject_cast<QLineEdit*>(entry.first))
+            edit->setText(entry.second.toString());
+        else if (QPlainTextEdit *text = qobject_cast<QPlainTextEdit*>(entry.first))
+            text->setPlainText(entry.second.toString());
+    }
+    clearStatusLabel();
+}
+
 void OptionsDialog::addCard(QWidget *card)
 {
     if (extraColumn)
@@ -387,6 +477,8 @@ void OptionsDialog::setModel(OptionsModel *_model)
             showRestartWarning(true);
 
         QString strLabel = _model->getOverriddenByCommandLine();
+        if (embedded)
+            ui->frame->setVisible(!strLabel.isEmpty());
         if (strLabel.isEmpty())
             strLabel = tr("none");
         ui->overriddenByCommandLineLabel->setText(strLabel);
@@ -459,6 +551,8 @@ void OptionsDialog::setMapper()
 void OptionsDialog::setOkButtonState(bool fState)
 {
     ui->okButton->setEnabled(fState);
+    if (networkSave)
+        networkSave->setEnabled(fState);
 }
 
 void OptionsDialog::on_resetButton_clicked()
@@ -589,6 +683,10 @@ void OptionsDialog::showRestartWarning(bool fPersistent)
     else
     {
         ui->statusLabel->setText(tr("This change would require a client restart."));
+        if (networkStatus && networkDialog && networkDialog->isVisible()) {
+            networkStatus->setText(ui->statusLabel->text());
+            networkStatus->show();
+        }
         // clear non-persistent status label after 10 seconds
         // Todo: should perhaps be a class attribute, if we extend the use of statusLabel
         QTimer::singleShot(10000, this, SLOT(clearStatusLabel()));
@@ -613,6 +711,8 @@ void OptionsDialog::updateProxyValidationState()
     {
         setOkButtonState(otherProxyWidget->isValid()); //only enable ok button if both proxys are valid
         clearStatusLabel();
+        if (networkStatus)
+            networkStatus->hide();
     }
     else
     {
@@ -622,6 +722,10 @@ void OptionsDialog::updateProxyValidationState()
     ui->statusLabel->style()->polish(ui->statusLabel);
     ui->statusLabel->show();
         ui->statusLabel->setText(tr("The supplied proxy address is invalid."));
+        if (networkStatus) {
+            networkStatus->setText(ui->statusLabel->text());
+            networkStatus->show();
+        }
     }
 }
 

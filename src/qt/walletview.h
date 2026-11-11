@@ -30,6 +30,7 @@ class ExplorerPage;
 class ReissueTokenDialog;
 
 QT_BEGIN_NAMESPACE
+class QBoxLayout;
 class QButtonGroup;
 class QLabel;
 class QModelIndex;
@@ -64,6 +65,9 @@ public:
     bool handlePaymentRequest(const SendCoinsRecipient& recipient);
 
     void showOutOfSyncWarning(bool fShow);
+
+protected:
+    bool eventFilter(QObject *object, QEvent *event) override;
 
 private:
     ClientModel *clientModel;
@@ -106,8 +110,7 @@ private:
     QWidget *settingsShell;
 
     /** Address book page: receiving and sending addresses */
-    QStackedWidget *addressStack;
-    QButtonGroup *addressTabs;
+    QBoxLayout *addressColumns;
     /** Sign page: prove an address, check a signature, multisig */
     SignHubPage *signPage;
     /** Settings page */
@@ -148,6 +151,12 @@ public Q_SLOTS:
     void changePassphrase();
     /** Ask for passphrase to unlock wallet temporarily */
     void unlockWallet();
+    /** Ask for the passphrase to start staking; by default the keys are then open for staking only */
+    void unlockWalletForStaking();
+    /** Lock a wallet that was unlocked for staking only */
+    void lockWalletAfterStaking();
+    /** Add the keys of another wallet from its recovery words */
+    void restoreFromMnemonic();
     /** Check if wallet is unlocked */
     bool isWalletUnlocked();
 

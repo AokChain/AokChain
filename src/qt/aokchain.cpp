@@ -27,6 +27,7 @@
 #include <winshutdownmonitor.h>
 
 #ifdef ENABLE_WALLET
+#include <askpassphrasedialog.h>
 #include <paymentserver.h>
 #include <walletmodel.h>
 #endif
@@ -513,6 +514,23 @@ void AokChainApplication::initializeResult(bool success)
         }
 #endif
 
+#ifdef ENABLE_WALLET
+        // A new wallet gets a passphrase before anything else: the window stays away until then.
+        // (-skipencryptprompt is for tests and scripts that drive the window.)
+        if (walletModel && walletModel->isFreshUnencrypted() && !gArgs.GetBoolArg("-skipencryptprompt", false)) {
+            Q_EMIT splashFinished(window);
+            AskPassphraseDialog dialog(AskPassphraseDialog::Encrypt, nullptr);
+            dialog.setWindowIcon(window->windowIcon());
+            dialog.setModel(walletModel);
+            dialog.setOnboarding();
+            dialog.exec();
+            // encrypted: the dialog asked for the restart. Otherwise the user chose to leave.
+            if (!GUIUtil::restartRequested())
+                quit();
+            return;
+        }
+#endif
+
         // If -min option passed, start window minimized.
         if(gArgs.GetBoolArg("-min", false))
         {
@@ -534,6 +552,15 @@ void AokChainApplication::initializeResult(bool success)
         connect(paymentServer, SIGNAL(message(QString,QString,unsigned int)),
                          window, SLOT(message(QString,QString,unsigned int)));
         QTimer::singleShot(100, paymentServer, SLOT(uiReady()));
+        // the start after the wallet was encrypted: the last step is the backup
+        if (walletModel && gArgs.GetBoolArg("-backupprompt", false) && walletModel->getEncryptionStatus() != WalletModel::Unencrypted) {
+            QTimer::singleShot(300, window, [this] {
+                BackupPromptDialog *dialog = new BackupPromptDialog(walletModel, window);
+                dialog->setAttribute(Qt::WA_DeleteOnClose);
+                dialog->setWindowModality(Qt::ApplicationModal);
+                dialog->show();
+            });
+        }
 #endif
     } else {
         quit(); // Exit main loop
@@ -637,6 +664,10 @@ int main(int argc, char *argv[])
         return EXIT_SUCCESS;
     }
 
+    // Fonts, palette and style sheet of the theme: the first-run screens use them as well
+    GUIUtil::loadAppFonts();
+    GUIUtil::applyTheme(app);
+
     /// 5. Now that settings and translations are available, ask user for data directory
     // User language is set up: pick a data directory
     // (the dialog can change the language: the translations are then loaded again)
@@ -681,7 +712,15 @@ int main(int argc, char *argv[])
     QScopedPointer<const NetworkStyle> networkStyle(NetworkStyle::instantiate(QString::fromStdString(Params().NetworkIDString())));
     assert(!networkStyle.isNull());
     // Allow for separate UI settings for testnets
+    const QString mainLanguage = QSettings().value("language", "").toString();
     QApplication::setApplicationName(networkStyle->getAppName());
+    {
+        // a test network that was never started takes the language of the main settings,
+        // which is where the first-run screen stores the choice
+        QSettings networkSettings;
+        if (!networkSettings.contains("language") && !mainLanguage.isEmpty())
+            networkSettings.setValue("language", mainLanguage);
+    }
     // Re-initialize translations after changing application name (language in network-specific settings can be different)
     initTranslations(qtTranslatorBase, qtTranslator, translatorBase, translator);
 
@@ -719,9 +758,6 @@ int main(int argc, char *argv[])
     // Load GUI settings from QSettings
     app.createOptionsModel(gArgs.IsArgSet("-resetguisettings"));
 
-    // Fonts, palette and style sheet of the theme
-    GUIUtil::loadAppFonts();
-    GUIUtil::applyTheme(app);
     // the block bootstrap of the GUI fetches with the network stack of Qt: https and redirects
     SetBootstrapFetcher(QtBootstrapFetch, true);
 
@@ -764,6 +800,9 @@ int main(int argc, char *argv[])
         const QString program = QCoreApplication::applicationFilePath();
         if (!arguments.isEmpty())
             arguments.removeFirst();
+        // one-time arguments of this start do not carry over; those asked for with the restart do
+        arguments.removeAll("-backupprompt");
+        arguments += GUIUtil::restartArguments();
         // the new process waits a moment: on Windows the lock of the data directory is only
         // released when this process has ended
         qputenv("AOKCHAIN_RESTART_DELAY", "1");
