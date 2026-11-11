@@ -171,7 +171,7 @@ public:
 
 TransactionView::TransactionView(const PlatformStyle *platformStyle, QWidget *parent) :
     QWidget(parent), model(0), transactionProxyModel(0),
-    transactionView(0), abandonAction(0), bumpFeeAction(0), columnResizingFixer(0)
+    transactionView(0), abandonAction(0), bumpFeeAction(0), columnResizingFixer(0), assetRowsSeen(0), assetRescan(false)
 {
     const GUIUtil::Theme& theme = GUIUtil::theme();
 
@@ -497,7 +497,7 @@ void TransactionView::setModel(WalletModel *_model)
         // The past year is shown at first; "all time" is one of the choices
         chooseDate(dateWidget->currentIndex());
         updateAssetList();
-        connect(_model->getTransactionTableModel(), SIGNAL(rowsInserted(QModelIndex,int,int)), assetListTimer, SLOT(start()));
+        connect(_model->getTransactionTableModel(), SIGNAL(rowsInserted(QModelIndex,int,int)), this, SLOT(assetRowsInserted(QModelIndex,int,int)));
 
         // show/hide column Watch-only
         updateWatchOnlyColumn(_model->haveWatchOnly());
@@ -631,6 +631,31 @@ void TransactionView::changedTokenName()
     transactionProxyModel->setAssetName(assetWidget->currentData().toString());
 }
 
+/** Remember the root of the asset of a row of the transaction table. */
+void TransactionView::noteAssetRow(int row)
+{
+    const QString name = model->getTransactionTableModel()->index(row, 0).data(TransactionTableModel::AssetNameRole).toString();
+    int end = 0;
+    while (end < name.size() && name[end] != '/' && name[end] != '#' && name[end] != '!')
+        ++end;
+    assetRoots.insert(name.left(end));
+}
+
+void TransactionView::assetRowsInserted(const QModelIndex &parent, int first, int last)
+{
+    Q_UNUSED(parent);
+    if (!model || !model->getTransactionTableModel())
+        return;
+    // a few new rows are looked at right away; a large batch is left to one pass over the table
+    if (last - first > 2000) {
+        assetRescan = true;
+    } else {
+        for (int row = first; row <= last; ++row)
+            noteAssetRow(row);
+    }
+    assetListTimer->start();
+}
+
 /** Fill the asset filter with what occurs in the transactions: AOK first, then the root tokens by
     name. Sub and unique tokens are not listed (there can be tens of thousands); choosing a root
     shows them as well. */
@@ -638,17 +663,24 @@ void TransactionView::updateAssetList()
 {
     if (!model || !model->getTransactionTableModel())
         return;
+    GUIUtil::LogTimer timer("transfers asset list");
     TransactionTableModel *ttm = model->getTransactionTableModel();
-    QSet<QString> names;
+    // New rows are looked at when they are inserted (assetRowsInserted); the whole table is
+    // read once, and again when rows were removed or very many arrived at once.
     const int rows = ttm->rowCount(QModelIndex());
-    for (int row = 0; row < rows; ++row)
-    {
-        const QString name = ttm->index(row, 0).data(TransactionTableModel::AssetNameRole).toString();
-        int end = 0;
-        while (end < name.size() && name[end] != '/' && name[end] != '#' && name[end] != '!')
-            ++end;
-        names.insert(name.left(end));
+    const int before = assetRoots.size();
+    const bool all = assetRowsSeen == 0 || rows < assetRowsSeen || assetRescan;
+    if (all) {
+        assetRoots.clear();
+        for (int row = 0; row < rows; ++row)
+            noteAssetRow(row);
+        assetRescan = false;
     }
+    assetRowsSeen = rows;
+    timer.setDetail(QString("%1 rows, %2").arg(rows).arg(all ? "all rows" : "list only"));
+    if (!all && assetRoots.size() == before && assetWidget->count() > 1)
+        return; // nothing new to list
+    QSet<QString> names = assetRoots;
     names.remove(QString());
     QStringList tokens = names.values();
     tokens.removeAll("AOK");

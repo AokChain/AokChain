@@ -1140,6 +1140,7 @@ void ReissueTokenDialog::onUnitChanged(int value)
 
 void ReissueTokenDialog::updateTokensList()
 {
+    GUIUtil::LogTimer timer("manage token dialog list");
     LOCK(cs_main);
     std::vector<std::string> tokens;
     GetAllAdministrativeTokens(model->getWallet(), tokens, 0);

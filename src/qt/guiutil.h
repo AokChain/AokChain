@@ -338,6 +338,20 @@ namespace GUIUtil
         QList<int> amountColumns;
     };
 
+    /** Logs how long a piece of GUI work took, in the "qt" debug category (-debug=qt). */
+    class LogTimer
+    {
+    public:
+        explicit LogTimer(const QString& what);
+        ~LogTimer();
+        void setDetail(const QString& detail) { m_detail = detail; }
+
+    private:
+        QString m_what;
+        QString m_detail;
+        qint64 m_start;
+    };
+
     class ClickableLabel : public QLabel
     {
         Q_OBJECT

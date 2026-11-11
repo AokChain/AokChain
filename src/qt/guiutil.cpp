@@ -19,6 +19,7 @@
 #include "script/script.h"
 #include "script/standard.h"
 #include "util.h"
+#include "utiltime.h"
 
 #ifdef WIN32
 #ifdef _WIN32_WINNT
@@ -403,6 +404,16 @@ void paintDirectionTile(QPainter* painter, const QRect& tile, bool outgoing, boo
     const QPixmap icon = lineIcon(reward ? "stake" : (outgoing ? "send" : "receive"), 16, outgoing ? t.negative : t.positive, 2.4);
     painter->drawPixmap(tile.left() + (tile.width() - 16) / 2, tile.top() + (tile.height() - 16) / 2, icon);
     painter->restore();
+}
+
+LogTimer::LogTimer(const QString& what) : m_what(what), m_start(GetTimeMicros())
+{
+}
+
+LogTimer::~LogTimer()
+{
+    LogPrint(BCLog::QT, "GUI timing: %s%s %.1f ms\n", m_what.toStdString(), m_detail.isEmpty() ? "" : " (" + m_detail.toStdString() + ")",
+             (GetTimeMicros() - m_start) / 1000.0);
 }
 
 QString monoHtml(const QString& escapedText)

@@ -5,6 +5,7 @@
 #include "tokenlists.h"
 
 #include "guiutil.h"
+#include "tokenrecord.h"
 #include "tokentablemodel.h"
 
 #include <QHBoxLayout>
@@ -19,7 +20,7 @@
 #include <algorithm>
 
 /** Most rows a list shows; the user narrows the search to see others. */
-static const int LIST_CAP = 200;
+static const int LIST_CAP = TokenLimits::LIST_ROWS;
 
 QString TokenNames::root(const QString& name)
 {
@@ -50,6 +51,18 @@ HeldTokenIndex::HeldTokenIndex(QObject *parent) : QObject(parent), source(nullpt
 {
 }
 
+HeldTokenIndex *HeldTokenIndex::forModel(TokenTableModel *model)
+{
+    if (!model)
+        return nullptr;
+    HeldTokenIndex *index = model->findChild<HeldTokenIndex*>(QString(), Qt::FindDirectChildrenOnly);
+    if (!index) {
+        index = new HeldTokenIndex(model);
+        index->setSourceModel(model);
+    }
+    return index;
+}
+
 void HeldTokenIndex::setSourceModel(TokenTableModel *model)
 {
     source = model;
@@ -62,22 +75,25 @@ void HeldTokenIndex::setSourceModel(TokenTableModel *model)
 
 void HeldTokenIndex::rebuild()
 {
+    GUIUtil::LogTimer timer("held token index rebuild");
     all.clear();
     rootList.clear();
     if (source) {
-        const int rows = source->rowCount(QModelIndex());
-        all.reserve(rows);
-        for (int row = 0; row < rows; ++row) {
-            const QModelIndex index = source->index(row, 0);
+        // straight from the records of the model: one pass, no QVariant per field
+        const QList<TokenRecord>& records = source->records();
+        all.reserve(records.size());
+        for (const TokenRecord& record : records) {
             HeldToken token;
-            token.name = index.data(TokenTableModel::TokenNameRole).toString();
-            token.admin = index.data(TokenTableModel::AdministratorRole).toBool();
-            token.locked = index.data(TokenTableModel::IsLockedRole).toBool();
+            token.name = QString::fromStdString(record.name);
+            token.admin = record.fIsAdministrator;
+            token.locked = record.fIsLocked;
+            token.quantity = record.quantity;
+            token.units = record.units;
             if (token.locked && token.name.endsWith(" (LOCKED)"))
                 token.name.chop(9);
             token.held = !token.name.endsWith('!');
             if (token.held)
-                token.amount = index.data(TokenTableModel::FormattedAmountRole).toString();
+                token.amount = QString::fromStdString(record.formattedQuantity());
             else
                 token.name.chop(1);
             all.push_back(token);
@@ -126,6 +142,7 @@ void HeldTokenIndex::rebuild()
         }
         rootList = merged;
     }
+    timer.setDetail(QString("%1 tokens, %2 roots").arg(all.size()).arg(rootList.size()));
     Q_EMIT changed();
 }
 
@@ -372,6 +389,7 @@ TokenListDialog::TokenListDialog(HeldTokenIndex *_index, const QString& _root, P
 
 void TokenListDialog::refill()
 {
+    GUIUtil::LogTimer timer("token list dialog refill");
     const QString text = search->text().trimmed();
     bool more = false;
     if (!root.isEmpty()) {

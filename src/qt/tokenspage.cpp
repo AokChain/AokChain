@@ -30,7 +30,7 @@
 /** Tokens of the chain that are read at a time. */
 static const int PAGE_SIZE = 60;
 /** Cards that are made at most. Root tokens are few; this only bounds the number of widgets. */
-static const int MAX_CARDS = 120;
+static const int MAX_CARDS = TokenLimits::ROOT_CARDS;
 static const int CARD_WIDTH = 250;
 static const int CARD_GAP = 16;
 
@@ -111,7 +111,7 @@ static QLabel *caption(const QString& text, QWidget *parent)
 }
 
 TokensPage::TokensPage(const PlatformStyle *platformStyle, QWidget *parent) :
-    QWidget(parent), model(nullptr), heldTokens(new HeldTokenIndex(this)), columns(0), generation(0), nextStart(0), loading(false), loadedOnce(false)
+    QWidget(parent), model(nullptr), heldTokens(nullptr), columns(0), generation(0), nextStart(0), loading(false), loadedOnce(false)
 {
     const GUIUtil::Theme& theme = GUIUtil::theme();
     QVBoxLayout *outer = new QVBoxLayout(this);
@@ -219,8 +219,8 @@ void TokensPage::setModel(WalletModel *_model)
 {
     model = _model;
     if (model && model->getTokenTableModel()) {
+        heldTokens = HeldTokenIndex::forModel(model->getTokenTableModel());
         connect(heldTokens, SIGNAL(changed()), this, SLOT(scheduleRebuild()));
-        heldTokens->setSourceModel(model->getTokenTableModel());
         rebuildHeld();
     }
 }
@@ -237,22 +237,38 @@ void TokensPage::scheduleRebuild()
  */
 void TokensPage::rebuildHeld()
 {
-    if (!model)
+    if (!model || !heldTokens)
         return;
+    // The cards are made again only when a root changed. Sub and unique tokens that come
+    // and go change the count on the card of their root, nothing else.
+    QString signature;
+    int listed = 0;
+    for (const RootToken& root : heldTokens->roots()) {
+        if (listed++ >= MAX_CARDS)
+            break;
+        signature += root.name + QChar('|') + root.amount + QChar('|') + QString::number(root.children) +
+                     (root.held ? "h" : "-") + (root.admin ? "a" : "-") + (root.locked ? "l" : "-") + QChar('\n');
+    }
+    signature += QString::number(heldTokens->roots().size());
+    if (signature == cardSignature && !cards.isEmpty())
+        return;
+    cardSignature = signature;
+    GUIUtil::LogTimer timer("tokens page cards rebuild");
     for (QWidget *card : cards)
         card->deleteLater();
     cards.clear();
     const QSet<QString> before = heldNames;
     heldNames.clear();
+    for (const RootToken& root : heldTokens->roots())
+        heldNames.insert(root.name);
 
     const GUIUtil::Theme& theme = GUIUtil::theme();
     const QVector<RootToken>& roots = heldTokens->roots();
     LOCK(cs_main);
     auto cache = GetCurrentTokenCache();
     for (const RootToken& root : roots) {
-        heldNames.insert(root.name);
         if (cards.size() >= MAX_CARDS)
-            continue;
+            break;
         QFrame *card = new QFrame(this);
         card->setProperty("role", "tokenCard");
         card->setFixedHeight(180);
@@ -355,6 +371,8 @@ void TokensPage::rebuildHeld()
 /** The window with the held sub and unique tokens of a root; "Send" there leads to the send page. */
 void TokensPage::showTokensBelow(const QString& root)
 {
+    if (!heldTokens)
+        return;
     TokenListDialog dialog(heldTokens, root, TokenListDialog::Browse, this);
     if (dialog.exec() == QDialog::Accepted && !dialog.chosen().isEmpty())
         Q_EMIT sendToken(dialog.chosen());

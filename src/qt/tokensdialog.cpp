@@ -163,9 +163,8 @@ void TokensDialog::buildLayout()
 
     // The root tokens of the wallet as round buttons; sub tokens and unique tokens are chosen
     // from a list with a search field. Below: the chosen token with its name and what is available.
-    heldTokens = new HeldTokenIndex(this);
+    heldTokens = nullptr; // the index of the wallet's token table, known with the model
     picker = new TokenPicker(formCard);
-    picker->setIndex(heldTokens);
     form->addWidget(picker);
     QHBoxLayout *pickedRow = new QHBoxLayout();
     pickedRow->setContentsMargins(0, 0, 6, 0);
@@ -258,7 +257,7 @@ void TokensDialog::tokenPicked(const QString &name)
         }
     }
     // "N sub tokens ›" next to the name of a root that has held tokens below it
-    const RootToken *root = name.isEmpty() ? nullptr : heldTokens->findRoot(TokenNames::root(name));
+    const RootToken *root = name.isEmpty() || !heldTokens ? nullptr : heldTokens->findRoot(TokenNames::root(name));
     belowButton->setVisible(root && root->children > 0);
     if (root)
         belowButton->setText(tr("%1 sub tokens").arg(root->children));
@@ -412,7 +411,8 @@ void TokensDialog::setModel(WalletModel *_model)
         connect(_model->getOptionsModel(), SIGNAL(customFeeFeaturesChanged(bool)), this, SLOT(customFeeFeatureChanged(bool)));
 
 
-        heldTokens->setSourceModel(_model->getTokenTableModel());
+        heldTokens = HeldTokenIndex::forModel(_model->getTokenTableModel());
+        picker->setIndex(heldTokens);
         refreshTokens();
         ui->frameTokenControl->setVisible(false);
         ui->frameTokenControl->setVisible(_model->getOptionsModel()->getCoinControlFeatures());

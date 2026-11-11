@@ -391,7 +391,7 @@ bool StatsStrip::eventFilter(QObject *object, QEvent *event)
 
 static const int PICK = 44;     // size of a round token button
 static const int PICK_GAP = 8;
-static const int PICK_MAX = 20; // root tokens shown without the list
+static const int PICK_MAX = TokenLimits::ICON_ROW; // root tokens shown without the list
 
 TokenPicker::TokenPicker(QWidget *parent) : QWidget(parent), index(nullptr), hover(-1)
 {
@@ -403,6 +403,8 @@ TokenPicker::TokenPicker(QWidget *parent) : QWidget(parent), index(nullptr), hov
 
 void TokenPicker::setIndex(HeldTokenIndex *_index)
 {
+    if (index == _index || !_index)
+        return;
     index = _index;
     connect(index, SIGNAL(changed()), this, SLOT(indexChanged()));
     indexChanged();
@@ -410,6 +412,8 @@ void TokenPicker::setIndex(HeldTokenIndex *_index)
 
 void TokenPicker::indexChanged()
 {
+    if (!index)
+        return;
     // the chosen token may be gone
     HeldToken token;
     if (!selected.isEmpty() && !(index->find(selected, &token) && token.held)) {

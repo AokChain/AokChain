@@ -373,7 +373,7 @@ OverviewPage::OverviewPage(const PlatformStyle *platformStyle, QWidget *parent) 
     currentLockedBalance(-1),
     outOfSync(true),
     statsPending(false),
-    heldTokens(new HeldTokenIndex(this)),
+    heldTokens(nullptr),
     rootModel(nullptr),
     transactionLimit(NUM_ITEMS),
     txdelegate(new TxViewDelegate(platformStyle, this)),
@@ -808,7 +808,7 @@ void OverviewPage::setWalletModel(WalletModel *model)
         listTransactions->setModel(filter.get());
         listTransactions->setModelColumn(TransactionTableModel::ToAddress);
 
-        heldTokens->setSourceModel(model->getTokenTableModel());
+        heldTokens = HeldTokenIndex::forModel(model->getTokenTableModel());
         rootModel = new OverviewRootModel(heldTokens, this);
         listTokens->setModel(rootModel);
         connect(rootModel, SIGNAL(modelReset()), this, SLOT(updateTokenCount()));
@@ -878,6 +878,8 @@ void OverviewPage::searchSubmitted()
 /** The window with the sub and unique tokens of a root. "Send" there leads to the send page. */
 void OverviewPage::showTokensBelow(const QString &root)
 {
+    if (!heldTokens)
+        return;
     TokenListDialog dialog(heldTokens, root, TokenListDialog::Browse, this);
     if (dialog.exec() == QDialog::Accepted && !dialog.chosen().isEmpty())
         Q_EMIT sendTokenRequested(dialog.chosen());

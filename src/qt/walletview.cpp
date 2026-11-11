@@ -290,6 +290,7 @@ void WalletView::setWalletModel(WalletModel *_walletModel)
 
 void WalletView::processNewTransaction(const QModelIndex& parent, int start, int end)
 {
+    GUIUtil::LogTimer timer("processNewTransaction");
     /** Everytime we get an new transaction. We should check to see if tokens are enabled or not */
     overviewPage->showTokens();
     
@@ -325,8 +326,12 @@ void WalletView::processNewTransaction(const QModelIndex& parent, int start, int
     Q_EMIT checkTokens();
 
     tokensPage->processNewTransaction();
-    createTokensPage->updateTokenList();
-    manageTokensPage->updateTokensList();
+    // The lists of the create and manage pages name every owner token of the wallet and are read
+    // with a scan of the wallet: they are brought up to date when one of these pages is shown.
+    if (currentWidget() == createTokensShell)
+        createTokensPage->updateTokenList();
+    if (currentWidget() == manageTokensShell)
+        manageTokensPage->updateTokensList();
 
 }
 
@@ -544,11 +549,13 @@ void WalletView::gotoTokensPage()
 
 void WalletView::gotoCreateTokensPage()
 {
+    createTokensPage->updateTokenList();
     setCurrentWidget(createTokensShell);
 }
 
 void WalletView::gotoManageTokensPage()
 {
+    manageTokensPage->updateTokensList();
     setCurrentWidget(manageTokensShell);
 }
 

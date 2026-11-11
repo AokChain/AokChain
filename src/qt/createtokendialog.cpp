@@ -1182,6 +1182,7 @@ void CreateTokenDialog::clearSelected()
 
 void CreateTokenDialog::updateTokenList()
 {
+    GUIUtil::LogTimer timer("create token dialog list");
     QStringList list;
     list << "";
 

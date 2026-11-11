@@ -158,6 +158,7 @@ void WalletModel::pollBalanceChanged()
     if(fForceCheckBalanceChanged || chainActive.Height() != cachedNumBlocks)
     {
         fForceCheckBalanceChanged = false;
+        GUIUtil::LogTimer timer("balance poll after a block or a transaction");
 
         // Balance and number of transactions might have changed
         cachedNumBlocks = chainActive.Height();

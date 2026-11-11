@@ -14,6 +14,8 @@
 #include "guiutil.h"
 #include "optionsmodel.h"
 #include "pagewidgets.h"
+#include "tokenlists.h"
+#include "tokentablemodel.h"
 #include "platformstyle.h"
 #include "walletmodel.h"
 #include "tokencontroldialog.h"
@@ -626,6 +628,7 @@ bool SendTokensEntry::updateLabel(const QString &address)
 
 void SendTokensEntry::onTokenSelected(int index)
 {
+    GUIUtil::LogTimer timer("send entry token selected");
     ui->tokenSelectionBox->lineEdit()->setStyleSheet("");
     QString name = ui->tokenSelectionBox->currentText();
     // If the name
@@ -670,29 +673,37 @@ void SendTokensEntry::onTokenSelected(int index)
     if(!model || !model->getWallet())
         return;
 
-    std::map<std::string, std::vector<COutput> > mapTokens;
-    model->getWallet()->AvailableTokens(mapTokens, true, TokenControlDialog::tokenControl);
-
     // Add back the OWNER_TAG (!) that was removed above
     if (fIsOwnerToken)
         name = name + OWNER_TAG;
 
+    // The balance comes from the token table of the wallet, which is kept up to date in the
+    // background. Only with a selection in the token control the outputs are counted here,
+    // which walks every token output of the wallet.
+    HeldToken held;
+    HeldTokenIndex *heldTokens = HeldTokenIndex::forModel(model->getTokenTableModel());
+    if (!fIsOwnerToken && !TokenControlDialog::tokenControl->HasTokenSelected() && heldTokens && heldTokens->find(name, &held) && held.held) {
+        amount = held.quantity;
+    } else {
+        std::map<std::string, std::vector<COutput> > mapTokens;
+        model->getWallet()->AvailableTokens(mapTokens, true, TokenControlDialog::tokenControl);
 
-    if (!mapTokens.count(name.toStdString())) {
-        clear();
-        ui->messageLabel->show();
-        ui->messageTextLabel->show();
-        ui->messageTextLabel->setText(tr("Failed to get token outpoints from database"));
-        return;
-    }
+        if (!mapTokens.count(name.toStdString())) {
+            clear();
+            ui->messageLabel->show();
+            ui->messageTextLabel->show();
+            ui->messageTextLabel->setText(tr("Failed to get token outpoints from database"));
+            return;
+        }
 
-    auto vec = mapTokens.at(name.toStdString());
+        auto vec = mapTokens.at(name.toStdString());
 
-    // Go through all of the mapTokens to get the total count of tokens
-    for (auto txout : vec) {
-        CTokenOutputEntry data;
-        if (GetTokenData(txout.tx->tx->vout[txout.i].scriptPubKey, data))
-            amount += data.nAmount;
+        // Go through all of the mapTokens to get the total count of tokens
+        for (auto txout : vec) {
+            CTokenOutputEntry data;
+            if (GetTokenData(txout.tx->tx->vout[txout.i].scriptPubKey, data))
+                amount += data.nAmount;
+        }
     }
 
     int units = fIsOwnerToken ? OWNER_UNITS : token.units;

@@ -9,6 +9,8 @@
 
 #include "guiutil.h"
 
+#include <QList>
+#include <QSet>
 #include <QWidget>
 #include <QKeyEvent>
 
@@ -80,6 +82,10 @@ private:
     QLineEdit *amountWidget;
     QComboBox *assetWidget;
     QTimer *assetListTimer;
+    QSet<QString> assetRoots;
+    int assetRowsSeen;
+    bool assetRescan;
+    void noteAssetRow(int row);
 
     bool showingTokens;
 
@@ -136,6 +142,7 @@ public Q_SLOTS:
     void changedAmount();
     void changedTokenName();
     void updateAssetList();
+    void assetRowsInserted(const QModelIndex &parent, int first, int last);
     void changedPrefix();
     void exportClicked();
     void focusTransaction(const QModelIndex&);

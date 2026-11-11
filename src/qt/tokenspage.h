@@ -89,6 +89,7 @@ private:
     QPushButton *moreButton;
 
     HeldTokenIndex *heldTokens;
+    QString cardSignature;
     void showTokensBelow(const QString& root);
     void reflow();
     void startList(bool reset);

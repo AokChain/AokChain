@@ -27,6 +27,14 @@ QT_END_NAMESPACE
  * below a root is reached through a search or through a list of its own.
  * These lists are models with a view: no widget is made per token.
  */
+/** Explicit limits of what the token lists show, however many tokens the wallet holds. */
+namespace TokenLimits
+{
+    const int LIST_ROWS = 200;  //!< rows of a token list or search result (TokenListDialog)
+    const int ROOT_CARDS = 120; //!< cards of the tokens page
+    const int ICON_ROW = 20;    //!< round buttons of the send page
+}
+
 namespace TokenNames
 {
     /** The part before the first '/', '#' or '!' */
@@ -44,7 +52,9 @@ struct HeldToken {
     bool held;          //!< false: only the owner token is held
     bool admin;         //!< the owner token is held
     bool locked;        //!< a locked balance
-    HeldToken() : held(false), admin(false), locked(false) {}
+    qint64 quantity;    //!< in the smallest unit
+    int units;          //!< decimals
+    HeldToken() : held(false), admin(false), locked(false), quantity(0), units(0) {}
 };
 
 /** A root token as the pages show it. */
@@ -66,6 +76,8 @@ class HeldTokenIndex : public QObject
 public:
     explicit HeldTokenIndex(QObject *parent = nullptr);
     void setSourceModel(TokenTableModel *model);
+    /** The one index of a token table model, shared by the pages (made on first use) */
+    static HeldTokenIndex *forModel(TokenTableModel *model);
 
     const QVector<RootToken>& roots() const { return rootList; }
     const RootToken *findRoot(const QString& name) const;
