@@ -201,9 +201,6 @@ AokChainGUI::AokChainGUI(const PlatformStyle *_platformStyle, const NetworkStyle
 
     loadFonts();
 
-#if !defined(Q_OS_MAC)
-    this->setFont(QFont("Montserrat"));
-#endif
 
     footerWidget = new QWidget();
 
@@ -264,26 +261,14 @@ AokChainGUI::AokChainGUI(const PlatformStyle *_platformStyle, const NetworkStyle
     // Progress bar and label for blocks download
     progressBarLabel = new QLabel();
     progressBarLabel->setVisible(false);
-    progressBarLabel->setStyleSheet(QString(".QLabel { color : %1; }").arg(platformStyle->TextColor().name()));
     progressBar = new GUIUtil::ProgressBar();
     progressBar->setAlignment(Qt::AlignCenter);
     progressBar->setVisible(false);
-
-    // Override style sheet for progress bar for styles that have a segmented progress bar,
-    // as they make the text unreadable (workaround for issue #1071)
-    // See https://qt-project.org/doc/qt-4.8/gallery.html
-    QString curStyle = QApplication::style()->metaObject()->className();
-    if(curStyle == "QWindowsStyle" || curStyle == "QWindowsXPStyle")
-    {
-        progressBar->setStyleSheet("QProgressBar { background-color: #e8e8e8; border: 1px solid grey; border-radius: 7px; padding: 1px; text-align: center; } QProgressBar::chunk { background: QLinearGradient(x1: 0, y1: 0, x2: 1, y2: 0, stop: 0 #FF8000, stop: 1 orange); border-radius: 7px; margin: 0px; }");
-    }
 
     statusBar()->addWidget(progressBarLabel);
     statusBar()->addWidget(progressBar);
     statusBar()->addPermanentWidget(frameBlocks);
 
-    if(darkModeEnabled)
-        statusBar()->setStyleSheet(QString(".QStatusBar{background-color: %1; border-top: 1px solid %2;}").arg(platformStyle->TopWidgetBackGroundColor().name(), platformStyle->TextColor().name()));
 
     // Install event filter to be able to catch status tip events (QEvent::StatusTip)
     this->installEventFilter(this);
@@ -326,22 +311,14 @@ AokChainGUI::~AokChainGUI()
 
 void AokChainGUI::loadFonts()
 {
-    QFontDatabase::addApplicationFont(":/fonts/montserrat-bold");
-    QFontDatabase::addApplicationFont(":/fonts/montserrat-reqular");
-    QFontDatabase::addApplicationFont(":/fonts/montserrat-semibold");
-    QFontDatabase::addApplicationFont(":/fonts/montserrat-light");
+    // The fonts are registered once for the application, see GUIUtil::loadAppFonts()
 }
 
 
 void AokChainGUI::createActions()
 {
-    QFont font = QFont();
-    font.setPixelSize(15);
-    font.setLetterSpacing(QFont::SpacingType::AbsoluteSpacing, -0.43);
-#if !defined(Q_OS_MAC)
-    font.setFamily("Open Sans");
-#endif
-    font.setWeight(QFont::Weight::ExtraLight);
+    // size and weight of the page tabs come from the style sheet
+    QFont font = GUIUtil::appFont(14, QFont::Medium);
 
     QActionGroup *tabGroup = new QActionGroup(this);
 
@@ -564,12 +541,8 @@ void AokChainGUI::createToolBars()
     if(walletFrame)
     {
         QToolBar *toolbar = addToolBar(tr("Tabs toolbar"));
-        toolbar->setStyleSheet(
-                "QToolBar{background-color: #ffffff; border: 0px;}"
-                "QToolButton{transbackground-color: transparent; border: 0px; border-bottom: 3px solid white;}"
-                "QToolButton:checked{background-color: #f3f3f3; border: 0px; border-bottom: 3px solid #116961;}"
-                "QToolButton:checked:hover{background-color: #f3f3f3; border: 0px; border-bottom: 3px solid #116961;}"
-                "QToolButton:hover{background-color: #f3f3f3; border: 0px; border-bottom: 3px solid #f3f3f3;}");
+        toolbar->setObjectName("tabsToolbar");
+        toolbar->setIconSize(QSize(18, 18));
 
         toolbar->setContextMenuPolicy(Qt::PreventContextMenu);
         toolbar->setMovable(false);
@@ -587,21 +560,25 @@ void AokChainGUI::createToolBars()
         
         overviewAction->setChecked(true);
 
-        QString mainWalletWidgetStyle = QString(".QWidget{background-color: %1}").arg(platformStyle->MainBackGroundColor().name());
         QWidget* mainWalletWidget = new QWidget();
-        mainWalletWidget->setStyleSheet(mainWalletWidgetStyle);
+        mainWalletWidget->setObjectName("mainWalletWidget");
 
         // Set the headers widget options
         footerWidget->setContentsMargins(0,0,0,0);
-        footerWidget->setStyleSheet(QString(".QWidget {background-color: #ffffff;}"));
-        footerWidget->setFixedHeight(50);
+        footerWidget->setObjectName("footerWidget");
+        footerWidget->setAttribute(Qt::WA_StyledBackground, true);
+        footerWidget->setFixedHeight(56);
 
         stakingButton = new QPushButton(this);
         connect(stakingButton, SIGNAL(clicked()), this, SLOT(toggleStakingActive()));
-        stakingButton->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
         stakingButton->setText(tr("Start Staking"));
+        stakingButton->setProperty("primary", true);
+        stakingButton->setMinimumWidth(180);
+        stakingButton->setCursor(Qt::PointingHandCursor);
 
         QHBoxLayout* footerLayout = new QHBoxLayout(footerWidget);
+        footerLayout->setContentsMargins(16, 10, 16, 10);
+        footerLayout->addStretch();
         footerLayout->addWidget(stakingButton);
 
         // Create the layout for widget to the top of the tool bar

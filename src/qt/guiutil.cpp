@@ -64,6 +64,10 @@
 
 #if QT_VERSION >= 0x50200
 #include <QFontDatabase>
+#include <QDebug>
+#include <QFile>
+#include <QPalette>
+#include <QStyleFactory>
 #endif
 
 #ifdef WIN32
@@ -85,64 +89,150 @@ extern double NSAppKitVersionNumber;
 
 namespace GUIUtil {
 
+const Theme& theme()
+{
+    static const Theme light = {
+        QColor("#F4F6F8"), QColor("#FFFFFF"), QColor("#F7F9FA"), QColor("#DFE4EA"), QColor("#C5CDD6"),
+        QColor("#17212B"), QColor("#5F6B7A"), QColor("#9AA5B1"),
+        QColor("#0A6C80"), QColor("#085A6B"), QColor("#064957"), QColor("#E3F1F4"), QColor("#FFFFFF"),
+        QColor("#16855B"), QColor("#D03B3B"), QColor("#FFF6DB"), QColor("#7A5200"), QColor("#F0D58A"),
+    };
+    static const Theme dark = {
+        QColor("#12161B"), QColor("#1A2027"), QColor("#212830"), QColor("#2B343E"), QColor("#3A4552"),
+        QColor("#E7ECF1"), QColor("#9BA7B4"), QColor("#5F6B78"),
+        QColor("#2BA3BA"), QColor("#3BB5CC"), QColor("#2390A5"), QColor("#16343B"), QColor("#06181D"),
+        QColor("#3CC28A"), QColor("#F06A6A"), QColor("#3A2F12"), QColor("#F2D48A"), QColor("#5A4A1E"),
+    };
+    return darkModeEnabled ? dark : light;
+}
+
+void loadAppFonts()
+{
+    for (const char* name : {"NotoSans-Regular", "NotoSans-Medium", "NotoSans-SemiBold", "NotoSans-Bold",
+                             "NotoSansKR-Regular", "NotoSansKR-Bold"}) {
+        if (QFontDatabase::addApplicationFont(QString(":/fonts/%1").arg(name)) < 0)
+            qWarning() << "Could not load the font" << name;
+    }
+}
+
+QFont appFont(int pixelSize, int weight)
+{
+    QFont font;
+#if QT_VERSION >= QT_VERSION_CHECK(5, 13, 0)
+    // Latin from Noto Sans, Hangul and CJK from Noto Sans KR
+    font.setFamilies({"Noto Sans", "Noto Sans KR"});
+#else
+    font.setFamily("Noto Sans");
+#endif
+    font.setPixelSize(pixelSize);
+    font.setWeight(weight);
+    font.setStyleStrategy(QFont::PreferAntialias);
+    return font;
+}
+
+void applyTheme(QApplication& app, bool dark)
+{
+    darkModeEnabled = dark;
+    const Theme& t = theme();
+
+    // The same widget style on every platform, colored by the palette
+    app.setStyle(QStyleFactory::create("Fusion"));
+    QFont::insertSubstitution("Noto Sans", "Noto Sans KR");
+    app.setFont(appFont());
+
+    QPalette p;
+    p.setColor(QPalette::Window, t.bg);
+    p.setColor(QPalette::WindowText, t.text);
+    p.setColor(QPalette::Base, t.surface);
+    p.setColor(QPalette::AlternateBase, t.surfaceAlt);
+    p.setColor(QPalette::Text, t.text);
+    p.setColor(QPalette::Button, t.surface);
+    p.setColor(QPalette::ButtonText, t.text);
+    p.setColor(QPalette::BrightText, t.negative);
+    p.setColor(QPalette::ToolTipBase, t.surface);
+    p.setColor(QPalette::ToolTipText, t.text);
+    p.setColor(QPalette::Highlight, t.accent);
+    p.setColor(QPalette::HighlightedText, t.onAccent);
+    p.setColor(QPalette::Link, t.accent);
+    p.setColor(QPalette::LinkVisited, t.accentPressed);
+    p.setColor(QPalette::Light, t.surface);
+    p.setColor(QPalette::Midlight, t.surfaceAlt);
+    p.setColor(QPalette::Mid, t.border);
+    p.setColor(QPalette::Dark, t.borderStrong);
+    p.setColor(QPalette::Shadow, t.borderStrong);
+#if QT_VERSION >= QT_VERSION_CHECK(5, 12, 0)
+    p.setColor(QPalette::PlaceholderText, t.textDisabled);
+#endif
+    for (QPalette::ColorRole role : {QPalette::WindowText, QPalette::Text, QPalette::ButtonText})
+        p.setColor(QPalette::Disabled, role, t.textDisabled);
+    app.setPalette(p);
+
+    QFile file(":/css/theme");
+    if (!file.open(QIODevice::ReadOnly | QIODevice::Text)) {
+        qWarning() << "Could not load the theme style sheet";
+        return;
+    }
+    QString qss = QString::fromUtf8(file.readAll());
+    // longer names first, so that @accent does not eat @accentHover
+    const std::pair<const char*, QColor> tokens[] = {
+        {"@accentPressed", t.accentPressed}, {"@accentHover", t.accentHover}, {"@accentSoft", t.accentSoft},
+        {"@borderStrong", t.borderStrong}, {"@textSecondary", t.textSecondary}, {"@textDisabled", t.textDisabled},
+        {"@surfaceAlt", t.surfaceAlt}, {"@warnBorder", t.warnBorder}, {"@warnText", t.warnText}, {"@warnBg", t.warnBg},
+        {"@onAccent", t.onAccent}, {"@positive", t.positive}, {"@negative", t.negative}, {"@surface", t.surface},
+        {"@accent", t.accent}, {"@border", t.border}, {"@text", t.text}, {"@bg", t.bg},
+    };
+    for (const std::pair<const char*, QColor>& token : tokens)
+        qss.replace(token.first, token.second.name());
+    app.setStyleSheet(qss);
+}
+
+QString labelColorStyle()
+{
+    return QString("color: %1").arg(theme().text.name());
+}
+
+QString invalidFieldStyle()
+{
+    const Theme& t = theme();
+    return QString("background-color: %1; border: 1px solid %2; border-radius: 6px; padding: 5px 8px;")
+        .arg(darkModeEnabled ? "#3A1F22" : "#FDECEC", t.negative.name());
+}
+
+QString validFieldStyle()
+{
+    return QString();
+}
+
+QString cardFrameStyle(const QString& selector)
+{
+    const Theme& t = theme();
+    return QString("%1 { background-color: %2; border: 1px solid %3; border-radius: 10px; padding: 10px 8px; }")
+        .arg(selector, t.surface.name(), t.border.name());
+}
+
 QFont getSubLabelFont()
 {
-    QFont labelSubFont;
-#if !defined(Q_OS_MAC)
-    labelSubFont.setFamily("Open Sans");
-#endif
-    labelSubFont.setWeight(QFont::Weight::ExtraLight);
-    labelSubFont.setLetterSpacing(QFont::SpacingType::AbsoluteSpacing, -0.6);
-    labelSubFont.setPixelSize(14);
-    return labelSubFont;
+    return appFont(13, QFont::Normal);
 }
 
 QFont getSubLabelFontBolded()
 {
-    QFont labelSubFont;
-#if !defined(Q_OS_MAC)
-    labelSubFont.setFamily("Open Sans");
-#endif
-    labelSubFont.setWeight(QFont::Weight::Bold);
-    labelSubFont.setLetterSpacing(QFont::SpacingType::AbsoluteSpacing, -0.6);
-    labelSubFont.setPixelSize(14);
-    return labelSubFont;
+    return appFont(13, QFont::DemiBold);
 }
 
 QFont getTopLabelFontBolded()
 {
-    QFont labelTopFont;
-#if !defined(Q_OS_MAC)
-    labelTopFont.setFamily("Open Sans");
-#endif
-    labelTopFont.setWeight(QFont::Weight::Bold);
-    labelTopFont.setLetterSpacing(QFont::SpacingType::AbsoluteSpacing, -0.6);
-    labelTopFont.setPixelSize(18);
-    return labelTopFont;
+    return appFont(16, QFont::DemiBold);
 }
 
 QFont getTopLabelFont(int weight, int pxsize)
 {
-    QFont labelTopFont;
-#if !defined(Q_OS_MAC)
-    labelTopFont.setFamily("Open Sans");
-#endif
-    labelTopFont.setWeight(weight);
-    labelTopFont.setLetterSpacing(QFont::SpacingType::AbsoluteSpacing, -0.6);
-    labelTopFont.setPixelSize(pxsize);
-    return labelTopFont;
+    return appFont(pxsize, weight);
 }
 
 QFont getTopLabelFont()
 {
-    QFont labelTopFont;
-#if !defined(Q_OS_MAC)
-    labelTopFont.setFamily("Open Sans");
-#endif
-    labelTopFont.setWeight(QFont::Weight::Light);
-    labelTopFont.setLetterSpacing(QFont::SpacingType::AbsoluteSpacing, -0.6);
-    labelTopFont.setPixelSize(18);
-    return labelTopFont;
+    return appFont(16, QFont::DemiBold);
 }
 
 QString dateTimeStr(const QDateTime &date)

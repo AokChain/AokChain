@@ -234,6 +234,10 @@
 <context>
     <name>AokChainGUI</name>
     <message>
+        <source>&amp;Wallet</source>
+        <translation>지갑(&amp;W)</translation>
+    </message>
+    <message>
         <source>Sign &amp;message...</source>
         <translation>메시지 서명(&amp;M)...</translation>
     </message>
@@ -561,11 +565,11 @@
     </message>
     <message>
         <source>Start Staking</source>
-        <translation>Start Staking</translation>
+        <translation>스테이킹 시작</translation>
     </message>
     <message>
         <source>Stop Staking</source>
-        <translation>Stop Staking</translation>
+        <translation>스테이킹 중지</translation>
     </message>
 </context>
 <context>
@@ -1056,6 +1060,14 @@
 </context>
 <context>
     <name>OptionsDialog</name>
+    <message>
+        <source>&amp;Dark mode</source>
+        <translation>다크 모드(&amp;D)</translation>
+    </message>
+    <message>
+        <source>Use the dark color theme. Takes effect after restarting the client.</source>
+        <translation>어두운 색 테마를 사용합니다. 프로그램을 다시 시작하면 적용됩니다.</translation>
+    </message>
     <message>
         <source>Options</source>
         <translation>환경설정</translation>
@@ -2927,6 +2939,10 @@
 </context>
 <context>
     <name>TransactionView</name>
+    <message>
+        <source>Token name</source>
+        <translation>토큰 이름</translation>
+    </message>
     <message>
         <source>All</source>
         <translation>전체</translation>

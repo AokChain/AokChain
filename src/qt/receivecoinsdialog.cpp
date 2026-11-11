@@ -33,6 +33,7 @@ ReceiveCoinsDialog::ReceiveCoinsDialog(const PlatformStyle *_platformStyle, QWid
     platformStyle(_platformStyle)
 {
     ui->setupUi(this);
+    ui->receiveButton->setProperty("primary", true);
 
     if (!_platformStyle->getImagesOnButtons()) {
         ui->clearButton->setIcon(QIcon());
@@ -131,7 +132,7 @@ void ReceiveCoinsDialog::accept()
 void ReceiveCoinsDialog::setupRequestFrame(const PlatformStyle *platformStyle)
 {
     /** Update the coincontrol frame */
-    ui->frame2->setStyleSheet(QString(".QFrame {background-color: %1; border: none;}").arg(platformStyle->WidgetBackGroundColor().name()));
+    ui->frame2->setStyleSheet(GUIUtil::cardFrameStyle());
     /** Create the shadow effects on the frames */
 
     ui->label_5->setStyleSheet(STRING_LABEL_COLOR);
@@ -168,7 +169,7 @@ void ReceiveCoinsDialog::setupRequestFrame(const PlatformStyle *platformStyle)
 void ReceiveCoinsDialog::setupHistoryFrame(const PlatformStyle *platformStyle)
 {
     /** Update the coincontrol frame */
-    ui->frame->setStyleSheet(QString(".QFrame {background-color: %1; border: none;}").arg(platformStyle->WidgetBackGroundColor().name()));
+    ui->frame->setStyleSheet(GUIUtil::cardFrameStyle());
     /** Create the shadow effects on the frames */
 
     ui->label_6->setStyleSheet(STRING_LABEL_COLOR);

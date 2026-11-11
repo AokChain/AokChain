@@ -102,7 +102,7 @@ SendTokensEntry::SendTokensEntry(const PlatformStyle *_platformStyle, const QStr
 
     fShowAdministratorList = false;
 
-    this->setStyleSheet(QString(".SendTokensEntry {background-color: %1; padding-top: 10px; padding-right: 30px; border: none;}").arg(platformStyle->SendEntriesBackGroundColor().name()));
+    this->setStyleSheet(GUIUtil::cardFrameStyle(".SendTokensEntry"));
 
     ui->tokenBoxLabel->setStyleSheet(STRING_LABEL_COLOR);
     ui->tokenBoxLabel->setFont(GUIUtil::getSubLabelFont());

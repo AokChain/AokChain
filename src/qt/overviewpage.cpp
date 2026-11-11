@@ -26,7 +26,7 @@
 #include <validation.h>
 #include <utiltime.h>
 
-#define DECORATION_SIZE 54
+#define DECORATION_SIZE 52
 #define NUM_ITEMS 8
 
 #include <QDebug>
@@ -48,44 +48,63 @@ public:
                       const QModelIndex &index ) const
     {
         painter->save();
+        painter->setRenderHint(QPainter::Antialiasing, true);
 
+        const GUIUtil::Theme& theme = GUIUtil::theme();
+        const QRect mainRect = option.rect;
+
+        // Two lines per transaction: date and token name above, address and
+        // amount below, with the type icon on a tinted tile to the left
+        const int iconTile = 34;
+        const QRect tileRect(mainRect.left() + 2, mainRect.top() + (mainRect.height() - iconTile) / 2, iconTile, iconTile);
+        painter->setPen(Qt::NoPen);
+        painter->setBrush(theme.accentSoft);
+        painter->drawRoundedRect(tileRect, 8, 8);
         QIcon icon = qvariant_cast<QIcon>(index.data(TransactionTableModel::RawDecorationRole));
-        QRect mainRect = option.rect;
-        QRect decorationRect(mainRect.topLeft(), QSize(DECORATION_SIZE, DECORATION_SIZE));
-        int xspace = DECORATION_SIZE + 8;
-        int ypad = 6;
-        int halfheight = (mainRect.height() - 2*ypad)/2;
-        QRect amountRect(mainRect.left() + xspace, mainRect.top()+ypad, mainRect.width() - xspace, halfheight);
-        QRect addressRect(mainRect.left() + xspace, mainRect.top()+ypad+halfheight, mainRect.width() - xspace, halfheight);
+        icon = platformStyle->SingleColorIcon(icon, theme.accent);
+        icon.paint(painter, tileRect.adjusted(8, 8, -8, -8));
 
-        icon = platformStyle->SingleColorIcon(icon, COLOR_LABELS);
-        icon.paint(painter, decorationRect);
+        const int xspace = iconTile + 14;
+        const int ypad = 7;
+        const int halfheight = (mainRect.height() - 2*ypad)/2;
+        const QRect topRect(mainRect.left() + xspace, mainRect.top()+ypad, mainRect.width() - xspace - 4, halfheight);
+        const QRect bottomRect(mainRect.left() + xspace, mainRect.top()+ypad+halfheight, mainRect.width() - xspace - 4, halfheight);
 
         QDateTime date = index.data(TransactionTableModel::DateRole).toDateTime();
         QString address = index.data(Qt::DisplayRole).toString();
         qint64 amount = index.data(TransactionTableModel::AmountRole).toLongLong();
         bool confirmed = index.data(TransactionTableModel::ConfirmedRole).toBool();
-        QVariant value = index.data(Qt::ForegroundRole);
-        QColor foreground = platformStyle->TextColor();
-        if(value.canConvert<QBrush>())
-        {
-            QBrush brush = qvariant_cast<QBrush>(value);
-            foreground = brush.color();
-        }
 
         QString amountText = index.data(TransactionTableModel::FormattedAmountRole).toString();
         if(!confirmed)
         {
             amountText = QString("[") + amountText + QString("]");
         }
+        QString tokenName = index.data(TransactionTableModel::TokenNameRole).toString();
 
-        painter->setFont(GUIUtil::getSubLabelFont());
-        // Concatenate the strings if needed before painting
-        GUIUtil::concatenate(painter, address, painter->fontMetrics().width(amountText), addressRect.left(), addressRect.right());
+        // top line
+        painter->setFont(GUIUtil::appFont(12));
+        painter->setPen(theme.textSecondary);
+        painter->drawText(topRect, Qt::AlignLeft|Qt::AlignVCenter, GUIUtil::dateTimeStr(date));
+        GUIUtil::concatenate(painter, tokenName, painter->fontMetrics().width(GUIUtil::dateTimeStr(date)), topRect.left(), topRect.right());
+        painter->drawText(topRect, Qt::AlignRight|Qt::AlignVCenter, tokenName);
 
-        painter->setPen(foreground);
+        // bottom line
+        QColor amountColor = theme.positive;
+        if(amount < 0)
+            amountColor = theme.negative;
+        else if(!confirmed)
+            amountColor = theme.textDisabled;
+        painter->setFont(GUIUtil::appFont(13, QFont::DemiBold));
+        painter->setPen(amountColor);
+        painter->drawText(bottomRect, Qt::AlignRight|Qt::AlignVCenter, amountText);
+        const int amountWidth = painter->fontMetrics().width(amountText);
+
+        painter->setFont(GUIUtil::appFont(13));
+        GUIUtil::concatenate(painter, address, amountWidth + 12, bottomRect.left(), bottomRect.right());
+        painter->setPen(theme.text);
         QRect boundingRect;
-        painter->drawText(addressRect, Qt::AlignLeft|Qt::AlignVCenter, address, &boundingRect);
+        painter->drawText(bottomRect, Qt::AlignLeft|Qt::AlignVCenter, address, &boundingRect);
 
         if (index.data(TransactionTableModel::WatchonlyRole).toBool())
         {
@@ -94,31 +113,9 @@ public:
             iconWatchonly.paint(painter, watchonlyRect);
         }
 
-        if(amount < 0)
-        {
-            foreground = COLOR_NEGATIVE;
-        }
-        else if(!confirmed)
-        {
-            foreground = COLOR_UNCONFIRMED;
-        }
-        else
-        {
-            foreground = platformStyle->TextColor();
-        }
-
-        painter->setPen(foreground);
-        painter->drawText(addressRect, Qt::AlignRight|Qt::AlignVCenter, amountText);
-
-        QString tokenName = index.data(TransactionTableModel::TokenNameRole).toString();
-
-        // Concatenate the strings if needed before painting
-        GUIUtil::concatenate(painter, tokenName, painter->fontMetrics().width(GUIUtil::dateTimeStr(date)), amountRect.left(), amountRect.right());
-
-        painter->drawText(amountRect, Qt::AlignRight|Qt::AlignVCenter, tokenName);
-
-        painter->setPen(platformStyle->TextColor());
-        painter->drawText(amountRect, Qt::AlignLeft|Qt::AlignVCenter, GUIUtil::dateTimeStr(date));
+        // separator
+        painter->setPen(theme.border);
+        painter->drawLine(mainRect.left() + xspace, mainRect.bottom(), mainRect.right(), mainRect.bottom());
 
         painter->restore();
     }
@@ -208,22 +205,10 @@ public:
             painter->drawPixmap(tokenAdministratorRect, pixmap);
 
         /** Create the font that is used for painting the token name */
-        QFont nameFont;
-#if !defined(Q_OS_MAC)
-        nameFont.setFamily("Open Sans");
-#endif
-        nameFont.setPixelSize(18);
-        nameFont.setWeight(QFont::Weight::Normal);
-        nameFont.setLetterSpacing(QFont::SpacingType::AbsoluteSpacing, -0.4);
+        QFont nameFont = GUIUtil::appFont(15, QFont::DemiBold);
 
         /** Create the font that is used for painting the token amount */
-        QFont amountFont;
-#if !defined(Q_OS_MAC)
-        amountFont.setFamily("Open Sans");
-#endif
-        amountFont.setPixelSize(14);
-        amountFont.setWeight(QFont::Weight::Normal);
-        amountFont.setLetterSpacing(QFont::SpacingType::AbsoluteSpacing, -0.3);
+        QFont amountFont = GUIUtil::appFont(13);
 
         /** Get the name and formatted amount from the data */
         QString name = index.data(TokenTableModel::TokenNameRole).toString();
@@ -327,10 +312,25 @@ OverviewPage::OverviewPage(const PlatformStyle *platformStyle, QWidget *parent) 
     connect(ui->labelTokenStatus, SIGNAL(clicked()), this, SLOT(handleOutOfSyncWarningClicks()));
     connect(ui->labelTransactionsStatus, SIGNAL(clicked()), this, SLOT(handleOutOfSyncWarningClicks()));
 
-    /** Set the overview page background colors, and the frames colors and padding */
-    ui->tokenFrame->setStyleSheet(QString(".QFrame {background-color: %1; padding-top: 0px; padding-right: 0px;}").arg(platformStyle->WidgetBackGroundColor().name()));
-    ui->frame->setStyleSheet(QString(".QFrame {background-color: %1; padding-bottom: 10px; padding-right: 0px;}").arg(platformStyle->WidgetBackGroundColor().name()));
-    ui->frame_2->setStyleSheet(QString(".QFrame {background-color: %1; padding-left: 5px;}").arg(platformStyle->WidgetBackGroundColor().name()));
+    /** The three panels are cards; the alerts label is a warning banner */
+    for (QFrame* card : {ui->tokenFrame, ui->frame, ui->frame_2}) {
+        card->setProperty("role", "card");
+        card->setFrameShape(QFrame::NoFrame);
+        if (card->layout())
+            card->layout()->setContentsMargins(20, 16, 20, 16);
+    }
+    ui->labelAlerts->setProperty("role", "warning");
+    ui->labelAlerts->setContentsMargins(0, 0, 0, 0);
+    for (QListView* list : {ui->listTransactions, ui->listTokens}) {
+        list->setFrameShape(QFrame::NoFrame);
+        list->setStyleSheet("QListView { background: transparent; border: none; }");
+    }
+    // the "out of sync" markers are icon-only buttons
+    for (QPushButton* button : {ui->labelTransactionsStatus, ui->labelWalletStatus, ui->labelTokenStatus}) {
+        button->setFlat(true);
+        button->setStyleSheet("QPushButton { border: none; background: transparent; padding: 0px; min-height: 0px; }");
+        button->setIconSize(QSize(18, 18));
+    }
 
     /** Update the labels colors */
     ui->tokenBalanceLabel->setStyleSheet(STRING_LABEL_COLOR);
@@ -361,21 +361,14 @@ OverviewPage::OverviewPage(const PlatformStyle *platformStyle, QWidget *parent) 
     ui->labelWatchPending->setFont(GUIUtil::getSubLabelFont());
     ui->labelWatchImmature->setFont(GUIUtil::getSubLabelFont());
     ui->labelTotalText->setFont(GUIUtil::getSubLabelFont());
-    ui->labelTotal->setFont(GUIUtil::getTopLabelFontBolded());
-    ui->labelWatchTotal->setFont(GUIUtil::getTopLabelFontBolded());
+    ui->labelTotal->setFont(GUIUtil::appFont(20, QFont::Bold));
+    ui->labelWatchTotal->setFont(GUIUtil::appFont(20, QFont::Bold));
     ui->labelStakeText->setFont(GUIUtil::getSubLabelFont());
     ui->labelStake->setFont(GUIUtil::getSubLabelFont());
 
     /** Create the search bar for tokens */
     ui->tokenSearch->setAttribute(Qt::WA_MacShowFocusRect, 0);
-    ui->tokenSearch->setStyleSheet(QString(".QLineEdit {border: 1px solid %1; border-radius: 3px;}").arg(COLOR_LABELS.name()));
     ui->tokenSearch->setAlignment(Qt::AlignVCenter);
-    QFont font = ui->tokenSearch->font();
-    font.setPointSize(12);
-    ui->tokenSearch->setFont(font);
-
-    QFontMetrics fm = QFontMetrics(ui->tokenSearch->font());
-    ui->tokenSearch->setFixedHeight(fm.height()+ 5);
 
     // Trigger the call to show the tokens table if tokens are active
     showTokens();

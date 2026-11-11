@@ -169,6 +169,7 @@ void OptionsDialog::setModel(OptionsModel *_model)
     /* Display */
     connect(ui->lang, SIGNAL(valueChanged()), this, SLOT(showRestartWarning()));
     connect(ui->thirdPartyTxUrls, SIGNAL(textChanged(const QString &)), this, SLOT(showRestartWarning()));
+    connect(ui->darkMode, SIGNAL(clicked(bool)), this, SLOT(showRestartWarning()));
 }
 
 void OptionsDialog::setMapper()
@@ -206,6 +207,7 @@ void OptionsDialog::setMapper()
     mapper->addMapping(ui->lang, OptionsModel::Language);
     mapper->addMapping(ui->unit, OptionsModel::DisplayUnit);
     mapper->addMapping(ui->thirdPartyTxUrls, OptionsModel::ThirdPartyTxUrls);
+    mapper->addMapping(ui->darkMode, OptionsModel::DarkModeEnabled);
 }
 
 void OptionsDialog::setOkButtonState(bool fState)

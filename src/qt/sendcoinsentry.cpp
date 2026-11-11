@@ -57,7 +57,7 @@ SendCoinsEntry::SendCoinsEntry(const PlatformStyle *_platformStyle, QWidget *par
     connect(ui->deleteButton_is, SIGNAL(clicked()), this, SLOT(deleteClicked()));
     connect(ui->deleteButton_s, SIGNAL(clicked()), this, SLOT(deleteClicked()));
 
-    this->setStyleSheet(QString(".SendCoinsEntry {background-color: %1; padding-top: 10px; padding-right: 30px; border: none;}").arg(platformStyle->SendEntriesBackGroundColor().name()));
+    this->setStyleSheet(GUIUtil::cardFrameStyle(".SendCoinsEntry"));
 
     ui->payToLabel->setStyleSheet(STRING_LABEL_COLOR);
     ui->payToLabel->setFont(GUIUtil::getSubLabelFont());

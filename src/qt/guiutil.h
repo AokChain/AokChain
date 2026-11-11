@@ -15,6 +15,8 @@
 #include <QMessageBox>
 #include <QObject>
 #include <QProgressBar>
+#include <QColor>
+#include <QFont>
 #include <QString>
 #include <QTableView>
 #include <QLabel>
@@ -23,6 +25,7 @@ class QValidatedLineEdit;
 class SendCoinsRecipient;
 
 QT_BEGIN_NAMESPACE
+class QApplication;
 class QAbstractItemView;
 class QDateTime;
 class QFont;
@@ -35,6 +38,42 @@ QT_END_NAMESPACE
  */
 namespace GUIUtil
 {
+    /** Colors of the application theme (light or dark). */
+    struct Theme {
+        QColor bg;            //!< window background
+        QColor surface;       //!< cards, inputs, tables
+        QColor surfaceAlt;    //!< headers, hover, read-only fields
+        QColor border;
+        QColor borderStrong;
+        QColor text;
+        QColor textSecondary;
+        QColor textDisabled;
+        QColor accent;
+        QColor accentHover;
+        QColor accentPressed;
+        QColor accentSoft;    //!< selection and hover tint
+        QColor onAccent;      //!< text on the accent color
+        QColor positive;
+        QColor negative;
+        QColor warnBg;
+        QColor warnText;
+        QColor warnBorder;
+    };
+    /** The active theme. */
+    const Theme& theme();
+    /** Register the bundled fonts (Noto Sans, Noto Sans KR). Call once, before any widget is created. */
+    void loadAppFonts();
+    /** The application font at a pixel size and weight. */
+    QFont appFont(int pixelSize = 13, int weight = QFont::Normal);
+    /** Apply style, palette, font and style sheet of the light or dark theme to the application. */
+    void applyTheme(QApplication& app, bool dark);
+    /** Style sheet snippets that follow the theme. */
+    QString labelColorStyle();
+    QString invalidFieldStyle();
+    QString validFieldStyle();
+    /** Style sheet of a card: a panel on the surface color with a border and rounded corners. */
+    QString cardFrameStyle(const QString& selector = ".QFrame");
+
     // Get the font for the sub labels
     QFont getSubLabelFont();
     QFont getSubLabelFontBolded();

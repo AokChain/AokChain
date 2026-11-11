@@ -23,6 +23,10 @@ layerIsVisible(false),
 userClosed(false)
 {
     ui->setupUi(this);
+    // colors of the active theme (the form has fixed light colors)
+    ui->contentWidget->setStyleSheet(QString("#contentWidget { background: %1; border: 1px solid %2; border-radius: 10px; }")
+        .arg(GUIUtil::theme().surface.name(), GUIUtil::theme().border.name()));
+    ui->bgWidget->setStyleSheet("#bgWidget { background: rgba(10,14,18,150); }");
     connect(ui->closeButton, SIGNAL(clicked()), this, SLOT(closeClicked()));
     if (parent) {
         parent->installEventFilter(this);

@@ -705,12 +705,9 @@ int main(int argc, char *argv[])
     // Load GUI settings from QSettings
     app.createOptionsModel(gArgs.IsArgSet("-resetguisettings"));
 
-    if (app.getOptionsModel()->getDarkModeEnabled()) {
-        app.setStyle(new DarkStyle);
-        darkModeEnabled = true;
-    } else {
-        app.setStyle("");
-    }
+    // Fonts, palette and style sheet of the light or dark theme
+    GUIUtil::loadAppFonts();
+    GUIUtil::applyTheme(app, app.getOptionsModel()->getDarkModeEnabled());
 
     // Subscribe to global signals from core
     uiInterface.InitMessage.connect(InitMessage);

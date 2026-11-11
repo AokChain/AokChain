@@ -68,9 +68,9 @@ TransactionView::TransactionView(const PlatformStyle *platformStyle, QWidget *pa
 
     dateWidget = new QComboBox(this);
     if (platformStyle->getUseExtraSpacing()) {
-        dateWidget->setFixedWidth(121);
+        dateWidget->setFixedWidth(133);
     } else {
-        dateWidget->setFixedWidth(120);
+        dateWidget->setFixedWidth(132);
     }
     dateWidget->addItem(tr("All"), All);
     dateWidget->addItem(tr("Today"), Today);
@@ -83,9 +83,9 @@ TransactionView::TransactionView(const PlatformStyle *platformStyle, QWidget *pa
 
     typeWidget = new QComboBox(this);
     if (platformStyle->getUseExtraSpacing()) {
-        typeWidget->setFixedWidth(121);
+        typeWidget->setFixedWidth(151);
     } else {
-        typeWidget->setFixedWidth(120);
+        typeWidget->setFixedWidth(150);
     }
 
     typeWidget->addItem(tr("All"), TransactionFilterProxy::ALL_TYPES);
@@ -110,9 +110,9 @@ TransactionView::TransactionView(const PlatformStyle *platformStyle, QWidget *pa
     amountWidget->setPlaceholderText(tr("Min amount"));
 #endif
     if (platformStyle->getUseExtraSpacing()) {
-        amountWidget->setFixedWidth(97);
+        amountWidget->setFixedWidth(147);
     } else {
-        amountWidget->setFixedWidth(100);
+        amountWidget->setFixedWidth(150);
     }
     amountWidget->setValidator(new QDoubleValidator(0, 1e20, 8, this));
     hlayout->addWidget(amountWidget);
@@ -142,14 +142,14 @@ TransactionView::TransactionView(const PlatformStyle *platformStyle, QWidget *pa
     token_typing_delay->setInterval(input_filter_delay);
 
     QVBoxLayout *vlayout = new QVBoxLayout(this);
-    vlayout->setContentsMargins(0,0,0,0);
-    vlayout->setSpacing(0);
+    vlayout->setContentsMargins(20,16,20,12);
+    vlayout->setSpacing(8);
 
     QTableView *view = new QTableView(this);
     vlayout->addLayout(hlayout);
     vlayout->addWidget(createDateRangeWidget());
     vlayout->addWidget(view);
-    vlayout->setSpacing(0);
+    vlayout->setSpacing(8);
     int width = view->verticalScrollBar()->sizeHint().width();
     // Cover scroll bar width with spacing
     if (platformStyle->getUseExtraSpacing()) {
@@ -163,7 +163,8 @@ TransactionView::TransactionView(const PlatformStyle *platformStyle, QWidget *pa
     view->setContextMenuPolicy(Qt::CustomContextMenu);
 
     view->installEventFilter(this);
-    view->setStyleSheet(".QTableView { border: none;}");
+    view->setShowGrid(false);
+    view->verticalHeader()->setDefaultSectionSize(34);
 
     transactionView = view;
     transactionView->setObjectName("transactionView");

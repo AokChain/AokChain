@@ -45,6 +45,7 @@ CreateTokenDialog::CreateTokenDialog(const PlatformStyle *_platformStyle, QWidge
         platformStyle(_platformStyle)
 {
     ui->setupUi(this);
+    ui->createTokenButton->setProperty("primary", true);
     setWindowTitle("Create Tokens");
     connect(ui->ipfsBox, SIGNAL(clicked()), this, SLOT(ipfsStateChanged()));
     connect(ui->availabilityButton, SIGNAL(clicked()), this, SLOT(checkAvailabilityClicked()));
@@ -271,7 +272,7 @@ void CreateTokenDialog::setUpValues()
 void CreateTokenDialog::setupCoinControlFrame(const PlatformStyle *platformStyle)
 {
     /** Update the tokencontrol frame */
-    ui->frameCoinControl->setStyleSheet(QString(".QFrame {background-color: %1; padding-top: 10px; padding-right: 5px; border: none;}").arg(platformStyle->WidgetBackGroundColor().name()));
+    ui->frameCoinControl->setStyleSheet(GUIUtil::cardFrameStyle());
     ui->widgetCoinControl->setStyleSheet(".QWidget {background-color: transparent;}");
     /** Create the shadow effects on the frames */
 
@@ -311,7 +312,7 @@ void CreateTokenDialog::setupTokenDataView(const PlatformStyle *platformStyle)
 {
     /** Update the scrollview*/
 
-    ui->frameTokenData->setStyleSheet(QString(".QFrame {background-color: %1; padding-top: 10px; padding-right: 5px; border: none;}").arg(platformStyle->WidgetBackGroundColor().name()));
+    ui->frameTokenData->setStyleSheet(GUIUtil::cardFrameStyle());
 
     ui->tokenTypeLabel->setStyleSheet(STRING_LABEL_COLOR);
     ui->tokenTypeLabel->setFont(GUIUtil::getSubLabelFont());
@@ -335,7 +336,7 @@ void CreateTokenDialog::setupTokenDataView(const PlatformStyle *platformStyle)
 void CreateTokenDialog::setupFeeControl(const PlatformStyle *platformStyle)
 {
     /** Update the coincontrol frame */
-    ui->frameFee->setStyleSheet(QString(".QFrame {background-color: %1; padding-top: 10px; padding-right: 5px; border: none;}").arg(platformStyle->WidgetBackGroundColor().name()));
+    ui->frameFee->setStyleSheet(GUIUtil::cardFrameStyle());
     /** Create the shadow effects on the frames */
 
     ui->labelFeeHeadline->setStyleSheet(STRING_LABEL_COLOR);

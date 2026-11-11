@@ -263,6 +263,8 @@ AOKCHAIN_QT_H = \
   qt/winshutdownmonitor.h
 
 RES_ICONS = \
+  qt/res/icons/check_white.png \
+  qt/res/icons/radio_white.png \
   qt/res/icons/add.png \
   qt/res/icons/address-book.png \
   qt/res/icons/about_aok.png \
@@ -348,10 +350,13 @@ RES_ICONS = \
   qt/res/darkstyle/icon_radiobutton_unchecked_pressed.png \
   qt/res/darkstyle/icon_radiobutton_checked_disabled.png \
   qt/res/darkstyle/icon_radiobutton_unchecked_disabled.png \
-  qt/res/fonts/Montserrat-Bold.otf \
-  qt/res/fonts/Montserrat-Light.otf \
-  qt/res/fonts/Montserrat-Regular.otf \
-  qt/res/fonts/Montserrat-SemiBold.otf
+  qt/res/fonts/NotoSans-Regular.ttf \
+  qt/res/fonts/NotoSans-Medium.ttf \
+  qt/res/fonts/NotoSans-SemiBold.ttf \
+  qt/res/fonts/NotoSans-Bold.ttf \
+  qt/res/fonts/NotoSansKR-Regular.ttf \
+  qt/res/fonts/NotoSansKR-Bold.ttf \
+  qt/res/css/theme.qss
 
 
 AOKCHAIN_QT_BASE_CPP = \

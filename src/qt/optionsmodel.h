@@ -71,7 +71,7 @@ public:
     bool getProxySettings(QNetworkProxy& proxy) const;
     bool getCoinControlFeatures() const { return fCoinControlFeatures; }
     bool getCustomFeeFeatures() const { return fCustomFeeFeatures; }
-    bool getDarkModeEnabled() const { /* return fDarkModeEnabled; */ return false; }
+    bool getDarkModeEnabled() const { return fDarkModeEnabled; }
     const QString& getOverriddenByCommandLine() { return strOverriddenByCommandLine; }
 
     /* Restart flag helper */
