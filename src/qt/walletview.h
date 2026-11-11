@@ -14,6 +14,8 @@
 class AokChainGUI;
 class ClientModel;
 class OverviewPage;
+class OptionsDialog;
+class SignVerifyMessageDialog;
 class PlatformStyle;
 class ReceiveCoinsDialog;
 class SendCoinsDialog;
@@ -29,6 +31,7 @@ class ReissueTokenDialog;
 
 QT_BEGIN_NAMESPACE
 class QButtonGroup;
+class QLabel;
 class QModelIndex;
 class QProgressDialog;
 QT_END_NAMESPACE
@@ -98,6 +101,22 @@ private:
     QWidget *createTokensShell;
     QWidget *manageTokensShell;
     QWidget *explorerShell;
+    QWidget *addressBookShell;
+    QWidget *signShell;
+    QWidget *settingsShell;
+
+    /** Address book page: receiving and sending addresses */
+    QStackedWidget *addressStack;
+    QButtonGroup *addressTabs;
+    /** Sign and verify page */
+    SignVerifyMessageDialog *signPage;
+    QButtonGroup *signTabs;
+    /** Settings page */
+    OptionsDialog *settingsPage;
+    QLabel *versionLabel;
+
+    /** A row of tab buttons as the send page has them */
+    QWidget *makeTabs(const QStringList &names, QButtonGroup **group, QWidget *parent);
 
     /** Put a page below a header with its title and, optionally, a context widget on the right */
     QWidget *addPage(QWidget *page, const QString &title, QWidget *context = nullptr);
@@ -162,6 +181,12 @@ public Q_SLOTS:
     void sendToken(const QString &name);
     /** Switch to the explorer page; look the query up when one is given */
     void gotoExplorerPage(QString query = "");
+    /** Switch to the settings page */
+    void gotoSettingsPage();
+    /** Receiving (0) or sending (1) addresses of the address book page */
+    void showAddressTab(int tab);
+    /** Sign (0) or verify (1) form of the sign page */
+    void showSignTab(int tab);
 
 Q_SIGNALS:
     /** Signal that we want to show the main window */

@@ -78,6 +78,8 @@ public:
 
     /** Add a navigation item for a page action. */
     void addPage(QAction* action, const QString& iconName);
+    /** A line between two groups of navigation items */
+    void addSeparator();
 
     void setStaking(bool on, const QString& detail, const QString& toolTip);
     void setSyncState(const QString& status, const QString& remaining, double progress, bool showProgress, const QString& toolTip);

@@ -107,6 +107,8 @@ public Q_SLOTS:
     /** TOKENS END */
     /** Switch to the explorer page */
     void gotoExplorerPage(QString query = "");
+    /** Switch to the settings page */
+    void gotoSettingsPage();
 };
 
 #endif // AOKCHAIN_QT_WALLETFRAME_H

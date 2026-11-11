@@ -56,6 +56,9 @@ public:
     static const std::string DEFAULT_UIPLATFORM;
 
     explicit AokChainGUI(const PlatformStyle *platformStyle, const NetworkStyle *networkStyle, QWidget *parent = 0);
+    /** The actions of the former menus for the cards of the settings page:
+        wallet management (0) or information (1) */
+    QList<QAction*> settingsActions(int group) const;
     ~AokChainGUI();
 
     /** Set the client model.
@@ -123,6 +126,9 @@ private:
     QAction *createTokenAction;
     QAction *manageTokenAction;
     QAction *explorerAction;
+    QAction *addressBookAction;
+    QAction *signPageAction;
+    QAction *settingsPageAction;
     QWidget *footerWidget;
     QPushButton *stakingButton;
     Sidebar *sidebar;
@@ -242,6 +248,11 @@ private Q_SLOTS:
     /** TOKENS END */
     /** Switch to the explorer page and look up a transaction id, address or block */
     void gotoExplorerPage(QString query = "");
+    /** Switch to the address book page: receiving addresses, or the sending ones */
+    void gotoAddressBookPage();
+    void gotoSendingAddressesPage();
+    /** Switch to the settings page */
+    void gotoSettingsPage();
 
 #endif // ENABLE_WALLET
     /** Show configuration dialog */

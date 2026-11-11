@@ -6,11 +6,16 @@
 
 #include "walletview.h"
 
+#if defined(HAVE_CONFIG_H)
+#include "config/aokchain-config.h"
+#endif
+
 #include "addressbookpage.h"
 #include "askpassphrasedialog.h"
 #include "aokchaingui.h"
 #include "clientmodel.h"
 #include "guiutil.h"
+#include "optionsdialog.h"
 #include "optionsmodel.h"
 #include "overviewpage.h"
 #include "pagewidgets.h"
@@ -34,6 +39,9 @@
 #include <QAction>
 #include <QActionGroup>
 #include <QFileDialog>
+#include <QStringList>
+#include <QRegExp>
+#include <QGridLayout>
 #include <QButtonGroup>
 #include <QHBoxLayout>
 #include <QLabel>
@@ -71,25 +79,7 @@ WalletView::WalletView(const PlatformStyle *_platformStyle, QWidget *parent):
     QWidget *sendContainer = new QWidget(this);
     QVBoxLayout *sendLayout = new QVBoxLayout(sendContainer);
     sendLayout->setSpacing(14);
-    QFrame *tabFrame = new QFrame(sendContainer);
-    tabFrame->setProperty("role", "segGroup");
-    QHBoxLayout *tabLayout = new QHBoxLayout(tabFrame);
-    tabLayout->setContentsMargins(3, 3, 3, 3);
-    tabLayout->setSpacing(4);
-    sendTabs = new QButtonGroup(this);
-    const QString tabNames[2] = {"AOK", tr("Tokens")};
-    for (int i = 0; i < 2; ++i) {
-        ChoiceButton *tab = new ChoiceButton(tabNames[i], ChoiceButton::Segment, tabFrame);
-        tab->setFixedHeight(38);
-        tab->setMinimumWidth(96);
-        sendTabs->addButton(tab, i);
-        tabLayout->addWidget(tab);
-    }
-    sendTabs->button(0)->setChecked(true);
-    QHBoxLayout *tabRow = new QHBoxLayout();
-    tabRow->addWidget(tabFrame);
-    tabRow->addStretch();
-    sendLayout->addLayout(tabRow);
+    sendLayout->addWidget(makeTabs({"AOK", tr("Tokens")}, &sendTabs, sendContainer));
     sendStack = new QStackedWidget(sendContainer);
     sendStack->addWidget(sendCoinsPage);
     sendStack->addWidget(tokensPage);
@@ -111,8 +101,50 @@ WalletView::WalletView(const PlatformStyle *_platformStyle, QWidget *parent):
     explorerPage = new ExplorerPage(platformStyle);
     explorerShell = addPage(explorerPage, tr("Explorer"), explorerPage->headerWidget());
 
+    // Address book: the receiving and the sending addresses are two tabs of one page
     usedSendingAddressesPage = new AddressBookPage(platformStyle, AddressBookPage::ForEditing, AddressBookPage::SendingTab, this);
     usedReceivingAddressesPage = new AddressBookPage(platformStyle, AddressBookPage::ForEditing, AddressBookPage::ReceivingTab, this);
+    usedSendingAddressesPage->embedAsPage();
+    usedReceivingAddressesPage->embedAsPage();
+    QWidget *addressContainer = new QWidget(this);
+    QVBoxLayout *addressLayout = new QVBoxLayout(addressContainer);
+    addressLayout->setSpacing(14);
+    addressLayout->addWidget(makeTabs({tr("Receiving addresses"), tr("Sending addresses")}, &addressTabs, addressContainer));
+    QFrame *addressCard = new QFrame(addressContainer);
+    addressCard->setProperty("role", "card");
+    QVBoxLayout *addressCardLayout = new QVBoxLayout(addressCard);
+    addressCardLayout->setContentsMargins(20, 16, 20, 16);
+    addressStack = new QStackedWidget(addressCard);
+    addressStack->addWidget(usedReceivingAddressesPage);
+    addressStack->addWidget(usedSendingAddressesPage);
+    addressCardLayout->addWidget(addressStack);
+    addressLayout->addWidget(addressCard, 1);
+    connect(addressTabs, SIGNAL(buttonClicked(int)), this, SLOT(showAddressTab(int)));
+    addressBookShell = addPage(addressContainer, tr("Address book"));
+
+    // Sign and verify messages
+    signPage = new SignVerifyMessageDialog(platformStyle, this);
+    signPage->embedAsPage();
+    QWidget *signContainer = new QWidget(this);
+    QVBoxLayout *signLayout = new QVBoxLayout(signContainer);
+    signLayout->setSpacing(14);
+    signLayout->addWidget(makeTabs({tr("Sign"), tr("Verify")}, &signTabs, signContainer));
+    QFrame *signCard = new QFrame(signContainer);
+    signCard->setProperty("role", "card");
+    signCard->setMaximumWidth(860);
+    QVBoxLayout *signCardLayout = new QVBoxLayout(signCard);
+    signCardLayout->setContentsMargins(22, 18, 22, 20);
+    signCardLayout->addWidget(signPage);
+    signLayout->addWidget(signCard);
+    signLayout->addStretch(1);
+    connect(signTabs, SIGNAL(buttonClicked(int)), this, SLOT(showSignTab(int)));
+    signShell = addPage(signContainer, tr("Sign message"));
+
+    // Settings: the options, the wallet management and the information of the former menus
+    settingsPage = new OptionsDialog(this, true);
+    settingsPage->embedAsPage();
+    versionLabel = nullptr;
+    settingsShell = addPage(settingsPage, tr("Settings"));
 
     // Clicking on a transaction on the overview pre-selects the transaction on the transaction history page
     connect(overviewPage, SIGNAL(transactionClicked(QModelIndex)), transactionView, SLOT(focusTransaction(QModelIndex)));
@@ -147,6 +179,52 @@ WalletView::WalletView(const PlatformStyle *_platformStyle, QWidget *parent):
 
 WalletView::~WalletView()
 {
+}
+
+QWidget *WalletView::makeTabs(const QStringList &names, QButtonGroup **group, QWidget *parent)
+{
+    QWidget *row = new QWidget(parent);
+    QHBoxLayout *rowLayout = new QHBoxLayout(row);
+    rowLayout->setContentsMargins(0, 0, 0, 0);
+    QFrame *tabFrame = new QFrame(row);
+    tabFrame->setProperty("role", "segGroup");
+    QHBoxLayout *tabLayout = new QHBoxLayout(tabFrame);
+    tabLayout->setContentsMargins(3, 3, 3, 3);
+    tabLayout->setSpacing(4);
+    *group = new QButtonGroup(this);
+    for (int i = 0; i < names.size(); ++i) {
+        ChoiceButton *tab = new ChoiceButton(names.at(i), ChoiceButton::Segment, tabFrame);
+        tab->setFixedHeight(38);
+        tab->setMinimumWidth(96);
+        (*group)->addButton(tab, i);
+        tabLayout->addWidget(tab);
+    }
+    (*group)->button(0)->setChecked(true);
+    rowLayout->addWidget(tabFrame);
+    rowLayout->addStretch();
+    return row;
+}
+
+/** A button of a card that does what an action of the former menus does. */
+static QPushButton *actionButton(QAction *action, QWidget *parent)
+{
+    QPushButton *button = new QPushButton(parent);
+    button->setFixedHeight(38);
+    button->setCursor(Qt::PointingHandCursor);
+    auto sync = [button, action] {
+        // "&Encrypt Wallet..." or the CJK form "Text(&E)..." -> the plain words
+        QString text = action->text();
+        text.remove(QRegExp("\\(&\\w\\)"));
+        text.remove('&');
+        text.remove(QRegExp("(\\.\\.\\.|\u2026)$"));
+        button->setText(text.trimmed());
+        button->setEnabled(action->isEnabled());
+        button->setToolTip(action->statusTip());
+    };
+    sync();
+    QObject::connect(action, &QAction::changed, button, sync);
+    QObject::connect(button, &QPushButton::clicked, action, &QAction::trigger);
+    return button;
 }
 
 QWidget *WalletView::addPage(QWidget *page, const QString &title, QWidget *context)
@@ -233,6 +311,42 @@ void WalletView::setAokChainGUI(AokChainGUI *gui)
 
         // Pass through checkTokens calls to the GUI
         connect(this, SIGNAL(checkTokens()), gui, SLOT(checkTokens()));
+
+        // "Send to this address" of the address book
+        connect(usedSendingAddressesPage, SIGNAL(sendCoins(QString)), gui, SLOT(gotoSendCoinsPage(QString)));
+
+        // Settings page: what the menus of the window offered
+        QVBoxLayout *body = nullptr;
+        QFrame *walletCard = OptionsDialog::makeCard(tr("Wallet management"), settingsPage, &body);
+        QLabel *walletHint = new QLabel(tr("Encrypt the wallet with a passphrase and keep a backup of the wallet file in a safe place."), walletCard);
+        walletHint->setProperty("role", "secondary");
+        walletHint->setWordWrap(true);
+        body->addWidget(walletHint);
+        QHBoxLayout *walletButtons = new QHBoxLayout();
+        walletButtons->setSpacing(8);
+        for (QAction *action : gui->settingsActions(0))
+            walletButtons->addWidget(actionButton(action, walletCard));
+        walletButtons->addStretch();
+        body->addLayout(walletButtons);
+        settingsPage->addCard(walletCard);
+
+        QFrame *infoCard = OptionsDialog::makeCard(tr("Information"), settingsPage, &body);
+        versionLabel = new QLabel(infoCard);
+        versionLabel->setFont(GUIUtil::monoFont(12));
+        versionLabel->setTextInteractionFlags(Qt::TextSelectableByMouse);
+        versionLabel->setProperty("role", "secondary");
+        body->addWidget(versionLabel);
+        QGridLayout *infoButtons = new QGridLayout();
+        infoButtons->setSpacing(8);
+        int n = 0;
+        for (QAction *action : gui->settingsActions(1)) {
+            infoButtons->addWidget(actionButton(action, infoCard), n / 3, n % 3);
+            ++n;
+        }
+        body->addLayout(infoButtons);
+        settingsPage->addCard(infoCard);
+        if (clientModel)
+            versionLabel->setText(tr(PACKAGE_NAME) + " " + clientModel->formatFullVersion());
     }
 }
 
@@ -243,6 +357,13 @@ void WalletView::setClientModel(ClientModel *_clientModel)
     overviewPage->setClientModel(_clientModel);
     sendCoinsPage->setClientModel(_clientModel);
     explorerPage->setClientModel(_clientModel);
+    if (_clientModel) {
+        settingsPage->setModel(_clientModel->getOptionsModel());
+        usedReceivingAddressesPage->setOptionsModel(_clientModel->getOptionsModel());
+        usedSendingAddressesPage->setOptionsModel(_clientModel->getOptionsModel());
+        if (versionLabel)
+            versionLabel->setText(tr(PACKAGE_NAME) + " " + _clientModel->formatFullVersion());
+    }
 }
 
 void WalletView::setWalletModel(WalletModel *_walletModel)
@@ -257,6 +378,7 @@ void WalletView::setWalletModel(WalletModel *_walletModel)
     explorerPage->setWalletModel(_walletModel);
     usedReceivingAddressesPage->setModel(_walletModel ? _walletModel->getAddressTableModel() : nullptr);
     usedSendingAddressesPage->setModel(_walletModel ? _walletModel->getAddressTableModel() : nullptr);
+    signPage->setModel(_walletModel);
 
     /** TOKENS START */
     tokensPage->setModel(_walletModel);
@@ -363,26 +485,40 @@ void WalletView::gotoSendCoinsPage(QString addr)
 
 void WalletView::gotoSignMessageTab(QString addr)
 {
-    // calls show() in showTab_SM()
-    SignVerifyMessageDialog *signVerifyMessageDialog = new SignVerifyMessageDialog(platformStyle, this);
-    signVerifyMessageDialog->setAttribute(Qt::WA_DeleteOnClose);
-    signVerifyMessageDialog->setModel(walletModel);
-    signVerifyMessageDialog->showTab_SM(true);
-
+    setCurrentWidget(signShell);
+    showSignTab(0);
     if (!addr.isEmpty())
-        signVerifyMessageDialog->setAddress_SM(addr);
+        signPage->setAddress_SM(addr);
 }
 
 void WalletView::gotoVerifyMessageTab(QString addr)
 {
-    // calls show() in showTab_VM()
-    SignVerifyMessageDialog *signVerifyMessageDialog = new SignVerifyMessageDialog(platformStyle, this);
-    signVerifyMessageDialog->setAttribute(Qt::WA_DeleteOnClose);
-    signVerifyMessageDialog->setModel(walletModel);
-    signVerifyMessageDialog->showTab_VM(true);
-
+    setCurrentWidget(signShell);
+    showSignTab(1);
     if (!addr.isEmpty())
-        signVerifyMessageDialog->setAddress_VM(addr);
+        signPage->setAddress_VM(addr);
+}
+
+void WalletView::showSignTab(int tab)
+{
+    if (tab == 0)
+        signPage->showTab_SM(false);
+    else
+        signPage->showTab_VM(false);
+    if (signTabs->button(tab))
+        signTabs->button(tab)->setChecked(true);
+}
+
+void WalletView::showAddressTab(int tab)
+{
+    addressStack->setCurrentIndex(tab);
+    if (addressTabs->button(tab))
+        addressTabs->button(tab)->setChecked(true);
+}
+
+void WalletView::gotoSettingsPage()
+{
+    setCurrentWidget(settingsShell);
 }
 
 bool WalletView::handlePaymentRequest(const SendCoinsRecipient& recipient)
@@ -467,22 +603,14 @@ unsigned long long WalletView::updateWeight()
 
 void WalletView::usedSendingAddresses()
 {
-    if(!walletModel)
-        return;
-
-    usedSendingAddressesPage->show();
-    usedSendingAddressesPage->raise();
-    usedSendingAddressesPage->activateWindow();
+    setCurrentWidget(addressBookShell);
+    showAddressTab(1);
 }
 
 void WalletView::usedReceivingAddresses()
 {
-    if(!walletModel)
-        return;
-
-    usedReceivingAddressesPage->show();
-    usedReceivingAddressesPage->raise();
-    usedReceivingAddressesPage->activateWindow();
+    setCurrentWidget(addressBookShell);
+    showAddressTab(0);
 }
 
 void WalletView::showProgress(const QString &title, int nProgress)

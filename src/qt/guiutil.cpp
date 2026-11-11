@@ -43,6 +43,9 @@
 
 #include <QAbstractItemView>
 #include <QApplication>
+#include <QEvent>
+#include <QLayout>
+#include <QDialog>
 #include <QClipboard>
 #include <QDateTime>
 #include <QDesktopServices>
@@ -184,9 +187,40 @@ QFont monoFont(int pixelSize, int weight)
     return font;
 }
 
+/**
+ * Gives the stock dialogs (pass phrase, edit address, transaction details, coin control, open URI
+ * and the like) the margins of the theme when they are first shown. Colors, buttons and inputs
+ * come from the style sheet.
+ */
+class DialogPolisher : public QObject
+{
+public:
+    explicit DialogPolisher(QObject* parent) : QObject(parent) {}
+
+protected:
+    bool eventFilter(QObject* object, QEvent* event) override
+    {
+        if (event->type() == QEvent::Show && object->isWidgetType()) {
+            QDialog* dialog = qobject_cast<QDialog*>(object);
+            if (dialog && dialog->isWindow() && !dialog->property("themePolished").toBool()
+                && !dialog->inherits("QMessageBox") && !dialog->inherits("QFileDialog") && !dialog->inherits("QProgressDialog")) {
+                dialog->setProperty("themePolished", true);
+                if (QLayout* layout = dialog->layout()) {
+                    const QMargins m = layout->contentsMargins();
+                    layout->setContentsMargins(qMax(m.left(), 22), qMax(m.top(), 20), qMax(m.right(), 22), qMax(m.bottom(), 18));
+                    if (layout->spacing() >= 0 && layout->spacing() < 10)
+                        layout->setSpacing(10);
+                }
+            }
+        }
+        return QObject::eventFilter(object, event);
+    }
+};
+
 void applyTheme(QApplication& app)
 {
     const Theme& t = theme();
+    app.installEventFilter(new DialogPolisher(&app));
 
     // The same widget style on every platform, colored by the palette
     app.setStyle(QStyleFactory::create("Fusion"));
@@ -343,6 +377,14 @@ QPixmap lineIcon(const QString& name, int size, const QColor& color, qreal strok
         p.drawRoundedRect(QRectF(5, 11, 14, 10), 2, 2); p.drawArc(QRectF(8, 3, 8, 12), 0, 180 * 16); line(8, 9, 8, 11); line(16, 9, 16, 11);
     } else if (name == "stake") {
         poly({{12, 3}, {20, 12}, {12, 21}, {4, 12}, {12, 3}}); line(12, 9, 12, 15); line(9, 12, 15, 12);
+    } else if (name == "sign") {
+        // a pen on a line
+        poly({{5, 17}, {5, 13.5}, {14.5, 4}, {18, 7.5}, {8.5, 17}, {5, 17}}); line(12.5, 6, 16, 9.5); line(4, 21, 20, 21);
+    } else if (name == "settings") {
+        // sliders
+        line(4, 6, 20, 6); line(4, 12, 20, 12); line(4, 18, 20, 18);
+        p.setBrush(color);
+        p.drawEllipse(QPointF(15, 6), 2, 2); p.drawEllipse(QPointF(8, 12), 2, 2); p.drawEllipse(QPointF(13, 18), 2, 2);
     } else if (name == "dots") {
         p.setBrush(color);
         p.drawEllipse(QPointF(5, 12), 1.2, 1.2); p.drawEllipse(QPointF(12, 12), 1.2, 1.2); p.drawEllipse(QPointF(19, 12), 1.2, 1.2);

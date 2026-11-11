@@ -405,7 +405,37 @@ void AokChainGUI::createActions()
     explorerAction->setFont(font);
     tabGroup->addAction(explorerAction);
 
+    // Pages for what the menus of the window offered
+    addressBookAction = new QAction(tr("&Address book"), this);
+    addressBookAction->setStatusTip(tr("Show the receiving and the sending addresses and their labels"));
+    addressBookAction->setToolTip(addressBookAction->statusTip());
+    addressBookAction->setCheckable(true);
+    addressBookAction->setShortcut(QKeySequence(Qt::ALT + Qt::Key_9));
+    addressBookAction->setFont(font);
+    tabGroup->addAction(addressBookAction);
+
+    signPageAction = new QAction(tr("Si&gn message"), this);
+    signPageAction->setStatusTip(tr("Sign messages with your addresses and verify signed messages"));
+    signPageAction->setToolTip(signPageAction->statusTip());
+    signPageAction->setCheckable(true);
+    signPageAction->setFont(font);
+    tabGroup->addAction(signPageAction);
+
+    settingsPageAction = new QAction(tr("Se&ttings"), this);
+    settingsPageAction->setStatusTip(tr("Options, wallet management and information"));
+    settingsPageAction->setToolTip(settingsPageAction->statusTip());
+    settingsPageAction->setCheckable(true);
+    settingsPageAction->setShortcut(QKeySequence(Qt::ALT + Qt::Key_0));
+    settingsPageAction->setFont(font);
+    tabGroup->addAction(settingsPageAction);
+
 #ifdef ENABLE_WALLET
+    connect(addressBookAction, SIGNAL(triggered()), this, SLOT(showNormalIfMinimized()));
+    connect(addressBookAction, SIGNAL(triggered()), this, SLOT(gotoAddressBookPage()));
+    connect(signPageAction, SIGNAL(triggered()), this, SLOT(showNormalIfMinimized()));
+    connect(signPageAction, SIGNAL(triggered()), this, SLOT(gotoSignMessageTab()));
+    connect(settingsPageAction, SIGNAL(triggered()), this, SLOT(showNormalIfMinimized()));
+    connect(settingsPageAction, SIGNAL(triggered()), this, SLOT(gotoSettingsPage()));
     // These showNormalIfMinimized are needed because Send Coins and Receive Coins
     // can be triggered from the tray menu, and need to show the GUI to be useful.
     connect(overviewAction, SIGNAL(triggered()), this, SLOT(showNormalIfMinimized()));
@@ -496,10 +526,12 @@ void AokChainGUI::createActions()
         connect(encryptWalletAction, SIGNAL(triggered(bool)), walletFrame, SLOT(encryptWallet(bool)));
         connect(backupWalletAction, SIGNAL(triggered()), walletFrame, SLOT(backupWallet()));
         connect(changePassphraseAction, SIGNAL(triggered()), walletFrame, SLOT(changePassphrase()));
+        connect(signMessageAction, SIGNAL(triggered()), this, SLOT(showNormalIfMinimized()));
         connect(signMessageAction, SIGNAL(triggered()), this, SLOT(gotoSignMessageTab()));
+        connect(verifyMessageAction, SIGNAL(triggered()), this, SLOT(showNormalIfMinimized()));
         connect(verifyMessageAction, SIGNAL(triggered()), this, SLOT(gotoVerifyMessageTab()));
-        connect(usedSendingAddressesAction, SIGNAL(triggered()), walletFrame, SLOT(usedSendingAddresses()));
-        connect(usedReceivingAddressesAction, SIGNAL(triggered()), walletFrame, SLOT(usedReceivingAddresses()));
+        connect(usedSendingAddressesAction, SIGNAL(triggered()), this, SLOT(gotoSendingAddressesPage()));
+        connect(usedReceivingAddressesAction, SIGNAL(triggered()), this, SLOT(gotoAddressBookPage()));
         connect(openAction, SIGNAL(triggered()), this, SLOT(openClicked()));
     }
 #endif // ENABLE_WALLET
@@ -551,6 +583,24 @@ void AokChainGUI::createMenuBar()
     help->addSeparator();
     help->addAction(aboutAction);
     help->addAction(aboutQtAction);
+
+#ifndef Q_OS_MAC
+    // The wallet window has no menu bar: the side bar has the pages, and the settings page has
+    // what else the menus offered. The actions stay on the window so that their shortcuts work.
+    // (macOS keeps its menu bar at the top of the screen; a window without a wallet keeps it too.)
+    if (walletFrame) {
+        appMenuBar->hide();
+        for (QMenu *menu : {file, settings, help})
+            addActions(menu->actions());
+    }
+#endif
+}
+
+QList<QAction*> AokChainGUI::settingsActions(int group) const
+{
+    if (group == 0)
+        return {encryptWalletAction, changePassphraseAction, backupWalletAction};
+    return {openRPCConsoleAction, showHelpMessageAction, aboutAction, aboutQtAction, openAction, quitAction};
 }
 
 void AokChainGUI::createToolBars()
@@ -565,11 +615,16 @@ void AokChainGUI::createToolBars()
         sidebar->addPage(receiveCoinsAction, "receive");
         sidebar->addPage(historyAction, "history");
         sidebar->addPage(transferTokenAction, "tokens");
+        sidebar->addPage(explorerAction, "explorer");
+        // below a line: what used to be in the menus
+        sidebar->addSeparator();
         if (displayAdvanced) {
             sidebar->addPage(createTokenAction, "create");
             sidebar->addPage(manageTokenAction, "manage");
         }
-        sidebar->addPage(explorerAction, "explorer");
+        sidebar->addPage(addressBookAction, "addressbook");
+        sidebar->addPage(signPageAction, "sign");
+        sidebar->addPage(settingsPageAction, "settings");
 
         // The actions carry the Alt+number shortcuts of the pages
         addAction(overviewAction);
@@ -582,6 +637,9 @@ void AokChainGUI::createToolBars()
             addAction(manageTokenAction);
         }
         addAction(explorerAction);
+        addAction(addressBookAction);
+        addAction(signPageAction);
+        addAction(settingsPageAction);
 
         overviewAction->setChecked(true);
 
@@ -720,6 +778,9 @@ void AokChainGUI::setWalletActionsEnabled(bool enabled)
     manageTokenAction->setEnabled(false);
     /** TOKENS END */
     explorerAction->setEnabled(enabled);
+    addressBookAction->setEnabled(enabled);
+    signPageAction->setEnabled(enabled);
+    settingsPageAction->setEnabled(enabled);
 }
 
 void AokChainGUI::createTrayIcon(const NetworkStyle *networkStyle)
@@ -786,6 +847,15 @@ void AokChainGUI::optionsClicked()
 {
     if(!clientModel || !clientModel->getOptionsModel())
         return;
+
+#ifdef ENABLE_WALLET
+    // with a wallet the options are a page of the window
+    if (walletFrame) {
+        showNormalIfMinimized();
+        gotoSettingsPage();
+        return;
+    }
+#endif
 
     OptionsDialog dlg(this, enableWallet);
     dlg.setModel(clientModel->getOptionsModel());
@@ -856,12 +926,32 @@ void AokChainGUI::gotoSendCoinsPage(QString addr)
 
 void AokChainGUI::gotoSignMessageTab(QString addr)
 {
+    signPageAction->setChecked(true);
     if (walletFrame) walletFrame->gotoSignMessageTab(addr);
 }
 
 void AokChainGUI::gotoVerifyMessageTab(QString addr)
 {
+    signPageAction->setChecked(true);
     if (walletFrame) walletFrame->gotoVerifyMessageTab(addr);
+}
+
+void AokChainGUI::gotoAddressBookPage()
+{
+    addressBookAction->setChecked(true);
+    if (walletFrame) walletFrame->usedReceivingAddresses();
+}
+
+void AokChainGUI::gotoSendingAddressesPage()
+{
+    addressBookAction->setChecked(true);
+    if (walletFrame) walletFrame->usedSendingAddresses();
+}
+
+void AokChainGUI::gotoSettingsPage()
+{
+    settingsPageAction->setChecked(true);
+    if (walletFrame) walletFrame->gotoSettingsPage();
 }
 
 /** TOKENS START */

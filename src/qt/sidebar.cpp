@@ -11,6 +11,8 @@
 #include <QHBoxLayout>
 #include <QLabel>
 #include <QPainter>
+#include <QFrame>
+#include <QScrollArea>
 #include <QPainterPath>
 #include <QRegExp>
 #include <QVBoxLayout>
@@ -176,11 +178,29 @@ Sidebar::Sidebar(QWidget* parent) : QWidget(parent)
     layout->addLayout(brand);
     layout->addSpacing(28);
 
+    // the pages; the list scrolls when the window is too low for all of them
+    QWidget* navBody = new QWidget();
+    navBody->setObjectName("sideNav");
+    navBody->setStyleSheet("QWidget#sideNav { background: transparent; }");
+    QVBoxLayout* navOuter = new QVBoxLayout(navBody);
+    navOuter->setContentsMargins(0, 0, 0, 0);
+    navOuter->setSpacing(0);
     navLayout = new QVBoxLayout();
     navLayout->setContentsMargins(0, 0, 0, 0);
     navLayout->setSpacing(4);
-    layout->addLayout(navLayout);
-    layout->addStretch(1);
+    navOuter->addLayout(navLayout);
+    navOuter->addStretch(1);
+    QScrollArea* navScroll = new QScrollArea();
+    navScroll->setWidgetResizable(true);
+    navScroll->setFrameShape(QFrame::NoFrame);
+    navScroll->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+    navScroll->setStyleSheet(QString("QScrollArea { background: transparent; } QScrollBar:vertical { width: 6px; margin: 0; }"
+                                     " QScrollBar::handle:vertical { background: %1; border-radius: 3px; }").arg(t.sideTrack.name()));
+    navScroll->viewport()->setAutoFillBackground(false);
+    navScroll->setWidget(navBody);
+    navScroll->setMinimumHeight(48);
+    layout->addWidget(navScroll, 1);
+    layout->addSpacing(12);
 
     // staking
     stakingCard = new QWidget();
@@ -245,6 +265,19 @@ Sidebar::Sidebar(QWidget* parent) : QWidget(parent)
 void Sidebar::addPage(QAction* action, const QString& iconName)
 {
     navLayout->addWidget(new SideNavButton(action, iconName, this));
+}
+
+void Sidebar::addSeparator()
+{
+    QWidget* box = new QWidget(this);
+    box->setFixedHeight(17);
+    QVBoxLayout* boxLayout = new QVBoxLayout(box);
+    boxLayout->setContentsMargins(8, 8, 8, 8);
+    QFrame* rule = new QFrame(box);
+    rule->setFixedHeight(1);
+    rule->setStyleSheet(QString("background-color: %1; border: none;").arg(GUIUtil::theme().sideCard.name()));
+    boxLayout->addWidget(rule);
+    navLayout->addWidget(box);
 }
 
 void Sidebar::setStaking(bool on, const QString& detail, const QString& toolTip)

@@ -58,6 +58,9 @@ QToolButton { background-color: @surfaceAlt; border: 1px solid @borderStrong; bo
 QToolButton:hover { border-color: @accent; background-color: @accentSoft; }
 QToolButton:pressed { background-color: @chip; }
 QDialogButtonBox QPushButton { min-width: 72px; }
+QDialogButtonBox { dialogbuttonbox-buttons-have-icons: 0; }
+QMessageBox { background-color: @surface; }
+QMessageBox QPushButton { min-width: 72px; }
 
 /* Inputs */
 QLineEdit, QAbstractSpinBox, QComboBox, QDateTimeEdit, QPlainTextEdit, QTextEdit {
@@ -131,6 +134,8 @@ QLabel[role="fieldLabel"] { color: @label; font-size: 13px; font-weight: 500; }
 QLabel[role="tag"] { background-color: @chip; color: @chipText; border-radius: 7px; padding: 2px 8px; font-size: 11px; font-weight: 500; }
 QLabel[role="ok"] { color: @ok; font-size: 12px; }
 QLabel[role="error"] { color: @error; font-size: 12px; }
+QLabel[role="resultOk"] { background-color: @okSoft; color: @ok; border: none; border-radius: 10px; padding: 9px 14px; font-size: 13px; font-weight: 500; }
+QLabel[role="resultError"] { background-color: @errorSoft; color: @error; border: none; border-radius: 10px; padding: 9px 14px; font-size: 13px; font-weight: 500; }
 QLabel[role="warning"] { background-color: @warnBg; color: @warnText; border: none; border-radius: 12px; padding: 10px 14px; font-size: 12px; }
 QLabel[role="pill"] { background-color: @warnBg; color: @warnText; border: none; border-radius: 15px; padding: 6px 12px; font-size: 12px; }
 QLabel[role="notice"] { background-color: @accentSoft; color: @label; border: none; border-radius: 12px; padding: 12px 14px; }

@@ -244,6 +244,13 @@ void WalletFrame::gotoManageTokensPage()
         i.value()->gotoManageTokensPage();
 }
 
+void WalletFrame::gotoSettingsPage()
+{
+    QMap<QString, WalletView*>::const_iterator i;
+    for (i = mapWalletViews.constBegin(); i != mapWalletViews.constEnd(); ++i)
+        i.value()->gotoSettingsPage();
+}
+
 void WalletFrame::gotoExplorerPage(QString query)
 {
     QMap<QString, WalletView*>::const_iterator i;

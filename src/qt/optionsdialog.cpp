@@ -21,6 +21,14 @@
 
 #include <QDataWidgetMapper>
 #include <QDir>
+#include <QComboBox>
+#include <QVBoxLayout>
+#include <QStyle>
+#include <QScrollArea>
+#include <QPushButton>
+#include <QLabel>
+#include <QHBoxLayout>
+#include <QFrame>
 #include <QIntValidator>
 #include <QLocale>
 #include <QMessageBox>
@@ -30,7 +38,10 @@ OptionsDialog::OptionsDialog(QWidget *parent, bool enableWallet) :
     QDialog(parent),
     ui(new Ui::OptionsDialog),
     model(0),
-    mapper(0)
+    mapper(0),
+    walletEnabled(enableWallet),
+    embedded(false),
+    extraColumn(0)
 {
     ui->setupUi(this);
 
@@ -126,6 +137,164 @@ OptionsDialog::OptionsDialog(QWidget *parent, bool enableWallet) :
     connect(ui->proxyIpTor, SIGNAL(validationDidChange(QValidatedLineEdit *)), this, SLOT(updateProxyValidationState()));
     connect(ui->proxyPort, SIGNAL(textChanged(const QString&)), this, SLOT(updateProxyValidationState()));
     connect(ui->proxyPortTor, SIGNAL(textChanged(const QString&)), this, SLOT(updateProxyValidationState()));
+}
+
+QFrame *OptionsDialog::makeCard(const QString &title, QWidget *parent, QVBoxLayout **body)
+{
+    QFrame *card = new QFrame(parent);
+    card->setProperty("role", "card");
+    QVBoxLayout *layout = new QVBoxLayout(card);
+    layout->setContentsMargins(22, 18, 22, 20);
+    layout->setSpacing(12);
+    if (!title.isEmpty()) {
+        QLabel *label = new QLabel(title, card);
+        label->setProperty("role", "title");
+        layout->addWidget(label);
+    }
+    if (body)
+        *body = layout;
+    return card;
+}
+
+void OptionsDialog::embedAsPage()
+{
+    embedded = true;
+    setWindowFlags(Qt::Widget);
+
+    // the buttons and the status line move to a bar below the cards
+    ui->verticalLayout_Buttons->removeWidget(ui->openAokChainConfButton);
+    ui->verticalLayout_Buttons->removeWidget(ui->resetButton);
+    ui->horizontalLayout_Buttons->removeWidget(ui->statusLabel);
+    ui->horizontalLayout->removeWidget(ui->okButton);
+    ui->horizontalLayout->removeWidget(ui->cancelButton);
+    ui->verticalLayout->removeWidget(ui->frame);
+    for (int i = 0; i < ui->verticalLayout->count(); ++i) {
+        if (ui->verticalLayout->itemAt(i)->layout() == ui->horizontalLayout_Buttons) {
+            delete ui->verticalLayout->takeAt(i);
+            break;
+        }
+    }
+    ui->verticalLayout->setContentsMargins(0, 0, 0, 0);
+    ui->verticalLayout->setSpacing(14);
+
+    // each tab becomes a card; two columns of cards that scroll
+    QList<QWidget*> pages;
+    while (ui->tabWidget->count() > 0) {
+        pages.append(ui->tabWidget->widget(0));
+        ui->tabWidget->removeTab(0);
+    }
+    ui->tabWidget->hide();
+
+    QScrollArea *scroll = new QScrollArea(this);
+    scroll->setWidgetResizable(true);
+    scroll->setFrameShape(QFrame::NoFrame);
+    scroll->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+    QWidget *body = new QWidget();
+    body->setObjectName("settingsBody");
+    body->setStyleSheet("QWidget#settingsBody { background: transparent; }");
+    scroll->setWidget(body);
+    scroll->viewport()->setAutoFillBackground(false);
+    QHBoxLayout *columns = new QHBoxLayout(body);
+    columns->setContentsMargins(0, 0, 8, 0);
+    columns->setSpacing(16);
+    QVBoxLayout *left = new QVBoxLayout();
+    left->setSpacing(16);
+    extraColumn = new QVBoxLayout();
+    extraColumn->setSpacing(16);
+    columns->addLayout(left, 1);
+    columns->addLayout(extraColumn, 1);
+
+    auto addPages = [this, &pages](QVBoxLayout *column, const QString &title, const QList<QWidget*> &wanted) {
+        QVBoxLayout *cardBody = nullptr;
+        QFrame *card = nullptr;
+        for (QWidget *page : wanted) {
+            if (!pages.contains(page))
+                continue; // a tab that this build or this start does not have
+            if (!card)
+                card = makeCard(title, this, &cardBody);
+            if (QLayout *pageLayout = page->layout()) {
+                pageLayout->setContentsMargins(0, 0, 0, 0);
+                // the tabs were stretched with spacers; a card is as high as what it holds
+                for (int i = pageLayout->count() - 1; i >= 0; --i) {
+                    if (pageLayout->itemAt(i)->spacerItem())
+                        delete pageLayout->takeAt(i);
+                }
+            }
+            cardBody->addWidget(page);
+            page->show();
+        }
+        if (card)
+            column->addWidget(card);
+    };
+    addPages(left, tr("General"), {ui->tabMain});
+    addPages(left, tr("Network"), {ui->tabNetwork});
+    addPages(extraColumn, tr("Wallet"), {ui->tabWallet});
+    addPages(extraColumn, tr("Display"), {ui->tabDisplay, ui->tabWindow});
+
+    // the cards share the width: long lists do not widen a column
+    for (QComboBox *combo : {(QComboBox*)ui->lang, (QComboBox*)ui->unit}) {
+        combo->setSizeAdjustPolicy(QComboBox::AdjustToMinimumContentsLengthWithIcon);
+        combo->setMinimumContentsLength(8);
+        combo->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
+    }
+    ui->thirdPartyTxUrls->setMinimumWidth(80);
+    ui->proxyPort->setMinimumWidth(76);
+    ui->proxyPortTor->setMinimumWidth(76);
+    body->setMinimumWidth(0);
+
+    // command-line options that override the options above
+    QVBoxLayout *overrideBody = nullptr;
+    QFrame *overrideCard = makeCard(QString(), this, &overrideBody);
+    ui->frame->setFrameShape(QFrame::NoFrame);
+    if (ui->frame->layout())
+        ui->frame->layout()->setContentsMargins(0, 0, 0, 0);
+    ui->overriddenByCommandLineInfoLabel->setProperty("role", "fieldLabel");
+    ui->overriddenByCommandLineLabel->setFont(GUIUtil::monoFont(12));
+    ui->overriddenByCommandLineLabel->setWordWrap(true);
+    overrideBody->addWidget(ui->frame);
+    left->addWidget(overrideCard);
+    left->addStretch(1);
+    extraColumn->addStretch(1);
+    ui->verticalLayout->addWidget(scroll, 1);
+
+    QHBoxLayout *bar = new QHBoxLayout();
+    bar->setSpacing(8);
+    ui->statusLabel->setAlignment(Qt::AlignLeft | Qt::AlignVCenter);
+    ui->statusLabel->setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Fixed);
+    ui->statusLabel->setMinimumWidth(0);
+    ui->statusLabel->hide();
+    ui->statusLabel->setWordWrap(false);
+    bar->addWidget(ui->statusLabel);
+    bar->addStretch(1);
+    bar->addWidget(ui->openAokChainConfButton);
+    bar->addWidget(ui->resetButton);
+    bar->addSpacing(12);
+    bar->addWidget(ui->cancelButton);
+    bar->addWidget(ui->okButton);
+    ui->cancelButton->setText(tr("Revert"));
+    ui->cancelButton->setToolTip(tr("Show the saved options again"));
+    ui->okButton->setText(tr("Save"));
+    ui->okButton->setProperty("primary", true);
+    ui->okButton->setDefault(false);
+    ui->okButton->setAutoDefault(false);
+    ui->cancelButton->setAutoDefault(false);
+    for (QPushButton *button : {ui->openAokChainConfButton, ui->resetButton, ui->cancelButton, ui->okButton})
+        button->setFixedHeight(40);
+    ui->okButton->setMinimumWidth(110);
+    ui->verticalLayout->addLayout(bar);
+}
+
+void OptionsDialog::addCard(QWidget *card)
+{
+    if (extraColumn)
+        extraColumn->insertWidget(extraColumn->count() - 1, card);
+}
+
+void OptionsDialog::done(int retval)
+{
+    // inside a page there is nothing to close
+    if (!embedded)
+        QDialog::done(retval);
 }
 
 OptionsDialog::~OptionsDialog()
@@ -248,10 +417,29 @@ void OptionsDialog::on_okButton_clicked()
     mapper->submit();
     accept();
     updateDefaultProxyNets();
+    if (embedded) {
+        // the page stays: say what happened
+        if (model && model->isRestartRequired()) {
+            showRestartWarning(true);
+        } else {
+            ui->statusLabel->setProperty("role", "resultOk");
+            ui->statusLabel->style()->unpolish(ui->statusLabel);
+            ui->statusLabel->style()->polish(ui->statusLabel);
+            ui->statusLabel->setText(tr("The options were saved."));
+            ui->statusLabel->show();
+            QTimer::singleShot(4000, this, SLOT(clearStatusLabel()));
+        }
+    }
 }
 
 void OptionsDialog::on_cancelButton_clicked()
 {
+    if (embedded) {
+        // back to what is saved
+        mapper->revert();
+        clearStatusLabel();
+        return;
+    }
     reject();
 }
 
@@ -270,7 +458,10 @@ void OptionsDialog::on_hideTrayIcon_stateChanged(int fState)
 
 void OptionsDialog::showRestartWarning(bool fPersistent)
 {
-    ui->statusLabel->setStyleSheet("QLabel { color: red; }");
+    ui->statusLabel->setProperty("role", embedded ? "warning" : "error");
+    ui->statusLabel->style()->unpolish(ui->statusLabel);
+    ui->statusLabel->style()->polish(ui->statusLabel);
+    ui->statusLabel->show();
 
     if(fPersistent)
     {
@@ -288,6 +479,8 @@ void OptionsDialog::showRestartWarning(bool fPersistent)
 void OptionsDialog::clearStatusLabel()
 {
     ui->statusLabel->clear();
+    if (embedded)
+        ui->statusLabel->hide();
     if (model && model->isRestartRequired()) {
         showRestartWarning(true);
     }
@@ -305,7 +498,10 @@ void OptionsDialog::updateProxyValidationState()
     else
     {
         setOkButtonState(false);
-        ui->statusLabel->setStyleSheet("QLabel { color: red; }");
+        ui->statusLabel->setProperty("role", embedded ? "resultError" : "error");
+    ui->statusLabel->style()->unpolish(ui->statusLabel);
+    ui->statusLabel->style()->polish(ui->statusLabel);
+    ui->statusLabel->show();
         ui->statusLabel->setText(tr("The supplied proxy address is invalid."));
     }
 }

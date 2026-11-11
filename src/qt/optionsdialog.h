@@ -11,6 +11,8 @@
 #include <QValidator>
 
 class OptionsModel;
+class QFrame;
+class QVBoxLayout;
 class QValidatedLineEdit;
 
 QT_BEGIN_NAMESPACE
@@ -44,6 +46,15 @@ public:
 
     void setModel(OptionsModel *model);
     void setMapper();
+    /** Show the options as cards inside a page of the main window; they are saved with a button */
+    void embedAsPage();
+    /** Add a card of the page below the cards of the options (right column) */
+    void addCard(QWidget *card);
+    /** A card with a title, as the page uses them */
+    static QFrame *makeCard(const QString &title, QWidget *parent, QVBoxLayout **body);
+
+public Q_SLOTS:
+    void done(int retval) override;
 
 private Q_SLOTS:
     /* set OK button state (enabled / disabled) */
@@ -68,6 +79,9 @@ private:
     Ui::OptionsDialog *ui;
     OptionsModel *model;
     QDataWidgetMapper *mapper;
+    bool walletEnabled;
+    bool embedded;
+    QVBoxLayout *extraColumn;
 };
 
 #endif // AOKCHAIN_QT_OPTIONSDIALOG_H
