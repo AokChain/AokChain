@@ -119,6 +119,14 @@ bool SignBlock(std::shared_ptr<CBlock> pblock, CWallet& wallet, const CAmount& n
     CMutableTransaction txCoinStake(*pblock->vtx[1]);
     txCoinStake.nTime = pblock->nTime;
 
+    // The kernel search reads the chain tip, the UTXO set and wallet
+    // transactions, so it must not run concurrently with block validation.
+    LOCK2(cs_main, wallet.cs_wallet);
+
+    // The template is stale if the tip moved after it was built
+    if (pindexPrev != chainActive.Tip() || pblock->hashPrevBlock != pindexPrev->GetBlockHash())
+        return false;
+
     if (wallet.CreateCoinStake(wallet, pblock->nBits, nTotalFees, pblock->nTime, txCoinStake, key))
     {
         if (txCoinStake.nTime >= pindexPrev->GetMedianTimePast() + 1)
@@ -641,6 +649,12 @@ void ThreadStakeMiner(CWallet *pwallet)
 
     bool fTryToSync = true;
 
+    // Tip and (masked) block time of the last kernel search that found
+    // nothing. Searching again before one of them changes would hash the same
+    // inputs again, so the loop only sleeps until then.
+    uint256 hashLastSearchTip;
+    int64_t nLastSearchTime = 0;
+
     while (true) {
         while (pwallet->IsLocked())
         {
@@ -664,16 +678,43 @@ void ThreadStakeMiner(CWallet *pwallet)
             }
         }
 
+        {
+            uint256 hashTip;
+            {
+                LOCK(cs_main);
+                hashTip = chainActive.Tip()->GetBlockHash();
+            }
+            if (hashTip == hashLastSearchTip && (GetAdjustedTime() & ~STAKE_TIMESTAMP_MASK) == nLastSearchTime) {
+                MilliSleep(nMinerSleep);
+                continue;
+            }
+        }
+
         //
         // Create new block
         //
-        if (pwallet->HaveAvailableCoinsForStaking()) {
+        if (!pwallet->HaveAvailableCoinsForStaking()) {
+            // Nothing to stake with. Sleep, instead of spinning on cs_main
+            // and cs_wallet until a coin matures.
+            MilliSleep(nMinerSleep);
+            continue;
+        }
+
+        {
             int64_t nTotalFees = 0;
             std::unique_ptr<CBlockTemplate> pblocktemplate(BlockAssembler(Params()).CreateNewBlock(reservekey.reserveScript, true, &nTotalFees));
             if (!pblocktemplate.get())
                 return;
 
-            CBlockIndex* pindexPrev = chainActive.Tip();
+            CBlockIndex* pindexPrev = nullptr;
+            {
+                LOCK(cs_main);
+                BlockMap::iterator mi = mapBlockIndex.find(pblocktemplate->block.hashPrevBlock);
+                if (mi != mapBlockIndex.end())
+                    pindexPrev = mi->second;
+            }
+            if (pindexPrev == nullptr)
+                continue;
 
             // Try to sign a block (this also checks for a PoS stake)
             std::shared_ptr<CBlock> pblock = std::make_shared<CBlock>(pblocktemplate->block);
@@ -696,6 +737,8 @@ void ThreadStakeMiner(CWallet *pwallet)
                 MilliSleep(500);
             } else {
                 // Wait till next stake
+                hashLastSearchTip = pblock->hashPrevBlock;
+                nLastSearchTime = pblock->GetBlockTime();
                 MilliSleep(nMinerSleep);
             }
         }
