@@ -97,6 +97,42 @@
         <source>There was an error trying to save the address list to %1. Please try again.</source>
         <translation>%1으로 주소 리스트를 저장하는 동안 오류가 발생했습니다. 다시 시도해주세요.</translation>
     </message>
+    <message>
+        <source>Add address</source>
+        <translation>주소 추가</translation>
+    </message>
+    <message>
+        <source>New address</source>
+        <translation>새 주소</translation>
+    </message>
+    <message>
+        <source>Edit</source>
+        <translation>수정</translation>
+    </message>
+    <message>
+        <source>QR code</source>
+        <translation>QR 코드</translation>
+    </message>
+    <message>
+        <source>Change the label of the selected address</source>
+        <translation>선택한 주소의 라벨을 바꿉니다</translation>
+    </message>
+    <message>
+        <source>Open the send page with the selected address</source>
+        <translation>선택한 주소로 보내기 화면을 엽니다</translation>
+    </message>
+    <message>
+        <source>Search by label or address</source>
+        <translation>라벨 또는 주소 검색</translation>
+    </message>
+    <message>
+        <source>Send to this address</source>
+        <translation>이 주소로 보내기</translation>
+    </message>
+    <message>
+        <source>Show the QR code of the selected address</source>
+        <translation>선택한 주소의 QR 코드를 봅니다</translation>
+    </message>
 </context>
 <context>
     <name>AddressTableModel</name>
@@ -738,6 +774,30 @@
     <message>
         <source>Pre-release test build. Use at your own risk.</source>
         <translation>출시 전 테스트 빌드입니다. 사용에 따른 책임은 본인에게 있습니다.</translation>
+    </message>
+    <message>
+        <source>&amp;Address book</source>
+        <translation>주소록(&amp;A)</translation>
+    </message>
+    <message>
+        <source>Se&amp;ttings</source>
+        <translation>설정(&amp;T)</translation>
+    </message>
+    <message>
+        <source>Si&amp;gn message</source>
+        <translation>서명(&amp;G)</translation>
+    </message>
+    <message>
+        <source>Options, wallet management and information</source>
+        <translation>옵션, 지갑 관리, 프로그램 정보</translation>
+    </message>
+    <message>
+        <source>Show the receiving and the sending addresses and their labels</source>
+        <translation>받는 주소와 보내는 주소, 라벨을 봅니다</translation>
+    </message>
+    <message>
+        <source>Sign messages with your addresses and verify signed messages</source>
+        <translation>내 주소로 메시지에 서명하고, 서명된 메시지를 검증합니다</translation>
     </message>
 </context>
 <context>
@@ -1785,6 +1845,94 @@
     <message>
         <source>The supplied proxy address is invalid.</source>
         <translation>지정한 프록시 주소가 잘못되었습니다.</translation>
+    </message>
+    <message>
+        <source>&amp;Hide tray icon</source>
+        <translation>트레이 아이콘 숨기기(&amp;H)</translation>
+    </message>
+    <message>
+        <source>&amp;Third party transaction URLs</source>
+        <translation>외부 거래 조회 URL(&amp;T)</translation>
+    </message>
+    <message>
+        <source>Accept connections from outside.</source>
+        <translation>외부에서 들어오는 연결을 받습니다.</translation>
+    </message>
+    <message>
+        <source>Allow incomin&amp;g connections</source>
+        <translation>들어오는 연결 허용(&amp;G)</translation>
+    </message>
+    <message>
+        <source>Configuration options</source>
+        <translation>설정 파일 옵션</translation>
+    </message>
+    <message>
+        <source>Display</source>
+        <translation>화면</translation>
+    </message>
+    <message>
+        <source>General</source>
+        <translation>일반</translation>
+    </message>
+    <message>
+        <source>Network</source>
+        <translation>네트워크</translation>
+    </message>
+    <message>
+        <source>Wallet</source>
+        <translation>지갑</translation>
+    </message>
+    <message>
+        <source>Enable fee control features</source>
+        <translation>수수료 직접 설정 기능 사용</translation>
+    </message>
+    <message>
+        <source>Error</source>
+        <translation>오류</translation>
+    </message>
+    <message>
+        <source>Hide the icon from the system tray.</source>
+        <translation>시스템 트레이에 아이콘을 표시하지 않습니다.</translation>
+    </message>
+    <message>
+        <source>Open Configuration File</source>
+        <translation>설정 파일 열기</translation>
+    </message>
+    <message>
+        <source>Open the %1 configuration file from the working directory.</source>
+        <translation>작업 폴더에 있는 %1 설정 파일을 엽니다.</translation>
+    </message>
+    <message>
+        <source>Revert</source>
+        <translation>되돌리기</translation>
+    </message>
+    <message>
+        <source>Save</source>
+        <translation>저장</translation>
+    </message>
+    <message>
+        <source>Show the saved options again</source>
+        <translation>저장된 옵션을 다시 표시합니다</translation>
+    </message>
+    <message>
+        <source>Shows if the supplied default SOCKS5 proxy is used to reach peers via this network type.</source>
+        <translation>이 종류의 네트워크에서 피어에 연결할 때 위 기본 SOCKS5 프록시를 쓰는지 표시합니다.</translation>
+    </message>
+    <message>
+        <source>The configuration file could not be opened.</source>
+        <translation>설정 파일을 열 수 없습니다.</translation>
+    </message>
+    <message>
+        <source>The configuration file is used to specify advanced user options which override GUI settings. Additionally, any command-line options will override this configuration file.</source>
+        <translation>설정 파일에는 화면의 설정보다 우선하는 고급 옵션을 적습니다. 명령줄 옵션은 이 설정 파일보다도 우선합니다.</translation>
+    </message>
+    <message>
+        <source>The options were saved.</source>
+        <translation>옵션을 저장했습니다.</translation>
+    </message>
+    <message>
+        <source>Use separate SOCKS&amp;5 proxy to reach peers via Tor hidden services:</source>
+        <translation>Tor 숨김 서비스 피어에는 별도 SOCKS5 프록시 사용(&amp;5):</translation>
     </message>
 </context>
 <context>
@@ -3521,6 +3669,22 @@
         <source>Message verified.</source>
         <translation>메시지를 검증했습니다.</translation>
     </message>
+    <message>
+        <source>Address</source>
+        <translation>주소</translation>
+    </message>
+    <message>
+        <source>Message</source>
+        <translation>메시지</translation>
+    </message>
+    <message>
+        <source>The message that was signed, exactly as it was written</source>
+        <translation>서명된 메시지를 쓰인 그대로 입력하세요</translation>
+    </message>
+    <message>
+        <source>The signature in base 64</source>
+        <translation>Base64 서명</translation>
+    </message>
 </context>
 <context>
     <name>SplashScreen</name>
@@ -4167,6 +4331,30 @@
         <source>Show only the transactions of one coin or of one token with its sub tokens</source>
         <translation>코인 하나, 또는 토큰 하나와 그 하위 토큰의 거래만 표시합니다</translation>
     </message>
+    <message>
+        <source>%1 per page</source>
+        <translation>%1개씩 보기</translation>
+    </message>
+    <message>
+        <source>%1 transactions</source>
+        <translation>거래 %1건</translation>
+    </message>
+    <message>
+        <source>First page</source>
+        <translation>첫 페이지</translation>
+    </message>
+    <message>
+        <source>Last page</source>
+        <translation>마지막 페이지</translation>
+    </message>
+    <message>
+        <source>Next</source>
+        <translation>다음</translation>
+    </message>
+    <message>
+        <source>Previous</source>
+        <translation>이전</translation>
+    </message>
 </context>
 <context>
     <name>UnitDisplayStatusBarControl</name>
@@ -4258,6 +4446,46 @@
     <message>
         <source>Explorer</source>
         <translation>탐색기</translation>
+    </message>
+    <message>
+        <source>Address book</source>
+        <translation>주소록</translation>
+    </message>
+    <message>
+        <source>Information</source>
+        <translation>정보</translation>
+    </message>
+    <message>
+        <source>Receiving addresses</source>
+        <translation>받는 주소</translation>
+    </message>
+    <message>
+        <source>Sending addresses</source>
+        <translation>보내는 주소</translation>
+    </message>
+    <message>
+        <source>Settings</source>
+        <translation>설정</translation>
+    </message>
+    <message>
+        <source>Sign</source>
+        <translation>서명</translation>
+    </message>
+    <message>
+        <source>Sign message</source>
+        <translation>서명</translation>
+    </message>
+    <message>
+        <source>Verify</source>
+        <translation>검증</translation>
+    </message>
+    <message>
+        <source>Wallet management</source>
+        <translation>지갑 관리</translation>
+    </message>
+    <message>
+        <source>Encrypt the wallet with a passphrase and keep a backup of the wallet file in a safe place.</source>
+        <translation>지갑을 암호로 잠그고, 지갑 파일 백업을 안전한 곳에 보관하세요.</translation>
     </message>
 </context>
 <context>
