@@ -571,6 +571,170 @@
         <source>Stop Staking</source>
         <translation>스테이킹 중지</translation>
     </message>
+    <message>
+        <source>T&amp;okens</source>
+        <translation>토큰(&amp;O)</translation>
+    </message>
+    <message>
+        <source>&amp;Create Tokens</source>
+        <translation>토큰 만들기(&amp;C)</translation>
+    </message>
+    <message>
+        <source>Create new main/sub/unique tokens</source>
+        <translation>새 토큰, 하위 토큰, 고유 토큰을 만듭니다</translation>
+    </message>
+    <message>
+        <source>&amp;Manage Tokens</source>
+        <translation>토큰 관리(&amp;M)</translation>
+    </message>
+    <message>
+        <source>Manage tokens you are the administrator of</source>
+        <translation>관리 권한이 있는 토큰을 관리합니다</translation>
+    </message>
+    <message>
+        <source>&amp;Explorer</source>
+        <translation>탐색기(&amp;E)</translation>
+    </message>
+    <message>
+        <source>Look up transactions, addresses and blocks on this node</source>
+        <translation>이 노드에서 거래, 주소, 블록을 조회합니다</translation>
+    </message>
+    <message>
+        <source>Mainnet</source>
+        <translation>메인넷</translation>
+    </message>
+    <message>
+        <source>Testnet</source>
+        <translation>테스트넷</translation>
+    </message>
+    <message>
+        <source>Regtest</source>
+        <translation>리그테스트</translation>
+    </message>
+    <message>
+        <source>Peers %1 · %2</source>
+        <translation>피어 %1 · %2</translation>
+    </message>
+    <message>
+        <source>Network off · %1</source>
+        <translation>네트워크 꺼짐 · %1</translation>
+    </message>
+    <message>
+        <source>Syncing headers</source>
+        <translation>헤더 동기화 중</translation>
+    </message>
+    <message>
+        <source>Syncing</source>
+        <translation>동기화 중</translation>
+    </message>
+    <message>
+        <source>Importing blocks</source>
+        <translation>블록 가져오는 중</translation>
+    </message>
+    <message>
+        <source>Reindexing</source>
+        <translation>재색인 중</translation>
+    </message>
+    <message>
+        <source>Synced</source>
+        <translation>동기화 완료</translation>
+    </message>
+    <message>
+        <source>Block %1</source>
+        <translation>블록 %1</translation>
+    </message>
+    <message>
+        <source>%1 left</source>
+        <translation>%1 남음</translation>
+    </message>
+    <message>
+        <source>Tokens not yet active</source>
+        <translation>토큰이 아직 활성화되지 않았습니다</translation>
+    </message>
+    <message>
+        <source>Wallet unlocked</source>
+        <translation>지갑 잠금 해제됨</translation>
+    </message>
+    <message>
+        <source>Wallet locked</source>
+        <translation>지갑 잠김</translation>
+    </message>
+    <message numerus="yes">
+        <source>%n second(s)</source>
+        <translation>
+            <numerusform>%n초</numerusform>
+        </translation>
+    </message>
+    <message numerus="yes">
+        <source>%n minute(s)</source>
+        <translation>
+            <numerusform>%n분</numerusform>
+        </translation>
+    </message>
+    <message numerus="yes">
+        <source>%n hour(s)</source>
+        <translation>
+            <numerusform>%n시간</numerusform>
+        </translation>
+    </message>
+    <message numerus="yes">
+        <source>%n day(s)</source>
+        <translation>
+            <numerusform>%n일</numerusform>
+        </translation>
+    </message>
+    <message>
+        <source>Staking.&lt;br&gt;Your weight is %1&lt;br&gt;Network weight is %2&lt;br&gt;Expected time to earn reward is %3</source>
+        <translation>스테이킹 중입니다.&lt;br&gt;내 가중치: %1&lt;br&gt;네트워크 가중치: %2&lt;br&gt;보상을 받기까지 예상 시간: %3</translation>
+    </message>
+    <message>
+        <source>On · a reward about every %1</source>
+        <translation>켜짐 · 약 %1마다 보상 예상</translation>
+    </message>
+    <message>
+        <source>On</source>
+        <translation>켜짐</translation>
+    </message>
+    <message>
+        <source>Off</source>
+        <translation>꺼짐</translation>
+    </message>
+    <message>
+        <source>Not staking because wallet is syncing</source>
+        <translation>지갑이 동기화 중이라 스테이킹하지 않습니다</translation>
+    </message>
+    <message>
+        <source>On · waiting for the synchronization to finish</source>
+        <translation>켜짐 · 동기화가 끝나기를 기다리는 중</translation>
+    </message>
+    <message>
+        <source>Off · staking is possible once synchronized</source>
+        <translation>꺼짐 · 동기화가 끝나면 켤 수 있습니다</translation>
+    </message>
+    <message>
+        <source>Not staking because wallet is locked</source>
+        <translation>지갑이 잠겨 있어 스테이킹하지 않습니다</translation>
+    </message>
+    <message>
+        <source>%1 · the wallet is locked</source>
+        <translation>%1 · 지갑이 잠겨 있습니다</translation>
+    </message>
+    <message>
+        <source>Not staking because you don't have mature coins</source>
+        <translation>성숙한 코인이 없어 스테이킹하지 않습니다</translation>
+    </message>
+    <message>
+        <source>%1 · no mature coins</source>
+        <translation>%1 · 성숙한 코인이 없습니다</translation>
+    </message>
+    <message>
+        <source>Not staking</source>
+        <translation>스테이킹하지 않는 중</translation>
+    </message>
+    <message>
+        <source>Connecting</source>
+        <translation>피어 연결 중</translation>
+    </message>
 </context>
 <context>
     <name>CoinControlDialog</name>
@@ -783,6 +947,140 @@
     <message>
         <source>Balance:</source>
         <translation>잔고:</translation>
+    </message>
+    <message>
+        <source>Copy quantity</source>
+        <translation>수량 복사</translation>
+    </message>
+    <message>
+        <source>Copy amount</source>
+        <translation>거래액 복사</translation>
+    </message>
+    <message>
+        <source>Copy fee</source>
+        <translation>수수료 복사</translation>
+    </message>
+    <message>
+        <source>Copy after fee</source>
+        <translation>수수료 이후 금액 복사</translation>
+    </message>
+    <message>
+        <source>Copy bytes</source>
+        <translation>바이트 복사</translation>
+    </message>
+    <message>
+        <source>Copy dust</source>
+        <translation>더스트 복사</translation>
+    </message>
+    <message>
+        <source>Copy change</source>
+        <translation>잔돈 복사</translation>
+    </message>
+    <message>
+        <source>Summary</source>
+        <translation>요약</translation>
+    </message>
+    <message>
+        <source>Tokens are sent to AokChain addresses. The fee is paid in AOK.</source>
+        <translation>토큰은 AokChain 주소로 보냅니다. 수수료는 AOK로 냅니다.</translation>
+    </message>
+    <message>
+        <source>A transaction that has been sent cannot be cancelled. Check the address once more.</source>
+        <translation>보낸 거래는 취소할 수 없습니다. 주소를 다시 확인하세요.</translation>
+    </message>
+    <message>
+        <source>%1 (%2 blocks)</source>
+        <translation>%1 (%2블록)</translation>
+    </message>
+    <message>
+        <source>There is no address associated with username you specified. Please recheck.</source>
+        <translation>입력한 사용자 이름에 연결된 주소가 없습니다. 다시 확인하세요.</translation>
+    </message>
+    <message>
+        <source>Send Coins</source>
+        <translation>코인 보내기</translation>
+    </message>
+    <message>
+        <source>%1 to %2</source>
+        <translation>%1을(를) %2(으)로</translation>
+    </message>
+    <message>
+        <source>Are you sure you want to send?</source>
+        <translation>정말로 보내시겠습니까?</translation>
+    </message>
+    <message>
+        <source>added as transaction fee</source>
+        <translation>거래 수수료로 추가됨</translation>
+    </message>
+    <message>
+        <source>Confirm send tokens</source>
+        <translation>토큰 보내기 확인</translation>
+    </message>
+    <message>
+        <source>The recipient address is not valid. Please recheck.</source>
+        <translation>받는 사람의 주소가 올바르지 않습니다. 다시 확인하세요.</translation>
+    </message>
+    <message>
+        <source>The amount to pay must be larger than 0.</source>
+        <translation>보낼 수량은 0보다 커야 합니다.</translation>
+    </message>
+    <message>
+        <source>The amount exceeds your balance.</source>
+        <translation>잔액을 초과했습니다.</translation>
+    </message>
+    <message>
+        <source>The total exceeds your balance when the %1 transaction fee is included.</source>
+        <translation>%1의 거래 수수료를 포함하면 잔액을 초과합니다.</translation>
+    </message>
+    <message>
+        <source>Duplicate address found: addresses should only be used once each.</source>
+        <translation>중복된 주소가 있습니다. 주소는 한 번씩만 써야 합니다.</translation>
+    </message>
+    <message>
+        <source>Transaction creation failed!</source>
+        <translation>거래를 만들지 못했습니다!</translation>
+    </message>
+    <message>
+        <source>The transaction was rejected with the following reason: %1</source>
+        <translation>거래가 다음 이유로 거부되었습니다: %1</translation>
+    </message>
+    <message>
+        <source>A fee higher than %1 is considered an absurdly high fee.</source>
+        <translation>%1보다 큰 수수료는 지나치게 높은 수수료로 봅니다.</translation>
+    </message>
+    <message>
+        <source>Payment request expired.</source>
+        <translation>지불 요청이 만료되었습니다.</translation>
+    </message>
+    <message>
+        <source>Pay only the required fee of %1</source>
+        <translation>필수 수수료 %1만 지불</translation>
+    </message>
+    <message numerus="yes">
+        <source>Estimated to begin confirmation within %n block(s).</source>
+        <translation>
+            <numerusform>%n블록 안에 승인이 시작될 것으로 추정됩니다.</numerusform>
+        </translation>
+    </message>
+    <message>
+        <source>Warning: Invalid AokChain address</source>
+        <translation>경고: 잘못된 AokChain 주소입니다</translation>
+    </message>
+    <message>
+        <source>Warning: Unknown change address</source>
+        <translation>경고: 알 수 없는 잔돈 주소입니다</translation>
+    </message>
+    <message>
+        <source>Confirm custom change address</source>
+        <translation>맞춤 잔돈 주소 확인</translation>
+    </message>
+    <message>
+        <source>The address you selected for change is not part of this wallet. Any or all funds in your wallet may be sent to this address. Are you sure?</source>
+        <translation>잔돈 주소로 고른 주소는 이 지갑의 주소가 아닙니다. 지갑의 자금 일부 또는 전부가 이 주소로 갈 수 있습니다. 계속하시겠습니까?</translation>
+    </message>
+    <message>
+        <source>(no label)</source>
+        <translation>(라벨 없음)</translation>
     </message>
 </context>
 <context>
@@ -1060,14 +1358,6 @@
 </context>
 <context>
     <name>OptionsDialog</name>
-    <message>
-        <source>&amp;Dark mode</source>
-        <translation>다크 모드(&amp;D)</translation>
-    </message>
-    <message>
-        <source>Use the dark color theme. Takes effect after restarting the client.</source>
-        <translation>어두운 색 테마를 사용합니다. 프로그램을 다시 시작하면 적용됩니다.</translation>
-    </message>
     <message>
         <source>Options</source>
         <translation>환경설정</translation>
@@ -1386,6 +1676,98 @@
     <message>
         <source>Search</source>
         <translation>검색</translation>
+    </message>
+    <message>
+        <source>Balances may differ from the real ones while synchronizing</source>
+        <translation>동기화 중에는 잔액이 실제와 다를 수 있습니다</translation>
+    </message>
+    <message>
+        <source>Total balance</source>
+        <translation>총 잔액</translation>
+    </message>
+    <message>
+        <source>Staking rewards that have not yet matured</source>
+        <translation>아직 성숙하지 않은 스테이킹 보상</translation>
+    </message>
+    <message>
+        <source>Coins that are staked at the moment</source>
+        <translation>지금 스테이킹에 걸려 있는 코인</translation>
+    </message>
+    <message>
+        <source>Available</source>
+        <translation>사용 가능</translation>
+    </message>
+    <message>
+        <source>Pending</source>
+        <translation>미확정</translation>
+    </message>
+    <message>
+        <source>Immature (staking rewards)</source>
+        <translation>미성숙 (스테이킹 보상)</translation>
+    </message>
+    <message>
+        <source>Staked</source>
+        <translation>스테이킹 중</translation>
+    </message>
+    <message>
+        <source>Balances in watch-only addresses</source>
+        <translation>조회 전용 주소의 잔액</translation>
+    </message>
+    <message>
+        <source>Send</source>
+        <translation>보내기</translation>
+    </message>
+    <message>
+        <source>Receive</source>
+        <translation>받기</translation>
+    </message>
+    <message>
+        <source>Tokens</source>
+        <translation>토큰</translation>
+    </message>
+    <message>
+        <source>Search tokens</source>
+        <translation>토큰 검색</translation>
+    </message>
+    <message>
+        <source>Click a token to send it or to copy its name</source>
+        <translation>토큰을 누르면 보내거나 이름을 복사할 수 있습니다</translation>
+    </message>
+    <message>
+        <source>Show all</source>
+        <translation>전체 보기</translation>
+    </message>
+    <message>
+        <source>Send Token</source>
+        <translation>토큰 보내기</translation>
+    </message>
+    <message>
+        <source>Copy Amount</source>
+        <translation>수량 복사</translation>
+    </message>
+    <message>
+        <source>Copy Name</source>
+        <translation>이름 복사</translation>
+    </message>
+    <message>
+        <source>Issue Sub Token</source>
+        <translation>하위 토큰 발행</translation>
+    </message>
+    <message>
+        <source>Issue Unique Token</source>
+        <translation>고유 토큰 발행</translation>
+    </message>
+    <message>
+        <source>Reissue Token</source>
+        <translation>토큰 재발행</translation>
+    </message>
+    <message>
+        <source>Watch-only: available %1 · pending %2 · immature %3 · total %4</source>
+        <translation>조회 전용: 사용 가능 %1 · 미확정 %2 · 미성숙 %3 · 합계 %4</translation>
+    </message>
+    <message>
+        <source>%1 kinds</source>
+        <translation>%1종</translation>
     </message>
 </context>
 <context>
@@ -2353,6 +2735,100 @@
         <source>Warning: Fee estimation is currently not possible.</source>
         <translation>주의 : 현재 수수료를 계산할 수 없습니다.</translation>
     </message>
+    <message>
+        <source>Available</source>
+        <translation>사용 가능</translation>
+    </message>
+    <message>
+        <source>Fee</source>
+        <translation>수수료</translation>
+    </message>
+    <message>
+        <source>Slow</source>
+        <translation>느리게</translation>
+    </message>
+    <message>
+        <source>about %1 blocks</source>
+        <translation>약 %1블록</translation>
+    </message>
+    <message>
+        <source>Normal</source>
+        <translation>보통</translation>
+    </message>
+    <message>
+        <source>Custom</source>
+        <translation>직접 입력</translation>
+    </message>
+    <message>
+        <source>Fee settings</source>
+        <translation>수수료 상세 설정</translation>
+    </message>
+    <message>
+        <source>Hide fee settings</source>
+        <translation>수수료 상세 설정 닫기</translation>
+    </message>
+    <message>
+        <source>Add recipient</source>
+        <translation>받는 사람 추가</translation>
+    </message>
+    <message>
+        <source>Summary</source>
+        <translation>요약</translation>
+    </message>
+    <message>
+        <source>Recipient</source>
+        <translation>받는 주소</translation>
+    </message>
+    <message>
+        <source>Amount to send</source>
+        <translation>보낼 금액</translation>
+    </message>
+    <message>
+        <source>Fee (estimated)</source>
+        <translation>수수료 (예상)</translation>
+    </message>
+    <message>
+        <source>Estimate for a transaction with one input. The fee that is really paid is shown for confirmation before the transaction is sent.</source>
+        <translation>입력이 하나인 거래를 기준으로 한 추정값입니다. 실제 수수료는 보내기 전 확인 창에 표시됩니다.</translation>
+    </message>
+    <message>
+        <source>Total</source>
+        <translation>합계</translation>
+    </message>
+    <message>
+        <source>Balance after sending</source>
+        <translation>보낸 뒤 잔액</translation>
+    </message>
+    <message>
+        <source>A transaction that has been sent cannot be cancelled. Check the address once more.</source>
+        <translation>보낸 거래는 취소할 수 없습니다. 주소를 다시 확인하세요.</translation>
+    </message>
+    <message>
+        <source>Clear all</source>
+        <translation>모두 지우기</translation>
+    </message>
+    <message numerus="yes">
+        <source>%n recipient(s)</source>
+        <translation>
+            <numerusform>받는 사람 %n명</numerusform>
+        </translation>
+    </message>
+    <message>
+        <source>Send %1</source>
+        <translation>%1 보내기</translation>
+    </message>
+    <message>
+        <source>%1 (%2 blocks)</source>
+        <translation>%1 (%2블록)</translation>
+    </message>
+    <message>
+        <source>There is no address associated with username you specified. Please recheck.</source>
+        <translation>입력한 사용자 이름에 연결된 주소가 없습니다. 다시 확인하세요.</translation>
+    </message>
+    <message>
+        <source>Send</source>
+        <translation>보내기</translation>
+    </message>
 </context>
 <context>
     <name>SendCoinsEntry</name>
@@ -2447,6 +2923,42 @@
     <message>
         <source>Use time lock</source>
         <translation>락업 기능 사용</translation>
+    </message>
+    <message>
+        <source>Recipient &amp;address</source>
+        <translation>받는 주소(&amp;A)</translation>
+    </message>
+    <message>
+        <source>&amp;Label</source>
+        <translation>라벨(&amp;L)</translation>
+    </message>
+    <message>
+        <source>A&amp;mount</source>
+        <translation>금액(&amp;M)</translation>
+    </message>
+    <message>
+        <source>All</source>
+        <translation>전액</translation>
+    </message>
+    <message>
+        <source>Use the whole available balance. The fee is subtracted from the amount.</source>
+        <translation>사용 가능한 잔액 전부를 보냅니다. 수수료는 보내는 금액에서 뺍니다.</translation>
+    </message>
+    <message>
+        <source>S&amp;ubtract the fee from the amount</source>
+        <translation>받는 금액에서 수수료 빼기(&amp;U)</translation>
+    </message>
+    <message>
+        <source>This is a valid AokChain address</source>
+        <translation>유효한 AokChain 주소입니다</translation>
+    </message>
+    <message>
+        <source>A user name: it is resolved to its address when sending</source>
+        <translation>사용자 이름입니다. 보낼 때 연결된 주소로 바뀝니다</translation>
+    </message>
+    <message>
+        <source>This is not a valid AokChain address</source>
+        <translation>유효한 AokChain 주소가 아닙니다</translation>
     </message>
 </context>
 <context>
@@ -2936,6 +3448,74 @@
         <source>Amount removed from or added to balance.</source>
         <translation>변경된 잔고.</translation>
     </message>
+    <message>
+        <source>Status</source>
+        <translation>상태</translation>
+    </message>
+    <message>
+        <source>Description</source>
+        <translation>내용</translation>
+    </message>
+    <message>
+        <source>Amount</source>
+        <translation>금액</translation>
+    </message>
+    <message>
+        <source>Token</source>
+        <translation>토큰</translation>
+    </message>
+    <message>
+        <source>Received · %1</source>
+        <translation>받음 · %1</translation>
+    </message>
+    <message>
+        <source>Sent · %1</source>
+        <translation>보냄 · %1</translation>
+    </message>
+    <message>
+        <source>Sent · within the wallet</source>
+        <translation>보냄 · 지갑 내 이동</translation>
+    </message>
+    <message>
+        <source>Staking reward</source>
+        <translation>스테이킹 보상</translation>
+    </message>
+    <message>
+        <source>Issued · %1</source>
+        <translation>발행 · %1</translation>
+    </message>
+    <message>
+        <source>Reissued · %1</source>
+        <translation>재발행 · %1</translation>
+    </message>
+    <message>
+        <source>Other</source>
+        <translation>기타</translation>
+    </message>
+    <message>
+        <source>Open</source>
+        <translation>대기</translation>
+    </message>
+    <message>
+        <source>Unconfirmed %1/%2</source>
+        <translation>미확정 %1/%2</translation>
+    </message>
+    <message>
+        <source>Confirmed</source>
+        <translation>확정</translation>
+    </message>
+    <message>
+        <source>Immature %1/%2</source>
+        <translation>미성숙 %1/%2</translation>
+    </message>
+    <message>
+        <source>Not accepted</source>
+        <translation>거부됨</translation>
+    </message>
+    <message>
+        <source>The token (or AOK) removed or added to balance.</source>
+        <translation>잔액에서 빠지거나 더해진 토큰(또는 AOK)입니다.</translation>
+    </message>
 </context>
 <context>
     <name>TransactionView</name>
@@ -3095,6 +3675,82 @@
         <source>to</source>
         <translation>상대방</translation>
     </message>
+    <message>
+        <source>Owner</source>
+        <translation>관리 권한</translation>
+    </message>
+    <message>
+        <source>No label</source>
+        <translation>라벨 없음</translation>
+    </message>
+    <message>
+        <source>Received</source>
+        <translation>받음</translation>
+    </message>
+    <message>
+        <source>Sent</source>
+        <translation>보냄</translation>
+    </message>
+    <message>
+        <source>Staking</source>
+        <translation>스테이킹</translation>
+    </message>
+    <message>
+        <source>Search address or label</source>
+        <translation>주소, 라벨 검색</translation>
+    </message>
+    <message>
+        <source>All assets</source>
+        <translation>모든 자산</translation>
+    </message>
+    <message>
+        <source>Show only the transactions of the assets whose name contains this text</source>
+        <translation>이름에 이 글자가 들어간 자산의 거래만 표시합니다</translation>
+    </message>
+    <message>
+        <source>All time</source>
+        <translation>전체 기간</translation>
+    </message>
+    <message>
+        <source>More filters: other transaction types, minimum amount, watch-only</source>
+        <translation>필터 더 보기: 그 밖의 거래 유형, 최소 금액, 조회 전용</translation>
+    </message>
+    <message>
+        <source>Double-click a row for the details; the menu of the right mouse button looks a transaction up in the explorer</source>
+        <translation>행을 두 번 누르면 상세 정보가 열리고, 오른쪽 버튼 메뉴에서 탐색기로 조회할 수 있습니다</translation>
+    </message>
+    <message>
+        <source>Open the explorer</source>
+        <translation>탐색기 열기</translation>
+    </message>
+    <message>
+        <source>Show in the explorer</source>
+        <translation>탐색기에서 보기</translation>
+    </message>
+    <message>
+        <source>Token</source>
+        <translation>토큰</translation>
+    </message>
+    <message>
+        <source>Token Issued</source>
+        <translation>토큰 발행</translation>
+    </message>
+    <message>
+        <source>Token Reissued</source>
+        <translation>토큰 재발행</translation>
+    </message>
+    <message>
+        <source>Token Received</source>
+        <translation>토큰 받음</translation>
+    </message>
+    <message>
+        <source>Token Sent</source>
+        <translation>토큰 보냄</translation>
+    </message>
+    <message>
+        <source>Copy token name</source>
+        <translation>토큰 이름 복사</translation>
+    </message>
 </context>
 <context>
     <name>UnitDisplayStatusBarControl</name>
@@ -3150,6 +3806,42 @@
     <message>
         <source>The wallet data was successfully saved to %1.</source>
         <translation>지갑 정보가 %1에 성공적으로 저장되었습니다.</translation>
+    </message>
+    <message>
+        <source>Overview</source>
+        <translation>개요</translation>
+    </message>
+    <message>
+        <source>Export to CSV</source>
+        <translation>CSV로 내보내기</translation>
+    </message>
+    <message>
+        <source>Transactions</source>
+        <translation>거래 내역</translation>
+    </message>
+    <message>
+        <source>Receive</source>
+        <translation>받기</translation>
+    </message>
+    <message>
+        <source>Send</source>
+        <translation>보내기</translation>
+    </message>
+    <message>
+        <source>Tokens</source>
+        <translation>토큰</translation>
+    </message>
+    <message>
+        <source>Create Tokens</source>
+        <translation>토큰 만들기</translation>
+    </message>
+    <message>
+        <source>Manage Tokens</source>
+        <translation>토큰 관리</translation>
+    </message>
+    <message>
+        <source>Explorer</source>
+        <translation>탐색기</translation>
     </message>
 </context>
 <context>
@@ -4065,6 +4757,330 @@
     <message>
         <source>Error</source>
         <translation>오류</translation>
+    </message>
+</context>
+<context>
+    <name>Sidebar</name>
+    <message>
+        <source>Staking</source>
+        <translation>스테이킹</translation>
+    </message>
+</context>
+<context>
+    <name>ExplorerPage</name>
+    <message>
+        <source>%1 bytes</source>
+        <translation>%1 바이트</translation>
+    </message>
+    <message>
+        <source>Looked up on the node of this computer. Nothing is sent to an outside server.</source>
+        <translation>이 PC의 노드에서 직접 조회합니다. 외부 서버로 보내지 않습니다.</translation>
+    </message>
+    <message>
+        <source>Transaction ID, address, block height or block hash</source>
+        <translation>거래 ID, 주소, 블록 높이 또는 해시</translation>
+    </message>
+    <message>
+        <source>Look up</source>
+        <translation>조회</translation>
+    </message>
+    <message>
+        <source>Block height</source>
+        <translation>블록 높이</translation>
+    </message>
+    <message>
+        <source>Difficulty</source>
+        <translation>난이도</translation>
+    </message>
+    <message>
+        <source>Network stake weight</source>
+        <translation>네트워크 스테이킹 가중치</translation>
+    </message>
+    <message>
+        <source>Connected peers</source>
+        <translation>연결된 피어</translation>
+    </message>
+    <message>
+        <source>Result</source>
+        <translation>조회 결과</translation>
+    </message>
+    <message>
+        <source>Copy ID</source>
+        <translation>ID 복사</translation>
+    </message>
+    <message>
+        <source>Show raw (hex)</source>
+        <translation>원본(hex) 보기</translation>
+    </message>
+    <message>
+        <source>Memory pool</source>
+        <translation>멤풀</translation>
+    </message>
+    <message>
+        <source>Transactions waiting to be confirmed</source>
+        <translation>확정을 기다리는 거래</translation>
+    </message>
+    <message>
+        <source>Waiting</source>
+        <translation>대기 거래</translation>
+    </message>
+    <message>
+        <source>Size</source>
+        <translation>크기</translation>
+    </message>
+    <message>
+        <source>Minimum fee</source>
+        <translation>최소 수수료</translation>
+    </message>
+    <message>
+        <source>Expected to be included in the next block. Blocks are about %1 apart.</source>
+        <translation>다음 블록에 들어갈 것으로 예상됩니다. 블록 간격은 약 %1입니다.</translation>
+    </message>
+    <message>
+        <source>Enter a transaction ID, an address, a block height or a block hash above. Transaction IDs and addresses shown here can be clicked to look them up.</source>
+        <translation>위에 거래 ID, 주소, 블록 높이 또는 블록 해시를 입력하세요. 여기에 표시되는 거래 ID와 주소는 눌러서 바로 조회할 수 있습니다.</translation>
+    </message>
+    <message>
+        <source>Raw transaction</source>
+        <translation>거래 원본</translation>
+    </message>
+    <message>
+        <source>Newly generated coins</source>
+        <translation>새로 생성된 코인</translation>
+    </message>
+    <message>
+        <source>Spends an output of this transaction</source>
+        <translation>이 거래의 출력을 사용합니다</translation>
+    </message>
+    <message>
+        <source>An address of this wallet</source>
+        <translation>이 지갑의 주소</translation>
+    </message>
+    <message>
+        <source>Data (no address)</source>
+        <translation>데이터 (주소 없음)</translation>
+    </message>
+    <message>
+        <source>Unknown</source>
+        <translation>알 수 없음</translation>
+    </message>
+    <message>
+        <source>Mine</source>
+        <translation>내 주소</translation>
+    </message>
+    <message>
+        <source>Transaction</source>
+        <translation>거래</translation>
+    </message>
+    <message>
+        <source>Confirmed · %1 confirmations</source>
+        <translation>확정 · 확인 %1회</translation>
+    </message>
+    <message>
+        <source>Unconfirmed · in the memory pool</source>
+        <translation>미확정 · 멤풀에서 대기 중</translation>
+    </message>
+    <message>
+        <source>Block</source>
+        <translation>블록</translation>
+    </message>
+    <message>
+        <source>Not in a block yet</source>
+        <translation>아직 블록에 없음</translation>
+    </message>
+    <message>
+        <source>Time</source>
+        <translation>시각</translation>
+    </message>
+    <message>
+        <source>Fee</source>
+        <translation>수수료</translation>
+    </message>
+    <message>
+        <source>Staking reward</source>
+        <translation>스테이킹 보상</translation>
+    </message>
+    <message>
+        <source>None (generated coins)</source>
+        <translation>없음 (생성된 코인)</translation>
+    </message>
+    <message>
+        <source>Unknown (an input could not be looked up)</source>
+        <translation>알 수 없음 (입력을 조회할 수 없음)</translation>
+    </message>
+    <message>
+        <source>Wallet</source>
+        <translation>지갑</translation>
+    </message>
+    <message>
+        <source>A transaction of this wallet</source>
+        <translation>이 지갑의 거래</translation>
+    </message>
+    <message>
+        <source>and %1 more</source>
+        <translation>외 %1개</translation>
+    </message>
+    <message>
+        <source>%1 inputs</source>
+        <translation>입력 %1개</translation>
+    </message>
+    <message>
+        <source>%1 outputs</source>
+        <translation>출력 %1개</translation>
+    </message>
+    <message>
+        <source>%1 confirmations</source>
+        <translation>확인 %1회</translation>
+    </message>
+    <message>
+        <source>Not in the active chain</source>
+        <translation>활성 체인에 없음</translation>
+    </message>
+    <message>
+        <source>Height</source>
+        <translation>높이</translation>
+    </message>
+    <message>
+        <source>Transactions</source>
+        <translation>거래 수</translation>
+    </message>
+    <message>
+        <source>Proof</source>
+        <translation>증명 방식</translation>
+    </message>
+    <message>
+        <source>Proof of stake</source>
+        <translation>지분 증명 (PoS)</translation>
+    </message>
+    <message>
+        <source>Proof of work</source>
+        <translation>작업 증명 (PoW)</translation>
+    </message>
+    <message>
+        <source>Previous block</source>
+        <translation>이전 블록</translation>
+    </message>
+    <message>
+        <source>Next block</source>
+        <translation>다음 블록</translation>
+    </message>
+    <message>
+        <source>%1 transactions</source>
+        <translation>거래 %1개</translation>
+    </message>
+    <message>
+        <source>Address</source>
+        <translation>주소</translation>
+    </message>
+    <message>
+        <source>Not an address of this wallet</source>
+        <translation>이 지갑의 주소가 아님</translation>
+    </message>
+    <message>
+        <source>A watch-only address of this wallet</source>
+        <translation>이 지갑의 조회 전용 주소</translation>
+    </message>
+    <message>
+        <source>Label</source>
+        <translation>라벨</translation>
+    </message>
+    <message>
+        <source>The balance and the transactions of an address can only be shown when the node keeps an address index. To turn it on, add the line addressindex=1 to aokchain.conf and start the wallet once with the option -reindex. Rebuilding the index takes a while.</source>
+        <translation>주소의 잔액과 거래 내역은 노드가 주소 색인을 유지할 때만 볼 수 있습니다. 켜려면 aokchain.conf에 addressindex=1 줄을 추가하고 지갑을 -reindex 옵션으로 한 번 실행하세요. 색인을 다시 만드는 데 시간이 걸립니다.</translation>
+    </message>
+    <message>
+        <source>Balance</source>
+        <translation>잔액</translation>
+    </message>
+    <message>
+        <source>Total received</source>
+        <translation>받은 총액</translation>
+    </message>
+    <message>
+        <source>Recent transactions</source>
+        <translation>최근 거래</translation>
+    </message>
+    <message>
+        <source>No transactions.</source>
+        <translation>거래가 없습니다.</translation>
+    </message>
+    <message>
+        <source>The look-up failed.</source>
+        <translation>조회하지 못했습니다.</translation>
+    </message>
+    <message>
+        <source>Not found</source>
+        <translation>찾을 수 없음</translation>
+    </message>
+    <message>
+        <source>This node has no transaction or block with this ID in its wallet, memory pool or unspent outputs. Other transactions can only be looked up when the node keeps a transaction index. To turn it on, add the line txindex=1 to aokchain.conf and start the wallet once with the option -reindex. Rebuilding the index takes a while.</source>
+        <translation>이 노드의 지갑, 멤풀, 미사용 출력에는 이 ID의 거래나 블록이 없습니다. 그 밖의 거래는 노드가 거래 색인을 유지할 때만 조회할 수 있습니다. 켜려면 aokchain.conf에 txindex=1 줄을 추가하고 지갑을 -reindex 옵션으로 한 번 실행하세요. 색인을 다시 만드는 데 시간이 걸립니다.</translation>
+    </message>
+    <message>
+        <source>This node knows no transaction and no block with this ID. Check the ID; while the node is still synchronizing, recent ones are not known yet.</source>
+        <translation>이 노드에는 이 ID의 거래나 블록이 없습니다. ID를 확인하세요. 동기화 중에는 최근 거래와 블록을 아직 알지 못합니다.</translation>
+    </message>
+    <message>
+        <source>There is no block at this height. The node is at block %1.</source>
+        <translation>이 높이의 블록이 없습니다. 현재 노드의 블록 높이는 %1입니다.</translation>
+    </message>
+    <message>
+        <source>This is not a transaction ID or block hash (64 hexadecimal characters), an address or a block height.</source>
+        <translation>거래 ID나 블록 해시(16진수 64자), 주소, 블록 높이가 아닙니다.</translation>
+    </message>
+    <message>
+        <source>My transaction</source>
+        <translation>내 거래</translation>
+    </message>
+    <message>
+        <source>%1 ago</source>
+        <translation>%1 전</translation>
+    </message>
+    <message>
+        <source>fee %1</source>
+        <translation>수수료 %1</translation>
+    </message>
+    <message>
+        <source>No transactions are waiting.</source>
+        <translation>대기 중인 거래가 없습니다.</translation>
+    </message>
+    <message>
+        <source>Send to this address</source>
+        <translation>이 주소로 보내기</translation>
+    </message>
+    <message>
+        <source>Send</source>
+        <translation>보내기</translation>
+    </message>
+</context>
+<context>
+    <name>TokenViewDelegate</name>
+    <message>
+        <source>None held</source>
+        <translation>보유 없음</translation>
+    </message>
+    <message>
+        <source>Unique token</source>
+        <translation>고유 토큰</translation>
+    </message>
+    <message>
+        <source>Sub token</source>
+        <translation>하위 토큰</translation>
+    </message>
+    <message>
+        <source>Owner</source>
+        <translation>관리 권한</translation>
+    </message>
+    <message>
+        <source>Locked</source>
+        <translation>잠김</translation>
+    </message>
+</context>
+<context>
+    <name>TxViewDelegate</name>
+    <message>
+        <source>Owner</source>
+        <translation>관리 권한</translation>
     </message>
 </context>
 </TS>
