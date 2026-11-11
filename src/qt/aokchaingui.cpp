@@ -1090,7 +1090,8 @@ void AokChainGUI::updateBootstrap()
         if (info.chunks == 0) {
             status = tr("Fast sync: getting ready");
             line = status;
-        } else if (info.chunksDownloaded < info.chunks) {
+        } else if (info.chunksDownloaded < info.chunks && info.chunksDownloaded - info.chunksImported < 2) {
+            // (with two archives waiting for their import the download pauses: the validation is shown then)
             status = tr("Fast sync: archive %1/%2").arg(info.chunksDownloaded + 1).arg(info.chunks);
             right = QString("%1 / %2").arg(megabytes(info.bytesDownloaded), megabytes(info.bytesTotal));
             line = tr("Fast sync: fetching block archive %1/%2 · %3 / %4").arg(info.chunksDownloaded + 1).arg(info.chunks)

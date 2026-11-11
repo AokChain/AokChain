@@ -809,7 +809,7 @@
     </message>
     <message>
         <source>Fast sync: archive %1/%2</source>
-        <translation>빠른 동기화: 묶음 %1/%2</translation>
+        <translation>블록 묶음 %1/%2 받는 중</translation>
     </message>
     <message>
         <source>Fast sync: fetching block archive %1/%2 · %3 / %4</source>
