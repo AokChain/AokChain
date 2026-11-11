@@ -266,6 +266,17 @@ public:
         strMasterAddress = "kp5eNwMzDfDgHXMG3XZw73c6rTA6WzFJEx";
 
         nMaxReorganizationDepth = 500; // Around 8 hours
+
+        // The chain state snapshot that this program accepts (see snapshot.h and
+        // doc/aokchain/15-snapshot.md). The values are those of getstatehashes on a node that
+        // validated every block and every script from the genesis block to this height; a
+        // second such node gave the same. A snapshot whose content has other hashes is removed.
+        snapshot.height = 3031432;
+        snapshot.block = uint256S("58a07d1f4dbe68b7fa66d864272ca6351a60de13a409c132b034c9da03af909a");
+        snapshot.utxo = uint256S("abd7798cc33ef739d7afb0824bfe07bd6519f9c9bba872f3d812b2495b308a2a");
+        snapshot.tokens = uint256S("8cc81e204a99e3042eb186aec7859c654c7bf4c1e5e25f2801639e64ca6a0e0a");
+        snapshot.governance = uint256S("93823e7f577c05fcafa2eb7ebb71cc80019bb55d6a4a5b03480a0fc36004e4e5");
+        snapshot.index = uint256S("b37c8739de4a505a0b6b3ea3ae44744d7b9c16ee9ed0aae8bd34050667e4bfa6");
         /** TOKENS END **/
     }
 };
@@ -511,6 +522,11 @@ void UpdateVersionBitsParameters(Consensus::DeploymentPos d, int64_t nStartTime,
 void UpdateLastPOWBlock(int nHeight)
 {
     globalChainParams->UpdateLastPOWBlock(nHeight);
+}
+
+void UpdateSnapshotParams(const CChainParams::SnapshotParams& params)
+{
+    globalChainParams->SetSnapshot(params);
 }
 
 void UpdateOldPeerCutoffHeight(int nHeight)

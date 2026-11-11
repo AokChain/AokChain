@@ -5,6 +5,7 @@
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
+#include "snapshot.h"
 #include <amount.h>
 #include <base58.h>
 #include <chain.h>
@@ -2247,7 +2248,7 @@ UniValue listsinceblock(const JSONRPCRequest& request)
     while (include_removed && paltindex && paltindex != pindex) {
         CBlock block;
         if (!ReadBlockFromDisk(block, paltindex, Params().GetConsensus())) {
-            throw JSONRPCError(RPC_INTERNAL_ERROR, "Can't read block from disk");
+            throw JSONRPCError(RPC_INTERNAL_ERROR, IsPastBlockMissing(paltindex) ? PastBlocksMessage() : "Can't read block from disk");
         }
         for (const CTransactionRef& tx : block.vtx) {
             auto it = pwallet->mapWallet.find(tx->GetHash());
@@ -2550,10 +2551,22 @@ UniValue keypoolrefill(const JSONRPCRequest& request)
 }
 
 
+/** The wallet was open for staking only (the staking switch of the GUI) when walletpassphrase opened it for a time. */
+static bool fRestoreStakingOnlyUnlock = false;
+
 static void LockWallet(CWallet* pWallet)
 {
     LOCK(pWallet->cs_wallet);
     pWallet->nRelockTime = 0;
+    if (fRestoreStakingOnlyUnlock && !pWallet->IsLocked()) {
+        // The time of walletpassphrase is over: back to what was before it, open for staking only.
+        // Locking here would stop the staking that the user switched on.
+        fRestoreStakingOnlyUnlock = false;
+        fWalletUnlockStakingOnly = true;
+        pWallet->NotifyStatusChanged(pWallet);
+        return;
+    }
+    fRestoreStakingOnlyUnlock = false;
     pWallet->Lock();
 }
 
@@ -2601,6 +2614,9 @@ UniValue walletpassphrase(const JSONRPCRequest& request)
     // Alternately, find a way to make request.params[0] mlock()'d to begin with.
     strWalletPass = request.params[0].get_str().c_str();
 
+    // open for staking only before this call, and not by an earlier call with a time
+    const bool fWasStakingOnly = !pwallet->IsLocked() && fWalletUnlockStakingOnly && pwallet->nRelockTime == 0;
+
     if (strWalletPass.length() > 0)
     {
         if (!pwallet->Unlock(strWalletPass)) {
@@ -2613,6 +2629,9 @@ UniValue walletpassphrase(const JSONRPCRequest& request)
             "Stores the wallet decryption key in memory for <timeout> seconds.");
 
     pwallet->TopUpKeyPool();
+
+    if (fWasStakingOnly)
+        fRestoreStakingOnlyUnlock = true;
 
     int64_t nSleepTime = request.params[1].get_int64();
     pwallet->nRelockTime = GetTime() + nSleepTime;
@@ -2713,6 +2732,7 @@ UniValue walletlock(const JSONRPCRequest& request)
     }
 
     pwallet->Lock();
+    fRestoreStakingOnlyUnlock = false;
     pwallet->nRelockTime = 0;
 
     return NullUniValue;
@@ -3992,6 +4012,9 @@ UniValue rescanblockchain(const JSONRPCRequest& request)
         }
     }
 
+    if (PastBlocksMissing() && pindexStart->nHeight <= SnapshotHeight())
+        throw JSONRPCError(RPC_MISC_ERROR, PastBlocksMessage());
+
     // We can't rescan beyond non-pruned blocks, stop and throw an error
     if (fPruneMode) {
         CBlockIndex *block = pindexStop ? pindexStop : chainActive.Tip();
@@ -4130,6 +4153,7 @@ UniValue listlabels(const JSONRPCRequest& request)
 extern UniValue abortrescan(const JSONRPCRequest& request); // in rpcdump.cpp
 extern UniValue dumpprivkey(const JSONRPCRequest& request); // in rpcdump.cpp
 extern UniValue importprivkey(const JSONRPCRequest& request);
+extern UniValue importmnemonic(const JSONRPCRequest& request);
 extern UniValue importaddress(const JSONRPCRequest& request);
 extern UniValue removeaddress(const JSONRPCRequest& request);
 extern UniValue importpubkey(const JSONRPCRequest& request);
@@ -4168,6 +4192,7 @@ static const CRPCCommand commands[] =
     { "wallet",             "gettransaction",           &gettransaction,           {"txid","include_watchonly"} },
     { "wallet",             "getunconfirmedbalance",    &getunconfirmedbalance,    {} },
     { "wallet",             "getwalletinfo",            &getwalletinfo,            {} },
+    { "wallet",             "importmnemonic",           &importmnemonic,           {"mnemonic","passphrase","address","rescan"} },
     { "wallet",             "importmulti",              &importmulti,              {"requests","options"} },
     { "wallet",             "importprivkey",            &importprivkey,            {"privkey","label","rescan"} },
     { "wallet",             "importwallet",             &importwallet,             {"filename"} },

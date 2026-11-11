@@ -16,6 +16,7 @@
 #include "pagewidgets.h"
 #include "platformstyle.h"
 #include "sendcoinsentry.h"
+#include "sendconfirmdialog.h"
 #include "walletmodel.h"
 #include "guiconstants.h"
 
@@ -667,78 +668,39 @@ void SendCoinsDialog::on_sendButton_clicked()
 
     CAmount txFee = currentTransaction.getTransactionFee();
 
-    // Format confirmation message
-    QStringList formatted;
+    // What is about to be sent, for the confirmation
+    const int unit = model->getOptionsModel()->getDisplayUnit();
+    auto number = [unit](const CAmount &amount) { return AokChainUnits::format(unit, amount, false, AokChainUnits::separatorNever); };
+    SendConfirmData confirm;
+    confirm.asset = AokChainUnits::name(unit).trimmed();
+    confirm.feeUnit = confirm.asset;
     for (const SendCoinsRecipient &rcp : currentTransaction.getRecipients())
     {
-        // generate bold amount string
-        QString amount = "<b>" + AokChainUnits::formatHtmlWithUnit(model->getOptionsModel()->getDisplayUnit(), rcp.amount);
-        amount.append("</b>");
-        // generate monospace address string
-        QString address = "<span style='font-family: monospace;'>" + rcp.address;
-        address.append("</span>");
-
-        QString recipientElement;
-
-        if (!rcp.paymentRequest.IsInitialized()) // normal payment
-        {
-            if(rcp.label.length() > 0) // label with address
-            {
-                recipientElement = tr("%1 to %2").arg(amount, GUIUtil::HtmlEscape(rcp.label));
-                recipientElement.append(QString(" (%1)").arg(address));
-            }
-            else // just address
-            {
-                recipientElement = tr("%1 to %2").arg(amount, address);
-            }
-        }
-        else if(!rcp.authenticatedMerchant.isEmpty()) // authenticated payment request
-        {
-            recipientElement = tr("%1 to %2").arg(amount, GUIUtil::HtmlEscape(rcp.authenticatedMerchant));
-        }
-        else // unauthenticated payment request
-        {
-            recipientElement = tr("%1 to %2").arg(amount, address);
-        }
-
-        if (rcp.username.length() > 0) {
-            recipientElement.append(QString(" (%1)").arg(rcp.username));
-        }
-
-        if (rcp.coinLockTime > 0) {
-            recipientElement.append(tr(" locked till %1").arg(QDateTime::fromTime_t(rcp.coinLockTime).toString("yyyy.MM.dd HH:mm")));
-        }
-
-        formatted.append(recipientElement);
+        SendConfirmData::Recipient to;
+        to.address = rcp.address;
+        to.label = !rcp.authenticatedMerchant.isEmpty() ? rcp.authenticatedMerchant : rcp.label;
+        if (to.label.isEmpty())
+            to.label = model->getAddressTableModel()->labelForAddress(rcp.address);
+        if (rcp.username.length() > 0)
+            to.label += QString(" (%1)").arg(rcp.username);
+        to.amount = number(rcp.amount);
+        to.known = model->isKnownAddress(rcp.address) || !rcp.authenticatedMerchant.isEmpty();
+        if (rcp.coinLockTime > 0)
+            to.note = tr("Locked until %1").arg(QDateTime::fromTime_t(rcp.coinLockTime).toString("yyyy.MM.dd HH:mm"));
+        confirm.recipients.append(to);
     }
-
-    QString questionString = tr("Are you sure you want to send?");
-    questionString.append("<br /><br />%1");
-
-    if(txFee > 0)
-    {
-        // append fee string if a fee is required
-        questionString.append("<hr /><span style='color:#aa0000;'>");
-        questionString.append(AokChainUnits::formatHtmlWithUnit(model->getOptionsModel()->getDisplayUnit(), txFee));
-        questionString.append("</span> ");
-        questionString.append(tr("added as transaction fee"));
-
-        // append transaction size
-        questionString.append(" (" + QString::number((double)currentTransaction.getTransactionSize() / 1000) + " kB)");
+    const CAmount totalAmount = currentTransaction.getTotalTransactionAmount() + txFee;
+    const CAmount balance = model->getBalance();
+    confirm.total = number(currentTransaction.getTotalTransactionAmount());
+    if (txFee > 0) {
+        confirm.fee = number(txFee);
+        confirm.feeNote = QString::number((double)currentTransaction.getTransactionSize() / 1000) + " kB";
     }
+    confirm.assetDeducted = number(totalAmount);
+    confirm.assetAfter = number(std::max<CAmount>(0, balance - totalAmount));
+    confirm.wholeBalance = totalAmount >= balance;
 
-    // add total amount in all subdivision units
-    questionString.append("<hr />");
-    CAmount totalAmount = currentTransaction.getTotalTransactionAmount() + txFee;
-    questionString.append(tr("Total Amount %1")
-        .arg(AokChainUnits::formatHtmlWithUnit(model->getOptionsModel()->getDisplayUnit(), totalAmount)));
-
-    SendConfirmationDialog confirmationDialog(tr("Confirm send coins"),
-        questionString.arg(formatted.join("<br />")), SEND_CONFIRM_DELAY, this);
-    confirmationDialog.exec();
-    QMessageBox::StandardButton retval = static_cast<QMessageBox::StandardButton>(confirmationDialog.result());
-
-    if(retval != QMessageBox::Yes)
+    if (!SendConfirmDialog::confirm(confirm, this))
     {
         fNewRecipientAllowed = true;
         return;
@@ -754,6 +716,9 @@ void SendCoinsDialog::on_sendButton_clicked()
         accept();
         CoinControlDialog::coinControl->UnSelectAll();
         coinControlUpdateLabels();
+        // (after the page has tidied up: widgets it let go of are deleted when the event loop is back)
+        const QString txid = QString::fromStdString(currentTransaction.getTransaction()->GetHash().GetHex());
+        QTimer::singleShot(0, this, [this, confirm, txid] { SendConfirmDialog::showSent(confirm, txid, this); });
     }
     fNewRecipientAllowed = true;
 }
@@ -974,6 +939,11 @@ void SendCoinsDialog::processSendCoinsReturn(const WalletModel::SendCoinsReturn 
         return;
     }
 
+    // the transaction was made but could not be sent: say so where the send was confirmed
+    if (sendCoinsReturn.status == WalletModel::TransactionCommitFailed) {
+        SendConfirmDialog::showFailed(msgParams.first, this);
+        return;
+    }
     Q_EMIT message(tr("Send Coins"), msgParams.first, msgParams.second);
 }
 

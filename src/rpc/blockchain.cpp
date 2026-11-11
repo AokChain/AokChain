@@ -6,6 +6,7 @@
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
+#include "snapshot.h"
 #include "rpc/blockchain.h"
 
 #include "bootstrap.h"
@@ -781,6 +782,9 @@ UniValue getblockdeltas(const JSONRPCRequest& request)
     if (fHavePruned && !(pblockindex->nStatus & BLOCK_HAVE_DATA) && pblockindex->nTx > 0)
         throw JSONRPCError(RPC_INTERNAL_ERROR, "Block not available (pruned data)");
 
+    if (IsPastBlockMissing(pblockindex))
+        throw JSONRPCError(RPC_MISC_ERROR, PastBlocksMessage());
+
     if(!ReadBlockFromDisk(block, pblockindex, Params().GetConsensus()))
         throw JSONRPCError(RPC_INTERNAL_ERROR, "Can't read block from disk");
 
@@ -1015,6 +1019,9 @@ UniValue getblock(const JSONRPCRequest& request)
 
     if (fHavePruned && !(pblockindex->nStatus & BLOCK_HAVE_DATA) && pblockindex->nTx > 0)
         throw JSONRPCError(RPC_MISC_ERROR, "Block not available (pruned data)");
+
+    if (IsPastBlockMissing(pblockindex))
+        throw JSONRPCError(RPC_MISC_ERROR, PastBlocksMessage());
 
     if (!ReadBlockFromDisk(block, pblockindex, Params().GetConsensus()))
         // Block not found on disk. This could be because we have the block
@@ -1956,10 +1963,116 @@ UniValue skipbootstrap(const JSONRPCRequest& request)
     return active;
 }
 
+UniValue getstatehashes(const JSONRPCRequest& request)
+{
+    if (request.fHelp || request.params.size() != 0)
+        throw std::runtime_error(
+            "getstatehashes\n"
+            "\nCompute the hashes that identify the chain state of this node at its tip: the values that a\n"
+            "program must have compiled in to accept a chain state snapshot of that height.\n"
+            "Reads every unspent output and every token and governance record; this takes a while.\n"
+            "\nResult:\n"
+            "{\n"
+            "  \"height\": n,              (numeric) height of the tip\n"
+            "  \"block\": \"hash\",         (string) hash of the tip\n"
+            "  \"utxo\": \"hash\",          (string) hash over every unspent output with all the fields that the chainstate stores\n"
+            "  \"utxo_legacy\": \"hash\",   (string) hash_serialized_2 of gettxoutsetinfo, for comparison with other versions\n"
+            "  \"tokens\": \"hash\",        (string) hash over the token database (without the undo records of blocks)\n"
+            "  \"governance\": \"hash\",    (string) hash over the governance database\n"
+            "  \"index\": \"hash\",         (string) hash over the block index of the active chain\n"
+            "  \"coins\": n,               (numeric) number of unspent outputs\n"
+            "  \"snapshotparams\": \"...\"  (string) height:block:utxo:tokens:governance:index\n"
+            "}\n"
+            "\nExamples:\n"
+            + HelpExampleCli("getstatehashes", "")
+            + HelpExampleRpc("getstatehashes", "")
+        );
+    StateHashes hashes;
+    std::string error;
+    if (!ComputeStateHashes(hashes, error))
+        throw JSONRPCError(RPC_MISC_ERROR, error);
+    UniValue result(UniValue::VOBJ);
+    result.pushKV("height", hashes.height);
+    result.pushKV("block", hashes.block.GetHex());
+    result.pushKV("utxo", hashes.utxo.GetHex());
+    result.pushKV("utxo_legacy", hashes.utxoLegacy.GetHex());
+    result.pushKV("tokens", hashes.tokens.GetHex());
+    result.pushKV("governance", hashes.governance.GetHex());
+    result.pushKV("index", hashes.index.GetHex());
+    result.pushKV("coins", (uint64_t)hashes.coins);
+    result.pushKV("snapshotparams", strprintf("%d:%s:%s:%s:%s:%s", hashes.height, hashes.block.GetHex(), hashes.utxo.GetHex(),
+                                              hashes.tokens.GetHex(), hashes.governance.GetHex(), hashes.index.GetHex()));
+    return result;
+}
+
+UniValue getsnapshotinfo(const JSONRPCRequest& request)
+{
+    if (request.fHelp || request.params.size() != 0)
+        throw std::runtime_error(
+            "getsnapshotinfo\n"
+            "\nThe chain state snapshot that this program accepts, whether this node started from one, and\n"
+            "the state of the past blocks (the blocks up to the snapshot height, which such a node does not\n"
+            "have until they are downloaded with fetchblocks).\n"
+            "\nResult:\n"
+            "{\n"
+            "  \"accepted_height\": n,       (numeric) height of the snapshot that this program accepts, 0: none\n"
+            "  \"accepted_block\": \"hash\",  (string) the block at that height\n"
+            "  \"snapshot_height\": n,       (numeric) height of the snapshot that this node started from, -1: it did not\n"
+            "  \"past_blocks\": \"...\",      (string) \"present\", \"missing\" or \"downloading\"\n"
+            "  \"bytes_total\": n,           (numeric) size of the block archives of the download\n"
+            "  \"bytes_done\": n,            (numeric) bytes of them that are downloaded and stored\n"
+            "  \"blocks_stored\": n,         (numeric) blocks stored by the download\n"
+            "  \"wallet_waits\": true|false, (boolean) a wallet has not been scanned for transactions in the past blocks\n"
+            "  \"error\": \"...\"            (string) why the last download stopped\n"
+            "}\n"
+            "\nExamples:\n"
+            + HelpExampleCli("getsnapshotinfo", "")
+            + HelpExampleRpc("getsnapshotinfo", "")
+        );
+    const PastBlocksInfo info = GetPastBlocksInfo();
+    UniValue result(UniValue::VOBJ);
+    result.pushKV("accepted_height", Params().Snapshot().height);
+    result.pushKV("accepted_block", Params().Snapshot().block.GetHex());
+    result.pushKV("snapshot_height", info.snapshotHeight);
+    result.pushKV("past_blocks", info.fetching ? "downloading" : info.missing ? "missing" : "present");
+    result.pushKV("bytes_total", (uint64_t)info.bytesTotal);
+    result.pushKV("bytes_done", (uint64_t)info.bytesDone);
+    result.pushKV("blocks_stored", info.blocksStored);
+    result.pushKV("wallet_waits", WalletRescanPending());
+    result.pushKV("error", info.error);
+    return result;
+}
+
+UniValue fetchblocks(const JSONRPCRequest& request)
+{
+    if (request.fHelp || request.params.size() != 0)
+        throw std::runtime_error(
+            "fetchblocks\n"
+            "\nDownload the past blocks of a node that started from a chain state snapshot, in the background.\n"
+            "The blocks come from the block archives (-bootstrapurl, -bootstrapdir or the built-in address);\n"
+            "every block is checked against the block index and stored. Nothing is validated again.\n"
+            "getsnapshotinfo shows the progress. Wallets that wait for these blocks are scanned at the end.\n"
+            "\nResult:\n"
+            "true|false    (boolean) true: the download was started; false: the past blocks are there\n"
+            "\nExamples:\n"
+            + HelpExampleCli("fetchblocks", "")
+            + HelpExampleRpc("fetchblocks", "")
+        );
+    if (!PastBlocksMissing())
+        return false;
+    std::string error;
+    if (!FetchPastBlocks(error))
+        throw JSONRPCError(RPC_MISC_ERROR, "Cannot download the past blocks: " + error);
+    return true;
+}
+
 static const CRPCCommand commands[] =
 { //  category              name                      actor (function)         argNames
   //  --------------------- ------------------------  -----------------------  ----------
     { "blockchain",         "getblockchaininfo",      &getblockchaininfo,      {} },
+    { "blockchain",         "getstatehashes",         &getstatehashes,         {} },
+    { "blockchain",         "getsnapshotinfo",        &getsnapshotinfo,        {} },
+    { "blockchain",         "fetchblocks",            &fetchblocks,            {} },
     { "blockchain",         "getbootstrapinfo",       &getbootstrapinfo,       {} },
     { "blockchain",         "skipbootstrap",          &skipbootstrap,          {} },
     { "blockchain",         "getchaintxstats",        &getchaintxstats,        {"nblocks", "blockhash"} },

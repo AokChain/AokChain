@@ -133,6 +133,26 @@
         <source>Show the QR code of the selected address</source>
         <translation>선택한 주소의 QR 코드를 봅니다</translation>
     </message>
+    <message>
+        <source>Search</source>
+        <translation>검색</translation>
+    </message>
+    <message>
+        <source>Send</source>
+        <translation>보내기</translation>
+    </message>
+    <message>
+        <source>Copy</source>
+        <translation>복사</translation>
+    </message>
+    <message>
+        <source>Add</source>
+        <translation>추가</translation>
+    </message>
+    <message>
+        <source>New</source>
+        <translation>새 주소</translation>
+    </message>
 </context>
 <context>
     <name>AddressTableModel</name>
@@ -254,6 +274,82 @@
     <message>
         <source>Warning: The Caps Lock key is on!</source>
         <translation>경고: Caps Lock키가 켜져있습니다!</translation>
+    </message>
+    <message>
+        <source>Cancel</source>
+        <translation>취소</translation>
+    </message>
+    <message>
+        <source>Choose a passphrase for the wallet. It is asked for when you send coins. A thief who copies the wallet file cannot spend the coins without it.</source>
+        <translation>지갑 암호를 정하세요. 코인을 보낼 때 이 암호를 묻습니다. 지갑 파일을 훔쳐 가도 암호가 없으면 코인을 쓸 수 없습니다.</translation>
+    </message>
+    <message>
+        <source>&lt;b&gt;The passphrase cannot be recovered.&lt;/b&gt; Nobody can reset it, not even the developers. If you forget it, the coins in this wallet are lost. Write it down and keep it where only you find it.</source>
+        <translation>&lt;b&gt;암호는 복구할 수 없습니다.&lt;/b&gt; 개발자를 포함해 누구도 다시 설정해 줄 수 없습니다. 잊어버리면 이 지갑의 코인을 잃습니다. 종이에 적어 본인만 찾을 수 있는 곳에 보관하세요.</translation>
+    </message>
+    <message>
+        <source>I wrote the passphrase down and understand that it cannot be recovered</source>
+        <translation>암호를 적어 두었고, 복구할 수 없다는 것을 이해했습니다</translation>
+    </message>
+    <message>
+        <source>For staking only (sending coins asks for the passphrase again)</source>
+        <translation>스테이킹 전용으로 잠금 해제 (코인을 보낼 때는 암호를 다시 묻습니다)</translation>
+    </message>
+    <message>
+        <source>Staking needs the wallet unlocked. Enter the wallet passphrase to start staking.</source>
+        <translation>스테이킹을 하려면 지갑 잠금을 풀어야 합니다. 지갑 암호를 입력하세요.</translation>
+    </message>
+    <message>
+        <source>Start staking</source>
+        <translation>스테이킹 시작</translation>
+    </message>
+    <message>
+        <source>Unlock</source>
+        <translation>잠금 해제</translation>
+    </message>
+    <message>
+        <source>Welcome</source>
+        <translation>환영합니다</translation>
+    </message>
+    <message>
+        <source>Protect the wallet</source>
+        <translation>지갑 보호하기</translation>
+    </message>
+    <message>
+        <source>Choose a passphrase for the new wallet. It is asked for when you send coins. A thief who copies the wallet file cannot spend the coins without it.</source>
+        <translation>새 지갑의 암호를 정하세요. 코인을 보낼 때 이 암호를 묻습니다. 지갑 파일을 훔쳐 가도 암호가 없으면 코인을 쓸 수 없습니다.</translation>
+    </message>
+    <message>
+        <source>Quit</source>
+        <translation>나가기</translation>
+    </message>
+    <message>
+        <source>Backups of the wallet file made before today are not encrypted: replace them with a new backup after the restart.</source>
+        <translation>전에 만든 지갑 파일 백업은 암호화되어 있지 않습니다. 다시 시작한 뒤 새 백업으로 바꾸세요.</translation>
+    </message>
+    <message>
+        <source>Use ten or more random characters, or four or more words.</source>
+        <translation>무작위 글자 10자 이상 또는 단어 4개 이상을 쓰세요.</translation>
+    </message>
+    <message>
+        <source>Weak.</source>
+        <translation>약함.</translation>
+    </message>
+    <message>
+        <source>Fair. Longer is better.</source>
+        <translation>보통. 길수록 좋습니다.</translation>
+    </message>
+    <message>
+        <source>Strong.</source>
+        <translation>강함.</translation>
+    </message>
+    <message>
+        <source>The wallet is encrypted. %1 restarts now to finish.</source>
+        <translation>지갑을 암호화했습니다. 마무리를 위해 프로그램을 지금 다시 시작합니다.</translation>
+    </message>
+    <message>
+        <source>The wallet needs a passphrase before it can be used. Quit %1?</source>
+        <translation>지갑을 쓰려면 먼저 암호를 정해야 합니다. 프로그램을 끝낼까요?</translation>
     </message>
 </context>
 <context>
@@ -855,6 +951,30 @@
         <source>This folder has no manifest.json. Choose the folder that holds manifest.json and the blocks-... files.</source>
         <translation>이 폴더에 manifest.json이 없습니다. manifest.json과 blocks-... 파일이 들어 있는 폴더를 고르세요.</translation>
     </message>
+    <message>
+        <source>Unlocked for staking only</source>
+        <translation>스테이킹 전용 잠금 해제</translation>
+    </message>
+    <message>
+        <source>Wallet is &lt;b&gt;encrypted&lt;/b&gt; and currently &lt;b&gt;unlocked for staking only&lt;/b&gt;</source>
+        <translation>지갑이 &lt;b&gt;암호화&lt;/b&gt;되어 있고 현재 &lt;b&gt;스테이킹 전용으로 잠금 해제&lt;/b&gt;되어 있습니다</translation>
+    </message>
+    <message>
+        <source>Showing the earlier transactions of this wallet</source>
+        <translation>이 지갑의 이전 거래 표시</translation>
+    </message>
+    <message>
+        <source>Past blocks</source>
+        <translation>과거 블록</translation>
+    </message>
+    <message>
+        <source>The past blocks are downloaded.</source>
+        <translation>과거 블록을 모두 받았습니다.</translation>
+    </message>
+    <message>
+        <source>The download of the past blocks stopped: %1</source>
+        <translation>과거 블록 내려받기가 중단되었습니다: %1</translation>
+    </message>
 </context>
 <context>
     <name>CoinControlDialog</name>
@@ -1394,6 +1514,10 @@
         <source>%1 sub tokens</source>
         <translation>하위 토큰 %1개</translation>
     </message>
+    <message>
+        <source>Locked until %1</source>
+        <translation>%1까지 락업</translation>
+    </message>
 </context>
 <context>
     <name>TokensDialog</name>
@@ -1596,6 +1720,50 @@
     <message>
         <source>Language</source>
         <translation>언어</translation>
+    </message>
+    <message>
+        <source>Data folder</source>
+        <translation>데이터 폴더</translation>
+    </message>
+    <message>
+        <source>Continue</source>
+        <translation>계속</translation>
+    </message>
+    <message>
+        <source>Quit</source>
+        <translation>나가기</translation>
+    </message>
+    <message>
+        <source>If you have chosen to limit block chain storage (pruning), the historical data must still be downloaded and processed, but will be deleted afterward to keep your disk usage low.</source>
+        <translation>블록체인 저장 용량을 제한(프루닝)했더라도 과거 데이터는 내려받아 처리해야 하며, 처리한 뒤 지워서 디스크 사용량을 줄입니다.</translation>
+    </message>
+    <message>
+        <source>At least %1 GB of data will be stored in this directory, and it will grow over time.</source>
+        <translation>이 폴더에 최소 %1 GB의 데이터가 저장되고, 시간이 지나면서 늘어납니다.</translation>
+    </message>
+    <message>
+        <source>Approximately %1 GB of data will be stored in this directory.</source>
+        <translation>이 폴더에 약 %1 GB의 데이터가 저장됩니다.</translation>
+    </message>
+    <message>
+        <source>The wallet will also be stored in this directory.</source>
+        <translation>지갑도 이 폴더에 저장됩니다.</translation>
+    </message>
+    <message>
+        <source>When you continue, %1 will begin to download and process the full %4 block chain (%2GB) starting with the earliest transactions in %3 when %4 initially launched.</source>
+        <translation>계속하면 %4 블록체인 전체(%2GB)를 %3년의 첫 거래부터 내려받아 처리합니다.</translation>
+    </message>
+    <message>
+        <source>This initial synchronisation is very demanding, and may expose hardware problems with your computer that had previously gone unnoticed. Each time you run %1, it will continue downloading where it left off.</source>
+        <translation>처음 동기화는 컴퓨터에 부담이 큰 작업이어서, 그동안 드러나지 않던 하드웨어 문제가 나타날 수 있습니다. 프로그램을 다시 실행하면 멈춘 곳부터 이어서 받습니다.</translation>
+    </message>
+    <message>
+        <source>%1 will download and store a copy of the AokChain block chain.</source>
+        <translation>AokChain 블록체인의 사본을 내려받아 저장합니다.</translation>
+    </message>
+    <message>
+        <source>When you continue, %1 downloads a snapshot of the state of the block chain at block %2 (about 1 GB), checks it against the values that are built into the program, and follows the chain from there. This takes a few minutes. The blocks before the snapshot are downloaded later, and only if you need them.</source>
+        <translation>계속하면 %1이(가) 블록 %2 시점의 블록체인 상태 스냅샷(약 1GB)을 받아 프로그램에 들어 있는 값과 대조한 뒤, 그 지점부터 체인을 따라갑니다. 몇 분이면 끝납니다. 스냅샷 이전의 블록은 나중에, 필요할 때만 받습니다.</translation>
     </message>
 </context>
 <context>
@@ -2065,6 +2233,18 @@
     <message>
         <source>Empty: the built-in address of the main network</source>
         <translation>비워 두면 메인넷 기본 주소를 씁니다</translation>
+    </message>
+    <message>
+        <source>Network settings</source>
+        <translation>네트워크 설정</translation>
+    </message>
+    <message>
+        <source>The defaults work for most people. Change these only if you know that your network needs it.</source>
+        <translation>대부분은 기본값 그대로 쓰면 됩니다. 네트워크 환경 때문에 필요한 경우에만 바꾸세요.</translation>
+    </message>
+    <message>
+        <source>Cancel</source>
+        <translation>취소</translation>
     </message>
 </context>
 <context>
@@ -3420,7 +3600,7 @@
         <translation>모두 지우기</translation>
     </message>
     <message numerus="yes">
-        <source>%n recipient(s)</source>
+        <source>recipients: %n</source>
         <translation>
             <numerusform>받는 사람 %n명</numerusform>
         </translation>
@@ -3472,6 +3652,16 @@
     <message>
         <source>Enter a valid address and an amount for every recipient.</source>
         <translation>받는 사람마다 올바른 주소와 금액을 입력하세요.</translation>
+    </message>
+    <message>
+        <source>Locked until %1</source>
+        <translation>%1까지 락업</translation>
+    </message>
+    <message numerus="yes">
+        <source>%n recipient(s)</source>
+        <translation>
+            <numerusform>받는 사람 %n명</numerusform>
+        </translation>
     </message>
 </context>
 <context>
@@ -4501,12 +4691,40 @@
         <source>No wallet has been loaded.</source>
         <translation>지갑 불러오기가 안됩니다.</translation>
     </message>
+    <message>
+        <source>This wallet is not encrypted. Anyone who copies the wallet file or uses this computer can send the coins.</source>
+        <translation>이 지갑은 암호화되어 있지 않습니다. 지갑 파일을 복사해 가거나 이 컴퓨터를 쓰는 사람은 누구나 코인을 보낼 수 있습니다.</translation>
+    </message>
+    <message>
+        <source>Encrypt</source>
+        <translation>암호화</translation>
+    </message>
+    <message>
+        <source>Hide until the next start</source>
+        <translation>다음에 시작할 때까지 숨기기</translation>
+    </message>
 </context>
 <context>
     <name>WalletModel</name>
     <message>
         <source>Send Coins</source>
         <translation>코인 보내기</translation>
+    </message>
+    <message>
+        <source>This node does not keep the blocks of the past (pruning), so the wallet cannot look for earlier transactions.</source>
+        <translation>이 노드는 지난 블록을 보관하지 않아(프루닝) 지갑이 이전 거래를 찾을 수 없습니다.</translation>
+    </message>
+    <message>
+        <source>Looking for the earlier transactions of these keys</source>
+        <translation>이 키들의 이전 거래 찾기</translation>
+    </message>
+    <message>
+        <source>The blocks of the past are being downloaded (Settings, Network settings shows how far the download is). Open this again when the download has finished.</source>
+        <translation>과거 블록을 받는 중입니다 (진행 상황은 설정의 네트워크 설정에서 볼 수 있습니다). 다 받은 뒤 이 창을 다시 열어 주세요.</translation>
+    </message>
+    <message>
+        <source>This wallet started from a snapshot of the chain state and does not hold the blocks of the past, so it cannot look for earlier transactions yet. Download them under Settings, Network settings, then open this again.</source>
+        <translation>이 지갑은 체인 상태 스냅샷에서 시작해서 과거 블록을 갖고 있지 않으므로 아직 이전 거래를 찾을 수 없습니다. 설정의 네트워크 설정에서 과거 블록을 받은 뒤 이 창을 다시 열어 주세요.</translation>
     </message>
 </context>
 <context>
@@ -4618,6 +4836,50 @@
     <message>
         <source>Encrypt the wallet with a passphrase and keep a backup of the wallet file in a safe place.</source>
         <translation>지갑을 암호로 잠그고, 지갑 파일 백업을 안전한 곳에 보관하세요.</translation>
+    </message>
+    <message>
+        <source>Wallet security</source>
+        <translation>지갑 보안</translation>
+    </message>
+    <message>
+        <source>Encryption</source>
+        <translation>암호화</translation>
+    </message>
+    <message>
+        <source>A passphrase locks the keys in the wallet file. Someone who copies the file or uses this computer cannot send your coins without it. The passphrase cannot be recovered: if it is lost, the coins are lost.</source>
+        <translation>암호로 지갑 파일 안의 키를 잠급니다. 파일을 복사해 가거나 이 컴퓨터를 쓰는 사람도 암호 없이는 코인을 보낼 수 없습니다. 암호는 복구할 수 없어서, 잊으면 코인을 잃습니다.</translation>
+    </message>
+    <message>
+        <source>A copy of the wallet file. If this computer breaks or is lost, the backup brings the coins back. Keep it on a USB drive or another computer, and make a new one after adding keys.</source>
+        <translation>지갑 파일의 사본입니다. 컴퓨터가 고장 나거나 없어져도 백업이 있으면 코인을 되찾습니다. USB 메모리나 다른 컴퓨터에 보관하고, 키를 추가한 뒤에는 새로 백업하세요.</translation>
+    </message>
+    <message>
+        <source>Recovery words</source>
+        <translation>복구 단어</translation>
+    </message>
+    <message>
+        <source>The 12 or 24 words of another wallet, such as a mobile wallet. Restoring adds the keys of that wallet to this one, so its coins can be used here.</source>
+        <translation>모바일 지갑 같은 다른 지갑의 단어 12개 또는 24개입니다. 복원하면 그 지갑의 키가 이 지갑에 추가되어 코인을 여기서 쓸 수 있습니다.</translation>
+    </message>
+    <message>
+        <source>Restore from recovery words</source>
+        <translation>복구 단어로 복원</translation>
+    </message>
+    <message>
+        <source>Add the keys of another wallet to this wallet, from its 12 or 24 recovery words</source>
+        <translation>다른 지갑의 복구 단어 12개 또는 24개로 그 지갑의 키를 이 지갑에 추가합니다</translation>
+    </message>
+    <message>
+        <source>Network settings</source>
+        <translation>네트워크 설정</translation>
+    </message>
+    <message>
+        <source>Port mapping, incoming connections, proxy and fast synchronization</source>
+        <translation>포트 매핑, 들어오는 연결, 프록시, 빠른 동기화</translation>
+    </message>
+    <message>
+        <source>Backup</source>
+        <translation>백업</translation>
     </message>
 </context>
 <context>
@@ -5534,12 +5796,44 @@
         <source>Error</source>
         <translation>오류</translation>
     </message>
+    <message>
+        <source>Fast start: looking for the chain state snapshot...</source>
+        <translation>빠른 시작: 체인 상태 스냅샷을 찾는 중...</translation>
+    </message>
+    <message>
+        <source>Fast start: downloading the snapshot, %s of %s</source>
+        <translation>빠른 시작: 스냅샷 받는 중, %s / %s</translation>
+    </message>
+    <message>
+        <source>Fast start: unpacking the snapshot...</source>
+        <translation>빠른 시작: 스냅샷 압축 푸는 중...</translation>
+    </message>
+    <message>
+        <source>Fast start: checking the snapshot (about a minute)...</source>
+        <translation>빠른 시작: 스냅샷 검사 중 (1분쯤 걸립니다)...</translation>
+    </message>
+    <message>
+        <source>less than a minute left</source>
+        <translation>1분 미만 남음</translation>
+    </message>
+    <message>
+        <source>about %d min left</source>
+        <translation>약 %d분 남음</translation>
+    </message>
+    <message>
+        <source>The snapshot was not accepted. Synchronizing from the blocks instead...</source>
+        <translation>스냅샷이 맞지 않아 쓰지 않습니다. 블록을 검증하는 방식으로 동기화합니다...</translation>
+    </message>
 </context>
 <context>
     <name>Sidebar</name>
     <message>
         <source>Staking</source>
         <translation>스테이킹</translation>
+    </message>
+    <message>
+        <source>Version of this program</source>
+        <translation>이 프로그램의 버전</translation>
     </message>
 </context>
 <context>
@@ -5831,6 +6125,14 @@
     <message>
         <source>fee</source>
         <translation>수수료</translation>
+    </message>
+    <message>
+        <source>This node knows no transaction and no block with this ID among the blocks that it has. It started from a snapshot of the chain state: transactions from before the snapshot can be looked up when the past blocks have been downloaded (Settings, Network settings).</source>
+        <translation>이 노드가 가진 블록에는 이 ID의 거래나 블록이 없습니다. 이 노드는 체인 상태 스냅샷에서 시작했습니다. 스냅샷 이전의 거래는 과거 블록을 받은 뒤(설정의 네트워크 설정)에 조회할 수 있습니다.</translation>
+    </message>
+    <message>
+        <source>Looking up a transaction from before the snapshot</source>
+        <translation>스냅샷 이전 거래 조회</translation>
     </message>
 </context>
 <context>
@@ -6328,6 +6630,10 @@
     <message>
         <source>The network did not accept the transaction: %1</source>
         <translation>네트워크가 거래를 받아들이지 않았습니다: %1</translation>
+    </message>
+    <message>
+        <source>Looking for the earlier transactions of this address</source>
+        <translation>이 주소의 이전 거래 찾기</translation>
     </message>
 </context>
 <context>
@@ -7460,12 +7766,535 @@
         <source>Broadcast</source>
         <translation>전송</translation>
     </message>
+    <message>
+        <source>From the multisig wallet &quot;%1&quot; (%2)</source>
+        <translation>멀티시그 지갑 &quot;%1&quot; (%2)에서 보냅니다</translation>
+    </message>
+    <message>
+        <source>estimate</source>
+        <translation>예상</translation>
+    </message>
+    <message>
+        <source>Make the request</source>
+        <translation>요청 만들기</translation>
+    </message>
+    <message>
+        <source>Nothing is sent yet: the request has to be signed by %1 participants and is sent after that.</source>
+        <translation>아직 보내지 않습니다. 참여자 %1명이 서명한 뒤에 전송됩니다.</translation>
+    </message>
 </context>
 <context>
     <name>GUIUtil</name>
     <message>
         <source>System default</source>
         <translation>시스템 기본값</translation>
+    </message>
+</context>
+<context>
+    <name>WizardHeader</name>
+    <message>
+        <source>Start</source>
+        <translation>시작</translation>
+    </message>
+    <message>
+        <source>Wallet passphrase</source>
+        <translation>지갑 암호</translation>
+    </message>
+    <message>
+        <source>Backup</source>
+        <translation>백업</translation>
+    </message>
+</context>
+<context>
+    <name>BackupPromptDialog</name>
+    <message>
+        <source>Back up the wallet</source>
+        <translation>지갑 백업</translation>
+    </message>
+    <message>
+        <source>Keep a backup</source>
+        <translation>백업을 보관하세요</translation>
+    </message>
+    <message>
+        <source>The wallet is encrypted now. One more step: save a copy of the wallet file.</source>
+        <translation>지갑이 암호화되었습니다. 마지막으로 지갑 파일의 사본을 저장하세요.</translation>
+    </message>
+    <message>
+        <source>The coins are in the wallet file on this computer. If the disk fails or the computer is lost, only a backup brings them back.</source>
+        <translation>코인은 이 컴퓨터의 지갑 파일에 들어 있습니다. 디스크가 고장 나거나 컴퓨터를 잃어버리면 백업으로만 되찾을 수 있습니다.</translation>
+    </message>
+    <message>
+        <source>Save the copy somewhere else: a USB drive or another computer, not only this disk.</source>
+        <translation>사본은 이 디스크가 아닌 다른 곳(USB 메모리, 다른 컴퓨터)에 저장하세요.</translation>
+    </message>
+    <message>
+        <source>The backup is encrypted with the same passphrase. Without the passphrase it is of no use, to a thief or to you.</source>
+        <translation>백업도 같은 암호로 암호화되어 있습니다. 암호가 없으면 훔친 사람도, 본인도 쓸 수 없습니다.</translation>
+    </message>
+    <message>
+        <source>Later</source>
+        <translation>나중에</translation>
+    </message>
+    <message>
+        <source>Save a backup...</source>
+        <translation>백업 저장...</translation>
+    </message>
+    <message>
+        <source>Backup Wallet</source>
+        <translation>지갑 백업</translation>
+    </message>
+    <message>
+        <source>Wallet Data (*.dat)</source>
+        <translation>지갑 데이터 (*.dat)</translation>
+    </message>
+    <message>
+        <source>The backup was saved to %1.</source>
+        <translation>백업을 %1에 저장했습니다.</translation>
+    </message>
+    <message>
+        <source>There was an error trying to save the wallet data to %1.</source>
+        <translation>지갑 데이터를 %1에 저장하는 중 오류가 발생했습니다.</translation>
+    </message>
+    <message>
+        <source>Done</source>
+        <translation>완료</translation>
+    </message>
+</context>
+<context>
+    <name>MnemonicDialog</name>
+    <message>
+        <source>Restore from recovery words</source>
+        <translation>복구 단어로 복원</translation>
+    </message>
+    <message>
+        <source>Close</source>
+        <translation>닫기</translation>
+    </message>
+    <message>
+        <source>Enter the recovery words of the other wallet (for example a mobile wallet). Its keys are added to this wallet, so the coins can be used here.</source>
+        <translation>다른 지갑(예: 모바일 지갑)의 복구 단어를 입력하세요. 그 지갑의 키가 이 지갑에 추가되어 코인을 여기서 쓸 수 있습니다.</translation>
+    </message>
+    <message>
+        <source>Anyone who sees these words can take the coins. Type them only on a computer you trust. The words are not saved; only the keys made from them go into this wallet.</source>
+        <translation>이 단어를 본 사람은 코인을 가져갈 수 있습니다. 믿을 수 있는 컴퓨터에서만 입력하세요. 단어는 저장하지 않고, 단어로 만든 키만 이 지갑에 넣습니다.</translation>
+    </message>
+    <message>
+        <source>Recovery words (12 to 24, separated by spaces; English or Korean)</source>
+        <translation>복구 단어 (12~24개, 띄어쓰기로 구분, 영어 또는 한국어)</translation>
+    </message>
+    <message>
+        <source>word1 word2 word3 ...</source>
+        <translation>단어1 단어2 단어3 ...</translation>
+    </message>
+    <message>
+        <source>Passphrase of the recovery words (optional)</source>
+        <translation>복구 단어의 암호 (선택 사항)</translation>
+    </message>
+    <message>
+        <source>Leave empty unless that wallet was set up with one</source>
+        <translation>그 지갑에 암호를 따로 걸지 않았다면 비워 두세요</translation>
+    </message>
+    <message>
+        <source>An address of that wallet (optional)</source>
+        <translation>그 지갑의 주소 하나 (선택 사항)</translation>
+    </message>
+    <message>
+        <source>Only if no coins are found without it</source>
+        <translation>주소 없이 코인을 찾지 못했을 때만 입력</translation>
+    </message>
+    <message>
+        <source>With an address the wallet can find an unusual key path. The search then takes up to a minute.</source>
+        <translation>주소를 넣으면 흔하지 않은 키 경로도 찾을 수 있습니다. 찾는 데 최대 1분쯤 걸립니다.</translation>
+    </message>
+    <message>
+        <source>Cancel</source>
+        <translation>취소</translation>
+    </message>
+    <message>
+        <source>Find addresses</source>
+        <translation>주소 찾기</translation>
+    </message>
+    <message>
+        <source>Address</source>
+        <translation>주소</translation>
+    </message>
+    <message>
+        <source>Key path</source>
+        <translation>키 경로</translation>
+    </message>
+    <message>
+        <source>Amount</source>
+        <translation>금액</translation>
+    </message>
+    <message>
+        <source>Add the keys and scan</source>
+        <translation>키 추가하고 스캔</translation>
+    </message>
+    <message>
+        <source>The wallet reads the blocks of the past to find the transactions of the new keys. The rest of the program can be used meanwhile.</source>
+        <translation>새 키의 거래를 찾기 위해 지난 블록을 읽습니다. 그동안 프로그램의 다른 화면은 쓸 수 있습니다.</translation>
+    </message>
+    <message>
+        <source>Stop</source>
+        <translation>중지</translation>
+    </message>
+    <message>
+        <source>The keys stay in the wallet. The scan can be done again later by starting the program with -rescan.</source>
+        <translation>키는 지갑에 남습니다. 나중에 프로그램을 -rescan 옵션으로 시작하면 다시 스캔합니다.</translation>
+    </message>
+    <message>
+        <source>The new keys are in this wallet only. They are not covered by earlier backups: make a new backup of the wallet file now.</source>
+        <translation>새 키는 이 지갑에만 있습니다. 전에 만든 백업에는 들어 있지 않으니 지금 지갑 파일을 새로 백업하세요.</translation>
+    </message>
+    <message>
+        <source>Back up now</source>
+        <translation>지금 백업</translation>
+    </message>
+    <message>
+        <source>Only English and Korean words can be used here.</source>
+        <translation>영어와 한국어 단어만 쓸 수 있습니다.</translation>
+    </message>
+    <message>
+        <source>12, 15, 18, 21 or 24 words.</source>
+        <translation>단어 12, 15, 18, 21 또는 24개.</translation>
+    </message>
+    <message numerus="yes">
+        <source>%n words, correct.</source>
+        <translation><numerusform>단어 %n개, 올바릅니다.</numerusform></translation>
+    </message>
+    <message>
+        <source>Korean word list.</source>
+        <translation>한국어 단어 목록.</translation>
+    </message>
+    <message>
+        <source>English word list.</source>
+        <translation>영어 단어 목록.</translation>
+    </message>
+    <message numerus="yes">
+        <source>%n words so far. 12, 15, 18, 21 or 24 are needed.</source>
+        <translation><numerusform>지금 %n개. 12, 15, 18, 21 또는 24개가 필요합니다.</numerusform></translation>
+    </message>
+    <message>
+        <source>Word %1 is not in the word list. Check its spelling.</source>
+        <translation>%1번째 단어가 단어 목록에 없습니다. 철자를 확인하세요.</translation>
+    </message>
+    <message>
+        <source>The words do not fit together (checksum). A word is mistyped, missing or out of order.</source>
+        <translation>단어들이 서로 맞지 않습니다(체크섬). 잘못 적었거나 빠졌거나 순서가 바뀐 단어가 있습니다.</translation>
+    </message>
+    <message>
+        <source>The wallet is still synchronizing. Coins in blocks that are not here yet would not be found: restore when the synchronization has finished.</source>
+        <translation>지갑이 아직 동기화 중입니다. 아직 받지 못한 블록의 코인은 찾을 수 없으니 동기화가 끝난 뒤 복원하세요.</translation>
+    </message>
+    <message>
+        <source>It was stopped.</source>
+        <translation>중지했습니다.</translation>
+    </message>
+    <message>
+        <source>No coins were found on the usual key paths of these words. Check the passphrase, or enter an address of that wallet so that its key path can be found.</source>
+        <translation>이 단어의 일반적인 키 경로에서 코인을 찾지 못했습니다. 암호를 확인하거나, 키 경로를 찾을 수 있도록 그 지갑의 주소 하나를 입력하세요.</translation>
+    </message>
+    <message>
+        <source>The coins of the chain could not be read.</source>
+        <translation>체인의 코인 목록을 읽지 못했습니다.</translation>
+    </message>
+    <message>
+        <source>The wallet is locked.</source>
+        <translation>지갑이 잠겨 있습니다.</translation>
+    </message>
+    <message>
+        <source>Some blocks could not be read. Transactions in those blocks are missing from the wallet.</source>
+        <translation>읽지 못한 블록이 있습니다. 그 블록의 거래는 지갑에 나오지 않습니다.</translation>
+    </message>
+    <message>
+        <source>Only English and Korean words, and a passphrase of ASCII or Korean characters, can be used here.</source>
+        <translation>영어와 한국어 단어, 그리고 영문·숫자·한글로 된 암호만 쓸 수 있습니다.</translation>
+    </message>
+    <message>
+        <source>The address is not a valid AokChain address.</source>
+        <translation>올바른 AokChain 주소가 아닙니다.</translation>
+    </message>
+    <message>
+        <source>Looking for the key path of the address and for addresses that hold coins. This can take a minute.</source>
+        <translation>주소의 키 경로와 코인이 있는 주소를 찾고 있습니다. 1분쯤 걸릴 수 있습니다.</translation>
+    </message>
+    <message>
+        <source>Looking for addresses that hold coins...</source>
+        <translation>코인이 있는 주소를 찾고 있습니다...</translation>
+    </message>
+    <message>
+        <source>The address does not belong to these recovery words.</source>
+        <translation>이 복구 단어의 주소가 아닙니다.</translation>
+    </message>
+    <message>
+        <source>tokens</source>
+        <translation>토큰</translation>
+    </message>
+    <message>
+        <source>The address belongs to these words (key path %1). It holds no coins now; its keys can still be added.</source>
+        <translation>이 단어의 주소가 맞습니다(키 경로 %1). 지금은 코인이 없지만 키를 추가할 수 있습니다.</translation>
+    </message>
+    <message numerus="yes">
+        <source>Addresses of these words that hold coins now: %n. Together:</source>
+        <translation><numerusform>이 단어의 주소 %n개에 코인이 있습니다:</numerusform></translation>
+    </message>
+    <message numerus="yes">
+        <source>Keys that will be added to this wallet: %n (the addresses above and the next ones on the same key paths). They are separate from the keys this wallet makes itself, so make a new backup afterwards. Then the wallet scans the blocks of the past for their transactions; that can take a while.</source>
+        <translation><numerusform>키 %n개를 이 지갑에 추가합니다(위 주소와 같은 키 경로의 다음 주소들). 이 지갑이 스스로 만드는 키와는 별개이므로 추가한 뒤 백업을 새로 해야 합니다. 그다음 지난 블록을 스캔해 거래를 찾으며, 시간이 걸릴 수 있습니다.</numerusform></translation>
+    </message>
+    <message>
+        <source>Restored</source>
+        <translation>복원됨</translation>
+    </message>
+    <message numerus="yes">
+        <source>Keys added: %n. Scanning the blocks...</source>
+        <translation><numerusform>키 %n개를 추가했습니다. 블록을 스캔하는 중...</numerusform></translation>
+    </message>
+    <message numerus="yes">
+        <source>Done. Keys added: %n. The blocks were scanned.</source>
+        <translation><numerusform>완료. 키 %n개를 추가하고 블록을 스캔했습니다.</numerusform></translation>
+    </message>
+    <message>
+        <source>Balance of the wallet now: %1</source>
+        <translation>현재 지갑 잔액: %1</translation>
+    </message>
+    <message>
+        <source>The keys were added, but the scan did not finish: %1</source>
+        <translation>키는 추가했지만 스캔을 끝내지 못했습니다: %1</translation>
+    </message>
+    <message>
+        <source>Start the program with -rescan to scan again.</source>
+        <translation>다시 스캔하려면 프로그램을 -rescan 옵션으로 시작하세요.</translation>
+    </message>
+    <message>
+        <source>Stopping...</source>
+        <translation>중지하는 중...</translation>
+    </message>
+    <message>
+        <source>Check the words and the passphrase.</source>
+        <translation>단어와 암호를 확인하세요.</translation>
+    </message>
+</context>
+<context>
+    <name>SendConfirmDialog</name>
+    <message>
+        <source>You are sending a token</source>
+        <translation>토큰을 보냅니다</translation>
+    </message>
+    <message>
+        <source>You are sending the coin</source>
+        <translation>코인을 보냅니다</translation>
+    </message>
+    <message>
+        <source>Token</source>
+        <translation>토큰</translation>
+    </message>
+    <message>
+        <source>Coin</source>
+        <translation>코인</translation>
+    </message>
+    <message>
+        <source>(no label)</source>
+        <translation>(라벨 없음)</translation>
+    </message>
+    <message>
+        <source>New address</source>
+        <translation>처음 보내는 주소</translation>
+    </message>
+    <message>
+        <source>Not in the address book: nothing was sent to this address from this wallet before</source>
+        <translation>주소록에 없습니다. 이 지갑에서 이 주소로 보낸 적이 없습니다</translation>
+    </message>
+    <message>
+        <source>Send</source>
+        <translation>보내기</translation>
+    </message>
+    <message>
+        <source>Check before sending</source>
+        <translation>보내기 전에 확인하세요</translation>
+    </message>
+    <message numerus="yes">
+        <source>Recipients: %n</source>
+        <translation><numerusform>받는 사람 %n명</numerusform></translation>
+    </message>
+    <message>
+        <source>To</source>
+        <translation>받는 사람</translation>
+    </message>
+    <message>
+        <source>Total to the recipients</source>
+        <translation>받는 사람 합계</translation>
+    </message>
+    <message>
+        <source>Fee</source>
+        <translation>수수료</translation>
+    </message>
+    <message>
+        <source>The fee is paid in %1</source>
+        <translation>수수료는 %1로 냅니다</translation>
+    </message>
+    <message>
+        <source>Leaves the %1 balance</source>
+        <translation>%1 잔액에서 차감</translation>
+    </message>
+    <message>
+        <source>Leaves the balance (with the fee)</source>
+        <translation>잔액에서 차감 (수수료 포함)</translation>
+    </message>
+    <message>
+        <source>%1 balance after sending</source>
+        <translation>보낸 뒤 %1 잔액</translation>
+    </message>
+    <message>
+        <source>This sends the token %1, not %2. Check that the recipient expects this token.</source>
+        <translation>%2가 아니라 %1 토큰을 보냅니다. 받는 쪽이 이 토큰을 받기로 한 것이 맞는지 확인하세요.</translation>
+    </message>
+    <message>
+        <source>This sends the whole %1 balance of the wallet.</source>
+        <translation>지갑의 %1 잔액 전부를 보냅니다.</translation>
+    </message>
+    <message numerus="yes">
+        <source>Addresses that are not in the address book: %n. Nothing was sent there from this wallet before. Compare every character; a send cannot be undone.</source>
+        <translation><numerusform>주소 %n개가 주소록에 없습니다(이 지갑에서 보낸 적이 없는 주소). 글자를 하나씩 대조하세요. 보낸 뒤에는 되돌릴 수 없습니다.</numerusform></translation>
+    </message>
+    <message>
+        <source>Cancel</source>
+        <translation>취소</translation>
+    </message>
+    <message>
+        <source>Sent</source>
+        <translation>보냈습니다</translation>
+    </message>
+    <message>
+        <source>Sent: %1 %2</source>
+        <translation>보냈습니다: %1 %2</translation>
+    </message>
+    <message numerus="yes">
+        <source>recipients: %n</source>
+        <translation><numerusform>받는 사람 %n명</numerusform></translation>
+    </message>
+    <message>
+        <source>Transaction ID</source>
+        <translation>거래 ID</translation>
+    </message>
+    <message>
+        <source>It shows in the transaction history; it is final when a block confirms it.</source>
+        <translation>전송 기록에 나옵니다. 블록에 들어가 확인되면 확정됩니다.</translation>
+    </message>
+    <message>
+        <source>Copy the transaction ID</source>
+        <translation>거래 ID 복사</translation>
+    </message>
+    <message>
+        <source>Close</source>
+        <translation>닫기</translation>
+    </message>
+    <message>
+        <source>Copied</source>
+        <translation>복사했습니다</translation>
+    </message>
+    <message>
+        <source>Not sent</source>
+        <translation>보내지 못했습니다</translation>
+    </message>
+    <message>
+        <source>Nothing was sent.</source>
+        <translation>아무것도 보내지 않았습니다.</translation>
+    </message>
+</context>
+<context>
+    <name>PastBlocks</name>
+    <message>
+        <source>about %1 GB</source>
+        <translation>약 %1GB</translation>
+    </message>
+    <message>
+        <source>less than a minute left</source>
+        <translation>1분 미만 남음</translation>
+    </message>
+    <message>
+        <source>about %1 min left</source>
+        <translation>약 %1분 남음</translation>
+    </message>
+    <message>
+        <source>about %1 h %2 min left</source>
+        <translation>약 %1시간 %2분 남음</translation>
+    </message>
+    <message>
+        <source>Past blocks</source>
+        <translation>과거 블록</translation>
+    </message>
+    <message>
+        <source>The download could not be started: %1</source>
+        <translation>내려받기를 시작하지 못했습니다: %1</translation>
+    </message>
+    <message>
+        <source>%1 needs the past blocks. They are being downloaded: Settings, Network settings shows how far the download is. Try again when it has finished.</source>
+        <translation>%1에는 과거 블록이 필요합니다. 지금 받는 중이며 진행 상황은 설정의 네트워크 설정에서 볼 수 있습니다. 다 받은 뒤 다시 해 보세요.</translation>
+    </message>
+    <message>
+        <source>%1 needs the past blocks. Download them now?</source>
+        <translation>%1에는 과거 블록이 필요합니다. 지금 받을까요?</translation>
+    </message>
+    <message>
+        <source>%1 needs the past blocks, %2. Download them now?</source>
+        <translation>%1에는 과거 블록(%2)이 필요합니다. 지금 받을까요?</translation>
+    </message>
+    <message>
+        <source>This wallet started from a snapshot of the chain state and does not hold the blocks before block %1. The download runs in the background while you keep using the wallet; the blocks are only stored, not validated again.</source>
+        <translation>이 지갑은 체인 상태 스냅샷에서 시작했기 때문에 블록 %1 이전의 블록을 갖고 있지 않습니다. 받는 동안에도 지갑은 그대로 쓸 수 있고, 받은 블록은 저장만 하며 다시 검증하지 않습니다.</translation>
+    </message>
+    <message>
+        <source>Download</source>
+        <translation>받기</translation>
+    </message>
+    <message>
+        <source>Not now</source>
+        <translation>나중에</translation>
+    </message>
+    <message>
+        <source>Without the past blocks this is not available. You can download them at any time under Settings, Network settings.</source>
+        <translation>과거 블록이 없으면 이 기능을 쓸 수 없습니다. 설정의 네트워크 설정에서 언제든지 받을 수 있습니다.</translation>
+    </message>
+    <message>
+        <source>Download the past blocks</source>
+        <translation>과거 블록 받기</translation>
+    </message>
+    <message>
+        <source>The wallet is waiting for them to look for its earlier transactions.</source>
+        <translation>지갑이 이전 거래를 찾으려고 이 블록들을 기다리고 있습니다.</translation>
+    </message>
+    <message>
+        <source>The past blocks are stored. Looking for the earlier transactions of the wallet...</source>
+        <translation>과거 블록을 저장했습니다. 지갑의 이전 거래를 찾는 중...</translation>
+    </message>
+    <message>
+        <source>Downloading the past blocks: %1 of %2 MB%3</source>
+        <translation>과거 블록 받는 중: %1 / %2 MB%3</translation>
+    </message>
+    <message>
+        <source>You can keep using the wallet. After a restart the download starts again from here when you ask for it.</source>
+        <translation>지갑은 계속 쓸 수 있습니다. 프로그램을 다시 시작한 뒤에는 받기를 다시 누르면 이어서 받습니다.</translation>
+    </message>
+    <message>
+        <source>This wallet started from a snapshot of the chain state at block %1 and does not hold the blocks before it.</source>
+        <translation>이 지갑은 블록 %1 시점의 체인 상태 스냅샷에서 시작했으며 그 이전 블록은 갖고 있지 않습니다.</translation>
+    </message>
+    <message>
+        <source>It validates new blocks, sends, receives and stakes without them. They are needed to find the earlier transactions of an imported key or a restored wallet, to look up old transactions in the explorer, and to pass the whole chain on to other nodes.</source>
+        <translation>새 블록 검증, 보내기, 받기, 스테이킹은 과거 블록 없이도 됩니다. 가져온 키나 복원한 지갑의 이전 거래를 찾을 때, 탐색기에서 옛 거래를 조회할 때, 다른 노드에 전체 체인을 전달할 때 필요합니다.</translation>
+    </message>
+    <message>
+        <source>The last download stopped: %1</source>
+        <translation>지난 내려받기가 중단되었습니다: %1</translation>
+    </message>
+    <message>
+        <source>The past blocks are on this computer.</source>
+        <translation>과거 블록이 이 컴퓨터에 있습니다.</translation>
+    </message>
+    <message>
+        <source>This wallet started from a snapshot of the chain state at block %1 and has downloaded the blocks before it. After the next start it passes the whole chain on to other nodes.</source>
+        <translation>이 지갑은 블록 %1 시점의 체인 상태 스냅샷에서 시작했고 그 이전 블록도 받아 두었습니다. 다음에 시작하면 다른 노드에 전체 체인을 전달합니다.</translation>
     </message>
 </context>
 </TS>

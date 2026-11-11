@@ -3,6 +3,7 @@
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 #if defined(HAVE_CONFIG_H)
+#include "pastblocks.h"
 #include "config/aokchain-config.h"
 #endif
 
@@ -1144,6 +1145,15 @@ void ExplorerPage::lookupDone(const QString& query, const QString& json)
                            "Other transactions can only be looked up when the node keeps a transaction index. "
                            "To turn it on, add the line txindex=1 to aokchain.conf and start the wallet once with the option -reindex. "
                            "Rebuilding the index takes a while."), true);
+        } else if (PastBlocks::missing()) {
+            // a wallet that started from a chain state snapshot: old transactions are in blocks that it does not have
+            showMessage(tr("Not found"), tr("This node knows no transaction and no block with this ID among the blocks that it has. It started from a snapshot of the chain state: transactions from before the snapshot can be looked up when the past blocks have been downloaded (Settings, Network settings)."), true);
+            // (asked once: the ID may as well be mistyped)
+            static bool asked = false;
+            if (!asked) {
+                asked = true;
+                PastBlocks::offer(this, tr("Looking up a transaction from before the snapshot"));
+            }
         } else {
             showMessage(tr("Not found"), tr("This node knows no transaction and no block with this ID. Check the ID; while the node is still synchronizing, recent ones are not known yet."), false);
         }

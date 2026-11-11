@@ -28,6 +28,9 @@
 #include <QMenu>
 #include <QMessageBox>
 #include <QSortFilterProxyModel>
+#include <QStyledItemDelegate>
+#include <QHelpEvent>
+#include <QToolTip>
 
 AddressBookPage::AddressBookPage(const PlatformStyle *platformStyle, Mode _mode, Tabs _tab, QWidget *parent) :
     QDialog(parent),
@@ -35,6 +38,7 @@ AddressBookPage::AddressBookPage(const PlatformStyle *platformStyle, Mode _mode,
     model(0),
     mode(_mode),
     tab(_tab),
+    proxyModel(nullptr),
     optionsModel(0),
     embedded(false)
 {
@@ -187,6 +191,59 @@ private:
     QString search;
 };
 
+/** The address as 4…4 in the mono font; the whole address is the tool tip. */
+class ShortAddressDelegate : public QStyledItemDelegate
+{
+public:
+    explicit ShortAddressDelegate(QObject *parent) : QStyledItemDelegate(parent) {}
+
+    bool helpEvent(QHelpEvent *event, QAbstractItemView *view, const QStyleOptionViewItem &option, const QModelIndex &index) override
+    {
+        if (event->type() == QEvent::ToolTip && index.isValid()) {
+            QToolTip::showText(event->globalPos(), GUIUtil::monoToolTip(index.data(Qt::EditRole).toString()), view);
+            return true;
+        }
+        return QStyledItemDelegate::helpEvent(event, view, option, index);
+    }
+
+protected:
+    void initStyleOption(QStyleOptionViewItem *option, const QModelIndex &index) const override
+    {
+        QStyledItemDelegate::initStyleOption(option, index);
+        option->text = GUIUtil::shortAddress(index.data(Qt::EditRole).toString());
+        option->font = GUIUtil::monoFont(13);
+    }
+};
+
+void AddressBookPage::setCompact()
+{
+    // one of two lists side by side: short addresses, short button texts, the explanation as a tool tip
+    ui->tableView->setItemDelegateForColumn(AddressTableModel::Address, new ShortAddressDelegate(this));
+    ui->labelExplanation->hide();
+    searchEdit->setToolTip(ui->labelExplanation->text());
+    searchEdit->setPlaceholderText(tr("Search"));
+    searchEdit->setMinimumWidth(60);
+    sendButton->setText(tr("Send"));
+    ui->copyAddress->setText(tr("Copy"));
+    ui->newAddress->setText(tab == SendingTab ? tr("Add") : tr("New"));
+    // the export as an icon at the end of the row
+    ui->exportButton->setText(QString());
+    ui->exportButton->setFixedWidth(40);
+    for (QPushButton *button : {editButton, qrButton, sendButton, ui->copyAddress, ui->deleteAddress}) {
+        button->setIcon(QIcon());
+        button->setMinimumWidth(0);
+        button->setSizePolicy(QSizePolicy::Minimum, QSizePolicy::Fixed);
+        button->setStyleSheet("padding-left: 10px; padding-right: 10px;");
+    }
+    ui->horizontalLayout->setSpacing(6);
+    ui->tableView->setMinimumHeight(120);
+}
+
+int AddressBookPage::addressCount() const
+{
+    return proxyModel ? proxyModel->rowCount() : 0;
+}
+
 void AddressBookPage::embedAsPage()
 {
     embedded = true;
@@ -259,6 +316,9 @@ void AddressBookPage::setModel(AddressTableModel *_model)
     });
     ui->tableView->setModel(proxyModel);
     ui->tableView->sortByColumn(0, Qt::AscendingOrder);
+    for (const char *change : {SIGNAL(rowsInserted(QModelIndex,int,int)), SIGNAL(rowsRemoved(QModelIndex,int,int)), SIGNAL(modelReset()), SIGNAL(layoutChanged())})
+        connect(proxyModel, change, this, SIGNAL(countChanged()));
+    Q_EMIT countChanged();
 
     // Set column widths
 #if QT_VERSION < 0x050000

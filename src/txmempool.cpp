@@ -854,7 +854,9 @@ void CTxMemPool::removeForBlock(const std::vector<CTransactionRef>& vtx, unsigne
     /** TOKENS END */
 
     // Before the txs in the new block have been removed from the mempool, update policy estimates
-    if (minerPolicyEstimator) {minerPolicyEstimator->processBlock(nBlockHeight, entries);}
+    // (not during the first synchronization: there is nothing to estimate from, and aging the
+    // statistics for every block took a noticeable part of the time of each block)
+    if (minerPolicyEstimator && !IsInitialBlockDownload()) {minerPolicyEstimator->processBlock(nBlockHeight, entries);}
     for (const auto& tx : vtx)
     {
         txiter it = mapTx.find(tx->GetHash());

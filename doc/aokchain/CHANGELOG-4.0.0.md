@@ -1,5 +1,3 @@
-# AokChain Core 4.0.0 (candidate) changelog — compared with 3.0.5
-
 - **Covers:** 4.0.0 release candidate (`modernize` branch, Windows test build `v4.0.0.0-0698aa2`)
 - **Baseline:** 3.0.5 (`5d1fd3d`, 2022-09-24)
 - **Size:** 96 commits, 277 files changed (as of `08bd166`)
@@ -54,6 +52,8 @@ A wallet that had been used for a long time became very slow as transactions acc
 - **`purgeorphanstakes`.** Deletes orphaned stakes that pile up in the wallet file (run manually).
 - **`-checkwalletlive`.** Test option that verifies the wallet index against a full scan.
 - **`-lastpowblock`.** Lets regtest reach the proof-of-stake phase (regtest only).
+- **Chain state snapshot (fast start).** A new installation starts from the chain state at block 3,031,432 instead of validating every block. The program accepts a snapshot only when the hashes of its unspent outputs, tokens, governance state and block index equal the values compiled into it; otherwise it removes the snapshot and validates the blocks. The blocks before the snapshot are downloaded only when something needs them (`fetchblocks`, `-fetchblocks=1`, or the question the wallet asks). `-snapshot=0` turns it off. RPCs `getstatehashes`, `getsnapshotinfo`, `fetchblocks`; tool `contrib/aokchain/make_snapshot.py`. See `15-snapshot.md`.
+- **Faster block validation** for nodes that validate the chain: the staked transaction is no longer read from disk for every block, and three per-block costs that were not validation are gone. See `15-snapshot.md` §6.# AokChain Core 4.0.0 (candidate) changelog — compared with 3.0.5
 
 ## Bug fixes
 

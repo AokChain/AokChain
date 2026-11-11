@@ -116,7 +116,12 @@ namespace GUIUtil
         language, after "System default". The item data is the locale name ("" for the default). */
     void fillLanguageCombo(QComboBox* combo);
     /** Ask for the program to be started again after it has shut down (see main()). */
-    void requestRestart();
+    /** Make a window high enough for its texts that wrap (layouts ask for too little by themselves) */
+    void fitDialogHeight(QWidget* dialog);
+
+    /** Start the program again when it has ended; extraArguments are added to those of this start */
+    void requestRestart(const QStringList& extraArguments = QStringList());
+    QStringList restartArguments();
     bool restartRequested();
     QPixmap lineIcon(const QString& name, int size, const QColor& color, qreal strokeWidth = 2.0);
     /** The bundled logo of a token as a round pixmap; a letter avatar when there is none.

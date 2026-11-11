@@ -6,6 +6,7 @@
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
+#include "snapshot.h"
 #include <wallet/wallet.h>
 
 #include <base58.h>
@@ -2111,7 +2112,7 @@ int64_t CWallet::RescanFromTime(int64_t startTime, bool update)
  * If pindexStop is not a nullptr, the scan will stop at the block-index
  * defined by pindexStop
  */
-CBlockIndex* CWallet::ScanForWalletTransactions(CBlockIndex* pindexStart, CBlockIndex* pindexStop, bool fUpdate)
+CBlockIndex* CWallet::ScanForWalletTransactions(CBlockIndex* pindexStart, CBlockIndex* pindexStop, bool fUpdate, bool fQuiet)
 {
     int64_t nNow = GetTime();
     const CChainParams& chainParams = Params();
@@ -2122,7 +2123,7 @@ CBlockIndex* CWallet::ScanForWalletTransactions(CBlockIndex* pindexStart, CBlock
 
     CBlockIndex* pindex = pindexStart;
 
-    if (pindex) LogPrintf("Rescan started from block %d...\n", pindex->nHeight);
+    if (pindex && !fQuiet) LogPrintf("Rescan started from block %d...\n", pindex->nHeight);
 
     CBlockIndex* ret = nullptr;
     {
@@ -2130,12 +2131,12 @@ CBlockIndex* CWallet::ScanForWalletTransactions(CBlockIndex* pindexStart, CBlock
         fAbortRescan = false;
         fScanningWallet = true;
 
-        ShowProgress(_("Rescanning..."), 0); // show rescan progress in GUI as dialog or on splashscreen, if -rescan on startup
+        if (!fQuiet) ShowProgress(_("Rescanning..."), 0); // show rescan progress in GUI as dialog or on splashscreen, if -rescan on startup
         double dProgressStart = GuessVerificationProgress(chainParams.TxData(), pindex);
         double dProgressTip = GuessVerificationProgress(chainParams.TxData(), chainActive.Tip());
         while (pindex && !fAbortRescan && !ShutdownRequested())
         {
-            if (pindex->nHeight % 100 == 0 && dProgressTip - dProgressStart > 0.0)
+            if (!fQuiet && pindex->nHeight % 100 == 0 && dProgressTip - dProgressStart > 0.0)
                 ShowProgress(_("Rescanning..."), std::max(1, std::min(99, (int)((GuessVerificationProgress(chainParams.TxData(), pindex) - dProgressStart) / (dProgressTip - dProgressStart) * 100))));
             if (GetTime() >= nNow + 60) {
                 nNow = GetTime();
@@ -2160,7 +2161,7 @@ CBlockIndex* CWallet::ScanForWalletTransactions(CBlockIndex* pindexStart, CBlock
         } else if (pindex && ShutdownRequested()) {
             LogPrintf("Rescan interrupted by shutdown request at block %d. Progress=%f\n", pindex->nHeight, dProgressStart);
         }
-        ShowProgress(_("Rescanning..."), 100); // hide progress dialog in GUI
+        if (!fQuiet) ShowProgress(_("Rescanning..."), 100); // hide progress dialog in GUI
 
         fScanningWallet = false;
     }
@@ -5714,7 +5715,9 @@ CWallet* CWallet::CreateWalletFromFile(const std::string& name, const fs::path& 
     LOCK2(cs_main, walletInstance->cs_wallet);
 
     CBlockIndex *pindexRescan = chainActive.Genesis();
-    if (!gArgs.GetBoolArg("-rescan", false))
+    // A wallet that was loaded while the past blocks of a snapshot node were absent is scanned
+    // from the beginning once they are there.
+    if (!gArgs.GetBoolArg("-rescan", false) && !(WalletRescanPending() && !PastBlocksMissing()))
     {
         CWalletDB walletdb(*walletInstance->dbw);
         CBlockLocator locator;
@@ -5750,8 +5753,17 @@ CWallet* CWallet::CreateWalletFromFile(const std::string& name, const fs::path& 
             pindexRescan = chainActive.Next(pindexRescan);
         }
 
+        // This node started from a chain state snapshot and the blocks up to its height are not
+        // on disk: scan what is there. The rest is scanned when the past blocks have been fetched.
+        if (pindexRescan && PastBlocksMissing() && pindexRescan->nHeight <= SnapshotHeight()) {
+            LogPrintf("The wallet may have transactions in the past blocks (from block %d), which this node does not have yet. They are scanned when the past blocks have been downloaded.\n", pindexRescan->nHeight);
+            SetWalletRescanPending(true);
+            pindexRescan = chainActive[SnapshotHeight() + 1];
+        }
+
         nStart = GetTimeMillis();
-        walletInstance->ScanForWalletTransactions(pindexRescan, nullptr, true);
+        if (pindexRescan)
+            walletInstance->ScanForWalletTransactions(pindexRescan, nullptr, true);
         LogPrintf(" rescan      %15dms\n", GetTimeMillis() - nStart);
         walletInstance->SetBestChain(chainActive.GetLocator());
         walletInstance->dbw->IncrementUpdateCounter();

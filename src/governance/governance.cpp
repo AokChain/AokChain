@@ -12,6 +12,7 @@
 #include <amount.h>
 #include <base58.h>
 #include <chain.h>
+#include <hash.h>
 #include <util.h>
 
 static const CScript DUMMY_SCRIPT = CScript() << ParseHex("6885777789"); 
@@ -503,4 +504,30 @@ bool CGovernance::RevertUpdateFeeScript(int height) {
     }
 
     return WriteBatch(batch);
+}
+
+namespace {
+/** Reads whatever is left of a key or a value. */
+struct RawRecord {
+    std::vector<unsigned char> bytes;
+    template <typename Stream> void Unserialize(Stream& s)
+    {
+        bytes.resize(s.size());
+        if (!bytes.empty())
+            s.read((char*)bytes.data(), bytes.size());
+    }
+};
+} // namespace
+
+uint256 CGovernance::ContentHash()
+{
+    CHashWriter ss(SER_GETHASH, 0);
+    std::unique_ptr<CDBIterator> it(NewIterator());
+    for (it->SeekToFirst(); it->Valid(); it->Next()) {
+        RawRecord key, value;
+        if (!it->GetKey(key) || !it->GetValue(value))
+            return uint256();
+        ss << key.bytes << value.bytes;
+    }
+    return ss.GetHash();
 }

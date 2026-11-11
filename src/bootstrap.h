@@ -9,6 +9,7 @@
 #include <cstdint>
 #include <functional>
 #include <string>
+#include <vector>
 
 namespace boost { class thread_group; }
 
@@ -78,6 +79,34 @@ typedef std::function<bool(const std::string& url, const std::string& path, uint
 void SetBootstrapFetcher(BootstrapFetcher function, bool https);
 /** For a fetcher: the download is to be given up (shutdown, or the user skipped the bootstrap). */
 bool BootstrapCancelled();
+
+/**
+ * The same sources for other files (the chain state snapshot, see snapshot.h): -bootstrapdir,
+ * -bootstrapurl, or the built-in address when the fetcher does https.
+ */
+/** True when there is a folder or an address to take files from. */
+bool BootstrapHasSource();
+/** Read a small file (a manifest) from the folder or from the first mirror that has it. */
+bool BootstrapReadFile(const std::string& name, std::string& text, std::string& error);
+/**
+ * Get a file with a known size and SHA-256. From a folder: checked in place, path is the file in
+ * the folder and temporary is false. From a mirror: downloaded into dir (resumed when a part of it
+ * is there), path is the file in dir and temporary is true. progress counts the bytes.
+ */
+bool BootstrapGetFile(const std::string& name, uint64_t size, const std::string& sha256, const std::string& dir,
+                      std::atomic<uint64_t>* progress, std::string& path, bool& temporary, std::string& error);
+/**
+ * Visit the blocks of the block archives up to lastHeight, in order. visit gets the height and
+ * the serialized block and returns false, with an error, to stop. archiveDone is called after the
+ * last block of every archive, with the height of that block. Archives that end below firstHeight
+ * are left out (a visit that was interrupted goes on after the last archive that was done). Used
+ * to store the past blocks of a node that started from a snapshot. Blocks: it downloads and
+ * unpacks.
+ */
+bool BootstrapVisitBlocks(int firstHeight, int lastHeight,
+                          const std::function<bool(int height, const std::vector<char>& block, std::string& error)>& visit,
+                          const std::function<bool(int lastHeightOfArchive, std::string& error)>& archiveDone,
+                          std::atomic<uint64_t>* bytesDone, std::atomic<uint64_t>* bytesTotal, std::string& error);
 
 /** Start the bootstrap thread when -bootstrapurl asks for it. Call once, when the block index is loaded. */
 void StartBootstrap(boost::thread_group& threadGroup);

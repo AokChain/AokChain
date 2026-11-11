@@ -58,8 +58,8 @@ int Construct(Huffman& h, const short* length, int n)
 class Inflater
 {
 public:
-    Inflater(FILE* _in, FILE* _out, uint64_t _maxSize) :
-        in(_in), out(_out), maxSize(_maxSize), inPos(0), inLen(0), bitBuf(0), bitCount(0), total(0), crc(0xffffffffU),
+    Inflater(const GunzipReader& _read, const GunzipWriter& _write, uint64_t _maxSize) :
+        read(_read), write(_write), maxSize(_maxSize), inPos(0), inLen(0), bitBuf(0), bitCount(0), total(0), crc(0xffffffffU),
         window(WINDOW)
     {
         for (uint32_t n = 0; n < 256; n++) {
@@ -104,8 +104,8 @@ public:
     }
 
 private:
-    FILE* in;
-    FILE* out;
+    const GunzipReader& read;
+    const GunzipWriter& write;
     uint64_t maxSize;
     unsigned char inBuf[65536];
     size_t inPos, inLen;
@@ -119,7 +119,7 @@ private:
     int Byte()
     {
         if (inPos == inLen) {
-            inLen = fread(inBuf, 1, sizeof(inBuf), in);
+            inLen = read(inBuf, sizeof(inBuf));
             inPos = 0;
             if (inLen == 0)
                 throw Failure{"the file ends too early"};
@@ -152,8 +152,8 @@ private:
             return;
         for (size_t i = 0; i < n; i++)
             crc = crcTable[(crc ^ window[i]) & 0xff] ^ (crc >> 8);
-        if (fwrite(window.data(), 1, n, out) != n)
-            throw Failure{"cannot write the output file"};
+        if (!write(window.data(), n))
+            throw Failure{"cannot write the output"};
     }
 
     void Put(unsigned char c)
@@ -331,8 +331,14 @@ private:
 
 bool GunzipFile(FILE* in, FILE* out, uint64_t maxSize, uint64_t& size, std::string& error)
 {
+    return Gunzip([in](unsigned char* buffer, size_t n) { return fread(buffer, 1, n, in); },
+                  [out](const unsigned char* data, size_t n) { return fwrite(data, 1, n, out) == n; }, maxSize, size, error);
+}
+
+bool Gunzip(const GunzipReader& read, const GunzipWriter& write, uint64_t maxSize, uint64_t& size, std::string& error)
+{
     try {
-        Inflater inflater(in, out, maxSize);
+        Inflater inflater(read, write, maxSize);
         size = inflater.Run();
         return true;
     } catch (const Failure& failure) {

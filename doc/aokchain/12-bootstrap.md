@@ -1,5 +1,7 @@
 # Fast first synchronization (block bootstrap)
 
+> Update (4.0.0rc2): the chain state snapshot is implemented. See [15-snapshot.md](15-snapshot.md). The text below is the reasoning at the time of rc1.
+
 When a freshly installed wallet fetches 3 million blocks one by one from peers, it takes hours. The slow part is not validation but the **download** (there are few peers and they are old). So two things were done.
 
 1. **assumevalid update** — something that is done with every release. Below a block read from a node that has finished full validation, signature (script) checks are skipped.

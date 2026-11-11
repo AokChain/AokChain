@@ -69,7 +69,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
         self.end_headers()
         body = data[start:]
         try:
-            if server.delay and self.path.endswith(".gz"):
+            if server.delay and (self.path.endswith(".gz") or ".part" in self.path):
                 # slowly, and in pieces
                 for i in range(0, len(body), 4096):
                     self.wfile.write(body[i:i + 4096])

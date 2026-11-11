@@ -173,6 +173,7 @@ AOKCHAIN_CORE_H = \
   utiltime.h \
   validation.h \
   bootstrap.h \
+  snapshot.h \
   gunzip.h \
   validationinterface.h \
   versionbits.h \
@@ -181,6 +182,7 @@ AOKCHAIN_CORE_H = \
   wallet/crypter.h \
   wallet/db.h \
   wallet/feebumper.h \
+  wallet/mnemonicrestore.h \
   wallet/fees.h \
   wallet/rpcwallet.h \
   wallet/wallet.h \
@@ -248,6 +250,7 @@ libaokchain_server_a_SOURCES = \
   ui_interface.cpp \
   validation.cpp \
   bootstrap.cpp \
+  snapshot.cpp \
   gunzip.cpp \
   validationinterface.cpp \
   versionbits.cpp \
@@ -271,6 +274,7 @@ libaokchain_wallet_a_SOURCES = \
   wallet/crypter.cpp \
   wallet/db.cpp \
   wallet/feebumper.cpp \
+  wallet/mnemonicrestore.cpp \
   wallet/fees.cpp \
   wallet/init.cpp \
   wallet/rpcdump.cpp \

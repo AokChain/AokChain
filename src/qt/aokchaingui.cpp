@@ -10,6 +10,8 @@
 
 #include "aokchaingui.h"
 
+#include "pastblocks.h"
+#include "snapshot.h"
 #include "bootstrap.h"
 
 #include "aokchainunits.h"
@@ -300,6 +302,9 @@ AokChainGUI::AokChainGUI(const PlatformStyle *_platformStyle, const NetworkStyle
     QTimer *bootstrapTimer = new QTimer(this);
     connect(bootstrapTimer, SIGNAL(timeout()), this, SLOT(updateBootstrap()));
     bootstrapTimer->start(1000);
+    bootstrapSamplesAreBlocks = false;
+    pastBlocksAsked = false;
+    pastBlocksWereFetching = false;
 #ifdef ENABLE_WALLET
     if(enableWallet) {
         connect(walletFrame, SIGNAL(requestedSyncWarningInfo()), this, SLOT(showModalOverlay()));
@@ -1077,6 +1082,23 @@ static QString megabytes(quint64 bytes)
 
 void AokChainGUI::updateBootstrap()
 {
+    // A wallet that started from a chain state snapshot and needs the past blocks (it was
+    // restored from a file, say): ask once whether to download them.
+    if (!pastBlocksAsked && walletFrame && clientModel && WalletRescanPending() && PastBlocks::missing() && isVisible() && !QApplication::activeModalWidget()) {
+        pastBlocksAsked = true;
+        PastBlocks::offer(this, tr("Showing the earlier transactions of this wallet"));
+    }
+    {
+        const bool fetching = GetPastBlocksInfo().fetching;
+        if (pastBlocksWereFetching && !fetching) {
+            const PastBlocksInfo past = GetPastBlocksInfo();
+            if (!past.missing)
+                message(tr("Past blocks"), tr("The past blocks are downloaded."), CClientUIInterface::MSG_INFORMATION | CClientUIInterface::MODAL);
+            else if (!past.error.empty() && past.error != "cancelled")
+                message(tr("Past blocks"), tr("The download of the past blocks stopped: %1").arg(QString::fromStdString(past.error)), CClientUIInterface::MSG_WARNING | CClientUIInterface::MODAL);
+        }
+        pastBlocksWereFetching = fetching;
+    }
     const BootstrapInfo info = GetBootstrapInfo();
     if (!info.configured && bootstrapLastState.isEmpty())
         return; // nothing is shown when the bootstrap is not set up
@@ -1097,11 +1119,19 @@ void AokChainGUI::updateBootstrap()
             line = tr("Fast sync: fetching block archive %1/%2 · %3 / %4").arg(info.chunksDownloaded + 1).arg(info.chunks)
                        .arg(megabytes(info.bytesDownloaded), megabytes(info.bytesTotal));
             progress = info.bytesTotal ? double(info.bytesDownloaded) / info.bytesTotal : 0;
+            const QString left = bootstrapTimeLeft(false, info.bytesDownloaded, info.bytesTotal);
+            if (!left.isEmpty())
+                line += " · " + left;
         } else {
             status = tr("Validating blocks");
             right = QString("%1 / %2").arg(GUIUtil::withThousands(QString::number(height)), GUIUtil::withThousands(QString::number(info.targetHeight)));
             line = tr("Validating blocks %1 / %2").arg(GUIUtil::withThousands(QString::number(height)), GUIUtil::withThousands(QString::number(info.targetHeight)));
             progress = info.targetHeight ? double(height) / info.targetHeight : 0;
+            const QString left = bootstrapTimeLeft(true, height, info.targetHeight);
+            if (!left.isEmpty()) {
+                line += " · " + left;
+                status += " · " + left;
+            }
         }
         const QString detail = info.chunks == 0 ? explanation
             : explanation + "\n" + tr("Fetched %1 of %2 archives (%3 / %4), validated up to block %5 of %6.")
@@ -1130,6 +1160,25 @@ void AokChainGUI::updateBootstrap()
     }
     bootstrapActive = active;
     bootstrapLastState = state;
+}
+
+QString AokChainGUI::bootstrapTimeLeft(bool blocks, double value, double end)
+{
+    // the rate of the last minutes: early blocks validate much faster than recent ones
+    const qint64 now = QDateTime::currentMSecsSinceEpoch();
+    if (blocks != bootstrapSamplesAreBlocks) {
+        bootstrapSamples.clear();
+        bootstrapSamplesAreBlocks = blocks;
+    }
+    if (bootstrapSamples.isEmpty() || now - bootstrapSamples.last().first >= 5000)
+        bootstrapSamples.append(qMakePair(now, value));
+    while (bootstrapSamples.size() > 2 && now - bootstrapSamples.first().first > 180000)
+        bootstrapSamples.removeFirst();
+    const qint64 span = now - bootstrapSamples.first().first;
+    const double advanced = value - bootstrapSamples.first().second;
+    if (span < 20000 || advanced <= 0 || value >= end)
+        return QString();
+    return PastBlocks::timeLeft(qint64(span / 1000.0 * (end - value) / advanced));
 }
 
 void AokChainGUI::skipBootstrap()
@@ -1501,6 +1550,16 @@ void AokChainGUI::setEncryptionStatus(int status)
         changePassphraseAction->setEnabled(true);
         encryptWalletAction->setEnabled(false); // TODO: decrypt currently not supported
         break;
+    case WalletModel::UnlockedForStaking:
+        labelWalletEncryptionIcon->show();
+        labelWalletEncryptionIcon->setPixmap(platformStyle->SingleColorIcon(":/icons/lock_open").pixmap(STATUSBAR_ICONSIZE,STATUSBAR_ICONSIZE));
+        labelWalletEncryptionIcon->setToolTip(tr("Wallet is <b>encrypted</b> and currently <b>unlocked for staking only</b>"));
+        if (sidebar)
+            sidebar->setWalletState(tr("Unlocked for staking only"), labelWalletEncryptionIcon->toolTip());
+        encryptWalletAction->setChecked(true);
+        changePassphraseAction->setEnabled(true);
+        encryptWalletAction->setEnabled(false);
+        break;
     case WalletModel::Locked:
         labelWalletEncryptionIcon->show();
         labelWalletEncryptionIcon->setPixmap(platformStyle->SingleColorIcon(":/icons/lock_closed").pixmap(STATUSBAR_ICONSIZE,STATUSBAR_ICONSIZE));
@@ -1549,6 +1608,13 @@ void AokChainGUI::updateStakingIcon()
 {
     if (walletFrame) {
         nWeight = walletFrame->updateWeight();
+    }
+    // The wallet was locked from elsewhere (walletlock, or the time of walletpassphrase ran out):
+    // nothing is staked any more, and the switch says so.
+    if (this->nStaking && walletFrame && !walletFrame->isWalletUnlocked()) {
+        this->nStaking = false;
+        for (CWallet* pwallet : vpwallets)
+            pwallet->StopStake();
     }
 
     QString detail;
@@ -1691,7 +1757,7 @@ void AokChainGUI::toggleStakingActive()
     this->nStaking = !this->nStaking;
 
     if (this->nStaking) {
-        walletFrame->unlockWallet();
+        walletFrame->unlockWalletForStaking();
         if (walletFrame->isWalletUnlocked()) {
             for (CWallet* pwallet : vpwallets) {
                 pwallet->StartStake();
@@ -1705,6 +1771,7 @@ void AokChainGUI::toggleStakingActive()
         for (CWallet* pwallet : vpwallets) {
             pwallet->StopStake();
         }
+        walletFrame->lockWalletAfterStaking();
         updateStakingIcon();
     }
 }

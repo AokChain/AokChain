@@ -7,6 +7,7 @@
 
 #include <cstdint>
 #include <cstdio>
+#include <functional>
 #include <string>
 
 /**
@@ -24,5 +25,14 @@
  * @param[out] error    what is wrong with the file, when false is returned
  */
 bool GunzipFile(FILE* in, FILE* out, uint64_t maxSize, uint64_t& size, std::string& error);
+
+/**
+ * The same with functions for the input and the output: read fills the buffer and returns the
+ * number of bytes (0 at the end of the input), write takes the next decompressed bytes and returns
+ * false to stop. The compressed data may thus come from several files in a row.
+ */
+typedef std::function<size_t(unsigned char* buffer, size_t size)> GunzipReader;
+typedef std::function<bool(const unsigned char* data, size_t size)> GunzipWriter;
+bool Gunzip(const GunzipReader& read, const GunzipWriter& write, uint64_t maxSize, uint64_t& size, std::string& error);
 
 #endif // AOKCHAIN_GUNZIP_H

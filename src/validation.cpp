@@ -8,6 +8,8 @@
 
 #include "validation.h"
 
+#include "snapshot.h"
+
 #include "arith_uint256.h"
 #include "chain.h"
 #include "chainparams.h"
@@ -68,6 +70,9 @@
 #if defined(NDEBUG)
 # error "AokChain cannot be compiled without assertions."
 #endif
+
+/** Block tree database: time and coinstake mark of a spent coin from before the snapshot (see ConnectBlock) */
+static const char DB_SNAPSHOT_SPENT_COIN = 'k';
 
 #define MICRO 0.000001
 #define MILLI 0.001
@@ -1747,6 +1752,17 @@ int ApplyTxInUndo(Coin&& undo, CCoinsViewCache& view, const COutPoint& out, CTok
             return DISCONNECT_FAILED; // adding output for transaction without known metadata
         }
     }
+    // The undo data has neither the time of the transaction nor its coinstake mark. A node that
+    // started from a chain state snapshot kept them for the coins from before the snapshot when
+    // it spent them (see ConnectBlock): it cannot read them from the past blocks.
+    if (undo.nTime == 0 && (int)undo.nHeight <= SnapshotHeight()) {
+        std::pair<unsigned int, unsigned char> kept;
+        if (pblocktree->Read(std::make_pair(DB_SNAPSHOT_SPENT_COIN, out), kept)) {
+            undo.nTime = kept.first;
+            undo.fCoinStake = kept.second != 0;
+        }
+    }
+
     // The potential_overwrite parameter to AddCoin is only allowed to be false if we know for
     // sure that the coin did not already exist in the cache. As we have queried for that above
     // using HaveCoin, we don't need to guess. When fClean is false, a coin already existed and
@@ -2391,14 +2407,32 @@ static bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockInd
                 error("%s: tried to stake at depth %d", __func__, pindex->nHeight - coin.nHeight),
                         REJECT_INVALID, "bad-cs-premature");
 
-        CTransactionRef txPrev;
-        uint256 hashPrevBlock = block.GetBlockHash();
-        if (!GetTransaction(prevout.hash, txPrev, Params().GetConsensus(), hashPrevBlock, false)) {
-            return state.DoS(100, error("%s: read txPrev failed", __func__),
-                        REJECT_INVALID, "read-txprev-failed");
+        // The time of the transaction that is staked. The coin has it: AddCoins() stores tx.nTime
+        // in every coin. Only a coin that a disconnected block gave back has no time (0, the undo
+        // data does not keep it); for such a coin the transaction is read from disk, through the
+        // transaction index, as it used to be for every stake. Reading it for every block cost a
+        // large part of the time of the first synchronization, and a node that started from a
+        // chain state snapshot cannot read the transactions of the past blocks at all.
+        // -checkstaketime (default on regtest) reads the transaction as well and compares.
+        unsigned int nTimeTxPrev = coin.nTime;
+        static const bool fCheckStakeTime = gArgs.GetBoolArg("-checkstaketime", chainparams.DefaultConsistencyChecks());
+        if (nTimeTxPrev == 0 || fCheckStakeTime) {
+            CTransactionRef txPrev;
+            uint256 hashPrevBlock = block.GetBlockHash();
+            if (GetTransaction(prevout.hash, txPrev, Params().GetConsensus(), hashPrevBlock, false)) {
+                if (txPrev->nTime != coin.nTime && coin.nTime != 0) {
+                    LogPrintf("%s: WARNING: time of the staked transaction %s is %u on disk and %u in the coin\n", __func__,
+                              prevout.hash.GetHex(), txPrev->nTime, coin.nTime);
+                    assert(!fCheckStakeTime);
+                }
+                nTimeTxPrev = txPrev->nTime;
+            } else if (nTimeTxPrev == 0) {
+                return state.DoS(100, error("%s: read txPrev failed", __func__),
+                            REJECT_INVALID, "read-txprev-failed");
+            }
         }
 
-        if (!CheckStakeKernelHash(pindex->pprev, block.nBits, coin.out.nValue, prevout, block.vtx[1]->nTime, txPrev->nTime))
+        if (!CheckStakeKernelHash(pindex->pprev, block.nBits, coin.out.nValue, prevout, block.vtx[1]->nTime, nTimeTxPrev))
             return state.DoS(100, error("%s: proof-of-stake hash doesn't match nBits", __func__),
                         REJECT_INVALID, "bad-cs-proofhash");
 
@@ -2944,6 +2978,27 @@ static bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockInd
     if (fJustCheck)
         return true;
 
+    // A node that started from a chain state snapshot cannot read the transactions of the past
+    // blocks, and the undo data keeps neither the time nor the coinstake mark of a spent coin.
+    // Keep both for the coins from before the snapshot, so that a block that is disconnected
+    // gives them back as they were (see ApplyTxInUndo).
+    if (PastBlocksMissing()) {
+        CDBBatch batch(*pblocktree);
+        bool any = false;
+        for (size_t i = 0; i < blockundo.vtxundo.size() && i + 1 < block.vtx.size(); i++) {
+            const std::vector<Coin>& spent = blockundo.vtxundo[i].vprevout;
+            const CTransaction& tx = *block.vtx[i + 1];
+            for (size_t j = 0; j < spent.size() && j < tx.vin.size(); j++) {
+                if ((int)spent[j].nHeight <= SnapshotHeight() && spent[j].nTime != 0) {
+                    batch.Write(std::make_pair(DB_SNAPSHOT_SPENT_COIN, tx.vin[j].prevout), std::make_pair(spent[j].nTime, (unsigned char)spent[j].fCoinStake));
+                    any = true;
+                }
+            }
+        }
+        if (any && !pblocktree->WriteBatch(batch))
+            return AbortNode(state, "Failed to write to block index database");
+    }
+
     // Write undo information to disk
     if (pindex->GetUndoPos().IsNull() || !pindex->IsValid(BLOCK_VALID_SCRIPTS))
     {
@@ -3451,10 +3506,15 @@ bool static ConnectTip(CValidationState& state, const CChainParams& chainparams,
         int64_t nTimeTokensStart = GetTimeMicros();
         /** TOKENS START */
         // Get the newly created tokens, from the connectblock tokenCache so we can remove the correct tokens from the mempool
+        // (walk the tokens of this block, which are few, and not the tokens that wait to be
+        // written, which are all the tokens issued since the last flush: copying each of them
+        // for every block took a sixth of the time of the first synchronization)
         setNewTokensAddedInBlock = tokenCache.setNewTokensToAdd;
-        for (auto it : ptokens->setNewTokensToAdd) {
-            if (setNewTokensAddedInBlock.count(it))
-                setNewTokensAddedInBlock.erase(it);
+        for (auto it = setNewTokensAddedInBlock.begin(); it != setNewTokensAddedInBlock.end();) {
+            if (ptokens->setNewTokensToAdd.count(*it))
+                it = setNewTokensAddedInBlock.erase(it);
+            else
+                ++it;
         }
 
         // Remove all tx hashes, that were marked as reissued script from the mapReissuedTx.
@@ -4334,6 +4394,16 @@ static bool ContextualCheckBlockHeader(const CBlock& block, CValidationState& st
         );
     }
 
+    // A node that started from a chain state snapshot has no undo data for the blocks up to the
+    // snapshot height: it cannot follow a fork that begins there. (Once the chain is more than the
+    // maximum reorganization depth past the snapshot, the rule above covers this.)
+    if (nHeight <= SnapshotHeight() && (!chainActive[nHeight] || chainActive[nHeight]->GetBlockHash() != hash)) {
+        return state.DoS(25,
+            error("%s: forked chain begins at height %d, at or below the snapshot height %d", __func__, nHeight, SnapshotHeight()),
+            REJECT_MAXREORGDEPTH, "bad-fork-prior-to-snapshot"
+        );
+    }
+
     if (hash == params.GetConsensus().hashGenesisBlock)
         return true;
 
@@ -4596,11 +4666,40 @@ static bool CheckBlockStakeBeforeStorage(const CBlock& block, const CBlockIndex*
 
     const COutPoint& prevout = block.vtx[1]->vin[0].prevout;
 
-    // Same lookup ConnectBlock() uses for the kernel transaction.
+    // The block extends the tip and its kernel is an unspent coin that has the time of its
+    // transaction (see ConnectBlock()): everything that is checked here is in the coin, and the
+    // transaction is not read from disk. This is the case for nearly every block.
+    if (pindexPrev == chainActive.Tip()) {
+        const Coin& coin = pcoinsTip->AccessCoin(prevout);
+        if (!coin.IsSpent() && coin.nTime != 0) {
+            if (pindex->nHeight - (int)coin.nHeight < COINSTAKE_MATURITY)
+                return state.DoS(100, error("%s: tried to stake at depth %d", __func__, pindex->nHeight - coin.nHeight),
+                                 REJECT_INVALID, "bad-cs-premature");
+            if (!CheckStakeKernelHash(pindexPrev, block.nBits, coin.out.nValue, prevout, block.vtx[1]->nTime, coin.nTime))
+                return state.DoS(100, error("%s: proof-of-stake hash doesn't match nBits", __func__),
+                                 REJECT_INVALID, "bad-cs-proofhash");
+            return true;
+        }
+    }
+
+    // Same lookup ConnectBlock() uses for the kernel transaction when the coin has no time.
     CTransactionRef txPrev;
     uint256 hashBlock;
-    if (!GetTransaction(prevout.hash, txPrev, consensusParams, hashBlock, false) || prevout.n >= txPrev->vout.size())
+    if (!GetTransaction(prevout.hash, txPrev, consensusParams, hashBlock, false) || prevout.n >= txPrev->vout.size()) {
+        // A node that started from a chain state snapshot cannot read a transaction of the past
+        // blocks. For a block on a fork of the active chain the coin of the tip still tells what
+        // is needed, as long as it is unspent there.
+        const Coin& coin = pcoinsTip->AccessCoin(prevout);
+        if (!PastBlocksMissing() || coin.IsSpent() || coin.nTime == 0 || (int)coin.nHeight > SnapshotHeight() || (int)coin.nHeight > pindexPrev->nHeight)
+            return true;
+        if (pindex->nHeight - (int)coin.nHeight < COINSTAKE_MATURITY)
+            return state.DoS(100, error("%s: tried to stake at depth %d", __func__, pindex->nHeight - coin.nHeight),
+                             REJECT_INVALID, "bad-cs-premature");
+        if (!CheckStakeKernelHash(pindexPrev, block.nBits, coin.out.nValue, prevout, block.vtx[1]->nTime, coin.nTime))
+            return state.DoS(100, error("%s: proof-of-stake hash doesn't match nBits", __func__),
+                             REJECT_INVALID, "bad-cs-proofhash");
         return true;
+    }
 
     int nCoinHeight;
     CAmount nValueIn;
@@ -5120,6 +5219,9 @@ bool static LoadBlockIndexDB(const CChainParams& chainparams)
     {
         CDiskBlockPos pos(*it, 0);
         if (CAutoFile(OpenBlockFile(pos, true), SER_DISK, CLIENT_VERSION).IsNull()) {
+            // a node that started from a chain state snapshot has the block files from there on
+            if (SnapshotBlockFilesMayBeMissing())
+                continue;
             return false;
         }
     }
@@ -5226,6 +5328,9 @@ bool CVerifyDB::VerifyDB(const CChainParams& chainparams, CCoinsView *coinsview,
         }
         uiInterface.ShowProgress(_("Verifying blocks..."), percentageDone, false);
         if (pindex->nHeight < chainActive.Height()-nCheckDepth)
+            break;
+        // a node that started from a chain state snapshot has neither blocks nor undo data up to its height
+        if (pindex->nHeight <= SnapshotHeight())
             break;
         if (fPruneMode && !(pindex->nStatus & BLOCK_HAVE_DATA)) {
             // If pruning, only go back as far as we have data.

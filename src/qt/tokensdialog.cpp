@@ -5,6 +5,8 @@
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 #include "tokensdialog.h"
+#include "sendconfirmdialog.h"
+#include "tokenlists.h"
 #include "sendcoinsdialog.h"
 #include "ui_tokensdialog.h"
 
@@ -646,72 +648,44 @@ void TokensDialog::on_sendButton_clicked()
         return;
     }
 
-    // Format confirmation message
-    QStringList formatted;
+    // What is about to be sent, for the confirmation: the token first, so that it cannot be
+    // mistaken for the coin
+    const int unit = model->getOptionsModel()->getDisplayUnit();
+    SendConfirmData confirm;
+    confirm.token = true;
+    confirm.asset = recipients.first().tokenName;
+    confirm.feeUnit = AokChainUnits::name(unit).trimmed();
+    HeldToken held;
+    HeldTokenIndex *heldTokens = HeldTokenIndex::forModel(model->getTokenTableModel());
+    const bool haveBalance = heldTokens && heldTokens->find(confirm.asset, &held) && held.held;
+    const int tokenUnits = haveBalance ? held.units : 8;
+    auto number = [tokenUnits](const CAmount &amount) { return QString::fromStdString(ValueFromAmountString(amount, tokenUnits)); };
+    CAmount totalTokens = 0;
     for (SendTokensRecipient &rcp : recipients)
     {
-        // generate bold amount string
-        QString amount = "<b>" + QString::fromStdString(ValueFromAmountString(rcp.amount, 8)) + " " + rcp.tokenName;
-        amount.append("</b>");
-        // generate monospace address string
-        QString address = "<span style='font-family: monospace;'>" + rcp.address;
-        address.append("</span>");
-
-        QString recipientElement;
-
-        if (!rcp.paymentRequest.IsInitialized()) // normal payment
-        {
-            if(rcp.label.length() > 0) // label with address
-            {
-                recipientElement = tr("%1 to %2").arg(amount, GUIUtil::HtmlEscape(rcp.label));
-                recipientElement.append(QString(" (%1)").arg(address));
-            }
-            else // just address
-            {
-                recipientElement = tr("%1 to %2").arg(amount, address);
-            }
-        }
-        else if(!rcp.authenticatedMerchant.isEmpty()) // authenticated payment request
-        {
-            recipientElement = tr("%1 to %2").arg(amount, GUIUtil::HtmlEscape(rcp.authenticatedMerchant));
-        }
-        else // unauthenticated payment request
-        {
-            recipientElement = tr("%1 to %2").arg(amount, address);
-        }
-
-        if (rcp.username.length() > 0) {
-            recipientElement.append(QString(" (%1)").arg(rcp.username));
-        }
-
-        if (rcp.tokenLockTime > 0) {
-            recipientElement.append(QString(" locked till %1").arg(QDateTime::fromTime_t(rcp.tokenLockTime).toString("yyyy.MM.dd HH:mm")));
-        }
-
-        formatted.append(recipientElement);
+        SendConfirmData::Recipient to;
+        to.address = rcp.address;
+        to.label = rcp.label.isEmpty() ? model->getAddressTableModel()->labelForAddress(rcp.address) : rcp.label;
+        to.amount = number(rcp.amount);
+        to.known = model->isKnownAddress(rcp.address);
+        if (rcp.tokenName != confirm.asset)
+            to.note = rcp.tokenName; // a card with another token (owner tokens of the advanced view)
+        if (rcp.tokenLockTime > 0)
+            to.note = tr("Locked until %1").arg(QDateTime::fromTime_t(rcp.tokenLockTime).toString("yyyy.MM.dd HH:mm"));
+        if (rcp.tokenName == confirm.asset)
+            totalTokens += rcp.amount;
+        confirm.recipients.append(to);
     }
-
-    QString questionString = tr("Are you sure you want to send?");
-    questionString.append("<br /><br />%1");
-
-    if (nFeeRequired > 0)
-    {
-        // append fee string if a fee is required
-        questionString.append("<hr /><span style='color:#aa0000;'>");
-        questionString.append(AokChainUnits::formatHtmlWithUnit(model->getOptionsModel()->getDisplayUnit(), nFeeRequired));
-        questionString.append("</span> ");
-        questionString.append(tr("added as transaction fee"));
-
-        // append transaction size
-        questionString.append(" (" + QString::number((double)GetVirtualTransactionSize(*tx.tx) / 1000) + " kB)");
+    confirm.total = number(totalTokens);
+    confirm.fee = AokChainUnits::format(unit, nFeeRequired, false, AokChainUnits::separatorNever);
+    confirm.assetDeducted = confirm.total;
+    if (haveBalance) {
+        confirm.assetAfter = number(std::max<CAmount>(0, held.quantity - totalTokens));
+        confirm.wholeBalance = totalTokens >= held.quantity;
     }
+    confirm.coinAfter = AokChainUnits::format(unit, std::max<CAmount>(0, model->getBalance() - nFeeRequired), false, AokChainUnits::separatorNever);
 
-    SendConfirmationDialog confirmationDialog(tr("Confirm send tokens"),
-                                              questionString.arg(formatted.join("<br />")), SEND_CONFIRM_DELAY, this);
-    confirmationDialog.exec();
-    QMessageBox::StandardButton retval = static_cast<QMessageBox::StandardButton>(confirmationDialog.result());
-
-    if(retval != QMessageBox::Yes)
+    if (!SendConfirmDialog::confirm(confirm, this))
     {
         fNewRecipientAllowed = true;
         return;
@@ -727,6 +701,9 @@ void TokensDialog::on_sendButton_clicked()
         TokenControlDialog::tokenControl->UnSelectAll();
         tokenControlUpdateLabels();
         accept();
+        // (after the page has tidied up: widgets it let go of are deleted when the event loop is back)
+        const QString txid = QString::fromStdString(tx.GetHash().GetHex());
+        QTimer::singleShot(0, this, [this, confirm, txid] { SendConfirmDialog::showSent(confirm, txid, this); });
     }
     fNewRecipientAllowed = true;
 }

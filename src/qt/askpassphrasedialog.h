@@ -10,6 +10,9 @@
 #include <QDialog>
 
 class WalletModel;
+class QCheckBox;
+class QPushButton;
+class QLabel;
 
 namespace Ui {
     class AskPassphraseDialog;
@@ -25,6 +28,7 @@ public:
     enum Mode {
         Encrypt,    /**< Ask passphrase twice and encrypt */
         Unlock,     /**< Ask passphrase and unlock */
+        UnlockStaking, /**< Ask passphrase and unlock, by default for staking only */
         ChangePass, /**< Ask old passphrase + new passphrase twice */
         Decrypt     /**< Ask passphrase and decrypt wallet */
     };
@@ -32,15 +36,23 @@ public:
     explicit AskPassphraseDialog(Mode mode, QWidget *parent);
     ~AskPassphraseDialog();
 
-    void accept();
+    void accept() override;
+    void reject() override;
 
     void setModel(WalletModel *model);
+    /** Encrypt mode as the second step of the first start: wizard header, "Quit" instead of "Cancel" */
+    void setOnboarding();
 
 private:
     Ui::AskPassphraseDialog *ui;
     Mode mode;
     WalletModel *model;
     bool fCapsLock;
+    bool onboarding;
+    QLabel *strengthLabel;
+    QLabel *noteLabel;
+    QCheckBox *understood;
+    QCheckBox *stakingOnly;
 
 private Q_SLOTS:
     void textChanged();
@@ -49,6 +61,24 @@ private Q_SLOTS:
 protected:
     bool event(QEvent *event);
     bool eventFilter(QObject *object, QEvent *event);
+};
+
+/** Third step: the wallet was encrypted, now keep a copy of the wallet file. */
+class BackupPromptDialog : public QDialog
+{
+    Q_OBJECT
+
+public:
+    BackupPromptDialog(WalletModel *model, QWidget *parent);
+
+private Q_SLOTS:
+    void save();
+
+private:
+    WalletModel *model;
+    QLabel *result;
+    QPushButton *saveButton;
+    QPushButton *laterButton;
 };
 
 #endif // AOKCHAIN_QT_ASKPASSPHRASEDIALOG_H

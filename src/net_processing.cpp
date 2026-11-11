@@ -5,6 +5,7 @@
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
+#include "snapshot.h"
 #include "net_processing.h"
 
 #include "bootstrap.h"
@@ -1098,6 +1099,12 @@ void static ProcessGetData(CNode* pfrom, const Consensus::Params& consensusParam
                     pfrom->fDisconnect = true;
                     send = false;
                 }
+                // A node that started from a chain state snapshot does not have the past blocks
+                // (and does not advertise NODE_NETWORK while that is so).
+                if (send && IsPastBlockMissing(mi->second)) {
+                    LogPrint(BCLog::NET, "%s: ignoring request from peer=%i for a past block that this node does not have\n", __func__, pfrom->GetId());
+                    send = false;
+                }
                 // Pruned nodes may have deleted the block, so check whether
                 // it's available before trying to send.
                 if (send && (mi->second->nStatus & BLOCK_HAVE_DATA))
@@ -2156,6 +2163,11 @@ bool static ProcessMessage(CNode* pfrom, const std::string& strCommand, CDataStr
             inv.hash = req.blockhash;
             pfrom->vRecvGetData.push_back(inv);
             ProcessGetData(pfrom, chainparams.GetConsensus(), connman, interruptMsgProc);
+            return true;
+        }
+
+        if (IsPastBlockMissing(it->second)) {
+            LogPrint(BCLog::NET, "Peer %d sent us a getblocktxn for a past block that this node does not have\n", pfrom->GetId());
             return true;
         }
 

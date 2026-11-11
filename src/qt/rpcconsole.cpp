@@ -73,6 +73,7 @@ const QStringList historyFilter = QStringList()
     << "importprivkey"
     << "mnemonictokeys"
     << "mnemonicfindaddress"
+    << "importmnemonic"
     << "importmulti"
     << "signmessagewithprivkey"
     << "signrawtransaction"
