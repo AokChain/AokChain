@@ -5,7 +5,8 @@ QWidget { color: @text; }
 QMainWindow, QDialog { background-color: @bg; }
 QToolTip { background-color: @surface; color: @text; border: 1px solid @borderStrong; padding: 4px 6px; }
 
-/* Menus */
+/* Menus (the font is named here because Windows otherwise uses its own menu font) */
+QMenuBar, QMenu, QToolTip { font-family: "Noto Sans"; font-size: 13px; }
 QMenuBar { background-color: @surface; border-bottom: 1px solid @border; padding: 2px 4px; }
 QMenuBar::item { background: transparent; padding: 5px 10px; border-radius: 4px; }
 QMenuBar::item:selected { background-color: @accentSoft; color: @accent; }
@@ -42,7 +43,7 @@ QDialogButtonBox QPushButton { min-width: 72px; }
 
 /* Inputs */
 QLineEdit, QAbstractSpinBox, QComboBox, QDateTimeEdit, QPlainTextEdit, QTextEdit {
-    background-color: @surface; color: @text; border: 1px solid @borderStrong; border-radius: 6px;
+    background-color: @surface; border: 1px solid @borderStrong; border-radius: 6px;
     padding: 5px 8px; selection-background-color: @accent; selection-color: @onAccent;
 }
 QLineEdit:focus, QAbstractSpinBox:focus, QComboBox:focus, QDateTimeEdit:focus, QPlainTextEdit:focus, QTextEdit:focus { border: 1px solid @accent; }
