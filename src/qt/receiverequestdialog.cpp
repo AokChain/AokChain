@@ -134,10 +134,10 @@ void ReceiveRequestDialog::setInfo(const SendCoinsRecipient &_info)
     update();
 }
 
-QImage ReceiveRequestDialog::qrCodeImage(const QString &uri, int size)
+QImage ReceiveRequestDialog::qrCodeImage(const QString &uri, int size, int maxLength)
 {
 #ifdef USE_QRCODE
-    if (uri.isEmpty() || uri.length() > MAX_URI_LENGTH)
+    if (uri.isEmpty() || uri.length() > (maxLength > 0 ? maxLength : MAX_URI_LENGTH))
         return QImage();
     QRcode *code = QRcode_encodeString(uri.toUtf8().constData(), 0, QR_ECLEVEL_L, QR_MODE_8, 1);
     if (!code)
