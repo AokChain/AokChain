@@ -61,6 +61,8 @@ bool TransactionFilterProxy::filterAcceptsRow(int sourceRow, const QModelIndex &
         return false;
     if(!tokenName.contains(tokenNamePrefix, Qt::CaseInsensitive))
         return false;
+    if(!assetName.isEmpty() && tokenName != assetName && tokenName != assetName + "!")
+        return false;
 
     return true;
 }
@@ -87,6 +89,12 @@ void TransactionFilterProxy::setTypeFilter(quint32 modes)
 void TransactionFilterProxy::setMinAmount(const CAmount& minimum)
 {
     this->minAmount = minimum;
+    invalidateFilter();
+}
+
+void TransactionFilterProxy::setAssetName(const QString &_assetName)
+{
+    this->assetName = _assetName;
     invalidateFilter();
 }
 

@@ -24,6 +24,7 @@ class QLineEdit;
 class QMenu;
 class QButtonGroup;
 class QModelIndex;
+class QTimer;
 class QSignalMapper;
 class QTableView;
 QT_END_NAMESPACE
@@ -50,6 +51,7 @@ public:
         ThisMonth,
         LastMonth,
         ThisYear,
+        PastYear,
         Range
     };
 
@@ -76,7 +78,8 @@ private:
     QComboBox *watchOnlyWidget;
     QLineEdit *addressWidget;
     QLineEdit *amountWidget;
-    QLineEdit *tokenNameWidget;
+    QComboBox *assetWidget;
+    QTimer *assetListTimer;
 
     bool showingTokens;
 
@@ -132,6 +135,7 @@ public Q_SLOTS:
     void chooseWatchonly(int idx);
     void changedAmount();
     void changedTokenName();
+    void updateAssetList();
     void changedPrefix();
     void exportClicked();
     void focusTransaction(const QModelIndex&);

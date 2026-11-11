@@ -38,6 +38,7 @@
 #include <QScrollBar>
 #include <QSignalMapper>
 #include <QTableView>
+#include <QSet>
 #include <QTimer>
 #include <QHelpEvent>
 #include <QPainter>
@@ -88,7 +89,7 @@ public:
         case TransactionTableModel::ToAddress: {
             const QRect topRect(r.left(), r.top() + 9, r.width() - 12, 20);
             const QRect bottomRect(r.left(), r.top() + 29, r.width() - 12, 18);
-            painter->setFont(GUIUtil::appFont(14, QFont::DemiBold));
+            painter->setFont(GUIUtil::appFont(14, QFont::Medium));
             painter->setPen(failed ? theme.textDisabled : theme.text);
             const bool owner = index.data(TransactionTableModel::OwnerTokenRole).toBool();
             const QString title = painter->fontMetrics().elidedText(index.data(TransactionTableModel::TitleRole).toString(), Qt::ElideRight, topRect.width() - (owner ? 80 : 0));
@@ -139,11 +140,8 @@ public:
             QColor color = outgoing ? theme.negative : theme.positive;
             if (!confirmed || failed)
                 color = theme.textDisabled;
-            painter->setFont(GUIUtil::monoFont(14, QFont::DemiBold));
-            painter->setPen(color);
             const QRect amountRect = cell.adjusted(0, 0, -(assetWidth + 6), 0);
-            painter->drawText(amountRect, Qt::AlignRight | Qt::AlignVCenter,
-                              painter->fontMetrics().elidedText(index.data(TransactionTableModel::DisplayAmountRole).toString(), Qt::ElideLeft, amountRect.width()));
+            GUIUtil::paintAmount(painter, amountRect, index.data(TransactionTableModel::DisplayAmountRole).toString(), GUIUtil::monoFont(15, QFont::Medium), color);
             break;
         }
         default:
@@ -221,16 +219,20 @@ TransactionView::TransactionView(const PlatformStyle *platformStyle, QWidget *pa
     addressWidget->setClearButtonEnabled(true);
     hlayout->addWidget(addressWidget, 1);
 
-    tokenNameWidget = new QLineEdit(this);
-    tokenNameWidget->setProperty("look", "search");
-    tokenNameWidget->setPlaceholderText(tr("All assets"));
-    tokenNameWidget->setToolTip(tr("Show only the transactions of the assets whose name contains this text"));
-    tokenNameWidget->setFixedSize(150, 48);
-    hlayout->addWidget(tokenNameWidget);
-    tokenNameWidget->hide();
+    // the coins and tokens that occur in the transactions of the wallet
+    assetWidget = new QComboBox(this);
+    assetWidget->setFixedSize(170, 48);
+    assetWidget->addItem(tr("All assets"), QString());
+    assetWidget->setToolTip(tr("Show only the transactions of one coin or token"));
+    hlayout->addWidget(assetWidget);
+    assetListTimer = new QTimer(this);
+    assetListTimer->setSingleShot(true);
+    assetListTimer->setInterval(500);
+    connect(assetListTimer, SIGNAL(timeout()), this, SLOT(updateAssetList()));
 
     dateWidget = new QComboBox(this);
     dateWidget->setFixedSize(140, 48);
+    dateWidget->addItem(tr("Past year"), PastYear);
     dateWidget->addItem(tr("All time"), All);
     dateWidget->addItem(tr("Today"), Today);
     dateWidget->addItem(tr("This week"), ThisWeek);
@@ -298,10 +300,7 @@ TransactionView::TransactionView(const PlatformStyle *platformStyle, QWidget *pa
     prefix_typing_delay->setSingleShot(true);
     prefix_typing_delay->setInterval(input_filter_delay);
 
-    QTimer *token_typing_delay;
-    token_typing_delay = new QTimer(this);
-    token_typing_delay->setSingleShot(true);
-    token_typing_delay->setInterval(input_filter_delay);
+
 
     QVBoxLayout *vlayout = new QVBoxLayout(this);
     vlayout->setContentsMargins(0,0,0,0);
@@ -398,8 +397,7 @@ TransactionView::TransactionView(const PlatformStyle *platformStyle, QWidget *pa
     connect(watchOnlyWidget, SIGNAL(activated(int)), this, SLOT(chooseWatchonly(int)));
     connect(amountWidget, SIGNAL(textChanged(QString)), amount_typing_delay, SLOT(start()));
     connect(amount_typing_delay, SIGNAL(timeout()), this, SLOT(changedAmount()));
-    connect(tokenNameWidget, SIGNAL(textChanged(QString)), token_typing_delay, SLOT(start()));
-    connect(token_typing_delay, SIGNAL(timeout()), this, SLOT(changedTokenName()));
+    connect(assetWidget, SIGNAL(activated(int)), this, SLOT(changedTokenName()));
     connect(addressWidget, SIGNAL(textChanged(QString)), prefix_typing_delay, SLOT(start()));
     connect(prefix_typing_delay, SIGNAL(timeout()), this, SLOT(changedPrefix()));
 
@@ -426,7 +424,7 @@ TransactionView::TransactionView(const PlatformStyle *platformStyle, QWidget *pa
     dateWidget->setFont(GUIUtil::getSubLabelFont());
     typeWidget->setFont(GUIUtil::getSubLabelFont());
     addressWidget->setFont(GUIUtil::getSubLabelFont());
-    tokenNameWidget->setFont(GUIUtil::getSubLabelFont());
+    assetWidget->setFont(GUIUtil::getSubLabelFont());
     contextMenu->setFont(GUIUtil::getSubLabelFont());
     transactionView->setFont(GUIUtil::getSubLabelFont());
 
@@ -496,6 +494,11 @@ void TransactionView::setModel(WalletModel *_model)
             }
         }
 
+        // The past year is shown at first; "all time" is one of the choices
+        chooseDate(dateWidget->currentIndex());
+        updateAssetList();
+        connect(_model->getTransactionTableModel(), SIGNAL(rowsInserted(QModelIndex,int,int)), assetListTimer, SLOT(start()));
+
         // show/hide column Watch-only
         updateWatchOnlyColumn(_model->haveWatchOnly());
 
@@ -539,6 +542,11 @@ void TransactionView::chooseDate(int idx)
         transactionProxyModel->setDateRange(
                 QDateTime(QDate(current.year(), current.month(), 1).addMonths(-1)),
                 QDateTime(QDate(current.year(), current.month(), 1)));
+        break;
+    case PastYear:
+        transactionProxyModel->setDateRange(
+                QDateTime::currentDateTime().addYears(-1),
+                TransactionFilterProxy::MAX_DATE);
         break;
     case ThisYear:
         transactionProxyModel->setDateRange(
@@ -620,7 +628,38 @@ void TransactionView::changedTokenName()
 {
     if (!transactionProxyModel)
         return;
-    transactionProxyModel->setTokenNamePrefix(tokenNameWidget->text());
+    transactionProxyModel->setAssetName(assetWidget->currentData().toString());
+}
+
+/** Fill the asset filter with what occurs in the transactions: AOK first, then the tokens by name. */
+void TransactionView::updateAssetList()
+{
+    if (!model || !model->getTransactionTableModel())
+        return;
+    TransactionTableModel *ttm = model->getTransactionTableModel();
+    QSet<QString> names;
+    const int rows = ttm->rowCount(QModelIndex());
+    for (int row = 0; row < rows; ++row)
+        names.insert(ttm->index(row, 0).data(TransactionTableModel::AssetNameRole).toString());
+    names.remove(QString());
+    QStringList tokens = names.values();
+    tokens.removeAll("AOK");
+    tokens.sort();
+    if (names.contains("AOK"))
+        tokens.prepend("AOK");
+
+    const QString current = assetWidget->currentData().toString();
+    assetWidget->blockSignals(true);
+    assetWidget->clear();
+    assetWidget->addItem(tr("All assets"), QString());
+    for (const QString& name : tokens)
+        assetWidget->addItem(name, name);
+    const int index = assetWidget->findData(current);
+    assetWidget->setCurrentIndex(index < 0 ? 0 : index);
+    assetWidget->blockSignals(false);
+    // the chosen asset may have gone with a removed transaction
+    if (index < 0 && !current.isEmpty())
+        changedTokenName();
 }
 
 void TransactionView::exportClicked()
@@ -672,7 +711,6 @@ void TransactionView::showTokens()
         typeWidget->addItem(tr("Token Received"), TransactionFilterProxy::TYPE(TransactionRecord::TransferFrom));
         typeWidget->addItem(tr("Token Sent"), TransactionFilterProxy::TYPE(TransactionRecord::TransferTo));
 
-        tokenNameWidget->show();
 
         QAction *copyTokenNameAction = new QAction(tr("Copy token name"), this);
         contextMenu->addAction(copyTokenNameAction);
@@ -681,10 +719,7 @@ void TransactionView::showTokens()
         showingTokens = true;
     }
 
-    if (!AreTokensDeployed())
-    {
-        tokenNameWidget->hide();
-    }
+    assetListTimer->start();
 }
 
 void TransactionView::contextualMenu(const QPoint &point)

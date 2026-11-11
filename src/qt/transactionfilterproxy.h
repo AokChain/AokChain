@@ -39,6 +39,8 @@ public:
     void setDateRange(const QDateTime &from, const QDateTime &to);
     void setAddressPrefix(const QString &addrPrefix);
     void setTokenNamePrefix(const QString &tokenNamePrefix);
+    /** Only the transactions of this asset ("AOK" or a token; an owner token counts for its token); empty for all */
+    void setAssetName(const QString &assetName);
     /**
       @note Type filter takes a bit field created with TYPE() or ALL_TYPES
      */
@@ -62,6 +64,7 @@ private:
     QDateTime dateTo;
     QString addrPrefix;
     QString tokenNamePrefix;
+    QString assetName;
     quint32 typeFilter;
     WatchOnlyFilter watchOnlyFilter;
     CAmount minAmount;
