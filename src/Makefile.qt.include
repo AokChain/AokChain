@@ -122,6 +122,7 @@ QT_MOC_CPP = \
   qt/moc_addressbookpage.cpp \
   qt/moc_addresstablemodel.cpp \
   qt/moc_askpassphrasedialog.cpp \
+  qt/moc_firstrun.cpp \
   qt/moc_tokencontroldialog.cpp \
   qt/moc_tokencontroltreewidget.cpp \
   qt/moc_tokenfilterproxy.cpp \
@@ -206,6 +207,7 @@ AOKCHAIN_QT_H = \
   qt/addressbookpage.h \
   qt/addresstablemodel.h \
   qt/askpassphrasedialog.h \
+  qt/firstrun.h \
   qt/tokencontroldialog.h \
   qt/tokencontroltreewidget.h \
   qt/tokenfilterproxy.h \
@@ -388,6 +390,7 @@ AOKCHAIN_QT_BASE_CPP = \
   qt/qvalidatedlineedit.cpp \
   qt/qvaluecombobox.cpp \
   qt/rpcconsole.cpp \
+  qt/firstrun.cpp \
   qt/splashscreen.cpp \
   qt/trafficgraphwidget.cpp \
   qt/utilitydialog.cpp \

@@ -79,6 +79,7 @@
 #include <QDebug>
 #include <QFile>
 #include <QPalette>
+#include <QProxyStyle>
 #include <QStyleFactory>
 #endif
 
@@ -191,6 +192,8 @@ QFont monoFont(int pixelSize, int weight)
     return font;
 }
 
+void fitDialogHeight(QWidget* dialog);
+
 /**
  * Gives the stock dialogs (pass phrase, edit address, transaction details, coin control, open URI
  * and the like) the margins of the theme when they are first shown. Colors, buttons and inputs
@@ -214,6 +217,9 @@ protected:
                     layout->setContentsMargins(qMax(m.left(), 22), qMax(m.top(), 20), qMax(m.right(), 22), qMax(m.bottom(), 18));
                     if (layout->spacing() >= 0 && layout->spacing() < 10)
                         layout->setSpacing(10);
+                    // Texts that wrap need more height than the layout asks for by itself:
+                    // without this the rows of a dialog with long notes are squeezed together.
+                    fitDialogHeight(dialog);
                 }
             }
         }
@@ -221,13 +227,80 @@ protected:
     }
 };
 
+/** The icon of a message box: a soft disc with the sign in the color of its meaning. */
+static QPixmap messageBadge(QStyle::StandardPixmap which, int size)
+{
+    const Theme& t = theme();
+    QColor fill, ink;
+    QString sign;
+    switch (which) {
+    case QStyle::SP_MessageBoxInformation: fill = t.accentSoft; ink = t.accent; sign = "i"; break;
+    case QStyle::SP_MessageBoxQuestion: fill = t.accentSoft; ink = t.accent; sign = "?"; break;
+    case QStyle::SP_MessageBoxWarning: fill = t.warnBg; ink = t.warnText; sign = "!"; break;
+    case QStyle::SP_MessageBoxCritical: fill = t.errorSoft; ink = t.error; sign = "!"; break;
+    default: return QPixmap();
+    }
+    const qreal dpr = qApp->devicePixelRatio();
+    QPixmap pixmap(QSize(size, size) * dpr);
+    pixmap.setDevicePixelRatio(dpr);
+    pixmap.fill(Qt::transparent);
+    QPainter p(&pixmap);
+    p.setRenderHints(QPainter::Antialiasing | QPainter::TextAntialiasing, true);
+    p.setPen(Qt::NoPen);
+    p.setBrush(fill);
+    p.drawEllipse(QRectF(0, 0, size, size));
+    p.setPen(ink);
+    p.setFont(appFont(size * 55 / 100, QFont::Bold));
+    p.drawText(QRectF(0, 0, size, size), Qt::AlignCenter, sign);
+    return pixmap;
+}
+
+/** Fusion, with the icons of the message boxes drawn in the theme. */
+class ThemeStyle : public QProxyStyle
+{
+public:
+    explicit ThemeStyle(QStyle* base) : QProxyStyle(base) {}
+
+    QIcon standardIcon(StandardPixmap which, const QStyleOption* option, const QWidget* widget) const override
+    {
+        const QPixmap badge = messageBadge(which, 40);
+        return badge.isNull() ? QProxyStyle::standardIcon(which, option, widget) : QIcon(badge);
+    }
+
+    QPixmap standardPixmap(StandardPixmap which, const QStyleOption* option, const QWidget* widget) const override
+    {
+        const QPixmap badge = messageBadge(which, 40);
+        return badge.isNull() ? QProxyStyle::standardPixmap(which, option, widget) : badge;
+    }
+
+    int pixelMetric(PixelMetric metric, const QStyleOption* option, const QWidget* widget) const override
+    {
+        if (metric == PM_MessageBoxIconSize)
+            return 40;
+        return QProxyStyle::pixelMetric(metric, option, widget);
+    }
+};
+
+void fitDialogHeight(QWidget* dialog)
+{
+    QLayout* layout = dialog ? dialog->layout() : nullptr;
+    if (!layout)
+        return;
+    const int needed = layout->totalHeightForWidth(dialog->width());
+    if (needed > dialog->height()) {
+        if (dialog->minimumHeight() < needed && dialog->maximumHeight() >= needed)
+            dialog->setMinimumHeight(needed);
+        dialog->resize(dialog->width(), needed);
+    }
+}
+
 void applyTheme(QApplication& app)
 {
     const Theme& t = theme();
     app.installEventFilter(new DialogPolisher(&app));
 
     // The same widget style on every platform, colored by the palette
-    app.setStyle(QStyleFactory::create("Fusion"));
+    app.setStyle(new ThemeStyle(QStyleFactory::create("Fusion")));
     QFont::insertSubstitution("Noto Sans", "Noto Sans KR");
     QFont::insertSubstitution("Noto Sans Mono", "Noto Sans KR");
     app.setFont(appFont());
@@ -428,10 +501,17 @@ void fillLanguageCombo(QComboBox* combo)
 }
 
 static bool fRestartRequested = false;
+static QStringList restartExtraArguments;
 
-void requestRestart()
+void requestRestart(const QStringList& extraArguments)
 {
     fRestartRequested = true;
+    restartExtraArguments = extraArguments;
+}
+
+QStringList restartArguments()
+{
+    return restartExtraArguments;
 }
 
 bool restartRequested()
