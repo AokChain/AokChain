@@ -517,7 +517,7 @@ bool CheckStake(const std::shared_ptr<const CBlock> pblock, CWallet& wallet)
 
 // Solo
 
-std::unique_ptr<CBlockTemplate> BlockAssembler::CreateNewBlock(const CScript& scriptPubKeyIn, bool fProofOfStake, int64_t* pTotalFees)
+std::unique_ptr<CBlockTemplate> BlockAssembler::CreateNewBlock(const CScript& scriptPubKeyIn, bool fProofOfStake, int64_t* pTotalFees, bool fEmptyBlock)
 {
     int64_t nTimeStart = GetTimeMicros();
 
@@ -572,7 +572,8 @@ std::unique_ptr<CBlockTemplate> BlockAssembler::CreateNewBlock(const CScript& sc
     int nPackagesSelected = 0;
     int nDescendantsUpdated = 0;
 
-    addPackageTxs(nPackagesSelected, nDescendantsUpdated);
+    if (!fEmptyBlock)
+        addPackageTxs(nPackagesSelected, nDescendantsUpdated);
 
     // Create coinbase transaction.
     CMutableTransaction coinbaseTx;
@@ -702,7 +703,8 @@ void ThreadStakeMiner(CWallet *pwallet)
 
         {
             int64_t nTotalFees = 0;
-            std::unique_ptr<CBlockTemplate> pblocktemplate(BlockAssembler(Params()).CreateNewBlock(reservekey.reserveScript, true, &nTotalFees));
+            // First just create an empty block. No need to process transactions until we know we can create a block
+            std::unique_ptr<CBlockTemplate> pblocktemplate(BlockAssembler(Params()).CreateEmptyBlock(reservekey.reserveScript, true, &nTotalFees));
             if (!pblocktemplate.get())
                 return;
 
@@ -722,16 +724,26 @@ void ThreadStakeMiner(CWallet *pwallet)
                 // Increase priority so we can build the full PoS block ASAP to ensure the timestamp doesn't expire
                 SetThreadPriority(THREAD_PRIORITY_ABOVE_NORMAL);
 
-                LogPrintf("Successfully signed block, now trying to check it: %s\n", pblock->GetBlockHash().ToString());
+                // Create a block that's properly populated with transactions
+                std::unique_ptr<CBlockTemplate> pblocktemplatefilled(BlockAssembler(Params()).CreateNewBlock(reservekey.reserveScript, true, &nTotalFees));
+                if (!pblocktemplatefilled.get())
+                    return;
 
-                // Check timestamps
-                if (pblock->GetBlockTime() <= pindexPrev->GetBlockTime() ||
-                    FutureDrift(pblock->GetBlockTime()) < pindexPrev->GetBlockTime()) {
-                    LogPrintf("ThreadStakeMiner(): Valid PoS block took too long to create and has expired\n");
-                    continue; //timestamp too late, so ignore
+                // Sign the full block (its time slot may be a later one by now,
+                // in which case this searches that slot)
+                std::shared_ptr<CBlock> pblockfilled = std::make_shared<CBlock>(pblocktemplatefilled->block);
+                if (pblockfilled->hashPrevBlock == pblock->hashPrevBlock &&
+                    SignBlock(pblockfilled, *pwallet, nTotalFees, pindexPrev)) {
+                    LogPrintf("Successfully signed block, now trying to check it: %s\n", pblockfilled->GetBlockHash().ToString());
+
+                    // Check timestamps
+                    if (pblockfilled->GetBlockTime() <= pindexPrev->GetBlockTime() ||
+                        FutureDrift(pblockfilled->GetBlockTime()) < pindexPrev->GetBlockTime()) {
+                        LogPrintf("ThreadStakeMiner(): Valid PoS block took too long to create and has expired\n");
+                    } else {
+                        CheckStake(pblockfilled, *pwallet);
+                    }
                 }
-
-                CheckStake(pblock, *pwallet);
 
                 SetThreadPriority(THREAD_PRIORITY_LOWEST);
                 MilliSleep(500);
