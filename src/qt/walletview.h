@@ -15,7 +15,7 @@ class AokChainGUI;
 class ClientModel;
 class OverviewPage;
 class OptionsDialog;
-class SignVerifyMessageDialog;
+class SignHubPage;
 class PlatformStyle;
 class ReceiveCoinsDialog;
 class SendCoinsDialog;
@@ -108,9 +108,8 @@ private:
     /** Address book page: receiving and sending addresses */
     QStackedWidget *addressStack;
     QButtonGroup *addressTabs;
-    /** Sign and verify page */
-    SignVerifyMessageDialog *signPage;
-    QButtonGroup *signTabs;
+    /** Sign page: prove an address, check a signature, multisig */
+    SignHubPage *signPage;
     /** Settings page */
     OptionsDialog *settingsPage;
     QLabel *versionLabel;
@@ -185,8 +184,6 @@ public Q_SLOTS:
     void gotoSettingsPage();
     /** Receiving (0) or sending (1) addresses of the address book page */
     void showAddressTab(int tab);
-    /** Sign (0) or verify (1) form of the sign page */
-    void showSignTab(int tab);
 
 Q_SIGNALS:
     /** Signal that we want to show the main window */

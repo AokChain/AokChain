@@ -23,7 +23,7 @@
 #include "platformstyle.h"
 #include "receivecoinsdialog.h"
 #include "sendcoinsdialog.h"
-#include "signverifymessagedialog.h"
+#include "signhubpage.h"
 #include "transactiontablemodel.h"
 #include "tokentablemodel.h"
 #include "transactionview.h"
@@ -122,23 +122,11 @@ WalletView::WalletView(const PlatformStyle *_platformStyle, QWidget *parent):
     connect(addressTabs, SIGNAL(buttonClicked(int)), this, SLOT(showAddressTab(int)));
     addressBookShell = addPage(addressContainer, tr("Address book"));
 
-    // Sign and verify messages
-    signPage = new SignVerifyMessageDialog(platformStyle, this);
-    signPage->embedAsPage();
-    QWidget *signContainer = new QWidget(this);
-    QVBoxLayout *signLayout = new QVBoxLayout(signContainer);
-    signLayout->setSpacing(14);
-    signLayout->addWidget(makeTabs({tr("Sign"), tr("Verify")}, &signTabs, signContainer));
-    QFrame *signCard = new QFrame(signContainer);
-    signCard->setProperty("role", "card");
-    signCard->setMaximumWidth(860);
-    QVBoxLayout *signCardLayout = new QVBoxLayout(signCard);
-    signCardLayout->setContentsMargins(22, 18, 22, 20);
-    signCardLayout->addWidget(signPage);
-    signLayout->addWidget(signCard);
-    signLayout->addStretch(1);
-    connect(signTabs, SIGNAL(buttonClicked(int)), this, SLOT(showSignTab(int)));
-    signShell = addPage(signContainer, tr("Sign message"));
+    // Sign: prove an address, check a signature, multisig wallets
+    signPage = new SignHubPage(platformStyle, this);
+    signShell = signPage;
+    addWidget(signShell);
+    connect(signPage, SIGNAL(explorerRequested(QString)), this, SIGNAL(explorerRequested(QString)));
 
     // Settings: the options, the wallet management and the information of the former menus
     settingsPage = new OptionsDialog(this, true);
@@ -486,27 +474,17 @@ void WalletView::gotoSendCoinsPage(QString addr)
 void WalletView::gotoSignMessageTab(QString addr)
 {
     setCurrentWidget(signShell);
-    showSignTab(0);
-    if (!addr.isEmpty())
-        signPage->setAddress_SM(addr);
+    // from the side bar: the first page; with an address: straight to "prove my address"
+    if (addr.isEmpty())
+        signPage->showHub();
+    else
+        signPage->showProve(addr);
 }
 
 void WalletView::gotoVerifyMessageTab(QString addr)
 {
     setCurrentWidget(signShell);
-    showSignTab(1);
-    if (!addr.isEmpty())
-        signPage->setAddress_VM(addr);
-}
-
-void WalletView::showSignTab(int tab)
-{
-    if (tab == 0)
-        signPage->showTab_SM(false);
-    else
-        signPage->showTab_VM(false);
-    if (signTabs->button(tab))
-        signTabs->button(tab)->setChecked(true);
+    signPage->showVerify(addr);
 }
 
 void WalletView::showAddressTab(int tab)

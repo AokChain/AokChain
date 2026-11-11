@@ -380,6 +380,13 @@ QPixmap lineIcon(const QString& name, int size, const QColor& color, qreal strok
     } else if (name == "sign") {
         // a pen on a line
         poly({{5, 17}, {5, 13.5}, {14.5, 4}, {18, 7.5}, {8.5, 17}, {5, 17}}); line(12.5, 6, 16, 9.5); line(4, 21, 20, 21);
+    } else if (name == "shield") {
+        poly({{12, 3}, {19, 6}, {19, 11}, {17.5, 15.5}, {12, 21}, {6.5, 15.5}, {5, 11}, {5, 6}, {12, 3}});
+        poly({{9, 12}, {11.2, 14.2}, {15.5, 10}});
+    } else if (name == "people") {
+        p.drawEllipse(QPointF(8, 9), 3, 3); p.drawEllipse(QPointF(17, 9), 3, 3);
+        p.drawArc(QRectF(2.5, 13.5, 11, 11), 0, 180 * 16);
+        p.drawArc(QRectF(12.5, 14, 9, 9), 10 * 16, 120 * 16);
     } else if (name == "settings") {
         // sliders
         line(4, 6, 20, 6); line(4, 12, 20, 12); line(4, 18, 20, 18);
