@@ -25,4 +25,4 @@ block from a peer. The SHA-256 of the manifest only detects damaged downloads ea
 
 ## publish_bootstrap_github.md
 
-How to publish the folder as GitHub release assets (Korean).
+How to publish the folder as GitHub release assets.
