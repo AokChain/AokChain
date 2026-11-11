@@ -5967,4 +5967,1366 @@
         <translation>%1개</translation>
     </message>
 </context>
+<context>
+    <name>MultisigModel</name>
+    <message>
+        <source>Paste the public key that the participant sent.</source>
+        <translation>참여자에게 받은 공개키를 붙여 넣으세요.</translation>
+    </message>
+    <message>
+        <source>This is not a public key. A public key starts with aokms-key1: followed by 66 characters.</source>
+        <translation>공개키가 아닙니다. 공개키는 aokms-key1: 로 시작하고 그 뒤에 66글자가 옵니다.</translation>
+    </message>
+    <message>
+        <source>This public key is not valid. Ask the participant to copy it again.</source>
+        <translation>올바른 공개키가 아닙니다. 참여자에게 다시 복사해 달라고 하세요.</translation>
+    </message>
+    <message>
+        <source>This is not multisig wallet information. It starts with aokms-wallet1:</source>
+        <translation>멀티시그 정보가 아닙니다. 멀티시그 정보는 aokms-wallet1: 로 시작합니다.</translation>
+    </message>
+    <message>
+        <source>The information does not fit together: its keys give another address than it states. Ask for it again.</source>
+        <translation>정보가 서로 맞지 않습니다. 공개키로 만든 주소가 적혀 있는 주소와 다릅니다. 다시 받아 주세요.</translation>
+    </message>
+    <message>
+        <source>This is not a signing request. It starts with aokms-req1:</source>
+        <translation>서명 요청이 아닙니다. 서명 요청은 aokms-req1: 로 시작합니다.</translation>
+    </message>
+    <message>
+        <source>The address is not valid.</source>
+        <translation>올바른 주소가 아닙니다.</translation>
+    </message>
+    <message>
+        <source>This kind of address cannot sign a text. Choose an ordinary address of this wallet.</source>
+        <translation>이 종류의 주소로는 글에 서명할 수 없습니다. 이 지갑의 일반 주소를 고르세요.</translation>
+    </message>
+    <message>
+        <source>This wallet does not have the key of this address. Choose one of your own addresses.</source>
+        <translation>이 지갑에 이 주소의 키가 없습니다. 내 주소 중에서 고르세요.</translation>
+    </message>
+    <message>
+        <source>Signing failed.</source>
+        <translation>서명하지 못했습니다.</translation>
+    </message>
+    <message>
+        <source>The address is not a valid AokChain address.</source>
+        <translation>올바른 AokChain 주소가 아닙니다.</translation>
+    </message>
+    <message>
+        <source>This kind of address cannot sign a text.</source>
+        <translation>이 종류의 주소로는 글에 서명할 수 없습니다.</translation>
+    </message>
+    <message>
+        <source>The signature is damaged: it could not be read. Copy it again, completely.</source>
+        <translation>서명이 손상되어 읽을 수 없습니다. 처음부터 끝까지 다시 복사하세요.</translation>
+    </message>
+    <message>
+        <source>The signature does not belong to this text.</source>
+        <translation>이 글에 대한 서명이 아닙니다.</translation>
+    </message>
+    <message>
+        <source>The signature was not made by this address, or the text was changed after signing.</source>
+        <translation>이 주소로 만든 서명이 아니거나, 서명한 뒤에 글이 바뀌었습니다.</translation>
+    </message>
+    <message>
+        <source>The wallet was not unlocked.</source>
+        <translation>지갑 잠금을 풀지 않았습니다.</translation>
+    </message>
+    <message>
+        <source>The wallet could not make a new key.</source>
+        <translation>지갑이 새 키를 만들지 못했습니다.</translation>
+    </message>
+    <message>
+        <source>Multisig key</source>
+        <translation>멀티시그 키</translation>
+    </message>
+    <message>
+        <source>A multisig wallet has 2 to %1 participants.</source>
+        <translation>멀티시그 지갑의 참여자는 2명에서 %1명까지입니다.</translation>
+    </message>
+    <message>
+        <source>The number of signatures must be between 1 and the number of participants.</source>
+        <translation>필요한 서명 수는 1 이상, 참여자 수 이하여야 합니다.</translation>
+    </message>
+    <message>
+        <source>The same public key is there twice. Every participant needs a key of their own.</source>
+        <translation>같은 공개키가 두 번 들어 있습니다. 참여자마다 자기 공개키가 있어야 합니다.</translation>
+    </message>
+    <message>
+        <source>Too many participants for one address.</source>
+        <translation>주소 하나에 넣기에는 참여자가 너무 많습니다.</translation>
+    </message>
+    <message>
+        <source>The request does not describe a multisig address.</source>
+        <translation>멀티시그 주소에 대한 요청이 아닙니다.</translation>
+    </message>
+    <message>
+        <source>Participant %1</source>
+        <translation>참여자 %1</translation>
+    </message>
+    <message>
+        <source>The request is for a multisig address that was not made with this wallet software (its keys are not sorted).</source>
+        <translation>이 지갑 프로그램으로 만들지 않은 멀티시그 주소의 요청입니다(공개키가 정렬되어 있지 않습니다).</translation>
+    </message>
+    <message>
+        <source>The multisig address has no confirmed coins.</source>
+        <translation>멀티시그 주소에 승인된 코인이 없습니다.</translation>
+    </message>
+    <message>
+        <source>All coins of the multisig address are in use by open requests. Finish or cancel a request first.</source>
+        <translation>멀티시그 주소의 코인이 모두 진행 중인 요청에 묶여 있습니다. 먼저 요청을 끝내거나 취소하세요.</translation>
+    </message>
+    <message>
+        <source>The coins of the address do not cover the fee.</source>
+        <translation>주소의 코인이 수수료보다 적습니다.</translation>
+    </message>
+    <message>
+        <source>Enter the amount to send.</source>
+        <translation>보낼 금액을 입력하세요.</translation>
+    </message>
+    <message>
+        <source>Not enough coins: part of the balance is in use by open requests.</source>
+        <translation>코인이 모자랍니다. 잔액의 일부가 진행 중인 요청에 묶여 있습니다.</translation>
+    </message>
+    <message>
+        <source>Not enough coins: the amount and the fee are more than the balance of the multisig address.</source>
+        <translation>코인이 모자랍니다. 금액과 수수료의 합이 멀티시그 잔액보다 많습니다.</translation>
+    </message>
+    <message>
+        <source>The multisig wallet is not known.</source>
+        <translation>모르는 멀티시그 지갑입니다.</translation>
+    </message>
+    <message>
+        <source>The recipient address is not valid.</source>
+        <translation>받는 주소가 올바르지 않습니다.</translation>
+    </message>
+    <message>
+        <source>The transaction could not be made: %1</source>
+        <translation>거래를 만들지 못했습니다: %1</translation>
+    </message>
+    <message>
+        <source>The transaction could not be read back.</source>
+        <translation>만든 거래를 다시 읽지 못했습니다.</translation>
+    </message>
+    <message>
+        <source>The transaction of the request cannot be read.</source>
+        <translation>요청에 든 거래를 읽을 수 없습니다.</translation>
+    </message>
+    <message>
+        <source>This multisig wallet is not in your wallet. Add it first, and check its participants.</source>
+        <translation>이 멀티시그 지갑이 내 지갑에 없습니다. 먼저 추가하고 참여자를 확인하세요.</translation>
+    </message>
+    <message>
+        <source>The request names another multisig address than its script belongs to.</source>
+        <translation>요청에 적힌 멀티시그 주소와 실제 스크립트의 주소가 다릅니다.</translation>
+    </message>
+    <message>
+        <source>The coins of this request are no longer there: it was sent already, or the coins were used by another transaction. (Or this wallet is not synchronized yet.)</source>
+        <translation>이 요청이 쓰는 코인이 더 이상 없습니다. 이미 전송되었거나 다른 거래에 쓰였습니다. (또는 이 지갑이 아직 동기화되지 않았습니다.)</translation>
+    </message>
+    <message>
+        <source>The request spends coins that do not belong to the multisig address.</source>
+        <translation>요청이 멀티시그 주소의 것이 아닌 코인을 씁니다.</translation>
+    </message>
+    <message>
+        <source>The transaction has an output that is not a plain payment to an address (data or tokens). This wallet does not sign such requests.</source>
+        <translation>거래에 주소로 보내는 일반 지급이 아닌 출력(데이터 또는 토큰)이 있습니다. 이 지갑은 그런 요청에 서명하지 않습니다.</translation>
+    </message>
+    <message>
+        <source>The transaction pays to %1 addresses. Check every one of them below.</source>
+        <translation>이 거래는 주소 %1곳으로 보냅니다. 아래에서 하나하나 확인하세요.</translation>
+    </message>
+    <message>
+        <source>The request says something else than its transaction does. What you see here is what the transaction does: compare the recipient and the amount with what you agreed on.</source>
+        <translation>요청에 적힌 내용과 실제 거래가 다릅니다. 여기 보이는 것이 실제 거래의 내용입니다. 받는 주소와 금액을 약속한 것과 비교하세요.</translation>
+    </message>
+    <message>
+        <source>The request says something else than its transaction does. What you see here is what the transaction does: compare the recipients and the amounts with what you agreed on.</source>
+        <translation>요청에 적힌 내용과 실제 거래가 다릅니다. 여기 보이는 것이 실제 거래의 내용입니다. 받는 주소들과 금액을 약속한 것과 비교하세요.</translation>
+    </message>
+    <message>
+        <source>The transaction pays out more than its coins are worth.</source>
+        <translation>거래가 가진 코인보다 많이 보내려 합니다.</translation>
+    </message>
+    <message>
+        <source>The fee is unusually high. Whatever is not paid to an address goes to the fee.</source>
+        <translation>수수료가 비정상적으로 많습니다. 주소로 보내지 않는 나머지는 모두 수수료가 됩니다.</translation>
+    </message>
+    <message>
+        <source>The request carries a signature that does not fit this transaction. The transaction may have been changed after someone signed it. Ask the sender before you sign.</source>
+        <translation>요청에 이 거래와 맞지 않는 서명이 들어 있습니다. 누군가 서명한 뒤에 거래가 바뀌었을 수 있습니다. 서명하기 전에 보낸 사람에게 확인하세요.</translation>
+    </message>
+    <message>
+        <source>This multisig wallet is not in your wallet. Add it first.</source>
+        <translation>이 멀티시그 지갑이 내 지갑에 없습니다. 먼저 추가하세요.</translation>
+    </message>
+    <message>
+        <source>The signatures could not be put together: %1</source>
+        <translation>서명을 합치지 못했습니다: %1</translation>
+    </message>
+    <message>
+        <source>The request is not known.</source>
+        <translation>모르는 요청입니다.</translation>
+    </message>
+    <message>
+        <source>This wallet has nothing to sign in this request.</source>
+        <translation>이 요청에서 이 지갑이 서명할 것이 없습니다.</translation>
+    </message>
+    <message>
+        <source>The coins of this request are no longer there.</source>
+        <translation>이 요청이 쓰는 코인이 더 이상 없습니다.</translation>
+    </message>
+    <message>
+        <source>Signing failed: %1</source>
+        <translation>서명하지 못했습니다: %1</translation>
+    </message>
+    <message>
+        <source>Signing changed the transaction. Nothing was stored.</source>
+        <translation>서명 과정에서 거래가 바뀌었습니다. 저장하지 않았습니다.</translation>
+    </message>
+    <message>
+        <source>The signature of this wallet was not added. Is the wallet unlocked?</source>
+        <translation>이 지갑의 서명이 들어가지 않았습니다. 지갑 잠금을 풀었는지 확인하세요.</translation>
+    </message>
+    <message>
+        <source>Signatures are still missing.</source>
+        <translation>아직 서명이 모자랍니다.</translation>
+    </message>
+    <message>
+        <source>The network did not accept the transaction: %1</source>
+        <translation>네트워크가 거래를 받아들이지 않았습니다: %1</translation>
+    </message>
+</context>
+<context>
+    <name>SignHubPage</name>
+    <message>
+        <source>%1-of-%2 · %3 of %2 sign</source>
+        <translation>%1-of-%2 · %2명 중 %3명 서명</translation>
+    </message>
+    <message>
+        <source>Sign</source>
+        <translation>서명</translation>
+    </message>
+    <message>
+        <source>Back to the first page of Sign</source>
+        <translation>서명 첫 화면으로</translation>
+    </message>
+    <message>
+        <source>Choose what you want to do and the wallet guides you step by step</source>
+        <translation>무엇을 하려는지 고르면 순서대로 안내합니다</translation>
+    </message>
+    <message>
+        <source>Prove my address</source>
+        <translation>내 주소 증명하기</translation>
+    </message>
+    <message>
+        <source>Proves that you are the owner of an address by signing a text with it. Used when an exchange or a partner asks you to confirm that an address is yours. No coins move.</source>
+        <translation>이 주소의 주인이 나라는 것을 글에 서명해서 증명합니다. 거래소나 상대방이 "주소 소유 확인"을 요구할 때 씁니다. 코인은 움직이지 않습니다.</translation>
+    </message>
+    <message>
+        <source>Choose an address and sign</source>
+        <translation>주소 고르고 서명하기</translation>
+    </message>
+    <message>
+        <source>Check a signature</source>
+        <translation>받은 서명 확인하기</translation>
+    </message>
+    <message>
+        <source>Paste the address, the text and the signature that someone sent, and the wallet tells you whether they are genuine. Pasted in one piece, they are split automatically.</source>
+        <translation>상대가 보낸 주소·글·서명 세 가지를 붙여 넣으면 진짜인지 바로 알려 줍니다. 한 번에 붙여 넣어도 자동으로 나눕니다.</translation>
+    </message>
+    <message>
+        <source>Paste a signature</source>
+        <translation>서명 붙여 넣기</translation>
+    </message>
+    <message>
+        <source>Multisig</source>
+        <translation>멀티시그</translation>
+    </message>
+    <message>
+        <source>multi-signature</source>
+        <translation>다중 서명</translation>
+    </message>
+    <message>
+        <source>A multisig (multi-signature) address lets coins go out only when a set number of several people sign. Example: 2 of 3 (2-of-3). The mistake of one person, or a theft from one person, does not move the coins.</source>
+        <translation>멀티시그(다중 서명)는 정해 둔 여러 사람 중 일정 수가 서명해야만 코인이 나가는 주소입니다. 예: 3명 중 2명(2-of-3). 한 사람의 실수나 도난으로는 코인이 빠져나가지 않습니다.</translation>
+    </message>
+    <message>
+        <source>Make a multisig wallet</source>
+        <translation>멀티시그 지갑 만들기</translation>
+    </message>
+    <message>
+        <source>What is multisig?</source>
+        <translation>멀티시그란?</translation>
+    </message>
+    <message>
+        <source>My multisig wallets</source>
+        <translation>내 멀티시그 지갑</translation>
+    </message>
+    <message>
+        <source>Copy my public key</source>
+        <translation>내 공개키 복사</translation>
+    </message>
+    <message>
+        <source>The key to give to the person who makes a multisig wallet with you</source>
+        <translation>나와 멀티시그 지갑을 만드는 사람에게 줄 공개키입니다</translation>
+    </message>
+    <message>
+        <source>Open a signing request</source>
+        <translation>받은 서명 요청 열기</translation>
+    </message>
+    <message>
+        <source>A signing request that another participant sent you as a file or as a code</source>
+        <translation>다른 참여자가 파일이나 코드로 보낸 서명 요청을 엽니다</translation>
+    </message>
+    <message>
+        <source>Add a multisig wallet I was invited to</source>
+        <translation>초대받은 멀티시그 지갑 추가</translation>
+    </message>
+    <message>
+        <source>Coins at a multisig address cannot be sent by one person alone. You make a send request, and when the set number of participants have signed it in their own wallets, it is sent.</source>
+        <translation>멀티시그 주소의 코인은 혼자서는 보낼 수 없습니다. 보내기 요청을 만들고, 정해진 수의 참여자가 각자 지갑에서 서명하면 전송됩니다.</translation>
+    </message>
+    <message>
+        <source>More about multisig</source>
+        <translation>멀티시그 자세히 알아보기</translation>
+    </message>
+    <message>
+        <source>No multisig wallet yet. Make one with "Make a multisig wallet", or add one that someone else made with "Add a multisig wallet I was invited to".</source>
+        <translation>아직 멀티시그 지갑이 없습니다. "멀티시그 지갑 만들기"로 새로 만들거나, 다른 사람이 만든 것은 "초대받은 멀티시그 지갑 추가"로 넣으세요.</translation>
+    </message>
+    <message>
+        <source>(no name)</source>
+        <translation>(이름 없음)</translation>
+    </message>
+    <message>
+        <source>watch only</source>
+        <translation>조회 전용</translation>
+    </message>
+    <message>
+        <source>My signature needed: %1</source>
+        <translation>내 서명 필요 %1건</translation>
+    </message>
+    <message>
+        <source>Waiting for signatures: %1</source>
+        <translation>서명 대기 중 %1건</translation>
+    </message>
+    <message>
+        <source>No open request</source>
+        <translation>대기 중인 요청 없음</translation>
+    </message>
+    <message>
+        <source>Send</source>
+        <translation>보내기</translation>
+    </message>
+    <message>
+        <source>My public key</source>
+        <translation>내 공개키</translation>
+    </message>
+    <message>
+        <source>Your public key was copied. Send it to the person who makes the multisig wallet, by messenger or mail.</source>
+        <translation>내 공개키를 복사했습니다. 멀티시그 지갑을 만드는 사람에게 메신저나 메일로 보내세요.</translation>
+    </message>
+    <message>
+        <source>A public key only says "this person is a signer". It cannot take coins out, so it is safe to share. Never send your recovery words or a private key to anyone.</source>
+        <translation>공개키는 "이 사람이 승인자"라는 표시일 뿐, 코인을 꺼낼 수 있는 열쇠가 아니어서 공유해도 안전합니다. 복구 단어와 개인키는 누구에게도 보내지 마세요.</translation>
+    </message>
+    <message>
+        <source>You sign a text with one of your addresses. Whoever gets the address, the text and the signature can check that the owner of the address wrote it. No coins move, and nothing is sent to the network.</source>
+        <translation>내 주소 하나로 글에 서명합니다. 주소·글·서명을 받은 사람은 그 주소의 주인이 쓴 글인지 확인할 수 있습니다. 코인은 움직이지 않고, 네트워크로 나가는 것도 없습니다.</translation>
+    </message>
+    <message>
+        <source>1. My address</source>
+        <translation>1. 내 주소</translation>
+    </message>
+    <message>
+        <source>Choose one of the addresses of this wallet</source>
+        <translation>이 지갑의 주소 중 하나를 고르세요</translation>
+    </message>
+    <message>
+        <source>Choose my address</source>
+        <translation>내 주소 고르기</translation>
+    </message>
+    <message>
+        <source>2. The text to sign</source>
+        <translation>2. 서명할 글</translation>
+    </message>
+    <message>
+        <source>For example the sentence that the exchange asked you to sign</source>
+        <translation>예: 거래소가 서명해 달라고 한 문장</translation>
+    </message>
+    <message>
+        <source>3. Send this to the other side, as it is</source>
+        <translation>3. 이것을 그대로 상대에게 보내세요</translation>
+    </message>
+    <message>
+        <source>The address, the text and the signature appear here as one block</source>
+        <translation>주소·글·서명이 한 덩어리로 여기에 나옵니다</translation>
+    </message>
+    <message>
+        <source>Copy all</source>
+        <translation>전체 복사</translation>
+    </message>
+    <message>
+        <source>Copied</source>
+        <translation>복사됨</translation>
+    </message>
+    <message>
+        <source>Choose the address first.</source>
+        <translation>먼저 주소를 고르세요.</translation>
+    </message>
+    <message>
+        <source>Enter the text to sign.</source>
+        <translation>서명할 글을 입력하세요.</translation>
+    </message>
+    <message>
+        <source>The wallet was not unlocked.</source>
+        <translation>지갑 잠금을 풀지 않았습니다.</translation>
+    </message>
+    <message>
+        <source>Signed. Copy the block below and send it.</source>
+        <translation>서명했습니다. 아래 내용을 복사해 보내세요.</translation>
+    </message>
+    <message>
+        <source>Paste what you received</source>
+        <translation>받은 내용 붙여 넣기</translation>
+    </message>
+    <message>
+        <source>Paste the whole block that the other side sent. The address, the text and the signature are taken apart for you.</source>
+        <translation>상대가 보낸 내용을 통째로 붙여 넣으세요. 주소·글·서명으로 자동으로 나눕니다.</translation>
+    </message>
+    <message>
+        <source>Paste</source>
+        <translation>붙여넣기</translation>
+    </message>
+    <message>
+        <source>Check</source>
+        <translation>확인하기</translation>
+    </message>
+    <message>
+        <source>Clear</source>
+        <translation>지우기</translation>
+    </message>
+    <message>
+        <source>Or enter the three parts</source>
+        <translation>또는 세 가지를 따로 입력</translation>
+    </message>
+    <message>
+        <source>Address</source>
+        <translation>주소</translation>
+    </message>
+    <message>
+        <source>Text</source>
+        <translation>글</translation>
+    </message>
+    <message>
+        <source>Signature</source>
+        <translation>서명</translation>
+    </message>
+    <message>
+        <source>Not checked yet</source>
+        <translation>아직 확인 전</translation>
+    </message>
+    <message>
+        <source>Valid</source>
+        <translation>유효</translation>
+    </message>
+    <message>
+        <source>Not valid</source>
+        <translation>유효하지 않음</translation>
+    </message>
+    <message>
+        <source>The result appears here.</source>
+        <translation>결과가 여기에 나옵니다.</translation>
+    </message>
+    <message>
+        <source>Paste the block, or fill in the address, the text and the signature.</source>
+        <translation>받은 내용을 붙여 넣거나 주소·글·서명을 입력하세요.</translation>
+    </message>
+    <message>
+        <source>The pasted text is not a complete signed block. Copy it again from the first line to the last, or fill in the three parts.</source>
+        <translation>붙여 넣은 내용이 온전하지 않습니다. 첫 줄부터 마지막 줄까지 다시 복사하거나, 세 가지를 따로 입력하세요.</translation>
+    </message>
+    <message>
+        <source>The owner of the address %1 signed exactly this text.</source>
+        <translation>주소 %1의 주인이 바로 이 글에 서명했습니다.</translation>
+    </message>
+    <message>
+        <source>Multisig (multi-signature)</source>
+        <translation>멀티시그 (다중 서명)</translation>
+    </message>
+    <message>
+        <source>What it is</source>
+        <translation>무엇인가요</translation>
+    </message>
+    <message>
+        <source>A multisig address is an address from which coins go out only when &lt;b&gt;M of the N people you decided on&lt;/b&gt; sign. Receiving works like with any address: anyone can send coins to it.</source>
+        <translation>멀티시그 주소는 &lt;b&gt;정해 둔 N명 중 M명&lt;/b&gt;이 서명해야 코인이 나가는 주소입니다. 받는 것은 보통 주소와 같아서 누구나 이 주소로 코인을 보낼 수 있습니다.</translation>
+    </message>
+    <message>
+        <source>Why use it</source>
+        <translation>왜 쓰나요</translation>
+    </message>
+    <message>
+        <source>The mistake of one person, or a theft from one person, does not move the coins. It is used for company funds, for money that several people manage together, and by one person as a two-step vault (two devices, both must sign).</source>
+        <translation>한 사람의 실수나 도난으로는 코인이 나가지 않습니다. 회사 자금, 여럿이 함께 관리하는 돈, 그리고 혼자 쓰는 2단계 보관(기기 두 대가 모두 서명)에 씁니다.</translation>
+    </message>
+    <message>
+        <source>What M-of-N means</source>
+        <translation>M-of-N이란</translation>
+    </message>
+    <message>
+        <source>&lt;b&gt;2-of-2&lt;/b&gt;: two people, both must sign. Nobody can send alone; if one of them loses the wallet, the coins are stuck.</source>
+        <translation>&lt;b&gt;2-of-2&lt;/b&gt;: 두 명이 모두 서명해야 합니다. 혼자서는 보낼 수 없고, 한 명이 지갑을 잃으면 코인을 꺼낼 수 없습니다.</translation>
+    </message>
+    <message>
+        <source>&lt;b&gt;2-of-3&lt;/b&gt;: three people, any two sign. One person can be away or lose the wallet, and the other two can still send.</source>
+        <translation>&lt;b&gt;2-of-3&lt;/b&gt;: 세 명 중 아무나 두 명이 서명합니다. 한 명이 자리에 없거나 지갑을 잃어도 나머지 두 명이 보낼 수 있습니다.</translation>
+    </message>
+    <message>
+        <source>Public key and private key</source>
+        <translation>공개키와 개인키</translation>
+    </message>
+    <message>
+        <source>Every participant gives one &lt;b&gt;public key&lt;/b&gt;. A public key only says "this person is a signer". It cannot take coins out, so it is &lt;b&gt;safe to share&lt;/b&gt; by messenger or mail.</source>
+        <translation>참여자마다 &lt;b&gt;공개키&lt;/b&gt;를 하나씩 냅니다. 공개키는 "이 사람이 승인자"라는 표시일 뿐 코인을 꺼낼 수 없어서, 메신저나 메일로 &lt;b&gt;공유해도 안전합니다&lt;/b&gt;.</translation>
+    </message>
+    <message>
+        <source>The &lt;b&gt;private key&lt;/b&gt; and the &lt;b&gt;recovery words&lt;/b&gt; stay in each participant's own wallet. &lt;b&gt;Never send them to anyone&lt;/b&gt;, also not to the other participants.</source>
+        <translation>&lt;b&gt;개인키&lt;/b&gt;와 &lt;b&gt;복구 단어&lt;/b&gt;는 각자의 지갑에만 둡니다. 다른 참여자를 포함해 &lt;b&gt;누구에게도 보내지 마세요&lt;/b&gt;.</translation>
+    </message>
+    <message>
+        <source>How coins are sent</source>
+        <translation>코인을 보내는 순서</translation>
+    </message>
+    <message>
+        <source>Make a request</source>
+        <translation>요청 만들기</translation>
+    </message>
+    <message>
+        <source>Each one signs</source>
+        <translation>각자 서명</translation>
+    </message>
+    <message>
+        <source>One participant enters the recipient and the amount. The wallet makes a "signing request".</source>
+        <translation>참여자 한 명이 받는 주소와 금액을 입력하면 지갑이 "서명 요청"을 만듭니다.</translation>
+    </message>
+    <message>
+        <source>The request is passed on as a file or a code. Each participant opens it in their own wallet, checks it and signs.</source>
+        <translation>서명 요청을 파일이나 코드로 전달합니다. 참여자는 각자 지갑에서 열어 내용을 확인하고 서명합니다.</translation>
+    </message>
+    <message>
+        <source>When M signatures are there, anyone who has the request sends it to the network.</source>
+        <translation>서명이 M개 모이면, 요청을 가진 사람 누구나 네트워크로 전송합니다.</translation>
+    </message>
+    <message>
+        <source>What to back up</source>
+        <translation>무엇을 백업하나요</translation>
+    </message>
+    <message>
+        <source>Every participant backs up &lt;b&gt;their own wallet&lt;/b&gt; (Settings → Wallet management → Backup), and keeps the &lt;b&gt;multisig information file&lt;/b&gt; that is saved when the multisig wallet is made. With a wallet backup and that file, the multisig wallet can be set up again on another computer.</source>
+        <translation>참여자마다 &lt;b&gt;자기 지갑을 백업&lt;/b&gt;하고(설정 → 지갑 관리 → 백업), 멀티시그 지갑을 만들 때 저장하는 &lt;b&gt;멀티시그 정보 파일&lt;/b&gt;을 보관합니다. 지갑 백업과 이 파일이 있으면 다른 컴퓨터에서도 멀티시그 지갑을 다시 쓸 수 있습니다.</translation>
+    </message>
+    <message>
+        <source>The risk: if so many participants lose their keys that fewer than M are left, nobody can take the coins out any more. Not the developers either. Decide M and N with that in mind.</source>
+        <translation>위험: 키를 잃은 참여자가 많아져 남은 사람이 M명보다 적어지면 누구도 코인을 꺼낼 수 없습니다. 개발자도 꺼낼 수 없습니다. M과 N은 이 점을 생각해서 정하세요.</translation>
+    </message>
+    <message>
+        <source>Close</source>
+        <translation>닫기</translation>
+    </message>
+    <message>
+        <source>Set the rule</source>
+        <translation>규칙 정하기</translation>
+    </message>
+    <message>
+        <source>Gather the participants</source>
+        <translation>참여자 모으기</translation>
+    </message>
+    <message>
+        <source>Check and finish</source>
+        <translation>확인하고 완성</translation>
+    </message>
+    <message>
+        <source>Name and rule</source>
+        <translation>이름과 규칙</translation>
+    </message>
+    <message>
+        <source>Name of the multisig wallet</source>
+        <translation>멀티시그 지갑 이름</translation>
+    </message>
+    <message>
+        <source>For example: Operating funds</source>
+        <translation>예: 운영 자금</translation>
+    </message>
+    <message>
+        <source>How many people, and how many of them must sign</source>
+        <translation>몇 명이 참여하고, 그중 몇 명이 서명해야 하나요</translation>
+    </message>
+    <message>
+        <source>Other</source>
+        <translation>직접 정하기</translation>
+    </message>
+    <message>
+        <source>both of two</source>
+        <translation>2명 모두</translation>
+    </message>
+    <message>
+        <source>any two of three</source>
+        <translation>3명 중 2명</translation>
+    </message>
+    <message>
+        <source>any three of five</source>
+        <translation>5명 중 3명</translation>
+    </message>
+    <message>
+        <source>set it yourself</source>
+        <translation>아래에서 입력</translation>
+    </message>
+    <message>
+        <source>Participants</source>
+        <translation>참여자</translation>
+    </message>
+    <message>
+        <source>Signatures needed</source>
+        <translation>필요한 서명</translation>
+    </message>
+    <message>
+        <source>Next: gather the participants</source>
+        <translation>다음: 참여자 모으기</translation>
+    </message>
+    <message>
+        <source>How to choose</source>
+        <translation>어떻게 고르나요</translation>
+    </message>
+    <message>
+        <source>&lt;b&gt;2-of-2&lt;/b&gt; suits two people who always decide together. If one of them loses the wallet, the coins are stuck.</source>
+        <translation>&lt;b&gt;2-of-2&lt;/b&gt;는 항상 둘이 함께 결정하는 경우에 맞습니다. 한 명이 지갑을 잃으면 코인을 꺼낼 수 없습니다.</translation>
+    </message>
+    <message>
+        <source>&lt;b&gt;2-of-3&lt;/b&gt; is the usual choice: it still works when one person is away or has lost the wallet.</source>
+        <translation>&lt;b&gt;2-of-3&lt;/b&gt;이 가장 많이 쓰입니다. 한 명이 자리에 없거나 지갑을 잃어도 쓸 수 있습니다.</translation>
+    </message>
+    <message>
+        <source>&lt;b&gt;3-of-5&lt;/b&gt; suits a larger group, such as a board.</source>
+        <translation>&lt;b&gt;3-of-5&lt;/b&gt;는 이사회처럼 인원이 많은 경우에 맞습니다.</translation>
+    </message>
+    <message>
+        <source>The rule cannot be changed later. To change it, make a new multisig wallet and move the coins.</source>
+        <translation>규칙은 나중에 바꿀 수 없습니다. 바꾸려면 멀티시그 지갑을 새로 만들고 코인을 옮겨야 합니다.</translation>
+    </message>
+    <message>
+        <source>Back</source>
+        <translation>이전</translation>
+    </message>
+    <message>
+        <source>A public key is safe to share</source>
+        <translation>공개키는 공유해도 안전합니다</translation>
+    </message>
+    <message>
+        <source>A public key only says "this person is a signer". It is not a key that can take coins out. You may send it by messenger or mail.</source>
+        <translation>공개키는 "이 사람이 승인자"라는 표시일 뿐, 코인을 꺼낼 수 있는 열쇠가 아닙니다. 메신저나 메일로 보내도 됩니다.</translation>
+    </message>
+    <message>
+        <source>But &lt;b&gt;never send your recovery words or a private key to anyone.&lt;/b&gt;</source>
+        <translation>반대로 &lt;b&gt;복구 단어와 개인키는 누구에게도 보내지 마세요.&lt;/b&gt;</translation>
+    </message>
+    <message>
+        <source>This is how multisig works</source>
+        <translation>멀티시그는 이렇게 동작합니다</translation>
+    </message>
+    <message>
+        <source>&lt;b&gt;Everyone's public key is gathered.&lt;/b&gt; This is the step you are at.</source>
+        <translation>&lt;b&gt;각자 공개키를 모읍니다.&lt;/b&gt; 지금 단계입니다.</translation>
+    </message>
+    <message>
+        <source>&lt;b&gt;The multisig address is made.&lt;/b&gt; Send the finished file to the other participants, and the same multisig wallet appears in their wallets.</source>
+        <translation>&lt;b&gt;멀티시그 주소가 만들어집니다.&lt;/b&gt; 완성 파일을 다른 참여자에게 보내면 그쪽 지갑에도 같은 멀티시그 지갑이 생깁니다.</translation>
+    </message>
+    <message>
+        <source>&lt;b&gt;Coins are paid to the multisig address.&lt;/b&gt; To take them out, the set number of participants must sign.</source>
+        <translation>&lt;b&gt;멀티시그 주소로 입금합니다.&lt;/b&gt; 꺼낼 때는 정해진 수의 참여자가 서명해야 합니다.</translation>
+    </message>
+    <message>
+        <source>To send coins, &lt;b&gt;%1 of the %2 participants&lt;/b&gt; must sign.</source>
+        <translation>코인을 보내려면 &lt;b&gt;참여자 %2명 중 %1명&lt;/b&gt;이 서명해야 합니다.</translation>
+    </message>
+    <message>
+        <source>Any one participant can send the coins alone. If several people are to approve, set 2 or more.</source>
+        <translation>참여자 누구든 혼자서 코인을 보낼 수 있습니다. 여러 사람의 승인이 필요하다면 2 이상으로 정하세요.</translation>
+    </message>
+    <message>
+        <source>If even one participant loses the wallet, the coins cannot be taken out. Everyone's backup is essential.</source>
+        <translation>한 명이라도 지갑을 잃으면 코인을 꺼낼 수 없습니다. 모두의 백업이 꼭 필요합니다.</translation>
+    </message>
+    <message>
+        <source>If %1 lose their wallets, the others can still take the coins out. If %2 lose them, nobody can.</source>
+        <translation>%1명이 지갑을 잃어도 나머지가 코인을 꺼낼 수 있습니다. %2명이 잃으면 아무도 꺼낼 수 없습니다.</translation>
+    </message>
+    <message>
+        <source>Give the multisig wallet a name, for example "Operating funds".</source>
+        <translation>멀티시그 지갑의 이름을 입력하세요. 예: "운영 자금"</translation>
+    </message>
+    <message>
+        <source>Me</source>
+        <translation>나</translation>
+    </message>
+    <message>
+        <source>Me (this wallet)</source>
+        <translation>나 (이 지갑)</translation>
+    </message>
+    <message>
+        <source>My name, as the others will see it</source>
+        <translation>다른 참여자에게 보일 내 이름</translation>
+    </message>
+    <message>
+        <source>Public key %1</source>
+        <translation>공개키 %1</translation>
+    </message>
+    <message>
+        <source>Ready</source>
+        <translation>준비됨</translation>
+    </message>
+    <message>
+        <source>Only needed when another participant makes the multisig wallet instead of you</source>
+        <translation>내가 아니라 다른 참여자가 멀티시그 지갑을 만들 때만 필요합니다</translation>
+    </message>
+    <message>
+        <source>Name and public key of participant %1</source>
+        <translation>참여자 %1의 이름과 공개키</translation>
+    </message>
+    <message>
+        <source>Waiting for the key</source>
+        <translation>공개키 기다리는 중</translation>
+    </message>
+    <message>
+        <source>Name (e.g. CEO)</source>
+        <translation>이름 (예: 대표)</translation>
+    </message>
+    <message>
+        <source>Paste the public key that the participant sent</source>
+        <translation>상대에게 받은 공개키를 붙여 넣으세요</translation>
+    </message>
+    <message>
+        <source>The participant gets the code in their own wallet at &lt;b&gt;Sign → My multisig wallets → Copy my public key&lt;/b&gt;.</source>
+        <translation>상대방은 자기 지갑의 &lt;b&gt;서명 → 내 멀티시그 지갑 → 내 공개키 복사&lt;/b&gt;에서 코드를 얻습니다.</translation>
+    </message>
+    <message>
+        <source>Not a public key</source>
+        <translation>공개키가 아님</translation>
+    </message>
+    <message>
+        <source>This is your own key</source>
+        <translation>내 공개키입니다</translation>
+    </message>
+    <message>
+        <source>Same key twice</source>
+        <translation>같은 공개키가 중복됨</translation>
+    </message>
+    <message>
+        <source>Every participant needs a key of their own.</source>
+        <translation>참여자마다 자기 공개키가 있어야 합니다.</translation>
+    </message>
+    <message>
+        <source>Key received</source>
+        <translation>코드 받음</translation>
+    </message>
+    <message>
+        <source>%1 of %2 participants ready</source>
+        <translation>참여자 %2명 중 %1명 준비됨</translation>
+    </message>
+    <message>
+        <source>Name: %1 · %2</source>
+        <translation>이름: %1 · %2</translation>
+    </message>
+    <message>
+        <source>Next: check and finish</source>
+        <translation>다음: 확인하고 완성</translation>
+    </message>
+    <message>
+        <source>Next, when all participants are here</source>
+        <translation>참여자가 모두 모이면 다음으로</translation>
+    </message>
+    <message>
+        <source>If one of the %1 participants loses the wallet, the coins cannot be taken out. Everyone must back up their wallet.</source>
+        <translation>참여자 %1명 중 1명이 지갑을 잃어버리면 코인을 꺼낼 수 없습니다. 각자 지갑 백업을 꼭 해 두세요.</translation>
+    </message>
+    <message>
+        <source>If %1 of the %2 participants lose their wallets, the coins cannot be taken out. Everyone must back up their wallet.</source>
+        <translation>참여자 %2명 중 %1명이 지갑을 잃어버리면 코인을 꺼낼 수 없습니다. 각자 지갑 백업을 꼭 해 두세요.</translation>
+    </message>
+    <message>
+        <source>Participant %1</source>
+        <translation>참여자 %1</translation>
+    </message>
+    <message>
+        <source>This wallet already has a multisig wallet with exactly these participants and this rule: "%1".</source>
+        <translation>참여자와 규칙이 똑같은 멀티시그 지갑이 이미 있습니다: "%1"</translation>
+    </message>
+    <message>
+        <source>Multisig address</source>
+        <translation>멀티시그 주소</translation>
+    </message>
+    <message>
+        <source>%1 (this wallet)</source>
+        <translation>%1 (이 지갑)</translation>
+    </message>
+    <message>
+        <source>The multisig wallet is ready</source>
+        <translation>멀티시그 지갑이 만들어졌습니다</translation>
+    </message>
+    <message>
+        <source>The public keys are put in a fixed order (sorted), so every participant gets this same address, whatever the order in which the keys were entered.</source>
+        <translation>공개키는 정해진 순서(정렬)로 넣기 때문에, 누가 어떤 순서로 입력해도 모든 참여자에게 같은 주소가 나옵니다.</translation>
+    </message>
+    <message>
+        <source>Compare the participants with what you agreed on. The rule and the participants cannot be changed after this.</source>
+        <translation>참여자가 약속한 대로인지 확인하세요. 만든 뒤에는 규칙과 참여자를 바꿀 수 없습니다.</translation>
+    </message>
+    <message>
+        <source>Make the multisig wallet</source>
+        <translation>멀티시그 지갑 만들기</translation>
+    </message>
+    <message>
+        <source>Next: send the multisig information to the other participants. They add it in their wallets at Sign → "Add a multisig wallet I was invited to". Keep the file yourself too: together with a wallet backup it brings this multisig wallet back.</source>
+        <translation>다음 할 일: 멀티시그 정보를 다른 참여자에게 보내세요. 받은 사람은 자기 지갑의 서명 → "초대받은 멀티시그 지갑 추가"에 넣습니다. 파일은 나도 보관하세요. 지갑 백업과 이 파일이 있으면 멀티시그 지갑을 되살릴 수 있습니다.</translation>
+    </message>
+    <message>
+        <source>The information holds the name, the rule, the public keys and the address. It holds no private key.</source>
+        <translation>정보에는 이름, 규칙, 공개키, 주소가 들어 있습니다. 개인키는 들어 있지 않습니다.</translation>
+    </message>
+    <message>
+        <source>Save the multisig information file</source>
+        <translation>멀티시그 정보 파일 저장</translation>
+    </message>
+    <message>
+        <source>Copy the information code</source>
+        <translation>정보 코드 복사</translation>
+    </message>
+    <message>
+        <source>Copy the address</source>
+        <translation>주소 복사</translation>
+    </message>
+    <message>
+        <source>Done</source>
+        <translation>완료</translation>
+    </message>
+    <message>
+        <source>Multisig wallet</source>
+        <translation>멀티시그 지갑</translation>
+    </message>
+    <message>
+        <source>The multisig wallet could not be added: %1</source>
+        <translation>멀티시그 지갑을 추가하지 못했습니다: %1</translation>
+    </message>
+    <message>
+        <source>AokChain multisig file (*.aokms)</source>
+        <translation>AokChain 멀티시그 파일 (*.aokms)</translation>
+    </message>
+    <message>
+        <source>The file could not be written: %1</source>
+        <translation>파일을 쓰지 못했습니다: %1</translation>
+    </message>
+    <message>
+        <source>1. Multisig information</source>
+        <translation>1. 멀티시그 정보</translation>
+    </message>
+    <message>
+        <source>Paste the information code that the maker of the multisig wallet sent you, or open the file. It starts with aokms-wallet1:</source>
+        <translation>멀티시그 지갑을 만든 사람이 보낸 정보 코드를 붙여 넣거나 파일을 여세요. aokms-wallet1: 로 시작합니다.</translation>
+    </message>
+    <message>
+        <source>Open a file...</source>
+        <translation>파일 열기...</translation>
+    </message>
+    <message>
+        <source>Open a multisig information file</source>
+        <translation>멀티시그 정보 파일 열기</translation>
+    </message>
+    <message>
+        <source>AokChain multisig file (*.aokms);;All files (*)</source>
+        <translation>AokChain 멀티시그 파일 (*.aokms);;모든 파일 (*)</translation>
+    </message>
+    <message>
+        <source>2. Check and add</source>
+        <translation>2. 확인하고 추가</translation>
+    </message>
+    <message>
+        <source>Name in this wallet</source>
+        <translation>이 지갑에서 쓸 이름</translation>
+    </message>
+    <message>
+        <source>Look for earlier transactions of this address (rescan; can take a while)</source>
+        <translation>이 주소의 지난 거래 찾기 (블록 다시 훑기, 시간이 걸릴 수 있음)</translation>
+    </message>
+    <message>
+        <source>Needed when coins were already paid to the multisig address. Without it the balance shows only what arrives from now on.</source>
+        <translation>멀티시그 주소에 이미 입금된 코인이 있을 때 필요합니다. 끄면 지금부터 들어오는 것만 잔액에 나옵니다.</translation>
+    </message>
+    <message>
+        <source>Add the multisig wallet</source>
+        <translation>멀티시그 지갑 추가</translation>
+    </message>
+    <message>
+        <source>The rule, the participants and the address appear here.</source>
+        <translation>규칙, 참여자, 주소가 여기에 나옵니다.</translation>
+    </message>
+    <message>
+        <source>This multisig wallet is in your wallet already: "%1".</source>
+        <translation>이미 내 지갑에 있는 멀티시그 지갑입니다: "%1"</translation>
+    </message>
+    <message>
+        <source>Compare this with what the maker of the multisig wallet told you.</source>
+        <translation>멀티시그 지갑을 만든 사람이 알려 준 내용과 비교하세요.</translation>
+    </message>
+    <message>
+        <source>One of the public keys belongs to this wallet: you are a signer.</source>
+        <translation>공개키 중 하나가 이 지갑의 것입니다. 나는 서명할 수 있는 참여자입니다.</translation>
+    </message>
+    <message>
+        <source>None of the public keys belongs to this wallet. You can add it to watch the balance and the requests, but this wallet cannot sign for it. If you expected to be a signer, you sent the public key from another wallet: open that wallet instead.</source>
+        <translation>이 지갑의 공개키가 하나도 없습니다. 잔액과 요청을 보는 용도(조회 전용)로 추가할 수는 있지만 이 지갑으로는 서명할 수 없습니다. 참여자여야 한다면 공개키를 다른 지갑에서 보낸 것이니 그 지갑을 여세요.</translation>
+    </message>
+    <message>
+        <source>Multisig balance</source>
+        <translation>멀티시그 잔액</translation>
+    </message>
+    <message>
+        <source>New send request</source>
+        <translation>새 보내기 요청</translation>
+    </message>
+    <message>
+        <source>Recipient address</source>
+        <translation>받는 주소</translation>
+    </message>
+    <message>
+        <source>AokChain address</source>
+        <translation>AokChain 주소</translation>
+    </message>
+    <message>
+        <source>Choose from the address book</source>
+        <translation>주소록에서 고르기</translation>
+    </message>
+    <message>
+        <source>Paste the address</source>
+        <translation>주소 붙여넣기</translation>
+    </message>
+    <message>
+        <source>Amount</source>
+        <translation>금액</translation>
+    </message>
+    <message>
+        <source>All</source>
+        <translation>전액</translation>
+    </message>
+    <message>
+        <source>Send everything that is at the multisig address; the fee is taken from it</source>
+        <translation>멀티시그 주소의 코인을 모두 보냅니다. 수수료는 그 안에서 빠집니다</translation>
+    </message>
+    <message>
+        <source>Memo for the other participants (optional)</source>
+        <translation>다른 참여자에게 보일 메모 (선택)</translation>
+    </message>
+    <message>
+        <source>For example: server cost of November. Travels with the request, is not written to the block chain.</source>
+        <translation>예: 11월 서버 비용. 요청과 함께 전달되고 블록체인에는 기록되지 않습니다.</translation>
+    </message>
+    <message>
+        <source>Fee</source>
+        <translation>수수료</translation>
+    </message>
+    <message>
+        <source>Normal</source>
+        <translation>보통</translation>
+    </message>
+    <message>
+        <source>Faster</source>
+        <translation>빠르게</translation>
+    </message>
+    <message>
+        <source>twice the fee</source>
+        <translation>수수료 2배</translation>
+    </message>
+    <message>
+        <source>Only AOK can be sent from a multisig address for now. Sending tokens from multisig is in preparation.</source>
+        <translation>지금은 멀티시그 주소에서 AOK만 보낼 수 있습니다. 토큰 보내기는 준비 중입니다.</translation>
+    </message>
+    <message>
+        <source>Make the send request</source>
+        <translation>보내기 요청 만들기</translation>
+    </message>
+    <message>
+        <source>Send from %1</source>
+        <translation>%1에서 보내기</translation>
+    </message>
+    <message>
+        <source>Requests in progress</source>
+        <translation>진행 중인 요청</translation>
+    </message>
+    <message>
+        <source>Sent</source>
+        <translation>전송됨</translation>
+    </message>
+    <message>
+        <source>No longer usable</source>
+        <translation>쓸 수 없음</translation>
+    </message>
+    <message>
+        <source>My signature needed</source>
+        <translation>내 서명 필요</translation>
+    </message>
+    <message>
+        <source>Ready to send</source>
+        <translation>전송 가능</translation>
+    </message>
+    <message>
+        <source>Signatures %1 / %2</source>
+        <translation>서명 %1 / %2</translation>
+    </message>
+    <message>
+        <source>Open</source>
+        <translation>열기</translation>
+    </message>
+    <message>
+        <source>None. A request that you make or receive appears here until it is sent.</source>
+        <translation>없습니다. 만들거나 받은 요청은 전송될 때까지 여기에 나옵니다.</translation>
+    </message>
+    <message>
+        <source>This multisig wallet</source>
+        <translation>이 멀티시그 지갑</translation>
+    </message>
+    <message>
+        <source>%1 (me)</source>
+        <translation>%1 (나)</translation>
+    </message>
+    <message>
+        <source>Participants: %1</source>
+        <translation>참여자: %1</translation>
+    </message>
+    <message>
+        <source>To receive, give this address to the payer like any other address.</source>
+        <translation>받을 때는 보통 주소처럼 이 주소를 보내는 사람에게 알려 주면 됩니다.</translation>
+    </message>
+    <message>
+        <source>Save the information file</source>
+        <translation>정보 파일 저장</translation>
+    </message>
+    <message>
+        <source>Remove from this list</source>
+        <translation>이 목록에서 제거</translation>
+    </message>
+    <message>
+        <source>Remove the multisig wallet</source>
+        <translation>멀티시그 지갑 제거</translation>
+    </message>
+    <message>
+        <source>Remove "%1" from the list of multisig wallets? Its open requests are dropped too. The coins stay at the address, and you can add the multisig wallet again with its information file.</source>
+        <translation>"%1"을(를) 멀티시그 지갑 목록에서 제거할까요? 진행 중인 요청도 함께 지워집니다. 코인은 주소에 그대로 있고, 멀티시그 정보 파일로 다시 추가할 수 있습니다.</translation>
+    </message>
+    <message>
+        <source>This wallet only watches the multisig wallet. It can make a request, but cannot sign it.</source>
+        <translation>이 지갑은 이 멀티시그 지갑을 조회만 합니다. 요청을 만들 수는 있지만 서명할 수는 없습니다.</translation>
+    </message>
+    <message>
+        <source>The fee is worked out from the size of the transaction with all its signatures.</source>
+        <translation>수수료는 서명이 모두 들어간 거래의 크기로 계산합니다.</translation>
+    </message>
+    <message>
+        <source>Fee (estimate) %1 AOK · multisig balance after sending %2 AOK</source>
+        <translation>수수료 (예상) %1 AOK · 보낸 뒤 멀티시그 잔액 %2 AOK</translation>
+    </message>
+    <message>
+        <source>The recipient address is not valid.</source>
+        <translation>받는 주소가 올바르지 않습니다.</translation>
+    </message>
+    <message>
+        <source>Send request</source>
+        <translation>보내기 요청</translation>
+    </message>
+    <message>
+        <source>Request made</source>
+        <translation>요청 만듦</translation>
+    </message>
+    <message>
+        <source>One more signature needed</source>
+        <translation>한 명 더 서명 필요</translation>
+    </message>
+    <message>
+        <source>%1 more signatures needed</source>
+        <translation>%1명 더 서명 필요</translation>
+    </message>
+    <message>
+        <source>(not an address)</source>
+        <translation>(주소 아님)</translation>
+    </message>
+    <message>
+        <source>Amount to this address</source>
+        <translation>이 주소로 가는 금액</translation>
+    </message>
+    <message>
+        <source>The memo comes with the request. It is not part of the transaction.</source>
+        <translation>메모는 요청과 함께 온 참고용 글입니다. 거래의 일부가 아닙니다.</translation>
+    </message>
+    <message>
+        <source>Memo</source>
+        <translation>메모</translation>
+    </message>
+    <message>
+        <source>Back to the multisig address (change)</source>
+        <translation>멀티시그 주소로 되돌아오는 금액 (잔돈)</translation>
+    </message>
+    <message>
+        <source>Multisig balance after sending</source>
+        <translation>보낸 뒤 멀티시그 잔액</translation>
+    </message>
+    <message>
+        <source>These figures are read from the transaction itself and from the block chain of this wallet, not from what the request says about itself.</source>
+        <translation>이 숫자들은 요청에 적힌 설명이 아니라, 거래 자체와 이 지갑의 블록체인에서 읽은 것입니다.</translation>
+    </message>
+    <message>
+        <source>Done: the transaction was sent</source>
+        <translation>완료: 거래를 전송했습니다</translation>
+    </message>
+    <message>
+        <source>It is confirmed with the next blocks. The other participants need not do anything.</source>
+        <translation>다음 블록들에서 승인됩니다. 다른 참여자는 할 일이 없습니다.</translation>
+    </message>
+    <message>
+        <source>Nothing to do: this request can no longer be used</source>
+        <translation>할 일 없음: 더 이상 쓸 수 없는 요청입니다</translation>
+    </message>
+    <message>
+        <source>Its coins were spent, most likely because another participant sent it already. You can remove it.</source>
+        <translation>이 요청의 코인이 이미 쓰였습니다. 다른 참여자가 이미 전송했을 가능성이 큽니다. 목록에서 지워도 됩니다.</translation>
+    </message>
+    <message>
+        <source>Do not sign: something is wrong with this request</source>
+        <translation>서명하지 마세요: 이 요청에 문제가 있습니다</translation>
+    </message>
+    <message>
+        <source>Next: add the multisig wallet of this request</source>
+        <translation>다음 할 일: 이 요청의 멀티시그 지갑 추가하기</translation>
+    </message>
+    <message>
+        <source>Read the red notes above and ask the person who sent the request.</source>
+        <translation>위의 빨간 안내를 읽고, 요청을 보낸 사람에게 확인하세요.</translation>
+    </message>
+    <message>
+        <source>The request is for a multisig wallet that is not in your wallet yet.</source>
+        <translation>아직 내 지갑에 없는 멀티시그 지갑의 요청입니다.</translation>
+    </message>
+    <message>
+        <source>Next: check the request and sign</source>
+        <translation>다음 할 일: 내용을 확인하고 서명하기</translation>
+    </message>
+    <message>
+        <source>Compare the recipient and the amount with what you agreed on. If they are right, press "Sign".</source>
+        <translation>받는 주소와 금액이 약속한 것과 같은지 확인하세요. 맞으면 "서명"을 누르세요.</translation>
+    </message>
+    <message>
+        <source>Next: send it</source>
+        <translation>다음 할 일: 전송하기</translation>
+    </message>
+    <message>
+        <source>All the signatures that are needed are here. Press "Send" to hand the transaction to the network.</source>
+        <translation>필요한 서명이 모두 모였습니다. "전송"을 누르면 거래가 네트워크로 나갑니다.</translation>
+    </message>
+    <message>
+        <source>Next: send the signing request to another participant</source>
+        <translation>다음 할 일: 다른 참여자에게 서명 요청 보내기</translation>
+    </message>
+    <message>
+        <source>Take the signing request out as a file or a code with the buttons below and send it by messenger or mail. The receiver puts it into their wallet at &lt;b&gt;Sign → Open a signing request&lt;/b&gt; and presses "Sign".</source>
+        <translation>아래 버튼으로 서명 요청을 파일이나 코드로 꺼내 메신저·메일로 보내세요. 받은 사람은 자기 지갑의 &lt;b&gt;서명 → 받은 서명 요청 열기&lt;/b&gt;에 넣고 "서명"을 누르면 됩니다.</translation>
+    </message>
+    <message>
+        <source>Transaction ID</source>
+        <translation>거래 ID</translation>
+    </message>
+    <message>
+        <source>View in the explorer</source>
+        <translation>탐색기에서 보기</translation>
+    </message>
+    <message>
+        <source>Save the signing request file</source>
+        <translation>서명 요청 파일 저장</translation>
+    </message>
+    <message>
+        <source>Copy the request code</source>
+        <translation>요청 코드 복사</translation>
+    </message>
+    <message>
+        <source>Show as QR</source>
+        <translation>QR로 보여 주기</translation>
+    </message>
+    <message>
+        <source>This request is too large for one QR code (%1 characters; a QR code is offered up to %2). Use the file or the code.</source>
+        <translation>요청이 QR 코드 하나에 담기에는 너무 큽니다(%1자, QR은 %2자까지). 파일이나 코드를 쓰세요.</translation>
+    </message>
+    <message>
+        <source>This build has no QR code support.</source>
+        <translation>이 빌드에는 QR 코드 기능이 없습니다.</translation>
+    </message>
+    <message>
+        <source>Signatures</source>
+        <translation>서명 현황</translation>
+    </message>
+    <message>
+        <source>Signed</source>
+        <translation>서명 완료</translation>
+    </message>
+    <message>
+        <source>Waiting for the signature</source>
+        <translation>서명을 기다리는 중</translation>
+    </message>
+    <message>
+        <source>Waiting</source>
+        <translation>대기</translation>
+    </message>
+    <message>
+        <source>Enough signatures are here.</source>
+        <translation>필요한 서명이 모두 모였습니다.</translation>
+    </message>
+    <message>
+        <source>One more participant has to sign.</source>
+        <translation>한 명만 더 서명하면 됩니다.</translation>
+    </message>
+    <message>
+        <source>%1 more participants have to sign.</source>
+        <translation>%1명이 더 서명해야 합니다.</translation>
+    </message>
+    <message>
+        <source>Who signed is read from the signatures in the transaction.</source>
+        <translation>누가 서명했는지는 거래에 든 서명에서 읽습니다.</translation>
+    </message>
+    <message>
+        <source>Add this multisig wallet...</source>
+        <translation>이 멀티시그 지갑 추가...</translation>
+    </message>
+    <message>
+        <source>Signing is not offered because something is wrong with this request. See the red notes.</source>
+        <translation>이 요청에 문제가 있어 서명할 수 없습니다. 빨간 안내를 보세요.</translation>
+    </message>
+    <message>
+        <source>Load signatures I received (file · paste)</source>
+        <translation>받은 서명 불러오기 (파일 · 붙여넣기)</translation>
+    </message>
+    <message>
+        <source>Can be sent when the signatures are here</source>
+        <translation>서명이 모이면 전송할 수 있습니다</translation>
+    </message>
+    <message>
+        <source>Remove from the list</source>
+        <translation>목록에서 지우기</translation>
+    </message>
+    <message>
+        <source>Cancel this request</source>
+        <translation>이 요청 취소</translation>
+    </message>
+    <message>
+        <source>Signing request</source>
+        <translation>서명 요청</translation>
+    </message>
+    <message>
+        <source>The QR code could not be made. Use the file or the code.</source>
+        <translation>QR 코드를 만들지 못했습니다. 파일이나 코드를 쓰세요.</translation>
+    </message>
+    <message>
+        <source>Signing request as QR code</source>
+        <translation>서명 요청 QR 코드</translation>
+    </message>
+    <message>
+        <source>The other participant scans this and pastes the text into their wallet at Sign → Open a signing request.</source>
+        <translation>다른 참여자가 이것을 스캔해서 나온 글을 자기 지갑의 서명 → 받은 서명 요청 열기에 붙여 넣습니다.</translation>
+    </message>
+    <message>
+        <source>Cancel</source>
+        <translation>취소</translation>
+    </message>
+    <message>
+        <source>Open a signing request file</source>
+        <translation>서명 요청 파일 열기</translation>
+    </message>
+    <message>
+        <source>Paste the signing request that another participant sent you, or open its file. Nothing is signed yet: the wallet first shows what the request does.</source>
+        <translation>다른 참여자가 보낸 서명 요청을 붙여 넣거나 파일을 여세요. 바로 서명되지 않습니다. 먼저 이 요청이 무엇을 하는지 보여 줍니다.</translation>
+    </message>
+    <message>
+        <source>Add the multisig wallet of this request</source>
+        <translation>이 요청의 멀티시그 지갑 추가</translation>
+    </message>
+    <message>
+        <source>This request is for a multisig wallet that is not in your wallet yet. Check that it is the multisig wallet you agreed to take part in: compare the address and the public keys with what the maker sent you. If you have its multisig information file, add it with that file instead, to get the names of the participants.</source>
+        <translation>아직 내 지갑에 없는 멀티시그 지갑의 요청입니다. 내가 참여하기로 한 멀티시그 지갑이 맞는지, 주소와 공개키를 만든 사람이 보낸 것과 비교하세요. 멀티시그 정보 파일이 있다면 그 파일로 추가하는 편이 좋습니다(참여자 이름이 함께 들어옵니다).</translation>
+    </message>
+    <message>
+        <source>None of the public keys belongs to this wallet: it cannot sign this request.</source>
+        <translation>이 지갑의 공개키가 하나도 없습니다. 이 지갑으로는 이 요청에 서명할 수 없습니다.</translation>
+    </message>
+    <message>
+        <source>Add and open the request</source>
+        <translation>추가하고 요청 열기</translation>
+    </message>
+    <message>
+        <source>Load signatures I received</source>
+        <translation>받은 서명 불러오기</translation>
+    </message>
+    <message>
+        <source>Paste the signing request that came back from another participant, or open its file. Its signatures are added to this request.</source>
+        <translation>다른 참여자에게서 돌아온 서명 요청을 붙여 넣거나 파일을 여세요. 그 안의 서명이 이 요청에 합쳐집니다.</translation>
+    </message>
+    <message>
+        <source>This is another request, not the one that is open. (It is for another transaction: a different recipient, amount or coins.) Open it with "Open a signing request" to see what it does.</source>
+        <translation>지금 열려 있는 요청이 아닌 다른 요청입니다. (받는 주소나 금액, 쓰는 코인이 다른 거래입니다.) "받은 서명 요청 열기"로 열어 무엇을 하는 요청인지 확인하세요.</translation>
+    </message>
+    <message>
+        <source>%1 AOK to %2</source>
+        <translation>%2 주소로 %1 AOK</translation>
+    </message>
+    <message>
+        <source>You are about to sign this transaction:</source>
+        <translation>이 거래에 서명합니다:</translation>
+    </message>
+    <message>
+        <source>Fee %1 AOK</source>
+        <translation>수수료 %1 AOK</translation>
+    </message>
+    <message>
+        <source>There are warnings for this request. Sign only if you have read them and they are in order.</source>
+        <translation>이 요청에 경고가 있습니다. 경고를 읽고 문제가 없을 때만 서명하세요.</translation>
+    </message>
+    <message>
+        <source>A signature cannot be taken back once you have passed the request on.</source>
+        <translation>서명한 요청을 다른 사람에게 넘긴 뒤에는 서명을 되돌릴 수 없습니다.</translation>
+    </message>
+    <message>
+        <source>Sign the request</source>
+        <translation>요청에 서명</translation>
+    </message>
+    <message>
+        <source>Send the transaction</source>
+        <translation>거래 전송</translation>
+    </message>
+    <message>
+        <source>Send this transaction to the network now?</source>
+        <translation>이 거래를 지금 네트워크로 전송할까요?</translation>
+    </message>
+    <message>
+        <source>A sent transaction cannot be cancelled.</source>
+        <translation>전송한 거래는 취소할 수 없습니다.</translation>
+    </message>
+    <message>
+        <source>Cancel the request</source>
+        <translation>요청 취소</translation>
+    </message>
+    <message>
+        <source>Remove this request from your wallet? If you already passed it on with your signature, the others can still complete and send it: to make sure it cannot be sent, the coins have to be spent by another transaction.</source>
+        <translation>이 요청을 내 지갑에서 지울까요? 이미 내 서명을 넣어 다른 사람에게 넘겼다면, 그쪽에서 서명을 채워 전송할 수 있습니다. 확실히 막으려면 같은 코인을 다른 거래로 써야 합니다.</translation>
+    </message>
+    <message>
+        <source>Broadcast</source>
+        <translation>전송</translation>
+    </message>
+</context>
 </TS>
