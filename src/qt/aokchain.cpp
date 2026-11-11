@@ -73,6 +73,9 @@ Q_IMPORT_PLUGIN(AccessibleFactory)
 Q_IMPORT_PLUGIN(QXcbIntegrationPlugin);
 #elif defined(QT_QPA_PLATFORM_WINDOWS)
 Q_IMPORT_PLUGIN(QWindowsIntegrationPlugin);
+#if defined(QT_WINDOWS_VISTA_STYLE)
+Q_IMPORT_PLUGIN(QWindowsVistaStylePlugin);
+#endif
 #elif defined(QT_QPA_PLATFORM_COCOA)
 Q_IMPORT_PLUGIN(QCocoaIntegrationPlugin);
 #endif
