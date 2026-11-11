@@ -24,6 +24,7 @@
 
 #include "ui_interface.h"
 
+#include <QButtonGroup>
 #include <QComboBox>
 #include <QDateTimeEdit>
 #include <QDesktopServices>
@@ -38,41 +39,199 @@
 #include <QSignalMapper>
 #include <QTableView>
 #include <QTimer>
+#include <QHelpEvent>
+#include <QPainter>
+#include <QPushButton>
+#include <QStyledItemDelegate>
+#include <QToolButton>
+#include <QToolTip>
 #include <QUrl>
 #include <QVBoxLayout>
+
+/**
+ * Paints the cells of the transaction table: a tile with the direction, the
+ * description on two lines, the date in the fixed-width font, the status as a
+ * badge and the amount with its sign and asset.
+ */
+class TransactionCellDelegate : public QStyledItemDelegate
+{
+public:
+    explicit TransactionCellDelegate(QObject *parent) : QStyledItemDelegate(parent) {}
+
+    void paint(QPainter *painter, const QStyleOptionViewItem &option, const QModelIndex &index) const override
+    {
+        const GUIUtil::Theme& theme = GUIUtil::theme();
+        const QRect r = option.rect;
+        painter->save();
+        painter->setRenderHint(QPainter::Antialiasing, true);
+        if (option.state & QStyle::State_Selected)
+            painter->fillRect(r, theme.accentSoft);
+        painter->setPen(theme.line);
+        painter->drawLine(r.left(), r.top(), r.right(), r.top());
+
+        const qint64 amount = index.data(TransactionTableModel::AmountRole).toLongLong();
+        const int type = index.data(TransactionTableModel::TypeRole).toInt();
+        const int status = index.data(TransactionTableModel::StatusRole).toInt();
+        const bool confirmed = index.data(TransactionTableModel::ConfirmedRole).toBool();
+        const bool outgoing = amount < 0 || type == TransactionRecord::SendToSelf || type == TransactionRecord::TransferTo;
+        const bool failed = status == TransactionStatus::Conflicted || status == TransactionStatus::Abandoned || status == TransactionStatus::NotAccepted;
+
+        switch (index.column()) {
+        case TransactionTableModel::Type:
+            GUIUtil::paintDirectionTile(painter, QRect(r.left(), r.top() + (r.height() - 36) / 2, 36, 36), outgoing, type == TransactionRecord::Generated);
+            break;
+        case TransactionTableModel::Watchonly: {
+            QIcon icon = qvariant_cast<QIcon>(index.data(TransactionTableModel::WatchonlyDecorationRole));
+            icon.paint(painter, QRect(r.left(), r.top() + (r.height() - 16) / 2, 16, 16));
+            break;
+        }
+        case TransactionTableModel::ToAddress: {
+            const QRect topRect(r.left(), r.top() + 9, r.width() - 12, 20);
+            const QRect bottomRect(r.left(), r.top() + 29, r.width() - 12, 18);
+            painter->setFont(GUIUtil::appFont(14, QFont::DemiBold));
+            painter->setPen(failed ? theme.textDisabled : theme.text);
+            const bool owner = index.data(TransactionTableModel::OwnerTokenRole).toBool();
+            const QString title = painter->fontMetrics().elidedText(index.data(TransactionTableModel::TitleRole).toString(), Qt::ElideRight, topRect.width() - (owner ? 80 : 0));
+            painter->drawText(topRect, Qt::AlignLeft | Qt::AlignVCenter, title);
+            if (owner)
+                GUIUtil::paintChip(painter, r.left() + painter->fontMetrics().horizontalAdvance(title) + 8, topRect.center().y() + 1, TransactionView::tr("Owner"));
+            const QString label = index.data(TransactionTableModel::LabelRole).toString();
+            const QString address = index.data(TransactionTableModel::AddressRole).toString();
+            painter->setPen(theme.textSecondary);
+            if (!label.isEmpty()) {
+                painter->setFont(GUIUtil::appFont(12));
+                painter->drawText(bottomRect, Qt::AlignLeft | Qt::AlignVCenter, painter->fontMetrics().elidedText(label, Qt::ElideRight, bottomRect.width()));
+            } else if (!address.isEmpty() && type != TransactionRecord::SendToSelf) {
+                painter->setFont(GUIUtil::monoFont(12));
+                // the full address when it fits, the short form otherwise
+                const QString shown = painter->fontMetrics().horizontalAdvance(address) <= bottomRect.width() ? address : GUIUtil::shortAddress(address);
+                painter->drawText(bottomRect, Qt::AlignLeft | Qt::AlignVCenter, shown);
+            } else {
+                painter->setFont(GUIUtil::appFont(12));
+                painter->drawText(bottomRect, Qt::AlignLeft | Qt::AlignVCenter, TransactionView::tr("No label"));
+            }
+            break;
+        }
+        case TransactionTableModel::Date:
+            painter->setFont(GUIUtil::monoFont(13));
+            painter->setPen(theme.label);
+            painter->drawText(r, Qt::AlignLeft | Qt::AlignVCenter, GUIUtil::isoDateTime(index.data(TransactionTableModel::DateRole).toDateTime()));
+            break;
+        case TransactionTableModel::Status: {
+            QColor fg = theme.negative, bg = theme.negativeSoft;
+            if (status == TransactionStatus::Confirmed) {
+                fg = theme.ok;
+                bg = theme.okSoft;
+            } else if (failed) {
+                fg = theme.error;
+                bg = theme.errorSoft;
+            }
+            GUIUtil::paintBadge(painter, r.adjusted(0, 0, -8, 0), index.data(TransactionTableModel::StatusTextRole).toString(), fg, bg);
+            break;
+        }
+        case TransactionTableModel::Amount: {
+            const QString asset = index.data(TransactionTableModel::TokenNameRole).toString();
+            painter->setFont(GUIUtil::appFont(12));
+            painter->setPen(theme.textSecondary);
+            const QRect cell = r.adjusted(0, 0, -10, 0);
+            const int assetWidth = qMin(painter->fontMetrics().horizontalAdvance(asset) + 2, cell.width() / 2);
+            painter->drawText(cell, Qt::AlignRight | Qt::AlignVCenter, painter->fontMetrics().elidedText(asset, Qt::ElideRight, assetWidth));
+            QColor color = outgoing ? theme.negative : theme.positive;
+            if (!confirmed || failed)
+                color = theme.textDisabled;
+            painter->setFont(GUIUtil::monoFont(14, QFont::DemiBold));
+            painter->setPen(color);
+            const QRect amountRect = cell.adjusted(0, 0, -(assetWidth + 6), 0);
+            painter->drawText(amountRect, Qt::AlignRight | Qt::AlignVCenter,
+                              painter->fontMetrics().elidedText(index.data(TransactionTableModel::DisplayAmountRole).toString(), Qt::ElideLeft, amountRect.width()));
+            break;
+        }
+        default:
+            break;
+        }
+        painter->restore();
+    }
+
+    QSize sizeHint(const QStyleOptionViewItem &, const QModelIndex &) const override
+    {
+        return QSize(40, TransactionView::ROW_HEIGHT);
+    }
+
+    /** The full address in the fixed-width font when the pointer is over the description */
+    bool helpEvent(QHelpEvent *event, QAbstractItemView *view, const QStyleOptionViewItem &option, const QModelIndex &index) override
+    {
+        if (event->type() == QEvent::ToolTip && index.isValid() && index.column() == TransactionTableModel::ToAddress) {
+            const QString address = index.data(TransactionTableModel::AddressRole).toString();
+            if (!address.isEmpty()) {
+                QToolTip::showText(event->globalPos(), GUIUtil::monoToolTip(address, index.data(TransactionTableModel::LabelRole).toString()), view);
+                return true;
+            }
+        }
+        return QStyledItemDelegate::helpEvent(event, view, option, index);
+    }
+};
 
 TransactionView::TransactionView(const PlatformStyle *platformStyle, QWidget *parent) :
     QWidget(parent), model(0), transactionProxyModel(0),
     transactionView(0), abandonAction(0), bumpFeeAction(0), columnResizingFixer(0)
 {
-    // Build filter row
-    setContentsMargins(0,0,0,0);
+    const GUIUtil::Theme& theme = GUIUtil::theme();
 
+    // Filter row: type as a segmented control, search, asset, period
+    setContentsMargins(0,0,0,0);
     QHBoxLayout *hlayout = new QHBoxLayout();
     hlayout->setContentsMargins(0,0,0,0);
+    hlayout->setSpacing(10);
 
-    if (platformStyle->getUseExtraSpacing()) {
-        hlayout->setSpacing(5);
-        hlayout->addSpacing(26);
-    } else {
-        hlayout->setSpacing(0);
-        hlayout->addSpacing(23);
+    QFrame *segFrame = new QFrame(this);
+    segFrame->setProperty("role", "segGroup");
+    QHBoxLayout *segLayout = new QHBoxLayout(segFrame);
+    segLayout->setContentsMargins(3, 3, 3, 3);
+    segLayout->setSpacing(4);
+    typeButtons = new QButtonGroup(this);
+    const quint32 received = TransactionFilterProxy::TYPE(TransactionRecord::RecvWithAddress) | TransactionFilterProxy::TYPE(TransactionRecord::RecvFromOther) |
+                             TransactionFilterProxy::TYPE(TransactionRecord::TransferFrom);
+    const quint32 sent = TransactionFilterProxy::TYPE(TransactionRecord::SendToAddress) | TransactionFilterProxy::TYPE(TransactionRecord::SendToOther) |
+                         TransactionFilterProxy::TYPE(TransactionRecord::SendToSelf) | TransactionFilterProxy::TYPE(TransactionRecord::TransferTo);
+    const std::pair<QString, quint32> segments[] = {
+        {tr("All"), TransactionFilterProxy::ALL_TYPES},
+        {tr("Received"), received},
+        {tr("Sent"), sent},
+        {tr("Staking"), TransactionFilterProxy::TYPE(TransactionRecord::Generated)},
+    };
+    int segmentId = 0;
+    for (const std::pair<QString, quint32>& segment : segments) {
+        QPushButton *button = new QPushButton(segment.first, segFrame);
+        button->setProperty("look", "seg");
+        button->setProperty("typeFilter", segment.second);
+        button->setCheckable(true);
+        button->setFixedHeight(40);
+        button->setCursor(Qt::PointingHandCursor);
+        typeButtons->addButton(button, segmentId++);
+        segLayout->addWidget(button);
     }
+    typeButtons->button(0)->setChecked(true);
+    hlayout->addWidget(segFrame);
 
-    watchOnlyWidget = new QComboBox(this);
-    watchOnlyWidget->setFixedWidth(24);
-    watchOnlyWidget->addItem("", TransactionFilterProxy::WatchOnlyFilter_All);
-    watchOnlyWidget->addItem(platformStyle->SingleColorIcon(":/icons/eye_plus"), "", TransactionFilterProxy::WatchOnlyFilter_Yes);
-    watchOnlyWidget->addItem(platformStyle->SingleColorIcon(":/icons/eye_minus"), "", TransactionFilterProxy::WatchOnlyFilter_No);
-    hlayout->addWidget(watchOnlyWidget);
+    addressWidget = new QLineEdit(this);
+    addressWidget->setProperty("look", "search");
+    addressWidget->setPlaceholderText(tr("Search address or label"));
+    addressWidget->setFixedHeight(48);
+    addressWidget->addAction(QIcon(GUIUtil::lineIcon("search", 16, theme.textSecondary, 2.2)), QLineEdit::LeadingPosition);
+    addressWidget->setClearButtonEnabled(true);
+    hlayout->addWidget(addressWidget, 1);
+
+    tokenNameWidget = new QLineEdit(this);
+    tokenNameWidget->setProperty("look", "search");
+    tokenNameWidget->setPlaceholderText(tr("All assets"));
+    tokenNameWidget->setToolTip(tr("Show only the transactions of the assets whose name contains this text"));
+    tokenNameWidget->setFixedSize(150, 48);
+    hlayout->addWidget(tokenNameWidget);
+    tokenNameWidget->hide();
 
     dateWidget = new QComboBox(this);
-    if (platformStyle->getUseExtraSpacing()) {
-        dateWidget->setFixedWidth(133);
-    } else {
-        dateWidget->setFixedWidth(132);
-    }
-    dateWidget->addItem(tr("All"), All);
+    dateWidget->setFixedSize(140, 48);
+    dateWidget->addItem(tr("All time"), All);
     dateWidget->addItem(tr("Today"), Today);
     dateWidget->addItem(tr("This week"), ThisWeek);
     dateWidget->addItem(tr("This month"), ThisMonth);
@@ -81,12 +240,25 @@ TransactionView::TransactionView(const PlatformStyle *platformStyle, QWidget *pa
     dateWidget->addItem(tr("Range..."), Range);
     hlayout->addWidget(dateWidget);
 
+    QToolButton *moreButton = new QToolButton(this);
+    moreButton->setIcon(QIcon(GUIUtil::lineIcon("manage", 18, theme.label)));
+    moreButton->setIconSize(QSize(18, 18));
+    moreButton->setFixedSize(48, 48);
+    moreButton->setCheckable(true);
+    moreButton->setToolTip(tr("More filters: other transaction types, minimum amount, watch-only"));
+    moreButton->setCursor(Qt::PointingHandCursor);
+    hlayout->addWidget(moreButton);
+
+    // Second filter row with the remaining filters, hidden until asked for
+    QWidget *moreRow = new QWidget(this);
+    QHBoxLayout *moreLayout = new QHBoxLayout(moreRow);
+    moreLayout->setContentsMargins(0,0,0,0);
+    moreLayout->setSpacing(10);
+    QLabel *typeLabel = new QLabel(tr("Type"), moreRow);
+    typeLabel->setProperty("role", "fieldLabel");
+    moreLayout->addWidget(typeLabel);
     typeWidget = new QComboBox(this);
-    if (platformStyle->getUseExtraSpacing()) {
-        typeWidget->setFixedWidth(151);
-    } else {
-        typeWidget->setFixedWidth(150);
-    }
+    typeWidget->setFixedWidth(190);
 
     typeWidget->addItem(tr("All"), TransactionFilterProxy::ALL_TYPES);
     typeWidget->addItem(tr("Received with"), TransactionFilterProxy::TYPE(TransactionRecord::RecvWithAddress) |
@@ -96,34 +268,24 @@ TransactionView::TransactionView(const PlatformStyle *platformStyle, QWidget *pa
     typeWidget->addItem(tr("To yourself"), TransactionFilterProxy::TYPE(TransactionRecord::SendToSelf));
     typeWidget->addItem(tr("Mined"), TransactionFilterProxy::TYPE(TransactionRecord::Generated));
     typeWidget->addItem(tr("Other"), TransactionFilterProxy::TYPE(TransactionRecord::Other));
-
-    hlayout->addWidget(typeWidget);
-
-    addressWidget = new QLineEdit(this);
-#if QT_VERSION >= 0x040700
-    addressWidget->setPlaceholderText(tr("Enter address or label to search"));
-#endif
-    hlayout->addWidget(addressWidget);
+    moreLayout->addWidget(typeWidget);
 
     amountWidget = new QLineEdit(this);
-#if QT_VERSION >= 0x040700
     amountWidget->setPlaceholderText(tr("Min amount"));
-#endif
-    if (platformStyle->getUseExtraSpacing()) {
-        amountWidget->setFixedWidth(147);
-    } else {
-        amountWidget->setFixedWidth(150);
-    }
+    amountWidget->setFixedWidth(170);
+    amountWidget->setFont(GUIUtil::monoFont(13));
     amountWidget->setValidator(new QDoubleValidator(0, 1e20, 8, this));
-    hlayout->addWidget(amountWidget);
+    moreLayout->addWidget(amountWidget);
 
-    tokenNameWidget = new QLineEdit(this);
-#if QT_VERSION >= 0x040700
-    tokenNameWidget->setPlaceholderText(tr("Token name"));
-#endif
-    tokenNameWidget->setFixedWidth(200);
-    hlayout->addWidget(tokenNameWidget);
-    tokenNameWidget->hide();
+    watchOnlyWidget = new QComboBox(this);
+    watchOnlyWidget->setFixedWidth(64);
+    watchOnlyWidget->addItem("", TransactionFilterProxy::WatchOnlyFilter_All);
+    watchOnlyWidget->addItem(platformStyle->SingleColorIcon(":/icons/eye_plus"), "", TransactionFilterProxy::WatchOnlyFilter_Yes);
+    watchOnlyWidget->addItem(platformStyle->SingleColorIcon(":/icons/eye_minus"), "", TransactionFilterProxy::WatchOnlyFilter_No);
+    moreLayout->addWidget(watchOnlyWidget);
+    moreLayout->addStretch();
+    moreRow->hide();
+    connect(moreButton, SIGNAL(toggled(bool)), moreRow, SLOT(setVisible(bool)));
 
     // Delay before filtering transactions in ms
     static const int input_filter_delay = 200;
@@ -142,33 +304,60 @@ TransactionView::TransactionView(const PlatformStyle *platformStyle, QWidget *pa
     token_typing_delay->setInterval(input_filter_delay);
 
     QVBoxLayout *vlayout = new QVBoxLayout(this);
-    vlayout->setContentsMargins(20,16,20,12);
-    vlayout->setSpacing(8);
+    vlayout->setContentsMargins(0,0,0,0);
+    vlayout->setSpacing(12);
 
-    QTableView *view = new QTableView(this);
+    // The table sits in a card
+    QFrame *card = new QFrame(this);
+    card->setProperty("role", "card");
+    QVBoxLayout *cardLayout = new QVBoxLayout(card);
+    cardLayout->setContentsMargins(24, 4, 12, 12);
+    cardLayout->setSpacing(0);
+
+    QTableView *view = new QTableView(card);
+    cardLayout->addWidget(view, 1);
+    QFrame *footerLine = new QFrame(card);
+    footerLine->setProperty("role", "hline");
+    footerLine->setFixedHeight(1);
+    cardLayout->addWidget(footerLine);
+    QHBoxLayout *footer = new QHBoxLayout();
+    footer->setContentsMargins(0, 10, 12, 0);
+    QLabel *hint = new QLabel(tr("Double-click a row for the details; the menu of the right mouse button looks a transaction up in the explorer"), card);
+    hint->setProperty("role", "caption");
+    QPushButton *explorerLink = new QPushButton(tr("Open the explorer"), card);
+    explorerLink->setProperty("look", "link");
+    explorerLink->setCursor(Qt::PointingHandCursor);
+    footer->addWidget(hint);
+    footer->addStretch();
+    footer->addWidget(explorerLink);
+    cardLayout->addLayout(footer);
+    connect(explorerLink, SIGNAL(clicked()), this, SLOT(openExplorer()));
+
     vlayout->addLayout(hlayout);
+    vlayout->addWidget(moreRow);
     vlayout->addWidget(createDateRangeWidget());
-    vlayout->addWidget(view);
-    vlayout->setSpacing(8);
-    int width = view->verticalScrollBar()->sizeHint().width();
-    // Cover scroll bar width with spacing
-    if (platformStyle->getUseExtraSpacing()) {
-        hlayout->addSpacing(width+2);
-    } else {
-        hlayout->addSpacing(width);
-    }
-    // Always show scroll bar
-    view->setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOn);
+    vlayout->addWidget(card, 1);
+
+    view->setVerticalScrollBarPolicy(Qt::ScrollBarAsNeeded);
     view->setTabKeyNavigation(false);
     view->setContextMenuPolicy(Qt::CustomContextMenu);
+    view->setFrameShape(QFrame::NoFrame);
+    view->setStyleSheet("QTableView { border: none; background: transparent; } QTableView::item { padding: 0; border: none; }");
 
     view->installEventFilter(this);
     view->setShowGrid(false);
-    view->verticalHeader()->setDefaultSectionSize(34);
+    view->setWordWrap(false);
+    view->setVerticalScrollMode(QAbstractItemView::ScrollPerPixel);
+    view->setItemDelegate(new TransactionCellDelegate(view));
+    // fixed row heights: the view never has to measure the rows
+    view->verticalHeader()->setSectionResizeMode(QHeaderView::Fixed);
+    view->verticalHeader()->setDefaultSectionSize(ROW_HEIGHT);
+    view->verticalHeader()->setMinimumSectionSize(ROW_HEIGHT);
+    view->horizontalHeader()->setHighlightSections(false);
+    view->horizontalHeader()->setDefaultAlignment(Qt::AlignLeft | Qt::AlignVCenter);
 
     transactionView = view;
     transactionView->setObjectName("transactionView");
-
 
     // Actions
     abandonAction = new QAction(tr("Abandon transaction"), this);
@@ -182,6 +371,7 @@ TransactionView::TransactionView(const PlatformStyle *platformStyle, QWidget *pa
     QAction *copyTxPlainText = new QAction(tr("Copy full transaction details"), this);
     QAction *editLabelAction = new QAction(tr("Edit label"), this);
     QAction *showDetailsAction = new QAction(tr("Show transaction details"), this);
+    QAction *showInExplorerAction = new QAction(tr("Show in the explorer"), this);
 
     contextMenu = new QMenu(this);
     contextMenu->setObjectName("contextMenu");
@@ -192,6 +382,7 @@ TransactionView::TransactionView(const PlatformStyle *platformStyle, QWidget *pa
     contextMenu->addAction(copyTxHexAction);
     contextMenu->addAction(copyTxPlainText);
     contextMenu->addAction(showDetailsAction);
+    contextMenu->addAction(showInExplorerAction);
     contextMenu->addSeparator();
 //    contextMenu->addAction(bumpFeeAction);
     contextMenu->addAction(abandonAction);
@@ -225,6 +416,8 @@ TransactionView::TransactionView(const PlatformStyle *platformStyle, QWidget *pa
     connect(copyTxPlainText, SIGNAL(triggered()), this, SLOT(copyTxPlainText()));
     connect(editLabelAction, SIGNAL(triggered()), this, SLOT(editLabel()));
     connect(showDetailsAction, SIGNAL(triggered()), this, SLOT(showDetails()));
+    connect(showInExplorerAction, SIGNAL(triggered()), this, SLOT(showInExplorer()));
+    connect(typeButtons, SIGNAL(buttonClicked(int)), this, SLOT(chooseTypeSegment(int)));
 
     // Trigger the call to show the tokens table if tokens are active
     showingTokens = false;
@@ -233,7 +426,6 @@ TransactionView::TransactionView(const PlatformStyle *platformStyle, QWidget *pa
     dateWidget->setFont(GUIUtil::getSubLabelFont());
     typeWidget->setFont(GUIUtil::getSubLabelFont());
     addressWidget->setFont(GUIUtil::getSubLabelFont());
-    amountWidget->setFont(GUIUtil::getSubLabelFont());
     tokenNameWidget->setFont(GUIUtil::getSubLabelFont());
     contextMenu->setFont(GUIUtil::getSubLabelFont());
     transactionView->setFont(GUIUtil::getSubLabelFont());
@@ -255,21 +447,35 @@ void TransactionView::setModel(WalletModel *_model)
 
         transactionView->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
         transactionView->setModel(transactionProxyModel);
-        transactionView->setAlternatingRowColors(true);
+        transactionView->setAlternatingRowColors(false);
         transactionView->setSelectionBehavior(QAbstractItemView::SelectRows);
         transactionView->setSelectionMode(QAbstractItemView::ExtendedSelection);
         transactionView->setSortingEnabled(true);
         transactionView->sortByColumn(TransactionTableModel::Date, Qt::DescendingOrder);
         transactionView->verticalHeader()->hide();
 
-        transactionView->setColumnWidth(TransactionTableModel::Status, STATUS_COLUMN_WIDTH);
+        // Column order: direction, (watch-only), description, date, status, amount with the asset.
+        // The widths are fixed and the description takes the rest, so that the view does not
+        // have to measure the contents of thousands of rows.
+        QHeaderView *header = transactionView->horizontalHeader();
+        header->setMinimumSectionSize(MINIMUM_COLUMN_WIDTH);
+        header->setSectionsMovable(false);
+        const int order[] = {TransactionTableModel::Type, TransactionTableModel::Watchonly, TransactionTableModel::ToAddress,
+                             TransactionTableModel::Date, TransactionTableModel::Status, TransactionTableModel::Amount, TransactionTableModel::TokenName};
+        for (int visual = 0; visual < 7; ++visual)
+            header->moveSection(header->visualIndex(order[visual]), visual);
+        for (int column : {TransactionTableModel::Type, TransactionTableModel::Watchonly, TransactionTableModel::Date,
+                           TransactionTableModel::Status, TransactionTableModel::Amount})
+            header->setSectionResizeMode(column, QHeaderView::Fixed);
+        header->setSectionResizeMode(TransactionTableModel::ToAddress, QHeaderView::Stretch);
+        header->setStretchLastSection(false);
+        transactionView->setColumnWidth(TransactionTableModel::Type, TYPE_COLUMN_WIDTH);
         transactionView->setColumnWidth(TransactionTableModel::Watchonly, WATCHONLY_COLUMN_WIDTH);
         transactionView->setColumnWidth(TransactionTableModel::Date, DATE_COLUMN_WIDTH);
-        transactionView->setColumnWidth(TransactionTableModel::Type, TYPE_COLUMN_WIDTH);
-        transactionView->setColumnWidth(TransactionTableModel::Amount, AMOUNT_MINIMUM_COLUMN_WIDTH);
-        transactionView->setColumnWidth(TransactionTableModel::TokenName, AMOUNT_MINIMUM_COLUMN_WIDTH);
-
-        columnResizingFixer = new GUIUtil::TableViewLastColumnResizingFixer(transactionView, AMOUNT_MINIMUM_COLUMN_WIDTH, MINIMUM_COLUMN_WIDTH, this);
+        transactionView->setColumnWidth(TransactionTableModel::Status, STATUS_COLUMN_WIDTH);
+        transactionView->setColumnWidth(TransactionTableModel::Amount, AMOUNT_COLUMN_WIDTH);
+        // the asset is shown next to the amount
+        transactionView->setColumnHidden(TransactionTableModel::TokenName, true);
 
         if (_model->getOptionsModel())
         {
@@ -352,6 +558,33 @@ void TransactionView::chooseType(int idx)
         return;
     transactionProxyModel->setTypeFilter(
         typeWidget->itemData(idx).toInt());
+    // the segmented control shows a choice only when it made it
+    typeButtons->setExclusive(false);
+    for (QAbstractButton *button : typeButtons->buttons())
+        button->setChecked(idx == 0 && typeButtons->id(button) == 0);
+    typeButtons->setExclusive(true);
+}
+
+void TransactionView::chooseTypeSegment(int id)
+{
+    if(!transactionProxyModel || !typeButtons->button(id))
+        return;
+    transactionProxyModel->setTypeFilter(typeButtons->button(id)->property("typeFilter").toUInt());
+    typeWidget->setCurrentIndex(0);
+}
+
+void TransactionView::showInExplorer()
+{
+    if(!transactionView || !transactionView->selectionModel())
+        return;
+    QModelIndexList selection = transactionView->selectionModel()->selectedRows(0);
+    if(!selection.isEmpty())
+        Q_EMIT explorerRequested(selection.at(0).data(TransactionTableModel::TxHashRole).toString());
+}
+
+void TransactionView::openExplorer()
+{
+    Q_EMIT explorerRequested(QString());
 }
 
 void TransactionView::chooseWatchonly(int idx)
@@ -615,25 +848,26 @@ void TransactionView::openThirdPartyTxUrl(QString url)
 QWidget *TransactionView::createDateRangeWidget()
 {
     dateRangeWidget = new QFrame();
-    dateRangeWidget->setFrameStyle(QFrame::Panel | QFrame::Raised);
-    dateRangeWidget->setContentsMargins(1,1,1,1);
+    dateRangeWidget->setProperty("role", "plain");
     QHBoxLayout *layout = new QHBoxLayout(dateRangeWidget);
     layout->setContentsMargins(0,0,0,0);
-    layout->addSpacing(23);
+    layout->setSpacing(10);
     layout->addWidget(new QLabel(tr("Range:")));
 
     dateFrom = new QDateTimeEdit(this);
-    dateFrom->setDisplayFormat("dd/MM/yy");
+    dateFrom->setDisplayFormat("yyyy-MM-dd");
+    dateFrom->setFont(GUIUtil::monoFont(13));
     dateFrom->setCalendarPopup(true);
-    dateFrom->setMinimumWidth(100);
+    dateFrom->setMinimumWidth(140);
     dateFrom->setDate(QDate::currentDate().addDays(-7));
     layout->addWidget(dateFrom);
     layout->addWidget(new QLabel(tr("to")));
 
     dateTo = new QDateTimeEdit(this);
-    dateTo->setDisplayFormat("dd/MM/yy");
+    dateTo->setDisplayFormat("yyyy-MM-dd");
+    dateTo->setFont(GUIUtil::monoFont(13));
     dateTo->setCalendarPopup(true);
-    dateTo->setMinimumWidth(100);
+    dateTo->setMinimumWidth(140);
     dateTo->setDate(QDate::currentDate());
     layout->addWidget(dateTo);
     layout->addStretch();
@@ -672,7 +906,6 @@ void TransactionView::focusTransaction(const QModelIndex &idx)
 void TransactionView::resizeEvent(QResizeEvent* event)
 {
     QWidget::resizeEvent(event);
-    columnResizingFixer->stretchColumnWidth(TransactionTableModel::ToAddress);
 }
 
 // Need to override default Ctrl+C action for amount as default behaviour is just to copy DisplayRole text

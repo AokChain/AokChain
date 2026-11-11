@@ -22,6 +22,7 @@ class QDateTimeEdit;
 class QFrame;
 class QLineEdit;
 class QMenu;
+class QButtonGroup;
 class QModelIndex;
 class QSignalMapper;
 class QTableView;
@@ -53,13 +54,15 @@ public:
     };
 
     enum ColumnWidths {
-        STATUS_COLUMN_WIDTH = 30,
+        STATUS_COLUMN_WIDTH = 132,
         WATCHONLY_COLUMN_WIDTH = 23,
-        DATE_COLUMN_WIDTH = 132,
-        TYPE_COLUMN_WIDTH = 150,
+        DATE_COLUMN_WIDTH = 150,
+        TYPE_COLUMN_WIDTH = 52,
         TOKEN_NAME_MINIMUM_COLUMN_WIDTH = 200,
+        AMOUNT_COLUMN_WIDTH = 270,
         AMOUNT_MINIMUM_COLUMN_WIDTH = 150,
-        MINIMUM_COLUMN_WIDTH = 23
+        MINIMUM_COLUMN_WIDTH = 23,
+        ROW_HEIGHT = 56
     };
 
 private:
@@ -69,6 +72,7 @@ private:
 
     QComboBox *dateWidget;
     QComboBox *typeWidget;
+    QButtonGroup *typeButtons;
     QComboBox *watchOnlyWidget;
     QLineEdit *addressWidget;
     QLineEdit *amountWidget;
@@ -108,6 +112,8 @@ private Q_SLOTS:
     void openThirdPartyTxUrl(QString url);
     void updateWatchOnlyColumn(bool fHaveWatchOnly);
     void abandonTx();
+    void showInExplorer();
+    void openExplorer();
     void bumpFee();
 
 Q_SIGNALS:
@@ -116,9 +122,13 @@ Q_SIGNALS:
     /**  Fired when a message should be reported to the user */
     void message(const QString &title, const QString &message, unsigned int style);
 
+    /** Look a transaction up in the explorer; an empty id just opens the explorer */
+    void explorerRequested(const QString &txid);
+
 public Q_SLOTS:
     void chooseDate(int idx);
     void chooseType(int idx);
+    void chooseTypeSegment(int id);
     void chooseWatchonly(int idx);
     void changedAmount();
     void changedTokenName();

@@ -23,6 +23,7 @@
 #include "walletmodel.h"
 #include "tokensdialog.h"
 #include "createtokendialog.h"
+#include "explorerpage.h"
 #include "reissuetokendialog.h"
 #include <validation.h>
 
@@ -32,6 +33,7 @@
 #include <QActionGroup>
 #include <QFileDialog>
 #include <QHBoxLayout>
+#include <QLabel>
 #include <QProgressDialog>
 #include <QPushButton>
 #include <QVBoxLayout>
@@ -43,43 +45,38 @@ WalletView::WalletView(const PlatformStyle *_platformStyle, QWidget *parent):
     walletModel(0),
     platformStyle(_platformStyle)
 {
-    // Create tabs
+    // Create the pages. Each one sits below a header with its title.
     overviewPage = new OverviewPage(platformStyle);
+    overviewShell = addPage(overviewPage, tr("Overview"), overviewPage->headerWidget());
 
-    transactionsPage = new QWidget(this);
-    QVBoxLayout *vbox = new QVBoxLayout();
-    QHBoxLayout *hbox_buttons = new QHBoxLayout();
     transactionView = new TransactionView(platformStyle, this);
-    vbox->addWidget(transactionView);
-    QPushButton *exportButton = new QPushButton(tr("&Export"), this);
+    QPushButton *exportButton = new QPushButton(tr("Export to CSV"), this);
     exportButton->setToolTip(tr("Export the data in the current tab to a file"));
-    if (platformStyle->getImagesOnButtons()) {
-        exportButton->setIcon(platformStyle->SingleColorIcon(":/icons/export"));
-    }
-    hbox_buttons->addStretch();
-    hbox_buttons->addWidget(exportButton);
-    vbox->addLayout(hbox_buttons);
-    transactionsPage->setLayout(vbox);
-    receiveCoinsPage = new ReceiveCoinsDialog(platformStyle);
-    sendCoinsPage = new SendCoinsDialog(platformStyle);
+    exportButton->setIcon(QIcon(GUIUtil::lineIcon("download", 15, GUIUtil::theme().text, 2.2)));
+    exportButton->setIconSize(QSize(15, 15));
+    exportButton->setFixedHeight(40);
+    exportButton->setCursor(Qt::PointingHandCursor);
+    transactionsPage = addPage(transactionView, tr("Transactions"), exportButton);
 
+    receiveCoinsPage = new ReceiveCoinsDialog(platformStyle);
+    receiveShell = addPage(receiveCoinsPage, tr("Receive"));
+    sendCoinsPage = new SendCoinsDialog(platformStyle);
+    sendShell = addPage(sendCoinsPage, tr("Send"), sendCoinsPage->headerWidget());
+
+    /** TOKENS START */
     tokensPage = new TokensDialog(platformStyle);
+    tokensShell = addPage(tokensPage, tr("Tokens"));
     createTokensPage = new CreateTokenDialog(platformStyle);
+    createTokensShell = addPage(createTokensPage, tr("Create Tokens"));
     manageTokensPage = new ReissueTokenDialog(platformStyle);
+    manageTokensShell = addPage(manageTokensPage, tr("Manage Tokens"));
+    /** TOKENS END */
+
+    explorerPage = new ExplorerPage(platformStyle);
+    explorerShell = addPage(explorerPage, tr("Explorer"), explorerPage->headerWidget());
 
     usedSendingAddressesPage = new AddressBookPage(platformStyle, AddressBookPage::ForEditing, AddressBookPage::SendingTab, this);
     usedReceivingAddressesPage = new AddressBookPage(platformStyle, AddressBookPage::ForEditing, AddressBookPage::ReceivingTab, this);
-
-    addWidget(overviewPage);
-    addWidget(transactionsPage);
-    addWidget(receiveCoinsPage);
-    addWidget(sendCoinsPage);
-
-    /** TOKENS START */
-    addWidget(tokensPage);
-    addWidget(createTokensPage);
-    addWidget(manageTokensPage);
-    /** TOKENS END */
 
     // Clicking on a transaction on the overview pre-selects the transaction on the transaction history page
     connect(overviewPage, SIGNAL(transactionClicked(QModelIndex)), transactionView, SLOT(focusTransaction(QModelIndex)));
@@ -104,11 +101,51 @@ WalletView::WalletView(const PlatformStyle *_platformStyle, QWidget *parent):
     connect(overviewPage, SIGNAL(tokenIssueSubClicked(QModelIndex)), createTokensPage, SLOT(focusSubToken(QModelIndex)));
     connect(overviewPage, SIGNAL(tokenIssueUniqueClicked(QModelIndex)), createTokensPage, SLOT(focusUniqueToken(QModelIndex)));
     connect(overviewPage, SIGNAL(tokenReissueClicked(QModelIndex)), manageTokensPage, SLOT(focusReissueToken(QModelIndex)));
+
+    // Transactions, addresses and blocks can be looked up in the explorer
+    connect(transactionView, SIGNAL(explorerRequested(QString)), this, SIGNAL(explorerRequested(QString)));
     /** RNV END */
 }
 
 WalletView::~WalletView()
 {
+}
+
+QWidget *WalletView::addPage(QWidget *page, const QString &title, QWidget *context)
+{
+    QWidget *shell = new QWidget(this);
+    shell->setObjectName("pageShell");
+    QVBoxLayout *layout = new QVBoxLayout(shell);
+    layout->setContentsMargins(36, 26, 36, 28);
+    layout->setSpacing(20);
+
+    QHBoxLayout *header = new QHBoxLayout();
+    header->setContentsMargins(0, 0, 0, 0);
+    header->setSpacing(12);
+    QLabel *titleLabel = new QLabel(title, shell);
+    titleLabel->setProperty("role", "pageTitle");
+    titleLabel->setFont(GUIUtil::appFont(24, QFont::Bold));
+    titleLabel->setMinimumHeight(40);
+    header->addWidget(titleLabel);
+    header->addStretch();
+    if (context)
+        header->addWidget(context, 0, Qt::AlignVCenter);
+    layout->addLayout(header);
+
+    // the margins belong to the shell: drop those of the form and of the layout directly inside it
+    if (page->layout()) {
+        page->layout()->setContentsMargins(0, 0, 0, 0);
+        for (int i = 0; i < page->layout()->count(); ++i) {
+            if (QLayout *inner = page->layout()->itemAt(i)->layout()) {
+                inner->setContentsMargins(0, 0, 0, 0);
+                if (inner->spacing() > 20)
+                    inner->setSpacing(20);
+            }
+        }
+    }
+    layout->addWidget(page, 1);
+    addWidget(shell);
+    return shell;
 }
 
 void WalletView::setAokChainGUI(AokChainGUI *gui)
@@ -117,6 +154,16 @@ void WalletView::setAokChainGUI(AokChainGUI *gui)
     {
         // Clicking on a transaction on the overview page simply sends you to transaction history page
         connect(overviewPage, SIGNAL(transactionClicked(QModelIndex)), gui, SLOT(gotoHistoryPage()));
+
+        // The buttons and links of the overview page
+        connect(overviewPage, SIGNAL(sendClicked()), gui, SLOT(gotoSendCoinsPage()));
+        connect(overviewPage, SIGNAL(receiveClicked()), gui, SLOT(gotoReceiveCoinsPage()));
+        connect(overviewPage, SIGNAL(allTransactionsClicked()), gui, SLOT(gotoHistoryPage()));
+        connect(overviewPage, SIGNAL(allTokensClicked()), gui, SLOT(gotoTokensPage()));
+
+        // Look something up in the explorer
+        connect(this, SIGNAL(explorerRequested(QString)), gui, SLOT(gotoExplorerPage(QString)));
+        connect(explorerPage, SIGNAL(sendToAddress(QString)), gui, SLOT(gotoSendCoinsPage(QString)));
 
         // Clicking on a token menu item Send
         connect(overviewPage, SIGNAL(tokenSendClicked(QModelIndex)), gui, SLOT(gotoTokensPage()));
@@ -153,6 +200,7 @@ void WalletView::setClientModel(ClientModel *_clientModel)
 
     overviewPage->setClientModel(_clientModel);
     sendCoinsPage->setClientModel(_clientModel);
+    explorerPage->setClientModel(_clientModel);
 }
 
 void WalletView::setWalletModel(WalletModel *_walletModel)
@@ -164,6 +212,7 @@ void WalletView::setWalletModel(WalletModel *_walletModel)
     overviewPage->setWalletModel(_walletModel);
     receiveCoinsPage->setModel(_walletModel);
     sendCoinsPage->setModel(_walletModel);
+    explorerPage->setWalletModel(_walletModel);
     usedReceivingAddressesPage->setModel(_walletModel ? _walletModel->getAddressTableModel() : nullptr);
     usedSendingAddressesPage->setModel(_walletModel ? _walletModel->getAddressTableModel() : nullptr);
 
@@ -240,7 +289,7 @@ void WalletView::processNewTransaction(const QModelIndex& parent, int start, int
 
 void WalletView::gotoOverviewPage()
 {
-    setCurrentWidget(overviewPage);
+    setCurrentWidget(overviewShell);
     Q_EMIT checkTokens();
 }
 
@@ -251,12 +300,12 @@ void WalletView::gotoHistoryPage()
 
 void WalletView::gotoReceiveCoinsPage()
 {
-    setCurrentWidget(receiveCoinsPage);
+    setCurrentWidget(receiveShell);
 }
 
 void WalletView::gotoSendCoinsPage(QString addr)
 {
-    setCurrentWidget(sendCoinsPage);
+    setCurrentWidget(sendShell);
 
     if (!addr.isEmpty())
         sendCoinsPage->setAddress(addr);
@@ -422,17 +471,26 @@ void WalletView::gotoTokensPage()
         fFirstVisit = false;
         tokensPage->handleFirstSelection();
     }
-    setCurrentWidget(tokensPage);
+    setCurrentWidget(tokensShell);
     tokensPage->focusTokenListBox();
 }
 
 void WalletView::gotoCreateTokensPage()
 {
-    setCurrentWidget(createTokensPage);
+    setCurrentWidget(createTokensShell);
 }
 
 void WalletView::gotoManageTokensPage()
 {
-    setCurrentWidget(manageTokensPage);
+    setCurrentWidget(manageTokensShell);
+}
+
+void WalletView::gotoExplorerPage(QString query)
+{
+    setCurrentWidget(explorerShell);
+    if (!query.isEmpty())
+        explorerPage->lookup(query);
+    else
+        explorerPage->focusSearch();
 }
 /** TOKENS END */

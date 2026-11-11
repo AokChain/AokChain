@@ -23,6 +23,7 @@ class WalletModel;
 class AddressBookPage;
 class TokensDialog;
 class CreateTokenDialog;
+class ExplorerPage;
 class ReissueTokenDialog;
 
 QT_BEGIN_NAMESPACE
@@ -81,6 +82,19 @@ private:
     CreateTokenDialog *createTokensPage;
     ReissueTokenDialog *manageTokensPage;
     /** TOKENS END */
+    ExplorerPage *explorerPage;
+
+    // each page sits in a shell that carries the page header
+    QWidget *overviewShell;
+    QWidget *receiveShell;
+    QWidget *sendShell;
+    QWidget *tokensShell;
+    QWidget *createTokensShell;
+    QWidget *manageTokensShell;
+    QWidget *explorerShell;
+
+    /** Put a page below a header with its title and, optionally, a context widget on the right */
+    QWidget *addPage(QWidget *page, const QString &title, QWidget *context = nullptr);
 
 public Q_SLOTS:
     /** Switch to overview (home) page */
@@ -136,6 +150,8 @@ public Q_SLOTS:
     void gotoCreateTokensPage();
     void gotoManageTokensPage();
     /** TOKENS END */
+    /** Switch to the explorer page; look the query up when one is given */
+    void gotoExplorerPage(QString query = "");
 
 Q_SIGNALS:
     /** Signal that we want to show the main window */
@@ -152,6 +168,8 @@ Q_SIGNALS:
     void outOfSyncWarningClicked();
     /** Show the tokens GUI */
     void checkTokens();
+    /** Look up a transaction id, address or block in the explorer */
+    void explorerRequested(const QString &query);
 };
 
 #endif // AOKCHAIN_QT_WALLETVIEW_H

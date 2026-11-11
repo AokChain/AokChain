@@ -27,7 +27,12 @@
 #include "policy/fees.h"
 #include "wallet/fees.h"
 
+#include <QButtonGroup>
 #include <QFontMetrics>
+#include <QHBoxLayout>
+#include <QLabel>
+#include <QPushButton>
+#include <QVBoxLayout>
 #include <QMessageBox>
 #include <QScrollBar>
 #include <QSettings>
@@ -45,16 +50,12 @@ SendCoinsDialog::SendCoinsDialog(const PlatformStyle *_platformStyle, QWidget *p
 {
     ui->setupUi(this);
     ui->sendButton->setProperty("primary", true);
+    buildLayout();
 
-    if (!_platformStyle->getImagesOnButtons()) {
-        ui->addButton->setIcon(QIcon());
-        ui->clearButton->setIcon(QIcon());
-        ui->sendButton->setIcon(QIcon());
-    } else {
-        ui->addButton->setIcon(_platformStyle->SingleColorIcon(":/icons/add"));
-        ui->clearButton->setIcon(_platformStyle->SingleColorIcon(":/icons/remove"));
-        ui->sendButton->setIcon(_platformStyle->SingleColorIcon(":/icons/send"));
-    }
+    ui->addButton->setIcon(QIcon(GUIUtil::lineIcon("plus", 14, GUIUtil::theme().label, 2.4)));
+    ui->addButton->setIconSize(QSize(14, 14));
+    ui->clearButton->setIcon(QIcon());
+    ui->sendButton->setIcon(QIcon());
 
     GUIUtil::setupAddressWidget(ui->lineEditCoinControlChange, this);
 
@@ -118,6 +119,300 @@ SendCoinsDialog::SendCoinsDialog(const PlatformStyle *_platformStyle, QWidget *p
     setupFeeControl(platformStyle);
 }
 
+static QLabel *summaryCaption(const QString &text, QWidget *parent)
+{
+    QLabel *label = new QLabel(text, parent);
+    label->setProperty("role", "secondary");
+    return label;
+}
+
+static QLabel *summaryValue(QWidget *parent)
+{
+    QLabel *label = new QLabel(parent);
+    label->setFont(GUIUtil::monoFont(14, QFont::DemiBold));
+    label->setAlignment(Qt::AlignRight | Qt::AlignVCenter);
+    return label;
+}
+
+/**
+ * Arrange the widgets of the form in two columns: a card with the recipients,
+ * the fee and the coin control on the left and a card with the summary and
+ * the send button on the right.
+ */
+void SendCoinsDialog::buildLayout()
+{
+    // available balance for the page header
+    headerBox = new QWidget();
+    QHBoxLayout *headerLayout = new QHBoxLayout(headerBox);
+    headerLayout->setContentsMargins(0, 0, 0, 0);
+    headerLayout->setSpacing(6);
+    headerLayout->addWidget(summaryCaption(tr("Available"), headerBox));
+    availableLabel = new QLabel(headerBox);
+    availableLabel->setFont(GUIUtil::monoFont(13, QFont::DemiBold));
+    headerLayout->addWidget(availableLabel);
+    ui->label->hide();
+    ui->labelBalance->hide();
+
+    // the layouts of the form go; the widgets stay
+    delete layout();
+    QHBoxLayout *columns = new QHBoxLayout(this);
+    columns->setContentsMargins(0, 0, 0, 0);
+    columns->setSpacing(20);
+
+    // left: recipients, fee, coin control
+    QFrame *formCard = new QFrame(this);
+    formCard->setProperty("role", "card");
+    QVBoxLayout *form = new QVBoxLayout(formCard);
+    form->setContentsMargins(26, 24, 20, 20);
+    form->setSpacing(12);
+    form->addWidget(ui->scrollArea, 1);
+
+    QLabel *feeLabel = new QLabel(tr("Fee"), formCard);
+    feeLabel->setProperty("role", "fieldLabel");
+    form->addWidget(feeLabel);
+    QHBoxLayout *feeRow = new QHBoxLayout();
+    feeRow->setSpacing(8);
+    feeRow->setContentsMargins(0, 0, 6, 0);
+    QButtonGroup *feeGroup = new QButtonGroup(this);
+    feeTargets[0] = 24;
+    feeTargets[1] = 6;
+    const QString feeTexts[3] = {
+        tr("Slow") + "\n" + tr("about %1 blocks").arg(feeTargets[0]),
+        tr("Normal") + "\n" + tr("about %1 blocks").arg(feeTargets[1]),
+        tr("Custom") + "\n" + "AOK/kB",
+    };
+    for (int i = 0; i < 3; ++i) {
+        feeButtons[i] = new QPushButton(feeTexts[i], formCard);
+        feeButtons[i]->setProperty("look", "fee");
+        feeButtons[i]->setCheckable(true);
+        feeButtons[i]->setFixedHeight(56);
+        feeButtons[i]->setCursor(Qt::PointingHandCursor);
+        feeGroup->addButton(feeButtons[i], i);
+        feeRow->addWidget(feeButtons[i], 1);
+    }
+    connect(feeGroup, SIGNAL(buttonClicked(int)), this, SLOT(feeButtonClicked(int)));
+    form->addLayout(feeRow);
+    QHBoxLayout *feeInfoRow = new QHBoxLayout();
+    feeInfoRow->setContentsMargins(0, 0, 6, 0);
+    feeInfo = new QLabel(formCard);
+    feeInfo->setProperty("role", "caption");
+    feeDetailsButton = new QPushButton(tr("Fee settings"), formCard);
+    feeDetailsButton->setProperty("look", "link");
+    feeDetailsButton->setCursor(Qt::PointingHandCursor);
+    connect(feeDetailsButton, SIGNAL(clicked()), this, SLOT(toggleFeeDetails()));
+    feeInfoRow->addWidget(feeInfo, 1);
+    feeInfoRow->addWidget(feeDetailsButton);
+    form->addLayout(feeInfoRow);
+    form->addWidget(ui->frameFee);
+    form->addWidget(ui->frameCoinControl);
+
+    ui->addButton->setProperty("look", "dashed");
+    ui->addButton->setText(tr("Add recipient"));
+    ui->addButton->setFixedHeight(44);
+    ui->addButton->setCursor(Qt::PointingHandCursor);
+    form->addWidget(ui->addButton, 0, Qt::AlignLeft);
+    columns->addWidget(formCard, 3);
+
+    // right: summary
+    QFrame *summaryCard = new QFrame(this);
+    summaryCard->setProperty("role", "card");
+    QVBoxLayout *summary = new QVBoxLayout(summaryCard);
+    summary->setContentsMargins(26, 24, 26, 24);
+    summary->setSpacing(14);
+    QLabel *summaryTitle = new QLabel(tr("Summary"), summaryCard);
+    summaryTitle->setProperty("role", "title");
+    summaryTitle->setFont(GUIUtil::appFont(16, QFont::Bold));
+    summary->addWidget(summaryTitle);
+    summary->addSpacing(2);
+
+    auto addRow = [&](const QString &caption, QLabel *&value) {
+        QHBoxLayout *row = new QHBoxLayout();
+        row->setSpacing(12);
+        row->addWidget(summaryCaption(caption, summaryCard));
+        value = summaryValue(summaryCard);
+        row->addWidget(value, 1);
+        summary->addLayout(row);
+    };
+    addRow(tr("Recipient"), summaryRecipient);
+    addRow(tr("Amount to send"), summaryAmount);
+    addRow(tr("Fee (estimated)"), summaryFee);
+    summaryFee->setToolTip(tr("Estimate for a transaction with one input. The fee that is really paid is shown for confirmation before the transaction is sent."));
+    QFrame *separator = new QFrame(summaryCard);
+    separator->setProperty("role", "hline");
+    separator->setFixedHeight(1);
+    summary->addWidget(separator);
+    addRow(tr("Total"), summaryTotal);
+    summaryTotal->setTextFormat(Qt::RichText);
+    summaryTotal->setFont(GUIUtil::monoFont(20, QFont::Bold));
+    addRow(tr("Balance after sending"), summaryAfter);
+    summaryAfter->setFont(GUIUtil::monoFont(13));
+    summary->addStretch(1);
+
+    QLabel *warning = new QLabel(tr("A transaction that has been sent cannot be cancelled. Check the address once more."), summaryCard);
+    warning->setProperty("role", "warning");
+    warning->setWordWrap(true);
+    summary->addWidget(warning);
+    ui->sendButton->setProperty("look", "send");
+    ui->sendButton->setFixedHeight(52);
+    ui->sendButton->setCursor(Qt::PointingHandCursor);
+    summary->addWidget(ui->sendButton);
+    ui->clearButton->setProperty("look", "ghost");
+    ui->clearButton->setText(tr("Clear all"));
+    ui->clearButton->setFixedHeight(44);
+    ui->clearButton->setCursor(Qt::PointingHandCursor);
+    summary->addWidget(ui->clearButton);
+    columns->addWidget(summaryCard, 2);
+}
+
+void SendCoinsDialog::feeButtonClicked(int id)
+{
+    if (id == 2) {
+        ui->radioCustomFee->setChecked(true);
+        // the custom rate is entered in the fee settings
+        minimizeFeeSection(false);
+    } else {
+        ui->radioSmartFee->setChecked(true);
+        ui->confTargetSelector->setCurrentIndex(getIndexForConfTarget(feeTargets[id]));
+    }
+    updateFeeSectionControls();
+    updateSmartFeeLabel();
+    coinControlUpdateLabels();
+}
+
+void SendCoinsDialog::toggleFeeDetails()
+{
+    minimizeFeeSection(!fFeeMinimized);
+}
+
+/** Show which of the three fee choices the fee settings amount to. */
+void SendCoinsDialog::updateFeeButtons()
+{
+    int checked = -1;
+    if (ui->radioCustomFee->isChecked())
+        checked = 2;
+    else if (getConfTargetForIndex(ui->confTargetSelector->currentIndex()) == feeTargets[1])
+        checked = 1;
+    else if (getConfTargetForIndex(ui->confTargetSelector->currentIndex()) == feeTargets[0])
+        checked = 0;
+    QButtonGroup *group = feeButtons[0]->group();
+    group->setExclusive(false);
+    for (int i = 0; i < 3; ++i)
+        feeButtons[i]->setChecked(i == checked);
+    group->setExclusive(true);
+
+    if (!model || !model->getOptionsModel())
+        return;
+    if (ui->radioCustomFee->isChecked()) {
+        feeInfo->setText(ui->checkBoxMinimumFee->isChecked() ? ui->checkBoxMinimumFee->text()
+            : AokChainUnits::formatWithUnit(model->getOptionsModel()->getDisplayUnit(), ui->customFee->value()) + "/kB");
+    } else {
+        QString text = ui->labelSmartFee->text();
+        if (!ui->labelFeeEstimation->text().isEmpty())
+            text += QString::fromUtf8(" · ") + ui->labelFeeEstimation->text();
+        feeInfo->setText(text);
+    }
+}
+
+/** Use everything that can be spent for this recipient; the fee comes out of the amount. */
+void SendCoinsDialog::useAvailableBalance(SendCoinsEntry *entry)
+{
+    if (!model || !model->getOptionsModel())
+        return;
+    // Calculate available amount to send.
+    CAmount amount = model->getOptionsModel()->getCoinControlFeatures() && CoinControlDialog::coinControl->HasSelected()
+        ? model->getBalance(CoinControlDialog::coinControl) : model->getBalance();
+    for (int i = 0; i < ui->entries->count(); ++i) {
+        SendCoinsEntry *e = qobject_cast<SendCoinsEntry*>(ui->entries->itemAt(i)->widget());
+        if (e && !e->isHidden() && e != entry)
+            amount -= e->amount();
+    }
+    if (amount > 0) {
+        entry->checkSubtractFeeFromAmount();
+        entry->setAmount(amount);
+    } else {
+        entry->setAmount(0);
+    }
+}
+
+static QString plainAmount(int unit, const CAmount &amount)
+{
+    return GUIUtil::withThousands(AokChainUnits::format(unit, amount, false, AokChainUnits::separatorNever));
+}
+
+void SendCoinsDialog::updateSummary()
+{
+    if (!model || !model->getOptionsModel())
+        return;
+    const int unit = model->getOptionsModel()->getDisplayUnit();
+    const QString unitName = AokChainUnits::name(unit);
+    const QString dash = QString::fromUtf8("–");
+
+    int count = 0;
+    CAmount total = 0;
+    bool subtractFee = false;
+    QString address, label;
+    for (int i = 0; i < ui->entries->count(); ++i) {
+        SendCoinsEntry *entry = qobject_cast<SendCoinsEntry*>(ui->entries->itemAt(i)->widget());
+        if (!entry || entry->isHidden())
+            continue;
+        ++count;
+        total += entry->amount();
+        subtractFee = subtractFee || entry->subtractsFee();
+        address = entry->addressText();
+        label = entry->labelText();
+    }
+
+    // recipient: the label, or the address in its short form with the full one in a tool tip
+    if (count > 1) {
+        summaryRecipient->setFont(GUIUtil::appFont(14, QFont::DemiBold));
+        summaryRecipient->setText(tr("%n recipient(s)", "", count));
+        summaryRecipient->setToolTip(QString());
+    } else if (address.isEmpty()) {
+        summaryRecipient->setText(dash);
+        summaryRecipient->setToolTip(QString());
+    } else {
+        const bool valid = model->validateAddress(address);
+        summaryRecipient->setFont(valid ? GUIUtil::monoFont(14, QFont::DemiBold) : GUIUtil::appFont(14, QFont::DemiBold));
+        const QString shown = valid ? GUIUtil::shortAddress(address) : address;
+        summaryRecipient->setText(QFontMetrics(summaryRecipient->font()).elidedText(shown, Qt::ElideMiddle, 220));
+        summaryRecipient->setToolTip(GUIUtil::monoToolTip(address, label));
+    }
+
+    // fee for a typical transaction of this many outputs at the chosen rate
+    CCoinControl coin_control;
+    updateCoinControlState(coin_control);
+    const unsigned int bytes = 10 + 4 + 148 + 34 * (qMax(1, count) + 1);
+    const CAmount fee = GetMinimumFee(bytes, coin_control, ::mempool, ::feeEstimator, nullptr);
+
+    const CAmount balance = model->getBalance();
+    if (total > 0) {
+        summaryAmount->setText(plainAmount(unit, total) + " " + unitName);
+        summaryFee->setText(QString::fromUtf8("≈ ") + plainAmount(unit, fee) + " " + unitName);
+        const CAmount spent = subtractFee ? total : total + fee;
+        summaryTotal->setText(QString("%1 <span style=\"font-family:'Noto Sans'; font-size:14px; color:%2;\">%3</span>")
+            .arg(plainAmount(unit, spent), GUIUtil::theme().accent.name(), unitName));
+        summaryAfter->setText(plainAmount(unit, balance - spent) + " " + unitName);
+        summaryAfter->setStyleSheet(balance - spent < 0 ? QString("QLabel { color: %1; }").arg(GUIUtil::theme().error.name()) : QString());
+
+        // "Send 25 AOK"
+        QString shortAmount = AokChainUnits::format(unit, total, false, AokChainUnits::separatorNever);
+        if (shortAmount.contains('.')) {
+            while (shortAmount.endsWith('0'))
+                shortAmount.chop(1);
+            if (shortAmount.endsWith('.'))
+                shortAmount.chop(1);
+        }
+        ui->sendButton->setText(tr("Send %1").arg(GUIUtil::withThousands(shortAmount) + " " + unitName));
+    } else {
+        summaryAmount->setText(dash);
+        summaryFee->setText(dash);
+        summaryTotal->setText(dash);
+        summaryAfter->setText(plainAmount(unit, balance) + " " + unitName);
+        summaryAfter->setStyleSheet(QString());
+        ui->sendButton->setText(tr("Send"));
+    }
+}
+
 void SendCoinsDialog::setClientModel(ClientModel *_clientModel)
 {
     this->clientModel = _clientModel;
@@ -153,6 +448,13 @@ void SendCoinsDialog::setModel(WalletModel *_model)
         connect(_model->getOptionsModel(), SIGNAL(coinControlFeaturesChanged(bool)), this, SLOT(coinControlFeatureChanged(bool)));
         ui->frameCoinControl->setVisible(_model->getOptionsModel()->getCoinControlFeatures());
         coinControlUpdateLabels();
+
+        // "normal" is the default confirmation target of the wallet, "slow" two steps later
+        const int normalIndex = getIndexForConfTarget(model->getDefaultConfirmTarget());
+        feeTargets[1] = getConfTargetForIndex(normalIndex);
+        feeTargets[0] = getConfTargetForIndex(std::min(normalIndex + 2, (int)confTargets.size() - 1));
+        feeButtons[0]->setText(tr("Slow") + "\n" + tr("about %1 blocks").arg(feeTargets[0]));
+        feeButtons[1]->setText(tr("Normal") + "\n" + tr("about %1 blocks").arg(feeTargets[1]));
 
         // fee section
         for (const int &n : confTargets) {
@@ -208,7 +510,7 @@ SendCoinsDialog::~SendCoinsDialog()
 void SendCoinsDialog::setupCoinControl(const PlatformStyle *platformStyle)
 {
     /** Update the coincontrol frame */
-    ui->frameCoinControl->setStyleSheet(GUIUtil::cardFrameStyle());
+    ui->frameCoinControl->setStyleSheet(QString(".QFrame { background-color: %1; border: none; border-radius: 12px; padding: 10px 8px; }").arg(GUIUtil::theme().surfaceAlt.name()));
     ui->widgetCoinControl->setStyleSheet(".QWidget {background-color: transparent;}");
     /** Create the shadow effects on the frames */
 
@@ -261,15 +563,15 @@ void SendCoinsDialog::setupScrollView(const PlatformStyle *platformStyle)
     /** Update the scrollview*/
     ui->scrollArea->setStyleSheet(".QScrollArea { background: transparent; border: none; }");
 
-    // Add some spacing so we can see the whole card
-    ui->entries->setContentsMargins(10,10,20,0);
+    ui->entries->setContentsMargins(0,0,6,0);
+    ui->entries->setSpacing(18);
     ui->scrollAreaWidgetContents->setStyleSheet(".QWidget { background: transparent; }");
 }
 
 void SendCoinsDialog::setupFeeControl(const PlatformStyle *platformStyle)
 {
-    /** Update the coincontrol frame */
-    ui->frameFee->setStyleSheet(GUIUtil::cardFrameStyle());
+    /** Update the fee frame */
+    ui->frameFee->setStyleSheet(QString(".QFrame#frameFee { background-color: %1; border: none; border-radius: 12px; padding: 6px 8px; }").arg(GUIUtil::theme().surfaceAlt.name()));
     /** Create the shadow effects on the frames */
 
     ui->labelFeeHeadline->setStyleSheet(STRING_LABEL_COLOR);
@@ -485,6 +787,8 @@ SendCoinsEntry *SendCoinsDialog::addEntry()
     connect(entry, SIGNAL(removeEntry(SendCoinsEntry*)), this, SLOT(removeEntry(SendCoinsEntry*)));
     connect(entry, SIGNAL(payAmountChanged()), this, SLOT(coinControlUpdateLabels()));
     connect(entry, SIGNAL(subtractFeeFromAmountChanged()), this, SLOT(coinControlUpdateLabels()));
+    connect(entry, SIGNAL(recipientChanged()), this, SLOT(updateSummary()));
+    connect(entry, SIGNAL(useAvailableBalance(SendCoinsEntry*)), this, SLOT(useAvailableBalance(SendCoinsEntry*)));
 
     // Focus the field, so that entry can start immediately
     entry->clear();
@@ -602,6 +906,9 @@ void SendCoinsDialog::setBalance(const CAmount& balance, const CAmount& unconfir
 
     if(model && model->getOptionsModel())
     {
+        const int unit = model->getOptionsModel()->getDisplayUnit();
+        availableLabel->setText(GUIUtil::withThousands(AokChainUnits::format(unit, balance, false, AokChainUnits::separatorNever)) + " " + AokChainUnits::name(unit));
+        updateSummary();
         ui->labelBalance->setText(AokChainUnits::formatWithUnit(model->getOptionsModel()->getDisplayUnit(), balance));
     }
 }
@@ -669,11 +976,15 @@ void SendCoinsDialog::processSendCoinsReturn(const WalletModel::SendCoinsReturn 
 
 void SendCoinsDialog::minimizeFeeSection(bool fMinimize)
 {
-    ui->labelFeeMinimized->setVisible(fMinimize);
-    ui->buttonChooseFee  ->setVisible(fMinimize);
-    ui->buttonMinimizeFee->setVisible(!fMinimize);
-    ui->frameFeeSelection->setVisible(!fMinimize);
-    ui->horizontalLayoutSmartFee->setContentsMargins(0, (fMinimize ? 0 : 6), 0, 0);
+    // The three fee buttons take the place of the minimized fee section; the
+    // complete controls are shown or hidden as a whole
+    ui->labelFeeHeadline ->setVisible(false);
+    ui->labelFeeMinimized->setVisible(false);
+    ui->buttonChooseFee  ->setVisible(false);
+    ui->buttonMinimizeFee->setVisible(false);
+    ui->frameFeeSelection->setVisible(true);
+    ui->frameFee->setVisible(!fMinimize);
+    feeDetailsButton->setText(fMinimize ? tr("Fee settings") : tr("Hide fee settings"));
     fFeeMinimized = fMinimize;
 }
 
@@ -704,6 +1015,7 @@ void SendCoinsDialog::updateFeeSectionControls()
     ui->labelMinFeeWarning      ->setEnabled(ui->radioCustomFee->isChecked());
     ui->labelCustomPerKilobyte  ->setEnabled(ui->radioCustomFee->isChecked() && !ui->checkBoxMinimumFee->isChecked());
     ui->customFee               ->setEnabled(ui->radioCustomFee->isChecked() && !ui->checkBoxMinimumFee->isChecked());
+    updateFeeButtons();
 }
 
 void SendCoinsDialog::updateFeeMinimizedLabel()
@@ -768,6 +1080,7 @@ void SendCoinsDialog::updateSmartFeeLabel()
     }
 
     updateFeeMinimizedLabel();
+    updateFeeButtons();
 }
 
 // Coin Control: copy label "Quantity" to clipboard
@@ -908,6 +1221,8 @@ void SendCoinsDialog::coinControlUpdateLabels()
         return;
 
     updateCoinControlState(*CoinControlDialog::coinControl);
+    updateFeeButtons();
+    updateSummary();
 
     // set pay amounts
     CoinControlDialog::payAmounts.clear();
@@ -983,4 +1298,9 @@ void SendConfirmationDialog::updateYesButton()
         yesButton->setEnabled(true);
         yesButton->setText(tr("Yes"));
     }
+}
+
+QWidget *SendCoinsDialog::headerWidget() const
+{
+    return headerBox;
 }

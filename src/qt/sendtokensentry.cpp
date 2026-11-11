@@ -102,7 +102,8 @@ SendTokensEntry::SendTokensEntry(const PlatformStyle *_platformStyle, const QStr
 
     fShowAdministratorList = false;
 
-    this->setStyleSheet(GUIUtil::cardFrameStyle(".SendTokensEntry"));
+    // the entries sit in the card of the tokens page
+    this->setStyleSheet(".SendTokensEntry { background: transparent; border: none; }");
 
     ui->tokenBoxLabel->setStyleSheet(STRING_LABEL_COLOR);
     ui->tokenBoxLabel->setFont(GUIUtil::getSubLabelFont());

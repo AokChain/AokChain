@@ -32,6 +32,9 @@
 #include "guiconstants.h"
 
 #include <QFontMetrics>
+#include <QHBoxLayout>
+#include <QLabel>
+#include <QVBoxLayout>
 #include <QMessageBox>
 #include <QScrollBar>
 #include <QSettings>
@@ -52,16 +55,12 @@ TokensDialog::TokensDialog(const PlatformStyle *_platformStyle, QWidget *parent)
 {
     ui->setupUi(this);
     ui->sendButton->setProperty("primary", true);
+    buildLayout();
 
-    if (!_platformStyle->getImagesOnButtons()) {
-        ui->addButton->setIcon(QIcon());
-        ui->clearButton->setIcon(QIcon());
-        ui->sendButton->setIcon(QIcon());
-    } else {
-        ui->addButton->setIcon(_platformStyle->SingleColorIcon(":/icons/add"));
-        ui->clearButton->setIcon(_platformStyle->SingleColorIcon(":/icons/remove"));
-        ui->sendButton->setIcon(_platformStyle->SingleColorIcon(":/icons/send"));
-    }
+    ui->addButton->setIcon(QIcon(GUIUtil::lineIcon("plus", 14, GUIUtil::theme().label, 2.4)));
+    ui->addButton->setIconSize(QSize(14, 14));
+    ui->clearButton->setIcon(QIcon());
+    ui->sendButton->setIcon(QIcon());
 
     GUIUtil::setupAddressWidget(ui->lineEditTokenControlChange, this);
 
@@ -124,6 +123,63 @@ TokensDialog::TokensDialog(const PlatformStyle *_platformStyle, QWidget *parent)
     setupScrollView(platformStyle);
     setupFeeControl(platformStyle);
     /** TOKENS END */
+}
+
+void TokensDialog::buildLayout()
+{
+    // the layouts of the form go; the widgets stay
+    delete layout();
+    QHBoxLayout *columns = new QHBoxLayout(this);
+    columns->setContentsMargins(0, 0, 0, 0);
+    columns->setSpacing(20);
+
+    QFrame *formCard = new QFrame(this);
+    formCard->setProperty("role", "card");
+    QVBoxLayout *form = new QVBoxLayout(formCard);
+    form->setContentsMargins(26, 24, 20, 20);
+    form->setSpacing(12);
+    form->addWidget(ui->scrollArea, 1);
+    form->addWidget(ui->frameFee);
+    form->addWidget(ui->frameTokenControl);
+    ui->addButton->setProperty("look", "dashed");
+    ui->addButton->setFixedHeight(44);
+    ui->addButton->setCursor(Qt::PointingHandCursor);
+    form->addWidget(ui->addButton, 0, Qt::AlignLeft);
+    columns->addWidget(formCard, 3);
+
+    QFrame *summaryCard = new QFrame(this);
+    summaryCard->setProperty("role", "card");
+    QVBoxLayout *summary = new QVBoxLayout(summaryCard);
+    summary->setContentsMargins(26, 24, 26, 24);
+    summary->setSpacing(14);
+    QLabel *title = new QLabel(tr("Summary"), summaryCard);
+    title->setProperty("role", "title");
+    title->setFont(GUIUtil::appFont(16, QFont::Bold));
+    summary->addWidget(title);
+    QLabel *note = new QLabel(tr("Tokens are sent to AokChain addresses. The fee is paid in AOK."), summaryCard);
+    note->setProperty("role", "secondary");
+    note->setWordWrap(true);
+    summary->addWidget(note);
+    QHBoxLayout *balanceRow = new QHBoxLayout();
+    ui->label->setProperty("role", "secondary");
+    ui->labelBalance->setAlignment(Qt::AlignRight | Qt::AlignVCenter);
+    balanceRow->addWidget(ui->label);
+    balanceRow->addWidget(ui->labelBalance, 1);
+    summary->addLayout(balanceRow);
+    summary->addStretch(1);
+    QLabel *warning = new QLabel(tr("A transaction that has been sent cannot be cancelled. Check the address once more."), summaryCard);
+    warning->setProperty("role", "warning");
+    warning->setWordWrap(true);
+    summary->addWidget(warning);
+    ui->sendButton->setProperty("look", "send");
+    ui->sendButton->setFixedHeight(52);
+    ui->sendButton->setCursor(Qt::PointingHandCursor);
+    summary->addWidget(ui->sendButton);
+    ui->clearButton->setProperty("look", "ghost");
+    ui->clearButton->setFixedHeight(44);
+    ui->clearButton->setCursor(Qt::PointingHandCursor);
+    summary->addWidget(ui->clearButton);
+    columns->addWidget(summaryCard, 2);
 }
 
 void TokensDialog::setClientModel(ClientModel *_clientModel)
@@ -223,7 +279,7 @@ TokensDialog::~TokensDialog()
 void TokensDialog::setupTokenControlFrame(const PlatformStyle *platformStyle)
 {
     /** Update the tokencontrol frame */
-    ui->frameTokenControl->setStyleSheet(GUIUtil::cardFrameStyle());
+    ui->frameTokenControl->setStyleSheet(QString(".QFrame { background-color: %1; border: none; border-radius: 12px; padding: 10px 8px; }").arg(GUIUtil::theme().surfaceAlt.name()));
     ui->widgetTokenControl->setStyleSheet(".QWidget {background-color: transparent;}");
     /** Create the shadow effects on the frames */
 
@@ -276,15 +332,15 @@ void TokensDialog::setupScrollView(const PlatformStyle *platformStyle)
     /** Update the scrollview*/
     ui->scrollArea->setStyleSheet(".QScrollArea { background: transparent; border: none; }");
 
-    // Add some spacing so we can see the whole card
-    ui->entries->setContentsMargins(10,10,20,0);
+    ui->entries->setContentsMargins(0,0,6,0);
+    ui->entries->setSpacing(18);
     ui->scrollAreaWidgetContents->setStyleSheet(".QWidget { background: transparent; }");
 }
 
 void TokensDialog::setupFeeControl(const PlatformStyle *platformStyle)
 {
-    /** Update the coincontrol frame */
-    ui->frameFee->setStyleSheet(GUIUtil::cardFrameStyle());
+    /** Update the fee frame */
+    ui->frameFee->setStyleSheet(QString(".QFrame#frameFee { background-color: %1; border: none; border-radius: 12px; padding: 6px 8px; }").arg(GUIUtil::theme().surfaceAlt.name()));
     /** Create the shadow effects on the frames */
 
     ui->labelFeeHeadline->setStyleSheet(STRING_LABEL_COLOR);
@@ -644,7 +700,7 @@ void TokensDialog::setBalance(const CAmount& balance, const CAmount& unconfirmed
     Q_UNUSED(watchUnconfirmedBalance);
     Q_UNUSED(watchImmatureBalance);
 
-    ui->labelBalance->setFont(GUIUtil::getSubLabelFont());
+    ui->labelBalance->setFont(GUIUtil::monoFont(13, QFont::DemiBold));
     ui->label->setFont(GUIUtil::getSubLabelFont());
 
     if(model && model->getOptionsModel())

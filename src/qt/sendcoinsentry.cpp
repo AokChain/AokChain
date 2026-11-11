@@ -18,6 +18,11 @@
 
 #include <tokens/tokens.h>
 
+#include <QHBoxLayout>
+#include <QLabel>
+#include <QPushButton>
+#include <QStyle>
+#include <QVBoxLayout>
 #include <QApplication>
 #include <QClipboard>
 
@@ -37,8 +42,7 @@ SendCoinsEntry::SendCoinsEntry(const PlatformStyle *_platformStyle, QWidget *par
 
     setCurrentWidget(ui->SendCoins);
 
-    if (platformStyle->getUseExtraSpacing())
-        ui->payToLayout->setSpacing(4);
+    buildLayout();
 #if QT_VERSION >= 0x040700
     ui->addAsLabel->setPlaceholderText(tr("Enter a label for this address to add it to your address book"));
 #endif
@@ -56,7 +60,8 @@ SendCoinsEntry::SendCoinsEntry(const PlatformStyle *_platformStyle, QWidget *par
     connect(ui->deleteButton_is, SIGNAL(clicked()), this, SLOT(deleteClicked()));
     connect(ui->deleteButton_s, SIGNAL(clicked()), this, SLOT(deleteClicked()));
 
-    this->setStyleSheet(GUIUtil::cardFrameStyle(".SendCoinsEntry"));
+    // the entries sit in the card of the send page
+    this->setStyleSheet(".SendCoinsEntry { background: transparent; border: none; }");
 
     ui->payToLabel->setStyleSheet(STRING_LABEL_COLOR);
     ui->payToLabel->setFont(GUIUtil::getSubLabelFont());
@@ -79,12 +84,159 @@ SendCoinsEntry::SendCoinsEntry(const PlatformStyle *_platformStyle, QWidget *par
 #else
     ui->useLockTime->setStyleSheet(QString(".QCheckBox{ %1; }").arg(STRING_LABEL_COLOR));
 #endif
-    ui->payTo->setFont(GUIUtil::getSubLabelFont());
+    ui->payTo->setFont(GUIUtil::monoFont(14));
     ui->addAsLabel->setFont(GUIUtil::getSubLabelFont());
     ui->coinLockTime->setFont(GUIUtil::getSubLabelFont());
     ui->coinLockTime->setMinimumDate(QDate::currentDate());
-    ui->payAmount->setFont(GUIUtil::getSubLabelFont());
     ui->messageTextLabel->setFont(GUIUtil::getSubLabelFont());
+}
+
+/** Labels above the fields, the amount in a large box of its own. */
+void SendCoinsEntry::buildLayout()
+{
+    const GUIUtil::Theme& theme = GUIUtil::theme();
+
+    // the grid of the form goes; its widgets stay
+    delete ui->SendCoins->layout();
+    QVBoxLayout *layout = new QVBoxLayout(ui->SendCoins);
+    layout->setContentsMargins(0, 0, 0, 12);
+    layout->setSpacing(8);
+
+    ui->payToLabel->setText(tr("Recipient &address"));
+    ui->labellLabel->setText(tr("&Label"));
+    ui->amountLabel->setText(tr("A&mount"));
+    for (QLabel *label : {ui->payToLabel, ui->labellLabel, ui->amountLabel, ui->lockTimeLabel, ui->messageLabel}) {
+        label->setProperty("role", "fieldLabel");
+        label->setAlignment(Qt::AlignLeft | Qt::AlignVCenter);
+    }
+
+    // address with the address book, paste and remove buttons
+    layout->addWidget(ui->payToLabel);
+    QHBoxLayout *addressRow = new QHBoxLayout();
+    addressRow->setSpacing(8);
+    ui->payTo->setProperty("look", "field");
+    ui->payTo->setFixedHeight(48);
+    addressRow->addWidget(ui->payTo, 1);
+    const std::pair<QToolButton*, const char*> squares[] = {
+        {ui->addressBookButton, "addressbook"}, {ui->pasteButton, "paste"}, {ui->deleteButton, "remove"}};
+    for (const std::pair<QToolButton*, const char*>& square : squares) {
+        square.first->setIcon(QIcon(GUIUtil::lineIcon(square.second, 18, theme.label)));
+        square.first->setIconSize(QSize(18, 18));
+        square.first->setFixedSize(48, 48);
+        square.first->setCursor(Qt::PointingHandCursor);
+        addressRow->addWidget(square.first);
+    }
+    layout->addLayout(addressRow);
+    addressHint = new QLabel(ui->SendCoins);
+    addressHint->setFont(GUIUtil::appFont(12));
+    addressHint->setMinimumHeight(16);
+    layout->addWidget(addressHint);
+    layout->addSpacing(6);
+
+    layout->addWidget(ui->labellLabel);
+    ui->addAsLabel->setProperty("look", "field");
+    ui->addAsLabel->setFixedHeight(48);
+    layout->addWidget(ui->addAsLabel);
+    layout->addSpacing(10);
+
+    // amount
+    layout->addWidget(ui->amountLabel);
+    QFrame *amountBox = new QFrame(ui->SendCoins);
+    amountBox->setProperty("role", "amountBox");
+    amountBox->setFixedHeight(60);
+    QHBoxLayout *amountLayout = new QHBoxLayout(amountBox);
+    amountLayout->setContentsMargins(16, 0, 10, 0);
+    amountLayout->setSpacing(12);
+    ui->payAmount->setHeroStyle();
+    amountLayout->addWidget(ui->payAmount, 1);
+    QPushButton *maxButton = new QPushButton(tr("All"), amountBox);
+    maxButton->setProperty("look", "soft");
+    maxButton->setToolTip(tr("Use the whole available balance. The fee is subtracted from the amount."));
+    maxButton->setFixedHeight(40);
+    maxButton->setCursor(Qt::PointingHandCursor);
+    amountLayout->addWidget(maxButton);
+    connect(maxButton, SIGNAL(clicked()), this, SLOT(useAvailableBalanceClicked()));
+    layout->addWidget(amountBox);
+    ui->checkboxSubtractFeeFromAmount->setText(tr("S&ubtract the fee from the amount"));
+    layout->addWidget(ui->checkboxSubtractFeeFromAmount);
+
+    // time lock
+    QHBoxLayout *lockRow = new QHBoxLayout();
+    lockRow->setSpacing(10);
+    ui->lockTimeLabel->hide();
+    ui->coinLockTime->setFont(GUIUtil::monoFont(13));
+    ui->coinLockTime->setDisplayFormat("yyyy-MM-dd HH:mm");
+    lockRow->addWidget(ui->useLockTime);
+    lockRow->addWidget(ui->coinLockTime);
+    lockRow->addStretch();
+    layout->addLayout(lockRow);
+
+    // message of an aokchain: URI
+    layout->addWidget(ui->messageLabel);
+    layout->addWidget(ui->messageTextLabel);
+
+    updateAddressHint(QString());
+}
+
+void SendCoinsEntry::updateAddressHint(const QString &address)
+{
+    const QString text = address.trimmed();
+    if (text.isEmpty() || !model) {
+        addressHint->setText(QString());
+        return;
+    }
+    if (model->validateAddress(text)) {
+        addressHint->setProperty("role", "ok");
+        addressHint->setText(tr("This is a valid AokChain address"));
+    } else if (IsUsernameValid(text.toStdString())) {
+        addressHint->setProperty("role", "secondary");
+        addressHint->setText(tr("A user name: it is resolved to its address when sending"));
+    } else {
+        addressHint->setProperty("role", "error");
+        addressHint->setText(tr("This is not a valid AokChain address"));
+    }
+    // the role selects the color
+    addressHint->style()->unpolish(addressHint);
+    addressHint->style()->polish(addressHint);
+}
+
+void SendCoinsEntry::useAvailableBalanceClicked()
+{
+    Q_EMIT useAvailableBalance(this);
+}
+
+QString SendCoinsEntry::addressText() const
+{
+    if (recipient.paymentRequest.IsInitialized())
+        return recipient.authenticatedMerchant.isEmpty() ? recipient.address : recipient.authenticatedMerchant;
+    return ui->payTo->text().trimmed();
+}
+
+QString SendCoinsEntry::labelText() const
+{
+    return ui->addAsLabel->text();
+}
+
+CAmount SendCoinsEntry::amount() const
+{
+    if (recipient.paymentRequest.IsInitialized())
+        return recipient.amount;
+    return ui->payAmount->value();
+}
+
+bool SendCoinsEntry::subtractsFee() const
+{
+    return ui->checkboxSubtractFeeFromAmount->checkState() == Qt::Checked;
+}
+
+void SendCoinsEntry::setAmount(const CAmount &amount)
+{
+    ui->payAmount->setValue(amount);
+}
+
+void SendCoinsEntry::checkSubtractFeeFromAmount()
+{
+    ui->checkboxSubtractFeeFromAmount->setChecked(true);
 }
 
 void SendCoinsEntry::toggleTimeLock(bool checked)
@@ -118,6 +270,8 @@ void SendCoinsEntry::on_addressBookButton_clicked()
 
 void SendCoinsEntry::on_payTo_textChanged(const QString &address)
 {
+    updateAddressHint(address);
+    Q_EMIT recipientChanged();
     updateLabel(address);
 }
 

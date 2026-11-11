@@ -12,23 +12,25 @@
 #include <QSortFilterProxyModel>
 #include <QWidget>
 #include <QMenu>
+#include <QPointer>
 #include <memory>
 
+class BalanceLabel;
 class ClientModel;
 class TransactionFilterProxy;
 class TxViewDelegate;
 class PlatformStyle;
 class WalletModel;
 class TokenFilterProxy;
-
 class TokenViewDelegate;
 
-namespace Ui {
-    class OverviewPage;
-}
-
 QT_BEGIN_NAMESPACE
+class QFrame;
+class QLabel;
+class QLineEdit;
+class QListView;
 class QModelIndex;
+class QPushButton;
 QT_END_NAMESPACE
 
 /** Overview ("home") page widget */
@@ -44,6 +46,8 @@ public:
     void setWalletModel(WalletModel *walletModel);
     void showOutOfSyncWarning(bool fShow);
     void showTokens();
+    /** The "balances may be wrong while synchronizing" marker, shown next to the page title */
+    QWidget *headerWidget() const;
 
 public Q_SLOTS:
     void setBalance(const CAmount& balance, const CAmount& unconfirmedBalance, const CAmount& immatureBalance, const CAmount& stake,
@@ -56,9 +60,16 @@ Q_SIGNALS:
     void tokenIssueUniqueClicked(const QModelIndex &index);
     void tokenReissueClicked(const QModelIndex &index);
     void outOfSyncWarningClicked();
+    void sendClicked();
+    void receiveClicked();
+    void allTransactionsClicked();
+    void allTokensClicked();
+
+protected:
+    void resizeEvent(QResizeEvent *event) override;
+    void showEvent(QShowEvent *event) override;
 
 private:
-    Ui::OverviewPage *ui;
     ClientModel *clientModel;
     WalletModel *walletModel;
     CAmount currentBalance;
@@ -71,6 +82,21 @@ private:
     CAmount currentWatchOnlyStake;
     CAmount currentLockedBalance;
 
+    QPointer<QWidget> syncPill;
+    QLabel *labelAlerts;
+    BalanceLabel *labelTotal;
+    QLabel *labelBalance;
+    QLabel *labelUnconfirmed;
+    QLabel *labelImmature;
+    QLabel *labelStake;
+    QWidget *stakeBlock;
+    QLabel *labelWatchOnly;
+    QFrame *tokenFrame;
+    QLabel *tokenCount;
+    QLineEdit *tokenSearch;
+    QListView *listTokens;
+    QListView *listTransactions;
+
     TxViewDelegate *txdelegate;
     std::unique_ptr<TransactionFilterProxy> filter;
     std::unique_ptr<TokenFilterProxy> tokenFilter;
@@ -82,6 +108,8 @@ private:
     QAction *issueUnique;
     QAction *reissue;
 
+    int transactionLimit;
+    void updateTransactionLimit();
 
 private Q_SLOTS:
     void updateDisplayUnit();
@@ -91,6 +119,7 @@ private Q_SLOTS:
     void updateWatchOnlyLabels(bool showWatchOnly);
     void handleOutOfSyncWarningClicks();
     void tokenSearchChanged();
+    void updateTokenCount();
 };
 
 #endif // AOKCHAIN_QT_OVERVIEWPAGE_H

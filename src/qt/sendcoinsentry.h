@@ -9,9 +9,15 @@
 
 #include "walletmodel.h"
 
+#include "amount.h"
+
 #include <QStackedWidget>
 
 class WalletModel;
+
+QT_BEGIN_NAMESPACE
+class QLabel;
+QT_END_NAMESPACE
 class PlatformStyle;
 
 namespace Ui {
@@ -48,6 +54,15 @@ public:
 
     void setFocus();
 
+    /** What the summary of the send page shows */
+    QString addressText() const;
+    QString labelText() const;
+    CAmount amount() const;
+    bool subtractsFee() const;
+    /** Used by "use the whole balance" */
+    void setAmount(const CAmount &amount);
+    void checkSubtractFeeFromAmount();
+
 public Q_SLOTS:
     void clear();
 
@@ -55,6 +70,8 @@ Q_SIGNALS:
     void removeEntry(SendCoinsEntry *entry);
     void payAmountChanged();
     void subtractFeeFromAmountChanged();
+    void recipientChanged();
+    void useAvailableBalance(SendCoinsEntry *entry);
 
 private Q_SLOTS:
     void deleteClicked();
@@ -63,6 +80,7 @@ private Q_SLOTS:
     void on_pasteButton_clicked();
     void updateDisplayUnit();
     void toggleTimeLock(bool checked);
+    void useAvailableBalanceClicked();
 
 private:
     SendCoinsRecipient recipient;
@@ -70,7 +88,11 @@ private:
     WalletModel *model;
     const PlatformStyle *platformStyle;
 
+    QLabel *addressHint;
+
     bool updateLabel(const QString &address);
+    void buildLayout();
+    void updateAddressHint(const QString &address);
 };
 
 #endif // AOKCHAIN_QT_SENDCOINSENTRY_H

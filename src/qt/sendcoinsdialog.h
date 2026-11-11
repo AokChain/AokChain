@@ -24,6 +24,8 @@ namespace Ui {
 }
 
 QT_BEGIN_NAMESPACE
+class QLabel;
+class QPushButton;
 class QUrl;
 QT_END_NAMESPACE
 
@@ -50,6 +52,9 @@ public:
     void setupCoinControl(const PlatformStyle *platformStyle);
     void setupScrollView(const PlatformStyle *platformStyle);
     void setupFeeControl(const PlatformStyle *platformStyle);
+
+    /** The available balance, shown next to the page title */
+    QWidget *headerWidget() const;
 public Q_SLOTS:
     void clear();
     void reject();
@@ -72,12 +77,31 @@ private:
     // Additional parameter msgArg can be used via .arg(msgArg).
     void processSendCoinsReturn(const WalletModel::SendCoinsReturn &sendCoinsReturn, const QString &msgArg = QString());
     void minimizeFeeSection(bool fMinimize);
+
+    // two columns: the form on the left, the summary on the right
+    QWidget *headerBox;
+    QLabel *availableLabel;
+    QPushButton *feeButtons[3];
+    int feeTargets[2]; //!< confirmation targets of "slow" and "normal"
+    QLabel *feeInfo;
+    QPushButton *feeDetailsButton;
+    QLabel *summaryRecipient;
+    QLabel *summaryAmount;
+    QLabel *summaryFee;
+    QLabel *summaryTotal;
+    QLabel *summaryAfter;
+    void buildLayout();
+    void updateFeeButtons();
     void updateFeeMinimizedLabel();
     // Update the passed in CCoinControl with state from the GUI
     void updateCoinControlState(CCoinControl& ctrl);
 
 private Q_SLOTS:
     void on_sendButton_clicked();
+    void feeButtonClicked(int id);
+    void toggleFeeDetails();
+    void updateSummary();
+    void useAvailableBalance(SendCoinsEntry *entry);
     void on_buttonChooseFee_clicked();
     void on_buttonMinimizeFee_clicked();
     void removeEntry(SendCoinsEntry* entry);

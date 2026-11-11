@@ -106,7 +106,6 @@ QT_FORMS_UI = \
   qt/forms/modaloverlay.ui \
   qt/forms/openuridialog.ui \
   qt/forms/optionsdialog.ui \
-  qt/forms/overviewpage.ui \
   qt/forms/receivecoinsdialog.ui \
   qt/forms/receiverequestdialog.ui \
   qt/forms/debugwindow.ui \
@@ -170,6 +169,7 @@ QT_MOC_CPP = \
   qt/moc_walletframe.cpp \
   qt/moc_walletmodel.cpp \
   qt/moc_walletview.cpp \
+  qt/moc_sidebar.cpp \
   qt/moc_explorerpage.cpp \
   qt/moc_tokensdialog.cpp \
   qt/moc_createtokendialog.cpp \
@@ -259,6 +259,7 @@ AOKCHAIN_QT_H = \
   qt/walletmodel.h \
   qt/walletmodeltransaction.h \
   qt/walletview.h \
+  qt/sidebar.h \
   qt/explorerpage.h \
   qt/winshutdownmonitor.h
 
@@ -377,7 +378,8 @@ AOKCHAIN_QT_BASE_CPP = \
   qt/rpcconsole.cpp \
   qt/splashscreen.cpp \
   qt/trafficgraphwidget.cpp \
-  qt/utilitydialog.cpp
+  qt/utilitydialog.cpp \
+  qt/sidebar.cpp
 
 AOKCHAIN_QT_WINDOWS_CPP = qt/winshutdownmonitor.cpp
 

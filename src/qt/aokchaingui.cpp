@@ -26,6 +26,7 @@
 
 #ifdef ENABLE_WALLET
 #include "walletframe.h"
+#include "sidebar.h"
 #include "walletmodel.h"
 #endif // ENABLE_WALLET
 
@@ -133,8 +134,10 @@ AokChainGUI::AokChainGUI(const PlatformStyle *_platformStyle, const NetworkStyle
     transferTokenAction(0),
     createTokenAction(0),
     manageTokenAction(0),
+    explorerAction(0),
     footerWidget(0),
     stakingButton(0),
+    sidebar(0),
     trayIcon(0),
     trayIconMenu(0),
     notificator(0),
@@ -143,6 +146,9 @@ AokChainGUI::AokChainGUI(const PlatformStyle *_platformStyle, const NetworkStyle
     modalOverlay(0),
     prevBlocks(0),
     spinnerFrame(0),
+    nWeight(0),
+    nStaking(false),
+    fSyncing(false),
     platformStyle(_platformStyle)
 
 {
@@ -221,6 +227,9 @@ AokChainGUI::AokChainGUI(const PlatformStyle *_platformStyle, const NetworkStyle
 
     // Disable size grip because it looks ugly and nobody needs it
     statusBar()->setSizeGripEnabled(false);
+    // With a wallet the side bar shows the status; the widgets of the status bar stay alive
+    if (walletFrame)
+        statusBar()->hide();
 
     // Status bar notification icons
     QFrame *frameBlocks = new QFrame();
@@ -238,8 +247,8 @@ AokChainGUI::AokChainGUI(const PlatformStyle *_platformStyle, const NetworkStyle
     QTimer *timerStakingIcon = new QTimer(labelStakingIcon);
     connect(timerStakingIcon, SIGNAL(timeout()), this, SLOT(updateStakingIcon()));
     timerStakingIcon->start(30 * 1000);
-    updateStakingIcon();
     this->nStaking = gArgs.GetBoolArg("-staking", false);
+    updateStakingIcon();
 
     if(enableWallet)
     {
@@ -362,7 +371,7 @@ void AokChainGUI::createActions()
     tabGroup->addAction(historyAction);
 
     /** TOKENS START */
-    transferTokenAction = new QAction(platformStyle->SingleColorIconOnOff(":/icons/token_transfer", ":/icons/token_transfer"), tr("&Transfer Tokens"), this);
+    transferTokenAction = new QAction(platformStyle->SingleColorIconOnOff(":/icons/token_transfer", ":/icons/token_transfer"), tr("T&okens"), this);
     transferTokenAction->setStatusTip(tr("Transfer tokens to AOK addresses"));
     transferTokenAction->setToolTip(transferTokenAction->statusTip());
     transferTokenAction->setCheckable(true);
@@ -388,6 +397,14 @@ void AokChainGUI::createActions()
 
     /** TOKENS END */
 
+    explorerAction = new QAction(tr("&Explorer"), this);
+    explorerAction->setStatusTip(tr("Look up transactions, addresses and blocks on this node"));
+    explorerAction->setToolTip(explorerAction->statusTip());
+    explorerAction->setCheckable(true);
+    explorerAction->setShortcut(QKeySequence(Qt::ALT + Qt::Key_8));
+    explorerAction->setFont(font);
+    tabGroup->addAction(explorerAction);
+
 #ifdef ENABLE_WALLET
     // These showNormalIfMinimized are needed because Send Coins and Receive Coins
     // can be triggered from the tray menu, and need to show the GUI to be useful.
@@ -409,6 +426,8 @@ void AokChainGUI::createActions()
     connect(createTokenAction, SIGNAL(triggered()), this, SLOT(gotoCreateTokensPage()));
     connect(manageTokenAction, SIGNAL(triggered()), this, SLOT(showNormalIfMinimized()));
     connect(manageTokenAction, SIGNAL(triggered()), this, SLOT(gotoManageTokensPage()));
+    connect(explorerAction, SIGNAL(triggered()), this, SLOT(showNormalIfMinimized()));
+    connect(explorerAction, SIGNAL(triggered()), this, SLOT(gotoExplorerPage()));
     // TODO add messaging actions to go to messaging page when clicked
     // TODO add voting actions to go to voting page when clicked
 #endif // ENABLE_WALLET
@@ -539,63 +558,53 @@ void AokChainGUI::createToolBars()
     bool displayAdvanced = gArgs.GetBoolArg("-advancedui", false);
     if(walletFrame)
     {
-        QToolBar *toolbar = addToolBar(tr("Tabs toolbar"));
-        toolbar->setObjectName("tabsToolbar");
-        toolbar->setIconSize(QSize(18, 18));
-
-        toolbar->setContextMenuPolicy(Qt::PreventContextMenu);
-        toolbar->setMovable(false);
-        toolbar->setToolButtonStyle(Qt::ToolButtonTextBesideIcon);
-        toolbar->addAction(overviewAction);
-        toolbar->addAction(sendCoinsAction);
-        toolbar->addAction(receiveCoinsAction);
-        toolbar->addAction(historyAction);
-        toolbar->addAction(transferTokenAction);
-
+        // The pages are chosen in a side bar; it also shows what the status bar used to show
+        sidebar = new Sidebar(this);
+        sidebar->addPage(overviewAction, "overview");
+        sidebar->addPage(sendCoinsAction, "send");
+        sidebar->addPage(receiveCoinsAction, "receive");
+        sidebar->addPage(historyAction, "history");
+        sidebar->addPage(transferTokenAction, "tokens");
         if (displayAdvanced) {
-            toolbar->addAction(createTokenAction);
-            toolbar->addAction(manageTokenAction);
+            sidebar->addPage(createTokenAction, "create");
+            sidebar->addPage(manageTokenAction, "manage");
         }
-        
+        sidebar->addPage(explorerAction, "explorer");
+
+        // The actions carry the Alt+number shortcuts of the pages
+        addAction(overviewAction);
+        addAction(sendCoinsAction);
+        addAction(receiveCoinsAction);
+        addAction(historyAction);
+        addAction(transferTokenAction);
+        if (displayAdvanced) {
+            addAction(createTokenAction);
+            addAction(manageTokenAction);
+        }
+        addAction(explorerAction);
+
         overviewAction->setChecked(true);
+
+        connect(sidebar, SIGNAL(stakingToggled()), this, SLOT(toggleStakingActive()));
+        connect(sidebar, SIGNAL(networkClicked()), this, SLOT(toggleNetworkActive()));
+        connect(sidebar, SIGNAL(syncClicked()), this, SLOT(showModalOverlay()));
+
+        // The former footer with the staking button is kept, hidden, for code that still updates it
+        footerWidget->setObjectName("footerWidget");
+        footerWidget->setParent(this);
+        footerWidget->setVisible(false);
+        stakingButton = new QPushButton(footerWidget);
+        stakingButton->setText(tr("Start Staking"));
 
         QWidget* mainWalletWidget = new QWidget();
         mainWalletWidget->setObjectName("mainWalletWidget");
-
-        // Set the headers widget options
-        footerWidget->setContentsMargins(0,0,0,0);
-        footerWidget->setObjectName("footerWidget");
-        footerWidget->setAttribute(Qt::WA_StyledBackground, true);
-        footerWidget->setFixedHeight(56);
-
-        stakingButton = new QPushButton(this);
-        connect(stakingButton, SIGNAL(clicked()), this, SLOT(toggleStakingActive()));
-        stakingButton->setText(tr("Start Staking"));
-        stakingButton->setProperty("primary", true);
-        stakingButton->setMinimumWidth(180);
-        stakingButton->setCursor(Qt::PointingHandCursor);
-
-        QHBoxLayout* footerLayout = new QHBoxLayout(footerWidget);
-        footerLayout->setContentsMargins(16, 10, 16, 10);
-        footerLayout->addStretch();
-        footerLayout->addWidget(stakingButton);
-
-        // Create the layout for widget to the top of the tool bar
-        QVBoxLayout* mainFrameLayout = new QVBoxLayout(mainWalletWidget);
-        mainFrameLayout->addWidget(walletFrame);
-        mainFrameLayout->addWidget(footerWidget);
-        mainFrameLayout->setDirection(QBoxLayout::TopToBottom);
-        mainFrameLayout->setContentsMargins(QMargins());
-
-        QVBoxLayout* layout = new QVBoxLayout();
-        layout->addWidget(mainWalletWidget);
+        mainWalletWidget->setAttribute(Qt::WA_StyledBackground, true);
+        QHBoxLayout* layout = new QHBoxLayout(mainWalletWidget);
         layout->setSpacing(0);
         layout->setContentsMargins(QMargins());
-        layout->setDirection(QBoxLayout::LeftToRight);
-        QWidget* containerWidget = new QWidget();
-        containerWidget->setLayout(layout);
-        setCentralWidget(containerWidget);
-        /** TOKENS END */
+        layout->addWidget(sidebar);
+        layout->addWidget(walletFrame, 1);
+        setCentralWidget(mainWalletWidget);
     }
 }
 
@@ -706,6 +715,7 @@ void AokChainGUI::setWalletActionsEnabled(bool enabled)
     createTokenAction->setEnabled(false);
     manageTokenAction->setEnabled(false);
     /** TOKENS END */
+    explorerAction->setEnabled(enabled);
 }
 
 void AokChainGUI::createTrayIcon(const NetworkStyle *networkStyle)
@@ -818,65 +828,62 @@ void AokChainGUI::openClicked()
 
 void AokChainGUI::gotoOverviewPage()
 {
-    footerWidget->show();
     overviewAction->setChecked(true);
     if (walletFrame) walletFrame->gotoOverviewPage();
 }
 
 void AokChainGUI::gotoHistoryPage()
 {
-    footerWidget->hide();
     historyAction->setChecked(true);
     if (walletFrame) walletFrame->gotoHistoryPage();
 }
 
 void AokChainGUI::gotoReceiveCoinsPage()
 {
-    footerWidget->hide();
     receiveCoinsAction->setChecked(true);
     if (walletFrame) walletFrame->gotoReceiveCoinsPage();
 }
 
 void AokChainGUI::gotoSendCoinsPage(QString addr)
 {
-    footerWidget->hide();
     sendCoinsAction->setChecked(true);
     if (walletFrame) walletFrame->gotoSendCoinsPage(addr);
 }
 
 void AokChainGUI::gotoSignMessageTab(QString addr)
 {
-    footerWidget->hide();
     if (walletFrame) walletFrame->gotoSignMessageTab(addr);
 }
 
 void AokChainGUI::gotoVerifyMessageTab(QString addr)
 {
-    footerWidget->hide();
     if (walletFrame) walletFrame->gotoVerifyMessageTab(addr);
 }
 
 /** TOKENS START */
 void AokChainGUI::gotoTokensPage()
 {
-    footerWidget->hide();
     transferTokenAction->setChecked(true);
     if (walletFrame) walletFrame->gotoTokensPage();
 };
 
 void AokChainGUI::gotoCreateTokensPage()
 {
-    footerWidget->hide();
     createTokenAction->setChecked(true);
     if (walletFrame) walletFrame->gotoCreateTokensPage();
 };
 
 void AokChainGUI::gotoManageTokensPage()
 {
-    footerWidget->hide();
     manageTokenAction->setChecked(true);
     if (walletFrame) walletFrame->gotoManageTokensPage();
 };
+
+void AokChainGUI::gotoExplorerPage(QString query)
+{
+    explorerAction->setChecked(true);
+    if (walletFrame) walletFrame->gotoExplorerPage(query);
+}
 /** TOKENS END */
 #endif // ENABLE_WALLET
 
@@ -905,6 +912,17 @@ void AokChainGUI::updateNetworkState()
     // Don't word-wrap this (fixed-width) tooltip
     tooltip = QString("<nobr>") + tooltip + QString("</nobr>");
     connectionsControl->setToolTip(tooltip);
+    if (sidebar) {
+        QString network = QString::fromStdString(Params().NetworkIDString());
+        if (network == "main")
+            network = tr("Mainnet");
+        else if (network == "test")
+            network = tr("Testnet");
+        else if (network == "regtest")
+            network = tr("Regtest");
+        sidebar->setNetworkState(clientModel->getNetworkActive() ? tr("Peers %1 · %2").arg(count).arg(network)
+                                                                 : tr("Network off · %1").arg(network), tooltip);
+    }
 
     connectionsControl->setPixmap(platformStyle->SingleColorIcon(icon).pixmap(STATUSBAR_ICONSIZE,STATUSBAR_ICONSIZE));
 }
@@ -925,7 +943,12 @@ void AokChainGUI::updateHeadersSyncProgressLabel()
     int headersTipHeight = clientModel->getHeaderTipHeight();
     int estHeadersLeft = (GetTime() - headersTipTime) / Params().GetConsensus().nTargetSpacing;
     if (estHeadersLeft > HEADER_HEIGHT_DELTA_SYNC)
+    {
         progressBarLabel->setText(tr("Syncing Headers (%1%)...").arg(QString::number(100.0 / (headersTipHeight+estHeadersLeft)*headersTipHeight, 'f', 1)));
+        if (sidebar)
+            sidebar->setSyncState(tr("Syncing headers"), QString::number(100.0 / (headersTipHeight+estHeadersLeft)*headersTipHeight, 'f', 1) + "%",
+                                  1.0 / (headersTipHeight+estHeadersLeft)*headersTipHeight, true, progressBarLabel->text());
+    }
 }
 
 void AokChainGUI::setNumBlocks(int count, const QDateTime& blockDate, double nVerificationProgress, bool header)
@@ -946,6 +969,7 @@ void AokChainGUI::setNumBlocks(int count, const QDateTime& blockDate, double nVe
 
     // Acquire current block source
     enum BlockSource blockSource = clientModel->getBlockSource();
+    QString sideStatus = tr("Syncing");
     switch (blockSource) {
         case BLOCK_SOURCE_NETWORK:
             if (header) {
@@ -961,15 +985,18 @@ void AokChainGUI::setNumBlocks(int count, const QDateTime& blockDate, double nVe
             } else {
                 progressBarLabel->setText(tr("Processing blocks on disk..."));
             }
+            sideStatus = tr("Importing blocks");
             break;
         case BLOCK_SOURCE_REINDEX:
             progressBarLabel->setText(tr("Reindexing blocks on disk..."));
+            sideStatus = tr("Reindexing");
             break;
         case BLOCK_SOURCE_NONE:
             if (header) {
                 return;
             }
             progressBarLabel->setText(tr("Connecting to peers..."));
+            sideStatus = tr("Connecting");
             break;
     }
 
@@ -996,10 +1023,14 @@ void AokChainGUI::setNumBlocks(int count, const QDateTime& blockDate, double nVe
 
         progressBarLabel->setVisible(false);
         progressBar->setVisible(false);
+        fSyncing = false;
+        if (sidebar)
+            sidebar->setSyncState(tr("Synced"), tr("Block %1").arg(count), 1.0, false, QString("<nobr>") + tooltip + QString("</nobr>"));
     }
     else
     {
         QString timeBehindText = GUIUtil::formatNiceTimeOffset(secs);
+        fSyncing = true;
 
         progressBarLabel->setVisible(true);
         progressBar->setFormat(tr("%1 behind").arg(timeBehindText));
@@ -1029,6 +1060,8 @@ void AokChainGUI::setNumBlocks(int count, const QDateTime& blockDate, double nVe
         tooltip += tr("Last received block was generated %1 ago.").arg(timeBehindText);
         tooltip += QString("<br>");
         tooltip += tr("Transactions after this will not yet be visible.");
+        if (sidebar)
+            sidebar->setSyncState(sideStatus, tr("%1 left").arg(timeBehindText), nVerificationProgress, true, QString("<nobr>") + tooltip + QString("</nobr>"));
     }
 
     // Don't word-wrap this (fixed-width) tooltip
@@ -1245,6 +1278,8 @@ void AokChainGUI::setEncryptionStatus(int status)
     switch(status)
     {
     case WalletModel::Unencrypted:
+        if (sidebar)
+            sidebar->setWalletState(QString(), QString());
         labelWalletEncryptionIcon->hide();
         encryptWalletAction->setChecked(false);
         changePassphraseAction->setEnabled(false);
@@ -1254,6 +1289,8 @@ void AokChainGUI::setEncryptionStatus(int status)
         labelWalletEncryptionIcon->show();
         labelWalletEncryptionIcon->setPixmap(platformStyle->SingleColorIcon(":/icons/lock_open").pixmap(STATUSBAR_ICONSIZE,STATUSBAR_ICONSIZE));
         labelWalletEncryptionIcon->setToolTip(tr("Wallet is <b>encrypted</b> and currently <b>unlocked</b>"));
+        if (sidebar)
+            sidebar->setWalletState(tr("Wallet unlocked"), labelWalletEncryptionIcon->toolTip());
         encryptWalletAction->setChecked(true);
         changePassphraseAction->setEnabled(true);
         encryptWalletAction->setEnabled(false); // TODO: decrypt currently not supported
@@ -1262,6 +1299,8 @@ void AokChainGUI::setEncryptionStatus(int status)
         labelWalletEncryptionIcon->show();
         labelWalletEncryptionIcon->setPixmap(platformStyle->SingleColorIcon(":/icons/lock_closed").pixmap(STATUSBAR_ICONSIZE,STATUSBAR_ICONSIZE));
         labelWalletEncryptionIcon->setToolTip(tr("Wallet is <b>encrypted</b> and currently <b>locked</b>"));
+        if (sidebar)
+            sidebar->setWalletState(tr("Wallet locked"), labelWalletEncryptionIcon->toolTip());
         encryptWalletAction->setChecked(true);
         changePassphraseAction->setEnabled(true);
         encryptWalletAction->setEnabled(false); // TODO: decrypt currently not supported
@@ -1306,6 +1345,7 @@ void AokChainGUI::updateStakingIcon()
         nWeight = walletFrame->updateWeight();
     }
 
+    QString detail;
     if (this->nStaking && nWeight) {
         uint64_t nWeight = this->nWeight;
         uint64_t nNetworkWeight = 1.1429 * GetPoSKernelPS();
@@ -1324,21 +1364,33 @@ void AokChainGUI::updateStakingIcon()
 
         nWeight /= COIN;
         nNetworkWeight /= COIN;
+
         labelStakingIcon->setPixmap(platformStyle->SingleColorIcon(":/icons/staking_on").pixmap(STATUSBAR_ICONSIZE, STATUSBAR_ICONSIZE));
         labelStakingIcon->setToolTip(tr("Staking.<br>Your weight is %1<br>Network weight is %2<br>Expected time to earn reward is %3").arg(nWeight).arg(nNetworkWeight).arg(text));
-
-        stakingButton->setText(tr("Stop Staking"));
+        if (stakingButton)
+            stakingButton->setText(tr("Stop Staking"));
+        detail = tr("On · a reward about every %1").arg(text);
     } else {
         labelStakingIcon->setPixmap(platformStyle->SingleColorIcon(":/icons/staking_off").pixmap(STATUSBAR_ICONSIZE, STATUSBAR_ICONSIZE));
+        const QString state = this->nStaking ? tr("On") : tr("Off");
         if (IsInitialBlockDownload()) {
             labelStakingIcon->setToolTip(tr("Not staking because wallet is syncing"));
+            detail = this->nStaking ? tr("On · waiting for the synchronization to finish") : tr("Off · staking is possible once synchronized");
+        } else if (walletFrame && !walletFrame->isWalletUnlocked()) {
+            labelStakingIcon->setToolTip(tr("Not staking because wallet is locked"));
+            detail = tr("%1 · the wallet is locked").arg(state);
         } else if (!nWeight) {
             labelStakingIcon->setToolTip(tr("Not staking because you don't have mature coins"));
+            detail = tr("%1 · no mature coins").arg(state);
         } else {
             labelStakingIcon->setToolTip(tr("Not staking"));
+            detail = state;
         }
-        stakingButton->setText(tr("Start Staking"));
+        if (stakingButton)
+            stakingButton->setText(tr("Start Staking"));
     }
+    if (sidebar)
+        sidebar->setStaking(this->nStaking, detail, labelStakingIcon->toolTip());
 }
 
 void AokChainGUI::detectShutdown()
@@ -1384,7 +1436,7 @@ void AokChainGUI::setTrayIconVisible(bool fHideTrayIcon)
 
 void AokChainGUI::showModalOverlay()
 {
-    if (modalOverlay && (progressBar->isVisible() || modalOverlay->isLayerVisible()))
+    if (modalOverlay && (fSyncing || progressBar->isVisible() || modalOverlay->isLayerVisible()))
         modalOverlay->toggleVisibility();
 }
 
@@ -1428,6 +1480,8 @@ void AokChainGUI::toggleNetworkActive()
 
 void AokChainGUI::toggleStakingActive()
 {
+    if (!walletFrame)
+        return;
     this->nStaking = !this->nStaking;
 
     if (this->nStaking) {
@@ -1436,9 +1490,11 @@ void AokChainGUI::toggleStakingActive()
             for (CWallet* pwallet : vpwallets) {
                 pwallet->StartStake();
             }
-
-            updateStakingIcon();
+        } else {
+            // the passphrase dialog was cancelled: staking was not started
+            this->nStaking = false;
         }
+        updateStakingIcon();
     } else {
         for (CWallet* pwallet : vpwallets) {
             pwallet->StopStake();

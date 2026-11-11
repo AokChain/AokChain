@@ -248,7 +248,7 @@ TransactionTableModel::TransactionTableModel(const PlatformStyle *_platformStyle
         fProcessingQueuedTransactions(false),
         platformStyle(_platformStyle)
 {
-    columns << QString() << QString() << tr("Date") << tr("Type") << tr("Label") << tr("Amount") << tr("Token");
+    columns << tr("Status") << QString() << tr("Date") << QString() << tr("Description") << tr("Amount") << tr("Token");
 
     priv->refreshWallet();
 
@@ -391,6 +391,65 @@ QString TransactionTableModel::formatTxType(const TransactionRecord *wtx) const
     default:
         return QString();
     }
+}
+
+static QString assetDisplayName(const TransactionRecord *wtx)
+{
+    QString name = QString::fromStdString(wtx->tokenName);
+    if (name.endsWith('!'))
+        name.chop(1);
+    return name;
+}
+
+QString TransactionTableModel::formatTxTitle(const TransactionRecord *wtx) const
+{
+    const QString asset = assetDisplayName(wtx);
+    switch(wtx->type)
+    {
+    case TransactionRecord::RecvWithAddress:
+    case TransactionRecord::RecvFromOther:
+    case TransactionRecord::TransferFrom:
+        return tr("Received · %1").arg(asset);
+    case TransactionRecord::SendToAddress:
+    case TransactionRecord::SendToOther:
+    case TransactionRecord::TransferTo:
+        return tr("Sent · %1").arg(asset);
+    case TransactionRecord::SendToSelf:
+        return tr("Sent · within the wallet");
+    case TransactionRecord::Generated:
+        return tr("Staking reward");
+    case TransactionRecord::Issue:
+        return tr("Issued · %1").arg(asset);
+    case TransactionRecord::Reissue:
+        return tr("Reissued · %1").arg(asset);
+    default:
+        return tr("Other");
+    }
+}
+
+QString TransactionTableModel::formatTxShortStatus(const TransactionRecord *wtx) const
+{
+    switch(wtx->status.status)
+    {
+    case TransactionStatus::OpenUntilBlock:
+    case TransactionStatus::OpenUntilDate:
+        return tr("Open");
+    case TransactionStatus::Unconfirmed:
+        return tr("Unconfirmed");
+    case TransactionStatus::Abandoned:
+        return tr("Abandoned");
+    case TransactionStatus::Confirming:
+        return tr("Unconfirmed %1/%2").arg(wtx->status.depth).arg(TransactionRecord::RecommendedNumConfirmations);
+    case TransactionStatus::Confirmed:
+        return tr("Confirmed");
+    case TransactionStatus::Conflicted:
+        return tr("Conflicted");
+    case TransactionStatus::Immature:
+        return tr("Immature %1/%2").arg(wtx->status.depth).arg(wtx->status.depth + wtx->status.matures_in);
+    case TransactionStatus::NotAccepted:
+        return tr("Not accepted");
+    }
+    return QString();
 }
 
 QVariant TransactionTableModel::txAddressDecoration(const TransactionRecord *wtx) const
@@ -694,6 +753,25 @@ QVariant TransactionTableModel::data(const QModelIndex &index, int role) const
         }
     case StatusRole:
         return rec->status.status;
+    case TitleRole:
+        return formatTxTitle(rec);
+    case AssetNameRole:
+        return assetDisplayName(rec);
+    case OwnerTokenRole:
+        return QString::fromStdString(rec->tokenName).endsWith('!');
+    case DisplayAmountRole:
+        {
+            QString amount = GUIUtil::withThousands(formatTxAmount(rec, false, AokChainUnits::separatorNever));
+            if (amount.startsWith('-'))
+                amount.replace(0, 1, QChar(0x2212));
+            else if (amount.startsWith('+'))
+                return amount;
+            else
+                amount.prepend('+');
+            return amount;
+        }
+    case StatusTextRole:
+        return formatTxShortStatus(rec);
     }
     return QVariant();
 }

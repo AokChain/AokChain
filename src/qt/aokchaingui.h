@@ -33,6 +33,7 @@ class WalletFrame;
 class WalletModel;
 class HelpMessageDialog;
 class ModalOverlay;
+class Sidebar;
 
 QT_BEGIN_NAMESPACE
 class QAction;
@@ -121,8 +122,10 @@ private:
     QAction *transferTokenAction;
     QAction *createTokenAction;
     QAction *manageTokenAction;
+    QAction *explorerAction;
     QWidget *footerWidget;
     QPushButton *stakingButton;
+    Sidebar *sidebar;
     /** TOKENS END */
 
     QSystemTrayIcon *trayIcon;
@@ -138,6 +141,8 @@ private:
 
     uint64_t nWeight;
     bool nStaking;
+    /** The chain tip is behind: the synchronization overlay may be opened */
+    bool fSyncing;
 
     const PlatformStyle *platformStyle;
 
@@ -235,6 +240,8 @@ private Q_SLOTS:
     void gotoCreateTokensPage();
     void gotoManageTokensPage();
     /** TOKENS END */
+    /** Switch to the explorer page and look up a transaction id, address or block */
+    void gotoExplorerPage(QString query = "");
 
 #endif // ENABLE_WALLET
     /** Show configuration dialog */

@@ -73,6 +73,9 @@ private:
     bool fFeeMinimized;
     const PlatformStyle *platformStyle;
 
+    /** Two columns as on the send page: the form on the left, balance and buttons on the right */
+    void buildLayout();
+
     // Process WalletModel::SendCoinsReturn and generate a pair consisting
     // of a message and message flags for use in Q_EMIT message().
     // Additional parameter msgArg can be used via .arg(msgArg).
