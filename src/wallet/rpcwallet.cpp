@@ -2381,6 +2381,56 @@ UniValue gettransaction(const JSONRPCRequest& request)
     return entry;
 }
 
+UniValue purgeorphanstakes(const JSONRPCRequest& request)
+{
+    CWallet * const pwallet = GetWalletForJSONRPCRequest(request);
+    if (!EnsureWalletIsAvailable(pwallet, request.fHelp)) {
+        return NullUniValue;
+    }
+
+    if (request.fHelp || request.params.size() > 1)
+        throw std::runtime_error(
+            "purgeorphanstakes ( minage )\n"
+            "\nDeletes this wallet's orphaned coinstake transactions from the wallet.\n"
+            "A coinstake is orphaned when the block it was staked in lost against another block. The wallet\n"
+            "abandons it and frees the staked coins at that moment, but keeps the transaction forever, which\n"
+            "makes the wallet file and its loading time grow on a staking wallet. Balances are not affected.\n"
+            "If the orphaned block ever becomes part of the best chain again, the transaction is added back.\n"
+            "\nArguments:\n"
+            "1. minage    (numeric, optional, default=86400) Only delete transactions the wallet received at least this many seconds ago\n"
+            "\nResult:\n"
+            "n            (numeric) The number of transactions deleted\n"
+            "\nExamples:\n"
+            + HelpExampleCli("purgeorphanstakes", "")
+            + HelpExampleRpc("purgeorphanstakes", "3600")
+        );
+
+    int64_t nMinAge = 86400;
+    if (!request.params[0].isNull()) {
+        nMinAge = request.params[0].get_int64();
+        if (nMinAge < 0)
+            throw JSONRPCError(RPC_INVALID_PARAMETER, "minage must not be negative");
+    }
+
+    ObserveSafeMode();
+    LOCK2(cs_main, pwallet->cs_wallet);
+
+    const int64_t nNow = GetAdjustedTime();
+    std::vector<uint256> vHash;
+    for (const std::pair<const uint256, CWalletTx>& item : pwallet->mapWallet) {
+        const CWalletTx& wtx = item.second;
+        if (wtx.IsCoinStake() && wtx.isAbandoned() && !wtx.InMempool() &&
+            wtx.GetDepthInMainChain() == 0 && (int64_t)wtx.nTimeReceived + nMinAge <= nNow)
+            vHash.push_back(item.first);
+    }
+
+    std::vector<uint256> vHashOut;
+    if (!vHash.empty() && pwallet->ZapSelectTx(vHash, vHashOut) != DB_LOAD_OK)
+        throw JSONRPCError(RPC_WALLET_ERROR, "Could not properly delete the transactions.");
+
+    return (uint64_t)vHashOut.size();
+}
+
 UniValue abandontransaction(const JSONRPCRequest& request)
 {
     CWallet * const pwallet = GetWalletForJSONRPCRequest(request);
@@ -4153,6 +4203,7 @@ static const CRPCCommand commands[] =
     { "wallet",             "walletpassphrasechange",   &walletpassphrasechange,   {"oldpassphrase","newpassphrase"} },
     { "wallet",             "walletpassphrase",         &walletpassphrase,         {"passphrase", "timeout", "stakingonly"} },
     { "wallet",             "removeprunedfunds",        &removeprunedfunds,        {"txid"} },
+    { "wallet",             "purgeorphanstakes",        &purgeorphanstakes,        {"minage"} },
     { "wallet",             "rescanblockchain",         &rescanblockchain,         {"start_height", "stop_height"} },
 
     /** Account functions (deprecated) */
