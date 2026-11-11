@@ -895,7 +895,13 @@ QWidget *ExplorerPage::transferRow(const UniValue& entry)
 
     const std::string token = strOf(entry, "token");
     if (!token.empty())
-        layout->addWidget(amountValue(amountText(strOf(entry, "tokenAmount")), QString::fromStdString(token), 14));
+    {
+        // a long token name is shortened in the middle; the tool tip has it in full
+        const QString name = QString::fromStdString(token);
+        QWidget *value = amountValue(amountText(strOf(entry, "tokenAmount")), QFontMetrics(GUIUtil::appFont(11)).elidedText(name, Qt::ElideMiddle, 200), 14);
+        value->setToolTip(name);
+        layout->addWidget(value);
+    }
     else if (!boolOf(entry, "unknown") && !boolOf(entry, "coinbase"))
         layout->addWidget(amountValue(amountText(strOf(entry, "value")), QString(), 14));
     return row;
@@ -945,8 +951,16 @@ void ExplorerPage::showTransaction(const UniValue& result)
     resultLayout->addWidget(line());
     resultLayout->addSpacing(12);
 
+    // Inputs and outputs side by side. A token transfer names the token after the amount, which
+    // does not fit into half of the card: such a transaction lists them one below the other.
+    bool wide = false;
+    for (const char *key : {"inputs", "outputs"}) {
+        const UniValue list = find_value(result, key);
+        for (size_t i = 0; list.isArray() && i < list.size(); ++i)
+            wide = wide || !strOf(list[i], "token").empty();
+    }
     QWidget *columns = new QWidget();
-    QHBoxLayout *columnLayout = new QHBoxLayout(columns);
+    QBoxLayout *columnLayout = new QBoxLayout(wide ? QBoxLayout::TopToBottom : QBoxLayout::LeftToRight, columns);
     columnLayout->setContentsMargins(0, 0, 0, 0);
     columnLayout->setSpacing(16);
     auto addColumn = [&](const QString& heading, const UniValue& entries, qint64 total) {
