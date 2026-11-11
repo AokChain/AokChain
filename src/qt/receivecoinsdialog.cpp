@@ -133,11 +133,22 @@ void ReceiveCoinsDialog::buildLayout()
     ui->reqMessage->setFixedHeight(44);
     ui->reqLabel->setPlaceholderText(tr("Who or what the payment is for"));
     ui->reqMessage->setPlaceholderText(tr("Shown to the payer when the request is opened"));
-    form->addWidget(ui->label_2);
-    form->addWidget(ui->reqLabel);
-    form->addSpacing(4);
-    form->addWidget(ui->label);
-    form->addWidget(ui->reqAmount);
+    // label and amount share a row: the label takes what the amount leaves
+    QHBoxLayout *firstRow = new QHBoxLayout();
+    firstRow->setSpacing(16);
+    QVBoxLayout *labelColumn = new QVBoxLayout();
+    labelColumn->setSpacing(8);
+    labelColumn->addWidget(ui->label_2);
+    labelColumn->addWidget(ui->reqLabel);
+    QVBoxLayout *amountColumn = new QVBoxLayout();
+    amountColumn->setSpacing(8);
+    amountColumn->addWidget(ui->label);
+    ui->reqAmount->setFixedHeight(44);
+    ui->reqAmount->setFixedWidth(220);
+    amountColumn->addWidget(ui->reqAmount);
+    firstRow->addLayout(labelColumn, 1);
+    firstRow->addLayout(amountColumn);
+    form->addLayout(firstRow);
     form->addSpacing(4);
     form->addWidget(ui->label_3);
     form->addWidget(ui->reqMessage);
