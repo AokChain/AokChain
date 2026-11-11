@@ -123,6 +123,7 @@ BASE_SCRIPTS= [
     'wallet_spent_cache.py',
     'feature_staking.py',
     'rpc_mnemonic.py',
+    'wallet_importmnemonic.py',
     'wallet_multisig_flow.py',
     'feature_bootstrap.py',
     'p2p_old_peer_cutoff.py',

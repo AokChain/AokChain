@@ -4,6 +4,7 @@
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
+#include "wallet/mnemonicrestore.h"
 #include <base58.h>
 #include <chain.h>
 #include <rpc/safemode.h>
@@ -158,6 +159,102 @@ UniValue importprivkey(const JSONRPCRequest& request)
     }
 
     return NullUniValue;
+}
+
+UniValue importmnemonic(const JSONRPCRequest& request)
+{
+    CWallet * const pwallet = GetWalletForJSONRPCRequest(request);
+    if (!EnsureWalletIsAvailable(pwallet, request.fHelp)) {
+        return NullUniValue;
+    }
+
+    if (request.fHelp || request.params.size() < 1 || request.params.size() > 4)
+        throw std::runtime_error(
+            "importmnemonic \"mnemonic\" ( \"passphrase\" \"address\" rescan )\n"
+            "\nAdds the keys of another wallet to this wallet, from its BIP39 mnemonic (recovery words).\n"
+            "The usual key paths are searched for addresses that hold coins now (unspent outputs of the\n"
+            "chain); the keys of those paths are imported up to 20 places past the last one in use,\n"
+            "together with the matching change path. If an address of that wallet is given, its path is\n"
+            "searched among all coin types (up to a minute) and imported even if it holds nothing now.\n"
+            "The keys are separate from the HD seed of this wallet: make a new backup afterwards.\n"
+            "WARNING: anyone who sees the mnemonic can spend the coins.\n"
+            "\nArguments:\n"
+            "1. \"mnemonic\"    (string, required) The 12 to 24 words, separated by spaces (English or Korean word list)\n"
+            "2. \"passphrase\"  (string, optional, default=\"\") The optional BIP39 passphrase (\"25th word\")\n"
+            "3. \"address\"     (string, optional, default=\"\") An address of the wallet that created the mnemonic\n"
+            "4. rescan        (boolean, optional, default=true) Rescan the chain for the transactions of the imported keys\n"
+            "\nResult:\n"
+            "{\n"
+            "  \"language\": \"xxx\",   (string) word list of the mnemonic\n"
+            "  \"searched\": n,       (numeric) number of keys tried\n"
+            "  \"imported\": n,       (numeric) number of keys added to the wallet\n"
+            "  \"found\": [           (array) addresses that hold coins now\n"
+            "    { \"path\": \"xxx\", \"address\": \"xxx\", \"amount\": x.xxx, \"outputs\": n, \"tokens\": true|false }, ...\n"
+            "  ]\n"
+            "}\n"
+            "\nExamples:\n"
+            + HelpExampleCli("importmnemonic", "\"word1 word2 ... word12\"")
+        );
+
+    if (fPruneMode && (request.params[3].isNull() || request.params[3].get_bool()))
+        throw JSONRPCError(RPC_WALLET_ERROR, "Rescan is disabled in pruned mode");
+    {
+        LOCK2(cs_main, pwallet->cs_wallet);
+        EnsureWalletIsUnlocked(pwallet);
+    }
+
+    CKeyID known;
+    const bool fKnown = !request.params[2].isNull() && !request.params[2].get_str().empty();
+    if (fKnown) {
+        const CTxDestination dest = DecodeDestination(request.params[2].get_str());
+        const CKeyID* keyid = boost::get<CKeyID>(&dest);
+        if (!keyid)
+            throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "The address must be a pay-to-pubkey-hash address of this network");
+        known = *keyid;
+    }
+
+    CExtKey master;
+    std::string language, error;
+    {
+        const SecureString words(request.params[0].get_str().c_str());
+        const SecureString passphrase(request.params[1].isNull() ? "" : request.params[1].get_str().c_str());
+        if (!mnemonicrestore::MasterFromMnemonic(words, passphrase, master, language, error))
+            throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid mnemonic: " + error);
+    }
+
+    mnemonicrestore::Plan plan;
+    std::atomic<bool> fCancel(false);
+    if (!mnemonicrestore::BuildPlan(master, fKnown ? &known : nullptr, fCancel, plan, error))
+        throw JSONRPCError(RPC_WALLET_ERROR, error);
+    if (fKnown && plan.knownPath.empty() && plan.found.empty())
+        throw JSONRPCError(RPC_WALLET_ERROR, "The address does not belong to this mnemonic");
+
+    const int nImported = mnemonicrestore::ImportKeys(pwallet, plan, "restored", error);
+    if (nImported < 0)
+        throw JSONRPCError(RPC_WALLET_ERROR, error);
+
+    UniValue found(UniValue::VARR);
+    for (const mnemonicrestore::FoundAddress& entry : plan.found) {
+        UniValue obj(UniValue::VOBJ);
+        obj.pushKV("path", entry.path);
+        obj.pushKV("address", EncodeDestination(entry.keyid));
+        obj.pushKV("amount", ValueFromAmount(entry.nAmount));
+        obj.pushKV("outputs", entry.nOutputs);
+        obj.pushKV("tokens", UniValue(entry.fTokens));
+        found.push_back(obj);
+    }
+    UniValue result(UniValue::VOBJ);
+    result.pushKV("language", language);
+    result.pushKV("searched", plan.nDerived);
+    result.pushKV("imported", nImported);
+    result.pushKV("found", found);
+    plan.Clear();
+
+    if (request.params[3].isNull() || request.params[3].get_bool()) {
+        if (!mnemonicrestore::Rescan(pwallet, fCancel, [](int) {}, error))
+            throw JSONRPCError(RPC_WALLET_ERROR, "The keys were imported, but the rescan did not finish: " + error);
+    }
+    return result;
 }
 
 UniValue abortrescan(const JSONRPCRequest& request)

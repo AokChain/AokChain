@@ -561,36 +561,9 @@ UniValue mnemonicfindaddress(const JSONRPCRequest& request)
     };
 
     auto search = [&]() -> bool {
-        // Layouts without a coin type
-        const std::vector<std::vector<uint32_t>> simple = {
-            {}, {0}, {0 | H}, {0 | H, 0}, {0 | H, 1}, {0 | H, 0 | H}, {0 | H, 1 | H}, {0, 0}, {0, 1},
-        };
-        for (const std::vector<uint32_t>& path : simple) {
-            if (tryChildren(path, 100, false) || tryChildren(path, 100, true))
+        for (const bip39::PathLayout& layout : bip39::CandidateLayouts(true)) {
+            if (tryChildren(layout.parent, layout.nCount, layout.fHardened))
                 return true;
-        }
-        // BIP44, and the same layout under the BIP49 and BIP84 purposes for
-        // the common coin types. Likely coin types first.
-        std::vector<uint32_t> coins = {0, 1, 175, 2, 5, 3, 7, 20, 28, 88, 105, 119, 2301};
-        const size_t nCommon = coins.size();
-        for (uint32_t c = 0; c < 2048; c++) {
-            if (std::find(coins.begin(), coins.begin() + nCommon, c) == coins.begin() + nCommon)
-                coins.push_back(c);
-        }
-        for (size_t n = 0; n < coins.size(); n++) {
-            for (uint32_t purpose : {44u, 49u, 84u}) {
-                if (purpose != 44 && n >= nCommon)
-                    continue;
-                for (uint32_t account = 0; account < 2; account++) {
-                    for (uint32_t change = 0; change < 2; change++) {
-                        if (tryChildren({purpose | H, coins[n] | H, account | H, change}, 20, false))
-                            return true;
-                    }
-                    // without the change level
-                    if (tryChildren({purpose | H, coins[n] | H, account | H}, 20, false))
-                        return true;
-                }
-            }
         }
         return false;
     };

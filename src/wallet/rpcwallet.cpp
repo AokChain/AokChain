@@ -4130,6 +4130,7 @@ UniValue listlabels(const JSONRPCRequest& request)
 extern UniValue abortrescan(const JSONRPCRequest& request); // in rpcdump.cpp
 extern UniValue dumpprivkey(const JSONRPCRequest& request); // in rpcdump.cpp
 extern UniValue importprivkey(const JSONRPCRequest& request);
+extern UniValue importmnemonic(const JSONRPCRequest& request);
 extern UniValue importaddress(const JSONRPCRequest& request);
 extern UniValue removeaddress(const JSONRPCRequest& request);
 extern UniValue importpubkey(const JSONRPCRequest& request);
@@ -4168,6 +4169,7 @@ static const CRPCCommand commands[] =
     { "wallet",             "gettransaction",           &gettransaction,           {"txid","include_watchonly"} },
     { "wallet",             "getunconfirmedbalance",    &getunconfirmedbalance,    {} },
     { "wallet",             "getwalletinfo",            &getwalletinfo,            {} },
+    { "wallet",             "importmnemonic",           &importmnemonic,           {"mnemonic","passphrase","address","rescan"} },
     { "wallet",             "importmulti",              &importmulti,              {"requests","options"} },
     { "wallet",             "importprivkey",            &importprivkey,            {"privkey","label","rescan"} },
     { "wallet",             "importwallet",             &importwallet,             {"filename"} },

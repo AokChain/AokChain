@@ -181,6 +181,7 @@ AOKCHAIN_CORE_H = \
   wallet/crypter.h \
   wallet/db.h \
   wallet/feebumper.h \
+  wallet/mnemonicrestore.h \
   wallet/fees.h \
   wallet/rpcwallet.h \
   wallet/wallet.h \
@@ -271,6 +272,7 @@ libaokchain_wallet_a_SOURCES = \
   wallet/crypter.cpp \
   wallet/db.cpp \
   wallet/feebumper.cpp \
+  wallet/mnemonicrestore.cpp \
   wallet/fees.cpp \
   wallet/init.cpp \
   wallet/rpcdump.cpp \
