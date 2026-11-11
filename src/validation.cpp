@@ -3468,10 +3468,15 @@ bool static ConnectTip(CValidationState& state, const CChainParams& chainparams,
         int64_t nTimeTokensStart = GetTimeMicros();
         /** TOKENS START */
         // Get the newly created tokens, from the connectblock tokenCache so we can remove the correct tokens from the mempool
+        // (walk the tokens of this block, which are few, and not the tokens that wait to be
+        // written, which are all the tokens issued since the last flush: copying each of them
+        // for every block took a sixth of the time of the first synchronization)
         setNewTokensAddedInBlock = tokenCache.setNewTokensToAdd;
-        for (auto it : ptokens->setNewTokensToAdd) {
-            if (setNewTokensAddedInBlock.count(it))
-                setNewTokensAddedInBlock.erase(it);
+        for (auto it = setNewTokensAddedInBlock.begin(); it != setNewTokensAddedInBlock.end();) {
+            if (ptokens->setNewTokensToAdd.count(*it))
+                it = setNewTokensAddedInBlock.erase(it);
+            else
+                ++it;
         }
 
         // Remove all tx hashes, that were marked as reissued script from the mapReissuedTx.
