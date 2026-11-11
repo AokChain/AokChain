@@ -15,6 +15,7 @@
 #include "aokchaingui.h"
 #include "clientmodel.h"
 #include "guiutil.h"
+#include "pastblocks.h"
 #include "optionsdialog.h"
 #include "optionsmodel.h"
 #include "overviewpage.h"
@@ -317,6 +318,8 @@ void WalletView::setAokChainGUI(AokChainGUI *gui)
         walletButtons->addStretch();
         body->addLayout(walletButtons);
         settingsPage->addCard(walletCard);
+        if (QFrame *pastBlocksCard = PastBlocks::settingsCard(settingsPage))
+            settingsPage->addCard(pastBlocksCard);
 
         QFrame *infoCard = OptionsDialog::makeCard(tr("Information"), settingsPage, &body);
         versionLabel = new QLabel(infoCard);

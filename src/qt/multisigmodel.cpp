@@ -2,6 +2,8 @@
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
+#include "pastblocks.h"
+#include <QApplication>
 #include "multisigmodel.h"
 
 #include "explorerpage.h"   // NodeRPC::call
@@ -624,8 +626,15 @@ void MultisigModel::markKeysUsed(const MultisigWallet& item)
     }
 }
 
-void MultisigModel::addWallet(const MultisigWallet& item, bool rescan)
+void MultisigModel::addWallet(const MultisigWallet& item, bool wantRescan)
 {
+    // A wallet that started from a chain state snapshot cannot look into the past blocks before it
+    // has them: the address is added now and the wallet is scanned when they have been downloaded.
+    bool rescan = wantRescan;
+    if (rescan && PastBlocks::missing()) {
+        rescan = false;
+        PastBlocks::offerForWallet(QApplication::activeWindow(), tr("Looking for the earlier transactions of this address"));
+    }
     const std::string redeemScript = item.redeemScript.toStdString();
     const std::string label = item.name.toStdString();
     const std::string json = QJsonDocument(walletJson(item)).toJson(QJsonDocument::Compact).toStdString();

@@ -270,6 +270,7 @@ AOKCHAIN_QT_H = \
   qt/tokenlists.h \
   qt/explorerpage.h \
   qt/bootstrapfetch.h \
+  qt/pastblocks.h \
   qt/multisigmodel.h \
   qt/signhubpage.h \
   qt/winshutdownmonitor.h
@@ -431,6 +432,7 @@ AOKCHAIN_QT_WALLET_CPP = \
   qt/walletview.cpp \
   qt/explorerpage.cpp \
   qt/bootstrapfetch.cpp \
+  qt/pastblocks.cpp \
   qt/multisigmodel.cpp \
   qt/signhubpage.cpp \
   qt/tokenspage.cpp \

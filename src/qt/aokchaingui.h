@@ -133,6 +133,13 @@ private:
     QPushButton *stakingButton;
     Sidebar *sidebar;
     bool bootstrapActive;
+    /** (time in ms, value) samples of the fast sync, for the time that is left */
+    QList<QPair<qint64, double> > bootstrapSamples;
+    bool bootstrapSamplesAreBlocks;
+    bool pastBlocksAsked;
+    bool pastBlocksWereFetching;
+    /** "about 12 min left" for the fast sync: value now, and its end */
+    QString bootstrapTimeLeft(bool blocks, double value, double end);
     QString bootstrapLastState;
     /** The sync line of the side bar; the block bootstrap has it while it runs */
     void setSideSync(const QString& status, const QString& remaining, double progress, bool showProgress, const QString& toolTip);

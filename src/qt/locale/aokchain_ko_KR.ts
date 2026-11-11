@@ -855,6 +855,22 @@
         <source>This folder has no manifest.json. Choose the folder that holds manifest.json and the blocks-... files.</source>
         <translation>이 폴더에 manifest.json이 없습니다. manifest.json과 blocks-... 파일이 들어 있는 폴더를 고르세요.</translation>
     </message>
+    <message>
+        <source>Showing the earlier transactions of this wallet</source>
+        <translation>이 지갑의 이전 거래 표시</translation>
+    </message>
+    <message>
+        <source>Past blocks</source>
+        <translation>과거 블록</translation>
+    </message>
+    <message>
+        <source>The past blocks are downloaded.</source>
+        <translation>과거 블록을 모두 받았습니다.</translation>
+    </message>
+    <message>
+        <source>The download of the past blocks stopped: %1</source>
+        <translation>과거 블록 내려받기가 중단되었습니다: %1</translation>
+    </message>
 </context>
 <context>
     <name>CoinControlDialog</name>
@@ -5534,6 +5550,34 @@
         <source>Error</source>
         <translation>오류</translation>
     </message>
+    <message>
+        <source>Fast start: looking for the chain state snapshot...</source>
+        <translation>빠른 시작: 체인 상태 스냅샷을 찾는 중...</translation>
+    </message>
+    <message>
+        <source>Fast start: downloading the snapshot, %s of %s</source>
+        <translation>빠른 시작: 스냅샷 받는 중, %s / %s</translation>
+    </message>
+    <message>
+        <source>Fast start: unpacking the snapshot...</source>
+        <translation>빠른 시작: 스냅샷 압축 푸는 중...</translation>
+    </message>
+    <message>
+        <source>Fast start: checking the snapshot (about a minute)...</source>
+        <translation>빠른 시작: 스냅샷 검사 중 (1분쯤 걸립니다)...</translation>
+    </message>
+    <message>
+        <source>less than a minute left</source>
+        <translation>1분 미만 남음</translation>
+    </message>
+    <message>
+        <source>about %d min left</source>
+        <translation>약 %d분 남음</translation>
+    </message>
+    <message>
+        <source>The snapshot was not accepted. Synchronizing from the blocks instead...</source>
+        <translation>스냅샷이 맞지 않아 쓰지 않습니다. 블록을 검증하는 방식으로 동기화합니다...</translation>
+    </message>
 </context>
 <context>
     <name>Sidebar</name>
@@ -5831,6 +5875,14 @@
     <message>
         <source>fee</source>
         <translation>수수료</translation>
+    </message>
+    <message>
+        <source>This node knows no transaction and no block with this ID among the blocks that it has. It started from a snapshot of the chain state: transactions from before the snapshot can be looked up when the past blocks have been downloaded (Settings).</source>
+        <translation>이 노드가 가진 블록에는 이 ID의 거래나 블록이 없습니다. 이 노드는 체인 상태 스냅샷에서 시작했습니다. 스냅샷 이전의 거래는 과거 블록을 받은 뒤(설정)에 조회할 수 있습니다.</translation>
+    </message>
+    <message>
+        <source>Looking up a transaction from before the snapshot</source>
+        <translation>스냅샷 이전 거래 조회</translation>
     </message>
 </context>
 <context>
@@ -6328,6 +6380,10 @@
     <message>
         <source>The network did not accept the transaction: %1</source>
         <translation>네트워크가 거래를 받아들이지 않았습니다: %1</translation>
+    </message>
+    <message>
+        <source>Looking for the earlier transactions of this address</source>
+        <translation>이 주소의 이전 거래 찾기</translation>
     </message>
 </context>
 <context>
@@ -7466,6 +7522,101 @@
     <message>
         <source>System default</source>
         <translation>시스템 기본값</translation>
+    </message>
+</context>
+<context>
+    <name>PastBlocks</name>
+    <message>
+        <source>about %1 GB</source>
+        <translation>약 %1GB</translation>
+    </message>
+    <message>
+        <source>less than a minute left</source>
+        <translation>1분 미만 남음</translation>
+    </message>
+    <message>
+        <source>about %1 min left</source>
+        <translation>약 %1분 남음</translation>
+    </message>
+    <message>
+        <source>about %1 h %2 min left</source>
+        <translation>약 %1시간 %2분 남음</translation>
+    </message>
+    <message>
+        <source>Past blocks</source>
+        <translation>과거 블록</translation>
+    </message>
+    <message>
+        <source>The download could not be started: %1</source>
+        <translation>내려받기를 시작하지 못했습니다: %1</translation>
+    </message>
+    <message>
+        <source>%1 needs the past blocks. They are being downloaded: Settings shows how far the download is. Try again when it has finished.</source>
+        <translation>%1에는 과거 블록이 필요합니다. 지금 받는 중이며 진행 상황은 설정에서 볼 수 있습니다. 다 받은 뒤 다시 해 보세요.</translation>
+    </message>
+    <message>
+        <source>%1 needs the past blocks. Download them now?</source>
+        <translation>%1에는 과거 블록이 필요합니다. 지금 받을까요?</translation>
+    </message>
+    <message>
+        <source>%1 needs the past blocks, %2. Download them now?</source>
+        <translation>%1에는 과거 블록(%2)이 필요합니다. 지금 받을까요?</translation>
+    </message>
+    <message>
+        <source>This wallet started from a snapshot of the chain state and does not hold the blocks before block %1. The download runs in the background while you keep using the wallet; the blocks are only stored, not validated again.</source>
+        <translation>이 지갑은 체인 상태 스냅샷에서 시작했기 때문에 블록 %1 이전의 블록을 갖고 있지 않습니다. 받는 동안에도 지갑은 그대로 쓸 수 있고, 받은 블록은 저장만 하며 다시 검증하지 않습니다.</translation>
+    </message>
+    <message>
+        <source>Download</source>
+        <translation>받기</translation>
+    </message>
+    <message>
+        <source>Not now</source>
+        <translation>나중에</translation>
+    </message>
+    <message>
+        <source>Without the past blocks this is not available. You can download them at any time under Settings.</source>
+        <translation>과거 블록이 없으면 이 기능을 쓸 수 없습니다. 설정에서 언제든지 받을 수 있습니다.</translation>
+    </message>
+    <message>
+        <source>Download the past blocks</source>
+        <translation>과거 블록 받기</translation>
+    </message>
+    <message>
+        <source>The wallet is waiting for them to look for its earlier transactions.</source>
+        <translation>지갑이 이전 거래를 찾으려고 이 블록들을 기다리고 있습니다.</translation>
+    </message>
+    <message>
+        <source>The past blocks are stored. Looking for the earlier transactions of the wallet...</source>
+        <translation>과거 블록을 저장했습니다. 지갑의 이전 거래를 찾는 중...</translation>
+    </message>
+    <message>
+        <source>Downloading the past blocks: %1 of %2 MB%3</source>
+        <translation>과거 블록 받는 중: %1 / %2 MB%3</translation>
+    </message>
+    <message>
+        <source>You can keep using the wallet. After a restart the download starts again from here when you ask for it.</source>
+        <translation>지갑은 계속 쓸 수 있습니다. 프로그램을 다시 시작한 뒤에는 받기를 다시 누르면 이어서 받습니다.</translation>
+    </message>
+    <message>
+        <source>This wallet started from a snapshot of the chain state at block %1 and does not hold the blocks before it.</source>
+        <translation>이 지갑은 블록 %1 시점의 체인 상태 스냅샷에서 시작했으며 그 이전 블록은 갖고 있지 않습니다.</translation>
+    </message>
+    <message>
+        <source>It validates new blocks, sends, receives and stakes without them. They are needed to find the earlier transactions of an imported key or a restored wallet, to look up old transactions in the explorer, and to pass the whole chain on to other nodes.</source>
+        <translation>새 블록 검증, 보내기, 받기, 스테이킹은 과거 블록 없이도 됩니다. 가져온 키나 복원한 지갑의 이전 거래를 찾을 때, 탐색기에서 옛 거래를 조회할 때, 다른 노드에 전체 체인을 전달할 때 필요합니다.</translation>
+    </message>
+    <message>
+        <source>The last download stopped: %1</source>
+        <translation>지난 내려받기가 중단되었습니다: %1</translation>
+    </message>
+    <message>
+        <source>The past blocks are on this computer.</source>
+        <translation>과거 블록이 이 컴퓨터에 있습니다.</translation>
+    </message>
+    <message>
+        <source>This wallet started from a snapshot of the chain state at block %1 and has downloaded the blocks before it. After the next start it passes the whole chain on to other nodes.</source>
+        <translation>이 지갑은 블록 %1 시점의 체인 상태 스냅샷에서 시작했고 그 이전 블록도 받아 두었습니다. 다음에 시작하면 다른 노드에 전체 체인을 전달합니다.</translation>
     </message>
 </context>
 </TS>
