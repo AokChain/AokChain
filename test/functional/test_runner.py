@@ -124,6 +124,7 @@ BASE_SCRIPTS= [
     'feature_staking.py',
     'rpc_mnemonic.py',
     'wallet_multisig_flow.py',
+    'feature_bootstrap.py',
     'wallet_multiwallet.py',
     'interface_zmq.py',
     'rpc_invalidateblock.py',
