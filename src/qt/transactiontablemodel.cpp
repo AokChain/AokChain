@@ -281,11 +281,38 @@ void TransactionTableModel::updateTransaction(const QString &hash, int status, b
 void TransactionTableModel::updateConfirmations()
 {
     // Blocks came in since last poll.
-    // Invalidate status (number of confirmations) and (possibly) description
-    //  for all rows. Qt is smart enough to only actually request the data for the
-    //  visible rows.
-    Q_EMIT dataChanged(index(0, Status), index(priv->size()-1, Status));
-    Q_EMIT dataChanged(index(0, ToAddress), index(priv->size()-1, ToAddress));
+    // Invalidate status (number of confirmations) and (possibly) description.
+    // The views ask only for the visible rows, but a filter proxy looks at every
+    // row that is said to have changed, which takes seconds with tens of
+    // thousands of transactions. A transaction that is well confirmed keeps its
+    // status when a block comes in, so only the rows that can still change are
+    // announced, as long as they are few.
+    static const int SETTLED_DEPTH = 2 * TransactionRecord::RecommendedNumConfirmations;
+    std::vector<int> open;
+    const int rows = priv->size();
+    // announcing rows one by one pays as long as they are a small part of all rows
+    const int MAX_SINGLE_ROWS = std::max(500, rows / 4);
+    for (int row = 0; row < rows && (int)open.size() <= MAX_SINGLE_ROWS; ++row) {
+        const TransactionStatus& status = priv->cachedWallet.at(row).status;
+        const bool settled = status.status == TransactionStatus::Confirmed && status.depth >= SETTLED_DEPTH
+                             && status.cur_num_blocks != -1 && !status.needsUpdate;
+        if (!settled)
+            open.push_back(row);
+    }
+    if ((int)open.size() > MAX_SINGLE_ROWS) {
+        Q_EMIT dataChanged(index(0, Status), index(rows - 1, Status));
+        Q_EMIT dataChanged(index(0, ToAddress), index(rows - 1, ToAddress));
+        return;
+    }
+    // runs of neighbouring rows in one signal
+    for (size_t i = 0; i < open.size();) {
+        size_t last = i;
+        while (last + 1 < open.size() && open[last + 1] == open[last] + 1)
+            ++last;
+        Q_EMIT dataChanged(index(open[i], Status), index(open[last], Status));
+        Q_EMIT dataChanged(index(open[i], ToAddress), index(open[last], ToAddress));
+        i = last + 1;
+    }
 }
 
 int TransactionTableModel::rowCount(const QModelIndex &parent) const

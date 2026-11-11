@@ -24,6 +24,7 @@
 
 #include "ui_interface.h"
 
+#include <QAbstractProxyModel>
 #include <QButtonGroup>
 #include <QComboBox>
 #include <QDateTimeEdit>
@@ -48,6 +49,101 @@
 #include <QToolTip>
 #include <QUrl>
 #include <QVBoxLayout>
+
+/**
+ * Shows one page of the filtered and sorted transactions, so that a history of
+ * tens of thousands of transactions is never put into the view at once.
+ * Paging comes after filter and sort: it is a window on the rows of the filter
+ * proxy. The export uses the filter proxy and so writes all matching rows.
+ */
+class TransactionPageProxy : public QAbstractProxyModel
+{
+public:
+    explicit TransactionPageProxy(QObject *parent) : QAbstractProxyModel(parent), pageSize(50), page(0) {}
+
+    void setSourceModel(QAbstractItemModel *source) override
+    {
+        QAbstractProxyModel::setSourceModel(source);
+        // whatever changes the rows of the source may change what is on the page
+        connect(source, &QAbstractItemModel::modelAboutToBeReset, this, [this] { beginResetModel(); });
+        connect(source, &QAbstractItemModel::modelReset, this, [this] { clamp(); endResetModel(); });
+        connect(source, &QAbstractItemModel::layoutAboutToBeChanged, this, [this] { beginResetModel(); });
+        connect(source, &QAbstractItemModel::layoutChanged, this, [this] { clamp(); endResetModel(); });
+        connect(source, &QAbstractItemModel::rowsAboutToBeInserted, this, [this] { beginResetModel(); });
+        connect(source, &QAbstractItemModel::rowsInserted, this, [this] { clamp(); endResetModel(); });
+        connect(source, &QAbstractItemModel::rowsAboutToBeRemoved, this, [this] { beginResetModel(); });
+        connect(source, &QAbstractItemModel::rowsRemoved, this, [this] { clamp(); endResetModel(); });
+        connect(source, &QAbstractItemModel::dataChanged, this, [this] {
+            if (rowCount() > 0)
+                Q_EMIT dataChanged(index(0, 0), index(rowCount() - 1, columnCount() - 1));
+        });
+        connect(source, &QAbstractItemModel::headerDataChanged, this, &QAbstractItemModel::headerDataChanged);
+    }
+
+    int totalRows() const { return sourceModel() ? sourceModel()->rowCount() : 0; }
+    int pageCount() const { return qMax(1, (totalRows() + pageSize - 1) / pageSize); }
+    int currentPage() const { return page; }
+    int rowsPerPage() const { return pageSize; }
+
+    void setPage(int newPage)
+    {
+        newPage = qBound(0, newPage, pageCount() - 1);
+        if (newPage == page)
+            return;
+        beginResetModel();
+        page = newPage;
+        endResetModel();
+    }
+
+    void setPageSize(int size)
+    {
+        beginResetModel();
+        pageSize = qMax(1, size);
+        page = 0;
+        endResetModel();
+    }
+
+    int rowCount(const QModelIndex &parent = QModelIndex()) const override
+    {
+        if (parent.isValid())
+            return 0;
+        return qBound(0, totalRows() - page * pageSize, pageSize);
+    }
+    int columnCount(const QModelIndex &parent = QModelIndex()) const override
+    {
+        return parent.isValid() || !sourceModel() ? 0 : sourceModel()->columnCount();
+    }
+    QModelIndex index(int row, int column, const QModelIndex &parent = QModelIndex()) const override
+    {
+        if (parent.isValid() || row < 0 || row >= rowCount() || column < 0 || column >= columnCount())
+            return QModelIndex();
+        return createIndex(row, column);
+    }
+    QModelIndex parent(const QModelIndex &) const override { return QModelIndex(); }
+    QModelIndex mapToSource(const QModelIndex &proxyIndex) const override
+    {
+        if (!proxyIndex.isValid() || !sourceModel())
+            return QModelIndex();
+        return sourceModel()->index(proxyIndex.row() + page * pageSize, proxyIndex.column());
+    }
+    QModelIndex mapFromSource(const QModelIndex &sourceIndex) const override
+    {
+        if (!sourceIndex.isValid())
+            return QModelIndex();
+        return index(sourceIndex.row() - page * pageSize, sourceIndex.column());
+    }
+    void sort(int column, Qt::SortOrder order = Qt::AscendingOrder) override
+    {
+        if (sourceModel())
+            sourceModel()->sort(column, order);
+    }
+
+private:
+    void clamp() { page = qBound(0, page, pageCount() - 1); }
+
+    int pageSize;
+    int page;
+};
 
 /**
  * Paints the cells of the transaction table: a tile with the direction, the
@@ -171,7 +267,7 @@ public:
 
 TransactionView::TransactionView(const PlatformStyle *platformStyle, QWidget *parent) :
     QWidget(parent), model(0), transactionProxyModel(0),
-    transactionView(0), abandonAction(0), bumpFeeAction(0), columnResizingFixer(0), assetRowsSeen(0), assetRescan(false)
+    transactionView(0), abandonAction(0), bumpFeeAction(0), columnResizingFixer(0), assetRowsSeen(0), assetRescan(false), pageProxy(0)
 {
     const GUIUtil::Theme& theme = GUIUtil::theme();
 
@@ -232,8 +328,8 @@ TransactionView::TransactionView(const PlatformStyle *platformStyle, QWidget *pa
 
     dateWidget = new QComboBox(this);
     dateWidget->setFixedSize(140, 48);
-    dateWidget->addItem(tr("Past year"), PastYear);
     dateWidget->addItem(tr("All time"), All);
+    dateWidget->addItem(tr("Past year"), PastYear);
     dateWidget->addItem(tr("Today"), Today);
     dateWidget->addItem(tr("This week"), ThisWeek);
     dateWidget->addItem(tr("This month"), ThisMonth);
@@ -321,14 +417,50 @@ TransactionView::TransactionView(const PlatformStyle *platformStyle, QWidget *pa
     cardLayout->addWidget(footerLine);
     QHBoxLayout *footer = new QHBoxLayout();
     footer->setContentsMargins(0, 10, 12, 0);
-    QLabel *hint = new QLabel(tr("Double-click a row for the details; the menu of the right mouse button looks a transaction up in the explorer"), card);
-    hint->setProperty("role", "caption");
+    // number of matching transactions, and the pages
+    pageCountLabel = new QLabel(card);
+    pageCountLabel->setProperty("role", "caption");
+    pageCountLabel->setToolTip(tr("Double-click a row for the details; the menu of the right mouse button looks a transaction up in the explorer"));
+    footer->addWidget(pageCountLabel);
+    footer->addStretch();
+    const std::pair<QPushButton**, QString> pageButtons[] = {
+        {&pageFirst, QString::fromUtf8("«")}, {&pagePrevious, QString::fromUtf8("‹ ") + tr("Previous")},
+        {&pageNext, tr("Next") + QString::fromUtf8(" ›")}, {&pageLast, QString::fromUtf8("»")}};
+    for (const std::pair<QPushButton**, QString>& button : pageButtons) {
+        *button.first = new QPushButton(button.second, card);
+        (*button.first)->setProperty("look", "chipButton");
+        (*button.first)->setCursor(Qt::PointingHandCursor);
+        (*button.first)->setFixedHeight(30);
+    }
+    pageFirst->setToolTip(tr("First page"));
+    pageLast->setToolTip(tr("Last page"));
+    pageLabel = new QLabel(card);
+    pageLabel->setFont(GUIUtil::monoFont(13, QFont::Medium));
+    pageLabel->setMinimumWidth(80);
+    pageLabel->setAlignment(Qt::AlignCenter);
+    footer->addWidget(pageFirst);
+    footer->addSpacing(6);
+    footer->addWidget(pagePrevious);
+    footer->addWidget(pageLabel);
+    footer->addWidget(pageNext);
+    footer->addSpacing(6);
+    footer->addWidget(pageLast);
+    footer->addSpacing(12);
+    pageSizeWidget = new QComboBox(card);
+    for (int size : {50, 100, 200})
+        pageSizeWidget->addItem(tr("%1 per page").arg(size), size);
+    pageSizeWidget->setFixedHeight(32);
+    footer->addWidget(pageSizeWidget);
+    footer->addSpacing(12);
     QPushButton *explorerLink = new QPushButton(tr("Open the explorer"), card);
     explorerLink->setProperty("look", "link");
     explorerLink->setCursor(Qt::PointingHandCursor);
-    footer->addWidget(hint);
-    footer->addStretch();
     footer->addWidget(explorerLink);
+    connect(pageFirst, &QPushButton::clicked, this, [this] { gotoPage(0); });
+    connect(pagePrevious, &QPushButton::clicked, this, [this] { gotoPage(pageProxy ? pageProxy->currentPage() - 1 : 0); });
+    connect(pageNext, &QPushButton::clicked, this, [this] { gotoPage(pageProxy ? pageProxy->currentPage() + 1 : 0); });
+    connect(pageLast, &QPushButton::clicked, this, [this] { gotoPage(pageProxy ? pageProxy->pageCount() - 1 : 0); });
+    connect(pageSizeWidget, SIGNAL(activated(int)), this, SLOT(pageSizeChosen(int)));
     cardLayout->addLayout(footer);
     connect(explorerLink, SIGNAL(clicked()), this, SLOT(openExplorer()));
 
@@ -444,7 +576,13 @@ void TransactionView::setModel(WalletModel *_model)
         transactionProxyModel->setSortRole(Qt::EditRole);
 
         transactionView->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
-        transactionView->setModel(transactionProxyModel);
+        // the view shows one page of the filtered and sorted rows
+        pageProxy = new TransactionPageProxy(this);
+        pageProxy->setSourceModel(transactionProxyModel);
+        transactionView->setModel(pageProxy);
+        connect(pageProxy, &QAbstractItemModel::modelAboutToBeReset, this, [this] { rememberSelection(); });
+        connect(pageProxy, &QAbstractItemModel::modelReset, this, [this] { updatePageControls(); restoreSelection(); });
+        updatePageControls();
         transactionView->setAlternatingRowColors(false);
         transactionView->setSelectionBehavior(QAbstractItemView::SelectRows);
         transactionView->setSelectionMode(QAbstractItemView::ExtendedSelection);
@@ -494,7 +632,6 @@ void TransactionView::setModel(WalletModel *_model)
             }
         }
 
-        // The past year is shown at first; "all time" is one of the choices
         chooseDate(dateWidget->currentIndex());
         updateAssetList();
         connect(_model->getTransactionTableModel(), SIGNAL(rowsInserted(QModelIndex,int,int)), this, SLOT(assetRowsInserted(QModelIndex,int,int)));
@@ -966,11 +1103,71 @@ void TransactionView::dateRangeChanged()
             QDateTime(dateTo->date()).addDays(1));
 }
 
+void TransactionView::gotoPage(int page)
+{
+    if (!pageProxy)
+        return;
+    selectedHash.clear();
+    pageProxy->setPage(page);
+    updatePageControls();
+    transactionView->scrollToTop();
+}
+
+void TransactionView::pageSizeChosen(int idx)
+{
+    if (!pageProxy)
+        return;
+    selectedHash.clear();
+    pageProxy->setPageSize(pageSizeWidget->itemData(idx).toInt());
+    updatePageControls();
+}
+
+/** "1 / 61", the number of matching transactions, and which of the buttons make sense. */
+void TransactionView::updatePageControls()
+{
+    if (!pageProxy)
+        return;
+    const int page = pageProxy->currentPage(), pages = pageProxy->pageCount();
+    pageLabel->setText(QString("%1 / %2").arg(page + 1).arg(pages));
+    pageCountLabel->setText(tr("%1 transactions").arg(GUIUtil::withThousands(QString::number(pageProxy->totalRows()))));
+    pageFirst->setEnabled(page > 0);
+    pagePrevious->setEnabled(page > 0);
+    pageNext->setEnabled(page < pages - 1);
+    pageLast->setEnabled(page < pages - 1);
+}
+
+/** The page is laid out again when a block or a transaction arrives: keep the selected row. */
+void TransactionView::rememberSelection()
+{
+    if (!transactionView->selectionModel())
+        return;
+    const QModelIndexList selection = transactionView->selectionModel()->selectedRows(0);
+    if (!selection.isEmpty())
+        selectedHash = selection.at(0).data(TransactionTableModel::TxHashRole).toString();
+}
+
+void TransactionView::restoreSelection()
+{
+    if (selectedHash.isEmpty() || !pageProxy)
+        return;
+    for (int row = 0; row < pageProxy->rowCount(); ++row) {
+        if (pageProxy->index(row, 0).data(TransactionTableModel::TxHashRole).toString() == selectedHash) {
+            transactionView->selectRow(row);
+            return;
+        }
+    }
+}
+
 void TransactionView::focusTransaction(const QModelIndex &idx)
 {
-    if(!transactionProxyModel)
+    if(!transactionProxyModel || !pageProxy)
         return;
-    QModelIndex targetIdx = transactionProxyModel->mapFromSource(idx);
+    // the page that has the transaction, then the row on it
+    const QModelIndex filtered = transactionProxyModel->mapFromSource(idx);
+    if (!filtered.isValid())
+        return;
+    gotoPage(filtered.row() / pageProxy->rowsPerPage());
+    QModelIndex targetIdx = pageProxy->mapFromSource(filtered);
     transactionView->scrollTo(targetIdx);
     transactionView->setCurrentIndex(targetIdx);
     transactionView->setFocus();

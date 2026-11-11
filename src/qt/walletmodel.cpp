@@ -163,9 +163,14 @@ void WalletModel::pollBalanceChanged()
         // Balance and number of transactions might have changed
         cachedNumBlocks = chainActive.Height();
 
-        checkBalanceChanged();
-        if(transactionTableModel)
+        {
+            GUIUtil::LogTimer part("balance poll: wallet balances (CWallet::GetBalance and the like)");
+            checkBalanceChanged();
+        }
+        if(transactionTableModel) {
+            GUIUtil::LogTimer part("balance poll: confirmations of the transaction rows");
             transactionTableModel->updateConfirmations();
+        }
         if(tokenTableModel)
             tokenTableModel->checkBalanceChanged();
     }

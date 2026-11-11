@@ -16,6 +16,7 @@
 
 class PlatformStyle;
 class TransactionFilterProxy;
+class TransactionPageProxy;
 class WalletModel;
 
 QT_BEGIN_NAMESPACE
@@ -26,6 +27,8 @@ class QLineEdit;
 class QMenu;
 class QButtonGroup;
 class QModelIndex;
+class QPushButton;
+class QLabel;
 class QTimer;
 class QSignalMapper;
 class QTableView;
@@ -84,6 +87,20 @@ private:
     QTimer *assetListTimer;
     QSet<QString> assetRoots;
     int assetRowsSeen;
+    // paging
+    TransactionPageProxy *pageProxy;
+    QLabel *pageCountLabel;
+    QLabel *pageLabel;
+    QPushButton *pageFirst;
+    QPushButton *pagePrevious;
+    QPushButton *pageNext;
+    QPushButton *pageLast;
+    QComboBox *pageSizeWidget;
+    QString selectedHash;
+    void gotoPage(int page);
+    void updatePageControls();
+    void rememberSelection();
+    void restoreSelection();
     bool assetRescan;
     void noteAssetRow(int row);
 
@@ -142,6 +159,7 @@ public Q_SLOTS:
     void changedAmount();
     void changedTokenName();
     void updateAssetList();
+    void pageSizeChosen(int idx);
     void assetRowsInserted(const QModelIndex &parent, int first, int last);
     void changedPrefix();
     void exportClicked();
