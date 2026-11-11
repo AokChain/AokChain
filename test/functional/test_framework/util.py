@@ -320,6 +320,8 @@ def initialize_datadir(dirname, n):
         f.write("port=" + str(p2p_port(n)) + "\n")
         f.write("rpcport=" + str(rpc_port(n)) + "\n")
         f.write("listenonion=0\n")
+        # Verify the wallet's live transaction index against a full scan on every use
+        f.write("checkwalletlive=1\n")
     return datadir
 
 def get_datadir_path(dirname, n):

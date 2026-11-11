@@ -7,11 +7,14 @@
 Balance and coin selection scans skip wallet transactions whose own outputs
 have all been spent by confirmed transactions. That shortcut is memoized, so
 it has to be dropped again when
- - an output that was not ours becomes ours (key import), or
+ - an output that was not ours becomes ours (key import, or an HD wallet
+   deriving the key later), or
  - the spending transaction stops being confirmed (reorg to a conflicting chain).
 """
 
 from decimal import Decimal
+import os
+import shutil
 
 from test_framework.test_framework import AokChainTestFramework
 from test_framework.util import assert_equal, connect_nodes_bi, disconnect_nodes, sync_blocks
@@ -21,7 +24,8 @@ class WalletSpentCacheTest(AokChainTestFramework):
     def set_test_params(self):
         self.num_nodes = 2
         self.setup_clean_chain = True
-        self.extra_args = [["-maxreorg=10000"], ["-maxreorg=10000"]]
+        # a small key pool, so that the HD part can reach keys not derived yet
+        self.extra_args = [["-maxreorg=10000", "-keypool=5"], ["-maxreorg=10000", "-keypool=5"]]
 
     def outputs_of(self, node, txid):
         """Unspent outputs of txid as the wallet sees them."""
@@ -105,6 +109,45 @@ class WalletSpentCacheTest(AokChainTestFramework):
         self.send_raw(n0, [c_in], {n0.getnewaddress(): Decimal("89.6")})
         n0.generate(1)
         assert_equal(self.outputs_of(n0, c), [])
+
+        self.log.info("Output to a key the HD wallet derives only later")
+        # node1 becomes a copy of node0's wallet that is further along the
+        # HD chain, like a wallet in use next to an older backup of itself
+        assert "hdmasterkeyid" in n0.getwalletinfo()
+        self.sync_all()
+        self.stop_nodes()
+        shutil.copyfile(os.path.join(self.options.tmpdir, "node0", "regtest", "wallets", "wallet.dat"),
+                        os.path.join(self.options.tmpdir, "node1", "regtest", "wallets", "wallet.dat"))
+        self.start_nodes()
+        connect_nodes_bi(self.nodes, 0, 1)
+        n0, n1 = self.nodes
+        for _ in range(30):
+            later_addr = n1.getnewaddress()
+        assert not n0.validateaddress(later_addr)["ismine"]
+
+        fund_addr = n0.getnewaddress()
+        fund = n0.sendtoaddress(fund_addr, 100)
+        n0.generate(1)
+        own = n0.getrawchangeaddress()
+        h = self.send_raw(n0, [{"txid": fund, "vout": self.vout_paying(n0, fund, fund_addr)}],
+                          {later_addr: 7, own: Decimal("92.9")})
+        n0.generate(1)
+        self.send_raw(n0, [{"txid": h, "vout": self.vout_paying(n0, h, own)}], {n0.getrawchangeaddress(): Decimal("92.8")})
+        n0.generate(1)
+        assert_equal(self.outputs_of(n0, h), [])
+        balance = n0.getbalance()  # H is now remembered as fully spent
+        n0.getwalletinfo()
+        # Deriving unrelated keys leaves H alone; deriving the key of its
+        # output brings it back
+        for _ in range(60):
+            if n0.validateaddress(later_addr)["ismine"]:
+                break
+            assert_equal(self.outputs_of(n0, h), [])
+            assert_equal(n0.getbalance(), balance)
+            n0.getnewaddress()
+        assert n0.validateaddress(later_addr)["ismine"]
+        assert_equal(self.outputs_of(n0, h), [self.vout_paying(n0, h, later_addr)])
+        assert_equal(n0.getbalance(), balance + 7)
 
 
 if __name__ == '__main__':

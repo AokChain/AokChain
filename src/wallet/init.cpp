@@ -85,6 +85,7 @@ std::string WalletInit::GetHelpString(bool showDebug)
     {
         strUsage += HelpMessageGroup(_("Wallet debugging/testing options:"));
 
+        strUsage += HelpMessageOpt("-checkwalletlive", "Verify the wallet's index of unspent transactions against a full scan on every use; slow, for tests (default: 0)");
         strUsage += HelpMessageOpt("-dblogsize=<n>", strprintf("Flush wallet database activity from memory to disk log every <n> megabytes (default: %u)", DEFAULT_WALLET_DBLOGSIZE));
         strUsage += HelpMessageOpt("-flushwallet", strprintf("Run a thread to flush wallet periodically (default: %u)", DEFAULT_FLUSHWALLET));
         strUsage += HelpMessageOpt("-privdb", strprintf("Sets the DB_PRIVATE flag in the wallet db environment (default: %u)", DEFAULT_WALLET_PRIVDB));
