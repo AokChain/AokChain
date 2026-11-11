@@ -125,6 +125,7 @@ BASE_SCRIPTS= [
     'rpc_mnemonic.py',
     'wallet_multisig_flow.py',
     'feature_bootstrap.py',
+    'p2p_old_peer_cutoff.py',
     'wallet_multiwallet.py',
     'interface_zmq.py',
     'rpc_invalidateblock.py',

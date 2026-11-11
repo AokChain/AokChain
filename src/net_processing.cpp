@@ -1521,6 +1521,21 @@ bool static ProcessHeadersMessage(CNode *pfrom, CConnman *connman, const std::ve
     return true;
 }
 
+/**
+ * The lowest protocol version that a peer may announce: MIN_PEER_PROTO_VERSION, and
+ * OLD_PEER_CUTOFF_VERSION once the active chain has reached the old peer cutoff height of the
+ * network. A node that is itself still below that height (initial synchronization) therefore
+ * still takes blocks from old peers.
+ */
+static int MinPeerProtoVersion()
+{
+    const int nCutoffHeight = Params().OldPeerCutoffHeight();
+    if (nCutoffHeight == std::numeric_limits<int>::max())
+        return MIN_PEER_PROTO_VERSION;
+    LOCK(cs_main);
+    return chainActive.Height() >= nCutoffHeight ? std::max(MIN_PEER_PROTO_VERSION, OLD_PEER_CUTOFF_VERSION) : MIN_PEER_PROTO_VERSION;
+}
+
 bool static ProcessMessage(CNode* pfrom, const std::string& strCommand, CDataStream& vRecv, int64_t nTimeReceived, const CChainParams& chainparams, CConnman* connman, const std::atomic<bool>& interruptMsgProc)
 {
     bool fBIP37 = false;
@@ -1621,12 +1636,15 @@ bool static ProcessMessage(CNode* pfrom, const std::string& strCommand, CDataStr
             }
         }
 
-        if (nVersion < MIN_PEER_PROTO_VERSION)
+        // Once the chain has reached the old peer cutoff height, peers of the previous release
+        // series are not accepted any more. Below that height nothing changes.
+        const int nMinPeerVersion = MinPeerProtoVersion();
+        if (nVersion < nMinPeerVersion)
         {
-            // disconnect from peers older than this proto version
+            // disconnect from peers older than this proto version (no ban: they may upgrade)
             LogPrintf("peer=%d using obsolete version %i; disconnecting\n", pfrom->GetId(), nVersion);
             connman->PushMessage(pfrom, CNetMsgMaker(INIT_PROTO_VERSION).Make(NetMsgType::REJECT, strCommand, REJECT_OBSOLETE,
-                               strprintf("Version must be %d or greater", MIN_PEER_PROTO_VERSION)));
+                               strprintf("Version must be %d or greater", nMinPeerVersion)));
             pfrom->fDisconnect = true;
             return false;
         }
@@ -3345,6 +3363,17 @@ bool PeerLogicValidation::SendMessages(CNode* pto, std::atomic<bool>& interruptM
 
         if (SendRejectsAndCheckIfBanned(pto, connman))
             return true;
+
+        // A peer that connected before the chain reached the old peer cutoff height and is below
+        // the version that is required from that height on: disconnect it, without a ban.
+        if (Params().OldPeerCutoffHeight() != std::numeric_limits<int>::max() && pto->nVersion != 0
+            && pto->nVersion < OLD_PEER_CUTOFF_VERSION && chainActive.Height() >= Params().OldPeerCutoffHeight()) {
+            if (!pto->fDisconnect)
+                LogPrintf("peer=%d uses version %i, below %d that is required from height %d on; disconnecting\n",
+                          pto->GetId(), pto->nVersion.load(), OLD_PEER_CUTOFF_VERSION, Params().OldPeerCutoffHeight());
+            pto->fDisconnect = true;
+            return true;
+        }
         CNodeState &state = *State(pto->GetId());
 
         // Address refresh broadcast

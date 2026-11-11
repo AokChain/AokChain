@@ -14,6 +14,7 @@
 #include "protocol.h"
 
 #include <memory>
+#include <limits>
 #include <vector>
 
 struct CDNSSeedData {
@@ -71,6 +72,10 @@ public:
     /** Policy: Filter transactions that do not match well-defined patterns */
     bool RequireStandard() const { return fRequireStandard; }
     uint64_t PruneAfterHeight() const { return nPruneAfterHeight; }
+    /** From this height of the active chain on, peers that announce a protocol version below
+        OLD_PEER_CUTOFF_VERSION are disconnected. INT_MAX: never. Not a consensus rule. */
+    int OldPeerCutoffHeight() const { return nOldPeerCutoffHeight; }
+    void SetOldPeerCutoffHeight(int height) { nOldPeerCutoffHeight = height; }
     /** Make miner stop after a block is found. In RPC, don't return until nGenProcLimit blocks are generated */
     bool MineBlocksOnDemand() const { return fMineBlocksOnDemand; }
     /** Return the BIP70 network string (main, test or regtest) */
@@ -113,6 +118,7 @@ protected:
     CMessageHeader::MessageStartChars pchMessageStart;
     int nDefaultPort;
     uint64_t nPruneAfterHeight;
+    int nOldPeerCutoffHeight = std::numeric_limits<int>::max();
     std::vector<CDNSSeedData> vSeeds;
     std::vector<unsigned char> base58Prefixes[MAX_BASE58_TYPES];
     std::string strNetworkID;
@@ -173,6 +179,8 @@ void UpdateVersionBitsParameters(Consensus::DeploymentPos d, int64_t nStartTime,
  * so that tests can reach the proof-of-stake phase.
  */
 void UpdateLastPOWBlock(int nHeight);
+/** Regtest only: set the height from which old peers are disconnected (-oldpeercutoffheight). */
+void UpdateOldPeerCutoffHeight(int nHeight);
 
 void TurnOffSegwit();
 

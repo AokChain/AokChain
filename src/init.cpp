@@ -489,6 +489,7 @@ std::string HelpMessage(HelpMessageMode mode)
         strUsage += HelpMessageOpt("-limitdescendantcount=<n>", strprintf("Do not accept transactions if any ancestor would have <n> or more in-mempool descendants (default: %u)", DEFAULT_DESCENDANT_LIMIT));
         strUsage += HelpMessageOpt("-limitdescendantsize=<n>", strprintf("Do not accept transactions if any ancestor would have more than <n> kilobytes of in-mempool descendants (default: %u).", DEFAULT_DESCENDANT_SIZE_LIMIT));
         strUsage += HelpMessageOpt("-lastpowblock=<height>", "Height of the last proof-of-work block; later blocks must be proof-of-stake (regtest-only)");
+        strUsage += HelpMessageOpt("-oldpeercutoffheight=<height>", "Chain height from which peers below the current protocol version are disconnected (regtest-only)");
         strUsage += HelpMessageOpt("-vbparams=deployment:start:end", "Use given start/end times for specified version bits deployment (regtest-only)");
     }
     strUsage += HelpMessageOpt("-debug=<category>", strprintf(_("Output debugging information (default: %u, supplying <category> is optional)"), 0) + ". " +
@@ -1165,6 +1166,19 @@ bool AppInitParameterInteraction()
         }
         UpdateLastPOWBlock((int)nLastPOW);
         LogPrintf("Setting last proof-of-work block height to %d\n", nLastPOW);
+    }
+
+    if (gArgs.IsArgSet("-oldpeercutoffheight")) {
+        // Lets tests reach the height at which old peers are no longer kept
+        if (!chainparams.MineBlocksOnDemand()) {
+            return InitError("The old peer cutoff height may only be overridden on regtest.");
+        }
+        const int64_t nCutoff = gArgs.GetArg("-oldpeercutoffheight", 0);
+        if (nCutoff < 0 || nCutoff > std::numeric_limits<int>::max()) {
+            return InitError(strprintf("Invalid -oldpeercutoffheight (%d)", nCutoff));
+        }
+        UpdateOldPeerCutoffHeight((int)nCutoff);
+        LogPrintf("Setting old peer cutoff height to %d\n", nCutoff);
     }
 
     if (gArgs.IsArgSet("-vbparams")) {

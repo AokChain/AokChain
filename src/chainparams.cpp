@@ -513,6 +513,11 @@ void UpdateLastPOWBlock(int nHeight)
     globalChainParams->UpdateLastPOWBlock(nHeight);
 }
 
+void UpdateOldPeerCutoffHeight(int nHeight)
+{
+    globalChainParams->SetOldPeerCutoffHeight(nHeight);
+}
+
 void TurnOffSegwit(){
 	globalChainParams->TurnOffSegwit();
 }
