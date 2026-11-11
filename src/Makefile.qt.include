@@ -124,6 +124,7 @@ QT_MOC_CPP = \
   qt/moc_askpassphrasedialog.cpp \
   qt/moc_firstrun.cpp \
   qt/moc_mnemonicdialog.cpp \
+  qt/moc_sendconfirmdialog.cpp \
   qt/moc_tokencontroldialog.cpp \
   qt/moc_tokencontroltreewidget.cpp \
   qt/moc_tokenfilterproxy.cpp \
@@ -210,6 +211,7 @@ AOKCHAIN_QT_H = \
   qt/askpassphrasedialog.h \
   qt/firstrun.h \
   qt/mnemonicdialog.h \
+  qt/sendconfirmdialog.h \
   qt/tokencontroldialog.h \
   qt/tokencontroltreewidget.h \
   qt/tokenfilterproxy.h \
@@ -405,6 +407,7 @@ AOKCHAIN_QT_WALLET_CPP = \
   qt/addresstablemodel.cpp \
   qt/askpassphrasedialog.cpp \
   qt/mnemonicdialog.cpp \
+  qt/sendconfirmdialog.cpp \
   qt/tokencontroldialog.cpp \
   qt/tokencontroltreewidget.cpp \
   qt/tokenfilterproxy.cpp \

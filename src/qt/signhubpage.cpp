@@ -4,6 +4,9 @@
 
 #include "signhubpage.h"
 
+#include "addresstablemodel.h"
+#include "sendconfirmdialog.h"
+
 #include "addressbookpage.h"
 #include "aokchainamountfield.h"
 #include "aokchainunits.h"
@@ -1833,6 +1836,37 @@ void SignHubPage::makeRequest()
         sendError->setText(tr("The recipient address is not valid."));
         sendError->show();
         return;
+    }
+    {
+        // the same question as before any other send
+        MultisigWallet wallet;
+        model->wallet(currentWallet, wallet);
+        CAmount fee = 0, sent = 0;
+        if (!model->previewSpend(currentWallet, all ? 0 : sendAmount->value(), all, sendFee->checkedId(), fee, sent, error)) {
+            sendError->setText(error);
+            sendError->show();
+            return;
+        }
+        SendConfirmData confirm;
+        confirm.asset = "AOK";
+        confirm.feeUnit = "AOK";
+        confirm.source = tr("From the multisig wallet \"%1\" (%2)").arg(wallet.name, wallet.rule());
+        SendConfirmData::Recipient to;
+        to.address = sendTo->text().trimmed();
+        to.label = walletModel->getAddressTableModel()->labelForAddress(to.address);
+        to.amount = amountText(sent);
+        to.known = walletModel->isKnownAddress(to.address);
+        confirm.recipients.append(to);
+        confirm.total = amountText(sent);
+        confirm.fee = amountText(fee);
+        confirm.feeNote = tr("estimate");
+        confirm.assetDeducted = amountText(sent + fee);
+        confirm.assetAfter = amountText(std::max<CAmount>(0, wallet.balance - sent - fee));
+        confirm.wholeBalance = all;
+        confirm.sendText = tr("Make the request");
+        confirm.extraWarnings << tr("Nothing is sent yet: the request has to be signed by %1 participants and is sent after that.").arg(wallet.required);
+        if (!SendConfirmDialog::confirm(confirm, this))
+            return;
     }
     if (!model->createRequest(currentWallet, sendTo->text(), all ? 0 : sendAmount->value(), all, sendMemo->text(), sendFee->checkedId(), id, error)) {
         sendError->setText(error);
