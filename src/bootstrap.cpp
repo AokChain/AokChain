@@ -845,6 +845,16 @@ void ThreadBootstrap(std::vector<std::string> mirrors, std::string folder)
 {
     RenameThread("aokchain-bootstrap");
     try {
+        // In a new data directory the import thread connects the genesis block: no block is
+        // handed to validation before the chain has a tip.
+        while (!Cancelled()) {
+            {
+                LOCK(cs_main);
+                if (chainActive.Tip())
+                    break;
+            }
+            MilliSleep(50);
+        }
         Run(mirrors, fs::path(folder));
     } catch (const boost::thread_interrupted&) {
         fHold = false;
