@@ -13,6 +13,8 @@
 #include "guiutil.h"
 #include "optionsmodel.h"
 #include "overviewpage.h"
+#include "pagewidgets.h"
+#include "tokenspage.h"
 #include "platformstyle.h"
 #include "receivecoinsdialog.h"
 #include "sendcoinsdialog.h"
@@ -32,12 +34,15 @@
 #include <QAction>
 #include <QActionGroup>
 #include <QFileDialog>
+#include <QButtonGroup>
 #include <QHBoxLayout>
 #include <QLabel>
 #include <QProgressDialog>
 #include <QPushButton>
 #include <QVBoxLayout>
 
+
+static bool fFirstVisit = true;
 
 WalletView::WalletView(const PlatformStyle *_platformStyle, QWidget *parent):
     QStackedWidget(parent),
@@ -60,12 +65,43 @@ WalletView::WalletView(const PlatformStyle *_platformStyle, QWidget *parent):
 
     receiveCoinsPage = new ReceiveCoinsDialog(platformStyle);
     receiveShell = addPage(receiveCoinsPage, tr("Receive"));
+    // Send: AOK and tokens are two tabs of one page
     sendCoinsPage = new SendCoinsDialog(platformStyle);
-    sendShell = addPage(sendCoinsPage, tr("Send"), sendCoinsPage->headerWidget());
+    tokensPage = new TokensDialog(platformStyle);
+    QWidget *sendContainer = new QWidget(this);
+    QVBoxLayout *sendLayout = new QVBoxLayout(sendContainer);
+    sendLayout->setSpacing(14);
+    QFrame *tabFrame = new QFrame(sendContainer);
+    tabFrame->setProperty("role", "segGroup");
+    QHBoxLayout *tabLayout = new QHBoxLayout(tabFrame);
+    tabLayout->setContentsMargins(3, 3, 3, 3);
+    tabLayout->setSpacing(4);
+    sendTabs = new QButtonGroup(this);
+    const QString tabNames[2] = {"AOK", tr("Tokens")};
+    for (int i = 0; i < 2; ++i) {
+        ChoiceButton *tab = new ChoiceButton(tabNames[i], ChoiceButton::Segment, tabFrame);
+        tab->setFixedHeight(38);
+        tab->setMinimumWidth(96);
+        sendTabs->addButton(tab, i);
+        tabLayout->addWidget(tab);
+    }
+    sendTabs->button(0)->setChecked(true);
+    QHBoxLayout *tabRow = new QHBoxLayout();
+    tabRow->addWidget(tabFrame);
+    tabRow->addStretch();
+    sendLayout->addLayout(tabRow);
+    sendStack = new QStackedWidget(sendContainer);
+    sendStack->addWidget(sendCoinsPage);
+    sendStack->addWidget(tokensPage);
+    sendLayout->addWidget(sendStack, 1);
+    connect(sendTabs, SIGNAL(buttonClicked(int)), this, SLOT(showSendTab(int)));
+    sendShell = addPage(sendContainer, tr("Send"), sendCoinsPage->headerWidget());
 
     /** TOKENS START */
-    tokensPage = new TokensDialog(platformStyle);
-    tokensShell = addPage(tokensPage, tr("Tokens"));
+    // Tokens: what the wallet holds, in detail, and the other tokens of the chain
+    tokenCardsPage = new TokensPage(platformStyle);
+    tokensShell = addPage(tokenCardsPage, tr("Tokens"));
+    connect(tokenCardsPage, SIGNAL(sendToken(QString)), this, SLOT(sendToken(QString)));
     createTokensPage = new CreateTokenDialog(platformStyle);
     createTokensShell = addPage(createTokensPage, tr("Create Tokens"));
     manageTokensPage = new ReissueTokenDialog(platformStyle);
@@ -98,6 +134,7 @@ WalletView::WalletView(const PlatformStyle *_platformStyle, QWidget *parent):
     connect(createTokensPage, SIGNAL(message(QString,QString,unsigned int)), this, SIGNAL(message(QString,QString,unsigned int)));
     connect(manageTokensPage, SIGNAL(message(QString,QString,unsigned int)), this, SIGNAL(message(QString,QString,unsigned int)));
     connect(overviewPage, SIGNAL(tokenSendClicked(QModelIndex)), tokensPage, SLOT(focusToken(QModelIndex)));
+    connect(overviewPage, SIGNAL(tokenSendClicked(QModelIndex)), this, SLOT(showTokenSendTab()));
     connect(overviewPage, SIGNAL(tokenIssueSubClicked(QModelIndex)), createTokensPage, SLOT(focusSubToken(QModelIndex)));
     connect(overviewPage, SIGNAL(tokenIssueUniqueClicked(QModelIndex)), createTokensPage, SLOT(focusUniqueToken(QModelIndex)));
     connect(overviewPage, SIGNAL(tokenReissueClicked(QModelIndex)), manageTokensPage, SLOT(focusReissueToken(QModelIndex)));
@@ -160,13 +197,16 @@ void WalletView::setAokChainGUI(AokChainGUI *gui)
         connect(overviewPage, SIGNAL(receiveClicked()), gui, SLOT(gotoReceiveCoinsPage()));
         connect(overviewPage, SIGNAL(allTransactionsClicked()), gui, SLOT(gotoHistoryPage()));
         connect(overviewPage, SIGNAL(allTokensClicked()), gui, SLOT(gotoTokensPage()));
+        connect(overviewPage, SIGNAL(explorerClicked()), gui, SLOT(gotoExplorerPage()));
 
         // Look something up in the explorer
         connect(this, SIGNAL(explorerRequested(QString)), gui, SLOT(gotoExplorerPage(QString)));
         connect(explorerPage, SIGNAL(sendToAddress(QString)), gui, SLOT(gotoSendCoinsPage(QString)));
 
-        // Clicking on a token menu item Send
-        connect(overviewPage, SIGNAL(tokenSendClicked(QModelIndex)), gui, SLOT(gotoTokensPage()));
+        // Clicking on a token menu item Send: the token tab of the send page
+        connect(overviewPage, SIGNAL(tokenSendClicked(QModelIndex)), gui, SLOT(gotoSendCoinsPage()));
+        connect(this, SIGNAL(sendPageRequested()), gui, SLOT(gotoSendCoinsPage()));
+        connect(tokenCardsPage, SIGNAL(receiveRequested()), gui, SLOT(gotoReceiveCoinsPage()));
 
         // Clicking on a token menu item Issue Sub
         connect(overviewPage, SIGNAL(tokenIssueSubClicked(QModelIndex)), gui, SLOT(gotoCreateTokensPage()));
@@ -218,6 +258,7 @@ void WalletView::setWalletModel(WalletModel *_walletModel)
 
     /** TOKENS START */
     tokensPage->setModel(_walletModel);
+    tokenCardsPage->setModel(_walletModel);
     createTokensPage->setModel(_walletModel);
     manageTokensPage->setModel(_walletModel);
 
@@ -306,9 +347,11 @@ void WalletView::gotoReceiveCoinsPage()
 void WalletView::gotoSendCoinsPage(QString addr)
 {
     setCurrentWidget(sendShell);
-
-    if (!addr.isEmpty())
+    // an address is for the AOK form; otherwise the tab stays as it was
+    if (!addr.isEmpty()) {
+        showSendTab(0);
         sendCoinsPage->setAddress(addr);
+    }
 }
 
 void WalletView::gotoSignMessageTab(QString addr)
@@ -463,16 +506,38 @@ void WalletView::requestedSyncWarningInfo()
     Q_EMIT outOfSyncWarningClicked();
 }
 
-bool fFirstVisit = true;
-/** TOKENS START */
-void WalletView::gotoTokensPage()
+void WalletView::showSendTab(int tab)
 {
-    if (fFirstVisit){
+    if (tab == 1 && fFirstVisit) {
         fFirstVisit = false;
         tokensPage->handleFirstSelection();
     }
+    sendStack->setCurrentIndex(tab);
+    if (sendTabs->button(tab))
+        sendTabs->button(tab)->setChecked(true);
+    if (tab == 1)
+        tokensPage->refreshTokens();
+}
+
+void WalletView::showTokenSendTab()
+{
+    showSendTab(1);
+}
+
+/** Send page, token tab, with this token chosen */
+void WalletView::sendToken(const QString &name)
+{
+    showSendTab(1);
+    tokensPage->clear();
+    tokensPage->selectToken(name);
+    Q_EMIT sendPageRequested();
+}
+
+
+/** TOKENS START */
+void WalletView::gotoTokensPage()
+{
     setCurrentWidget(tokensShell);
-    tokensPage->focusTokenListBox();
 }
 
 void WalletView::gotoCreateTokensPage()

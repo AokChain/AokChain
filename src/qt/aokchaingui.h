@@ -265,6 +265,8 @@ private Q_SLOTS:
     void toggleHidden();
 
     void updateStakingIcon();
+    /** Show the warnings of the node in the side bar */
+    void updateAlerts(const QString &warnings);
 
     /** called by a timer to check if fRequestShutdown has been set **/
     void detectShutdown();

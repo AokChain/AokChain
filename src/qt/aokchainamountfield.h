@@ -117,6 +117,9 @@ public:
     void setUnit(int unit);
     void setMaxAmount(CAmount& max);
 
+    /** Large borderless appearance for the amount box of the send page. */
+    void setHeroStyle();
+
 Q_SIGNALS:
     void valueChanged();
 

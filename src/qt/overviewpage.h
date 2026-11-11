@@ -15,7 +15,7 @@
 #include <QPointer>
 #include <memory>
 
-class BalanceLabel;
+class AmountLabel;
 class ClientModel;
 class TransactionFilterProxy;
 class TxViewDelegate;
@@ -64,6 +64,7 @@ Q_SIGNALS:
     void receiveClicked();
     void allTransactionsClicked();
     void allTokensClicked();
+    void explorerClicked();
 
 protected:
     void resizeEvent(QResizeEvent *event) override;
@@ -83,14 +84,17 @@ private:
     CAmount currentLockedBalance;
 
     QPointer<QWidget> syncPill;
-    QLabel *labelAlerts;
-    BalanceLabel *labelTotal;
-    QLabel *labelBalance;
-    QLabel *labelUnconfirmed;
-    QLabel *labelImmature;
-    QLabel *labelStake;
+    QWidget *syncHint;
+    QPushButton *chainStrip;
+    bool outOfSync;
+    AmountLabel *labelTotal;
+    AmountLabel *labelBalance;
+    AmountLabel *labelUnconfirmed;
+    AmountLabel *labelImmature;
+    AmountLabel *labelStake;
     QWidget *stakeBlock;
-    QLabel *labelWatchOnly;
+    QWidget *labelWatchOnly;
+    AmountLabel *watchAmounts[4];
     QFrame *tokenFrame;
     QLabel *tokenCount;
     QLineEdit *tokenSearch;
@@ -120,6 +124,7 @@ private Q_SLOTS:
     void handleOutOfSyncWarningClicks();
     void tokenSearchChanged();
     void updateTokenCount();
+    void updateChainStrip();
 };
 
 #endif // AOKCHAIN_QT_OVERVIEWPAGE_H

@@ -12,6 +12,10 @@
 #include <QLabel>
 #include <QWidget>
 
+#include <string>
+#include <vector>
+
+class AmountLabel;
 class ClientModel;
 class PlatformStyle;
 class UniValue;
@@ -23,6 +27,12 @@ class QPushButton;
 class QTimer;
 class QVBoxLayout;
 QT_END_NAMESPACE
+
+namespace NodeRPC
+{
+    /** Call an RPC handler of this node, as the console does. Returns false when it reports an error. */
+    bool call(const std::string& method, const std::vector<std::string>& args, UniValue& result, std::string *error = nullptr);
+}
 
 /**
  * Runs the look-ups of the explorer on its own thread. It only reads: it calls
@@ -95,18 +105,18 @@ private:
     QPointer<QLabel> headerNote;
     QLineEdit *searchEdit;
     QPushButton *searchButton;
-    QLabel *statHeight;
-    QLabel *statDifficulty;
-    QLabel *statWeight;
-    QLabel *statPeers;
+    AmountLabel *statHeight;
+    AmountLabel *statDifficulty;
+    AmountLabel *statWeight;
+    AmountLabel *statPeers;
     QLabel *resultTitle;
     QLabel *resultBadge;
     QVBoxLayout *resultLayout;
     QWidget *resultButtons;
     QPushButton *hexButton;
-    QLabel *poolCount;
-    QLabel *poolSize;
-    QLabel *poolMinFee;
+    AmountLabel *poolCount;
+    AmountLabel *poolSize;
+    AmountLabel *poolMinFee;
     QVBoxLayout *poolLayout;
     QLabel *poolFooter;
 
@@ -118,6 +128,8 @@ private:
     void showAddress(const UniValue& result);
     QWidget *keyValueRow(const QString& key, QWidget *value);
     QLabel *monoLabel(const QString& text, int px = 13, bool bold = false);
+    /** An amount in the typography of all pages (smaller fraction), optionally with a unit */
+    QWidget *amountValue(const QString& amount, const QString& unit = QString(), int px = 15);
     QLabel *linkLabel(const QString& text, const QString& target, const QString& toolTip = QString(), int px = 12);
     QWidget *transferRow(const UniValue& entry);
 };

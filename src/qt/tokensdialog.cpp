@@ -14,6 +14,7 @@
 #include "tokencontroldialog.h"
 #include "guiutil.h"
 #include "optionsmodel.h"
+#include "pagewidgets.h"
 #include "platformstyle.h"
 #include "sendtokensentry.h"
 #include "walletmodel.h"
@@ -35,6 +36,8 @@
 #include <QHBoxLayout>
 #include <QLabel>
 #include <QVBoxLayout>
+#include <QPushButton>
+#include <QStyle>
 #include <QMessageBox>
 #include <QScrollBar>
 #include <QSettings>
@@ -59,7 +62,6 @@ TokensDialog::TokensDialog(const PlatformStyle *_platformStyle, QWidget *parent)
 
     ui->addButton->setIcon(QIcon(GUIUtil::lineIcon("plus", 14, GUIUtil::theme().label, 2.4)));
     ui->addButton->setIconSize(QSize(14, 14));
-    ui->clearButton->setIcon(QIcon());
     ui->sendButton->setIcon(QIcon());
 
     GUIUtil::setupAddressWidget(ui->lineEditTokenControlChange, this);
@@ -127,6 +129,8 @@ TokensDialog::TokensDialog(const PlatformStyle *_platformStyle, QWidget *parent)
 
 void TokensDialog::buildLayout()
 {
+    const GUIUtil::Theme& theme = GUIUtil::theme();
+
     // the layouts of the form go; the widgets stay
     delete layout();
     QHBoxLayout *columns = new QHBoxLayout(this);
@@ -136,50 +140,217 @@ void TokensDialog::buildLayout()
     QFrame *formCard = new QFrame(this);
     formCard->setProperty("role", "card");
     QVBoxLayout *form = new QVBoxLayout(formCard);
-    form->setContentsMargins(26, 24, 20, 20);
+    form->setContentsMargins(22, 16, 16, 18);
     form->setSpacing(12);
+
+    QHBoxLayout *formHeader = new QHBoxLayout();
+    formHeader->setContentsMargins(0, 0, 6, 0);
+    QLabel *formTitle = new QLabel(tr("Token to send"), formCard);
+    formTitle->setProperty("role", "title");
+    formTitle->setFont(GUIUtil::appFont(16, QFont::DemiBold));
+    formHeader->addWidget(formTitle);
+    formHeader->addStretch();
+    ui->clearButton->setText(QString());
+    ui->clearButton->setProperty("look", "icon");
+    ui->clearButton->setIcon(QIcon(GUIUtil::lineIcon("remove", 16, theme.label, 2.2)));
+    ui->clearButton->setIconSize(QSize(16, 16));
+    ui->clearButton->setFixedSize(32, 32);
+    ui->clearButton->setToolTip(tr("Clear all"));
+    ui->clearButton->setCursor(Qt::PointingHandCursor);
+    formHeader->addWidget(ui->clearButton);
+    form->addLayout(formHeader);
+
+    // the tokens of the wallet as round buttons; the chosen one with its name and what is available
+    picker = new TokenPicker(formCard);
+    form->addWidget(picker);
+    QHBoxLayout *pickedRow = new QHBoxLayout();
+    pickedRow->setContentsMargins(0, 0, 6, 0);
+    pickedRow->setSpacing(8);
+    pickedName = new QLabel(formCard);
+    pickedName->setFont(GUIUtil::appFont(14, QFont::Medium));
+    pickedRow->addWidget(pickedName);
+    pickedRow->addStretch();
+    QLabel *availableCaption = new QLabel(tr("Available"), formCard);
+    availableCaption->setProperty("role", "secondary");
+    pickedRow->addWidget(availableCaption);
+    pickedAvailable = new AmountLabel(15, QFont::Medium, formCard);
+    pickedRow->addWidget(pickedAvailable);
+    form->addLayout(pickedRow);
+    connect(picker, SIGNAL(tokenSelected(QString)), this, SLOT(tokenPicked(QString)));
+
     form->addWidget(ui->scrollArea, 1);
-    form->addWidget(ui->frameFee);
-    form->addWidget(ui->frameTokenControl);
     ui->addButton->setProperty("look", "dashed");
-    ui->addButton->setFixedHeight(44);
+    ui->addButton->setText(tr("Add recipient"));
+    ui->addButton->setFixedHeight(40);
     ui->addButton->setCursor(Qt::PointingHandCursor);
     form->addWidget(ui->addButton, 0, Qt::AlignLeft);
+    form->addWidget(ui->frameFee);
+    form->addWidget(ui->frameTokenControl);
     columns->addWidget(formCard, 3);
 
-    QFrame *summaryCard = new QFrame(this);
-    summaryCard->setProperty("role", "card");
-    QVBoxLayout *summary = new QVBoxLayout(summaryCard);
-    summary->setContentsMargins(26, 24, 26, 24);
-    summary->setSpacing(14);
-    QLabel *title = new QLabel(tr("Summary"), summaryCard);
-    title->setProperty("role", "title");
-    title->setFont(GUIUtil::appFont(16, QFont::Bold));
-    summary->addWidget(title);
-    QLabel *note = new QLabel(tr("Tokens are sent to AokChain addresses. The fee is paid in AOK."), summaryCard);
-    note->setProperty("role", "secondary");
-    note->setWordWrap(true);
-    summary->addWidget(note);
-    QHBoxLayout *balanceRow = new QHBoxLayout();
-    ui->label->setProperty("role", "secondary");
-    ui->labelBalance->setAlignment(Qt::AlignRight | Qt::AlignVCenter);
-    balanceRow->addWidget(ui->label);
-    balanceRow->addWidget(ui->labelBalance, 1);
-    summary->addLayout(balanceRow);
-    summary->addStretch(1);
-    QLabel *warning = new QLabel(tr("A transaction that has been sent cannot be cancelled. Check the address once more."), summaryCard);
-    warning->setProperty("role", "warning");
-    warning->setWordWrap(true);
-    summary->addWidget(warning);
+    summary = new SummaryCard(tr("Summary"), this);
+    summary->setNote(tr("A transaction that has been sent cannot be cancelled. Check the address once more."));
+    ui->label->hide();
+    ui->labelBalance->hide();
     ui->sendButton->setProperty("look", "send");
     ui->sendButton->setFixedHeight(52);
     ui->sendButton->setCursor(Qt::PointingHandCursor);
-    summary->addWidget(ui->sendButton);
-    ui->clearButton->setProperty("look", "ghost");
-    ui->clearButton->setFixedHeight(44);
-    ui->clearButton->setCursor(Qt::PointingHandCursor);
-    summary->addWidget(ui->clearButton);
-    columns->addWidget(summaryCard, 2);
+    summary->addFooterWidget(ui->sendButton);
+    columns->addWidget(summary, 2);
+}
+
+void TokensDialog::renumberEntries()
+{
+    int number = 0;
+    for (int i = 0; i < ui->entries->count(); ++i) {
+        SendTokensEntry *entry = qobject_cast<SendTokensEntry*>(ui->entries->itemAt(i)->widget());
+        if (entry && !entry->isHidden())
+            entry->setIndex(++number);
+    }
+}
+
+/** The tokens the wallet can send (owner tokens are transferred with -advancedui in the entry). */
+void TokensDialog::refreshTokens()
+{
+    QStringList names;
+    if (model) {
+        LOCK(cs_main);
+        std::vector<std::string> tokens;
+        GetAllMyTokens(model->getWallet(), tokens, 0);
+        for (const std::string& name : tokens) {
+            if (!IsTokenNameAnOwner(name))
+                names << QString::fromStdString(name);
+        }
+    }
+    names.sort();
+    picker->setTokens(names);
+    tokenPicked(picker->current());
+}
+
+void TokensDialog::selectToken(const QString &name)
+{
+    refreshTokens();
+    picker->setCurrent(name);
+    tokenPicked(picker->current());
+}
+
+void TokensDialog::tokenPicked(const QString &name)
+{
+    SendTokensEntry *first = nullptr;
+    for (int i = 0; i < ui->entries->count(); ++i) {
+        SendTokensEntry *entry = qobject_cast<SendTokensEntry*>(ui->entries->itemAt(i)->widget());
+        if (entry && !entry->isHidden()) {
+            entry->selectToken(name);
+            if (!first)
+                first = entry;
+        }
+    }
+    if (name.isEmpty()) {
+        pickedName->setText(picker->tokens().isEmpty() ? tr("The wallet holds no tokens") : tr("Choose the token to send"));
+        pickedName->setProperty("role", "secondary");
+        pickedAvailable->setAmount(QString::fromUtf8("–"));
+    } else {
+        pickedName->setText(name);
+        pickedName->setProperty("role", QVariant());
+        pickedAvailable->setAmount(first ? GUIUtil::withThousands(QString::fromStdString(ValueFromAmountString(first->tokenBalance, first->tokenUnits))) : QString::fromUtf8("–"));
+    }
+    pickedName->style()->unpolish(pickedName);
+    pickedName->style()->polish(pickedName);
+    updateSummary();
+}
+
+void TokensDialog::updateSummary()
+{
+    if (!model || !model->getOptionsModel())
+        return;
+    const int unit = model->getOptionsModel()->getDisplayUnit();
+    const QString unitName = AokChainUnits::name(unit);
+    const QString dash = QString::fromUtf8("–");
+    const QString token = picker->current();
+
+    QList<SendTokensEntry*> entries;
+    for (int i = 0; i < ui->entries->count(); ++i) {
+        SendTokensEntry *entry = qobject_cast<SendTokensEntry*>(ui->entries->itemAt(i)->widget());
+        if (entry && !entry->isHidden())
+            entries << entry;
+    }
+    CAmount total = 0, available = 0;
+    int units = 0;
+    bool complete = !entries.isEmpty();
+    for (SendTokensEntry *entry : entries) {
+        total += entry->amount();
+        complete = complete && entry->isComplete();
+        available = entry->tokenBalance;
+        units = entry->tokenUnits;
+    }
+    auto quantity = [units](const CAmount& amount) {
+        return GUIUtil::withThousands(QString::fromStdString(ValueFromAmountString(amount, units)));
+    };
+
+    // fee of a typical token transfer at the chosen rate
+    CCoinControl ctrl;
+    updateTokenControlState(ctrl);
+    const CAmount fee = GetMinimumFee(300 + 80 * entries.size(), ctrl, ::mempool, ::feeEstimator, nullptr);
+    const CAmount balance = model->getBalance();
+
+    QList<SummaryCard::Row> rows;
+    rows << SummaryCard::Row(tr("Token"), token.isEmpty() ? dash : token, QString(), false);
+    int number = 0;
+    for (SendTokensEntry *entry : entries) {
+        ++number;
+        const QString address = entry->addressText();
+        const bool valid = model->validateAddress(address);
+        SummaryCard::Row row(entries.size() > 1 ? tr("Recipient %1").arg(number) : tr("Recipient"), dash, QString(), false);
+        if (!address.isEmpty()) {
+            row.value = !entry->labelText().isEmpty() ? entry->labelText() : (valid ? GUIUtil::shortAddress(address) : address);
+            row.value = QFontMetrics(GUIUtil::appFont(13, QFont::Medium)).elidedText(row.value, Qt::ElideMiddle, 200);
+            row.mono = valid && entry->labelText().isEmpty();
+            row.toolTip = GUIUtil::monoToolTip(address, entry->labelText());
+        }
+        rows << row;
+        if (entries.size() > 1)
+            rows << SummaryCard::Row(tr("Quantity %1").arg(number), entry->amount() > 0 ? quantity(entry->amount()) : dash, QString());
+        if (entry->lockTime().isValid()) {
+            SummaryCard::Row lock(entries.size() > 1 ? tr("Locked until (%1)").arg(number) : tr("Locked until"), GUIUtil::isoDateTime(entry->lockTime()), QString(), false);
+            lock.mono = true;
+            rows << lock;
+        }
+    }
+    if (!token.isEmpty()) {
+        SummaryCard::Row left(tr("Left of the token"), quantity(available - total), QString());
+        left.alert = total > available;
+        rows << left;
+    }
+    SummaryCard::Row feeRow(tr("Fee (estimated)"), GUIUtil::withThousands(AokChainUnits::format(unit, fee, false, AokChainUnits::separatorNever)), unitName);
+    feeRow.toolTip = tr("The fee is paid in AOK. The fee that is really paid is shown for confirmation before the transaction is sent.");
+    rows << feeRow;
+    SummaryCard::Row aok(tr("AOK balance"), GUIUtil::withThousands(AokChainUnits::format(unit, balance, false, AokChainUnits::separatorNever)), unitName);
+    aok.alert = balance < fee;
+    rows << aok;
+    summary->setTotal(tr("Quantity to send"), quantity(total), token);
+    summary->setRows(rows);
+
+    const bool ready = complete && !token.isEmpty() && total > 0 && total <= available && balance >= fee;
+    ui->sendButton->setEnabled(ready);
+    ui->sendButton->setProperty("primary", ready);
+    ui->sendButton->style()->unpolish(ui->sendButton);
+    ui->sendButton->style()->polish(ui->sendButton);
+    if (ready) {
+        // "Send 12.5 DZTB"
+        QString shortQuantity = quantity(total);
+        if (shortQuantity.contains('.')) {
+            while (shortQuantity.endsWith('0'))
+                shortQuantity.chop(1);
+            if (shortQuantity.endsWith('.'))
+                shortQuantity.chop(1);
+        }
+        ui->sendButton->setText(tr("Send %1").arg(shortQuantity + " " + token));
+        ui->sendButton->setToolTip(QString());
+    } else {
+        ui->sendButton->setText(tr("Send"));
+        ui->sendButton->setToolTip(total > available && !token.isEmpty() ? tr("The quantity exceeds what the wallet holds of this token.")
+                                                                        : tr("Choose a token and enter a valid address and a quantity for every recipient."));
+    }
 }
 
 void TokensDialog::setClientModel(ClientModel *_clientModel)
@@ -220,6 +391,7 @@ void TokensDialog::setModel(WalletModel *_model)
         connect(_model->getOptionsModel(), SIGNAL(customFeeFeaturesChanged(bool)), this, SLOT(customFeeFeatureChanged(bool)));
 
 
+        refreshTokens();
         ui->frameTokenControl->setVisible(false);
         ui->frameTokenControl->setVisible(_model->getOptionsModel()->getCoinControlFeatures());
         ui->frameFee->setVisible(_model->getOptionsModel()->getCustomFeeFeatures());
@@ -584,6 +756,9 @@ SendTokensEntry *TokensDialog::addEntry()
     connect(entry, SIGNAL(removeEntry(SendTokensEntry*)), this, SLOT(removeEntry(SendTokensEntry*)));
     connect(entry, SIGNAL(payAmountChanged()), this, SLOT(tokenControlUpdateLabels()));
     connect(entry, SIGNAL(subtractFeeFromAmountChanged()), this, SLOT(tokenControlUpdateLabels()));
+    connect(entry, SIGNAL(recipientChanged()), this, SLOT(updateSummary()));
+    for (QPushButton *button : findChildren<QPushButton*>())
+        button->setAutoDefault(false);
 
     // Focus the field, so that entry can start immediately
     entry->clear();
@@ -599,7 +774,12 @@ SendTokensEntry *TokensDialog::addEntry()
     if (list.size() == 1)
         entry->setCurrentIndex(1);
 
+    // the token is chosen for the page
+    if (!picker->current().isEmpty())
+        entry->selectToken(picker->current());
+    renumberEntries();
     updateTabsAndLabels();
+    updateSummary();
 
     return entry;
 }
@@ -620,7 +800,9 @@ void TokensDialog::removeEntry(SendTokensEntry* entry)
 
     entry->deleteLater();
 
+    renumberEntries();
     updateTabsAndLabels();
+    updateSummary();
 }
 
 QWidget *TokensDialog::setupTabChain(QWidget *prev)
@@ -700,12 +882,13 @@ void TokensDialog::setBalance(const CAmount& balance, const CAmount& unconfirmed
     Q_UNUSED(watchUnconfirmedBalance);
     Q_UNUSED(watchImmatureBalance);
 
-    ui->labelBalance->setFont(GUIUtil::monoFont(13, QFont::DemiBold));
+    ui->labelBalance->setFont(GUIUtil::monoFont(13, QFont::Medium));
     ui->label->setFont(GUIUtil::getSubLabelFont());
 
     if(model && model->getOptionsModel())
     {
         ui->labelBalance->setText(AokChainUnits::formatWithUnit(model->getOptionsModel()->getDisplayUnit(), balance));
+        updateSummary();
     }
 }
 
@@ -1078,36 +1261,30 @@ void TokensDialog::processNewTransaction()
             entry->refreshTokenList();
         }
     }
+    // refreshing an entry resets its choice: choose again for the page
+    refreshTokens();
 }
 
 void TokensDialog::focusToken(const QModelIndex &idx)
 {
-
     clear();
+
+    QString name = idx.data(TokenTableModel::TokenNameRole).toString();
+    // the name of a locked balance as the table model shows it
+    if (name.endsWith(" (LOCKED)"))
+        name.chop(9);
+    selectToken(name);
 
     SendTokensEntry *entry = qobject_cast<SendTokensEntry*>(ui->entries->itemAt(0)->widget());
     if(entry)
-    {
-        SendTokensRecipient recipient;
-        recipient.tokenName = idx.data(TokenTableModel::TokenNameRole).toString();
-
-        entry->setValue(recipient);
         entry->setFocus();
-    }
 }
 
 void TokensDialog::focusTokenListBox()
 {
-
     SendTokensEntry *entry = qobject_cast<SendTokensEntry*>(ui->entries->itemAt(0)->widget());
     if (entry)
-    {
-        entry->setFocusTokenListBox();
-
-        if (entry->getValue().tokenName != "")
-            entry->setFocus();
-
-    }
+        entry->setFocus();
 }
 
 void TokensDialog::handleFirstSelection()
@@ -1116,5 +1293,6 @@ void TokensDialog::handleFirstSelection()
     if (entry) {
         entry->refreshTokenList();
     }
+    refreshTokens();
 }
 /** TOKENS END */

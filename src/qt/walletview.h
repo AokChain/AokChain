@@ -23,10 +23,12 @@ class WalletModel;
 class AddressBookPage;
 class TokensDialog;
 class CreateTokenDialog;
+class TokensPage;
 class ExplorerPage;
 class ReissueTokenDialog;
 
 QT_BEGIN_NAMESPACE
+class QButtonGroup;
 class QModelIndex;
 class QProgressDialog;
 QT_END_NAMESPACE
@@ -83,6 +85,10 @@ private:
     ReissueTokenDialog *manageTokensPage;
     /** TOKENS END */
     ExplorerPage *explorerPage;
+    TokensPage *tokenCardsPage;
+    /** AOK and token forms of the send page */
+    QStackedWidget *sendStack;
+    QButtonGroup *sendTabs;
 
     // each page sits in a shell that carries the page header
     QWidget *overviewShell;
@@ -150,6 +156,10 @@ public Q_SLOTS:
     void gotoCreateTokensPage();
     void gotoManageTokensPage();
     /** TOKENS END */
+    /** Show the AOK (0) or the token (1) form of the send page */
+    void showSendTab(int tab);
+    void showTokenSendTab();
+    void sendToken(const QString &name);
     /** Switch to the explorer page; look the query up when one is given */
     void gotoExplorerPage(QString query = "");
 
@@ -168,6 +178,8 @@ Q_SIGNALS:
     void outOfSyncWarningClicked();
     /** Show the tokens GUI */
     void checkTokens();
+    /** The send page is to be shown */
+    void sendPageRequested();
     /** Look up a transaction id, address or block in the explorer */
     void explorerRequested(const QString &query);
 };

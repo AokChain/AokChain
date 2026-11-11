@@ -11,6 +11,7 @@
 #include "guiconstants.h"
 #include "guiutil.h"
 #include "optionsmodel.h"
+#include "pagewidgets.h"
 #include "platformstyle.h"
 #include "transactionfilterproxy.h"
 #include "transactionrecord.h"
@@ -40,59 +41,6 @@
 
 #define ROW_HEIGHT 52
 #define NUM_ITEMS 8
-
-/** The total balance: large integer part, smaller fraction, unit in the accent color. */
-class BalanceLabel : public QWidget
-{
-public:
-    explicit BalanceLabel(QWidget *parent = nullptr) : QWidget(parent)
-    {
-        setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Fixed);
-    }
-
-    void setAmount(const QString& _whole, const QString& _fraction, const QString& _unit)
-    {
-        whole = _whole;
-        fraction = _fraction;
-        unit = _unit;
-        updateGeometry();
-        update();
-    }
-
-    QSize sizeHint() const override
-    {
-        const QFontMetrics big(wholeFont()), small(fractionFont()), u(unitFont());
-        return QSize(big.horizontalAdvance(whole) + 2 + small.horizontalAdvance(fraction) + 10 + u.horizontalAdvance(unit) + 2, 48);
-    }
-
-protected:
-    void paintEvent(QPaintEvent*) override
-    {
-        const GUIUtil::Theme& t = GUIUtil::theme();
-        QPainter p(this);
-        p.setRenderHint(QPainter::TextAntialiasing, true);
-        const int baseline = 39;
-        int x = 0;
-        p.setFont(wholeFont());
-        p.setPen(t.text);
-        p.drawText(x, baseline, whole);
-        x += p.fontMetrics().horizontalAdvance(whole) + 2;
-        p.setFont(fractionFont());
-        p.setPen(t.textSecondary);
-        p.drawText(x, baseline, fraction);
-        x += p.fontMetrics().horizontalAdvance(fraction) + 10;
-        p.setFont(unitFont());
-        p.setPen(t.accent);
-        p.drawText(x, baseline, unit);
-    }
-
-private:
-    static QFont wholeFont() { QFont f = GUIUtil::monoFont(40, QFont::Bold); f.setLetterSpacing(QFont::AbsoluteSpacing, -1); return f; }
-    static QFont fractionFont() { QFont f = GUIUtil::monoFont(24, QFont::DemiBold); f.setLetterSpacing(QFont::AbsoluteSpacing, -0.4); return f; }
-    static QFont unitFont() { return GUIUtil::appFont(17, QFont::Bold); }
-
-    QString whole, fraction, unit;
-};
 
 /** One recent transaction: direction tile, title, address and date, amount and asset. */
 class TxViewDelegate : public QAbstractItemDelegate
@@ -148,10 +96,7 @@ public:
         QColor amountColor = outgoing ? theme.negative : theme.positive;
         if (!confirmed)
             amountColor = theme.textDisabled;
-        painter->setFont(GUIUtil::monoFont(14, QFont::DemiBold));
-        painter->setPen(amountColor);
-        painter->drawText(topRect, Qt::AlignRight | Qt::AlignVCenter, amountText);
-        const int amountWidth = painter->fontMetrics().horizontalAdvance(amountText);
+        const int amountWidth = GUIUtil::paintAmount(painter, topRect, amountText, GUIUtil::monoFont(15, QFont::Medium), amountColor);
         painter->setFont(GUIUtil::appFont(12));
         painter->setPen(theme.textSecondary);
         const QString asset = index.data(TransactionTableModel::TokenNameRole).toString();
@@ -159,7 +104,7 @@ public:
         const int assetWidth = painter->fontMetrics().horizontalAdvance(asset);
 
         // title and chip
-        painter->setFont(GUIUtil::appFont(14, QFont::DemiBold));
+        painter->setFont(GUIUtil::appFont(14, QFont::Medium));
         painter->setPen(theme.text);
         const bool owner = index.data(TransactionTableModel::OwnerTokenRole).toBool();
         const QString chip = owner ? tr("Owner") : QString();
@@ -258,16 +203,16 @@ public:
 
         // amount
         QString amountText = GUIUtil::withThousands(index.data(TokenTableModel::FormattedAmountRole).toString());
+        int amountWidth;
         if (ownerOnly) {
             amountText = tr("None held");
-            painter->setFont(GUIUtil::appFont(14));
+            painter->setFont(GUIUtil::appFont(13));
             painter->setPen(theme.textSecondary);
+            painter->drawText(r, Qt::AlignRight | Qt::AlignVCenter, amountText);
+            amountWidth = painter->fontMetrics().horizontalAdvance(amountText);
         } else {
-            painter->setFont(GUIUtil::monoFont(14, QFont::DemiBold));
-            painter->setPen(theme.text);
+            amountWidth = GUIUtil::paintAmount(painter, r, amountText, GUIUtil::monoFont(15, QFont::Medium), theme.text);
         }
-        painter->drawText(r, Qt::AlignRight | Qt::AlignVCenter, amountText);
-        const int amountWidth = painter->fontMetrics().horizontalAdvance(amountText);
 
         // name and chips
         QStringList chips;
@@ -279,13 +224,13 @@ public:
             chips << tr("Owner");
         if (locked)
             chips << tr("Locked");
-        painter->setFont(GUIUtil::appFont(11, QFont::DemiBold));
+        painter->setFont(GUIUtil::appFont(11, QFont::Medium));
         int chipsWidth = 0;
         for (const QString& chip : chips)
             chipsWidth += painter->fontMetrics().horizontalAdvance(chip) + 16 + 8;
 
         const int left = r.left() + indent + logoSize + 12;
-        painter->setFont(GUIUtil::appFont(14, QFont::DemiBold));
+        painter->setFont(GUIUtil::appFont(14, QFont::Medium));
         painter->setPen(theme.text);
         const QString shown = painter->fontMetrics().elidedText(name, Qt::ElideRight, qMax(40, r.right() - left - amountWidth - chipsWidth - 12));
         painter->drawText(QRect(left, r.top(), r.width(), r.height()), Qt::AlignLeft | Qt::AlignVCenter, shown);
@@ -338,16 +283,12 @@ static QLabel *captionLabel(const QString& text)
     return label;
 }
 
-static QLabel *amountLabel()
+static AmountLabel *amountLabel()
 {
-    QLabel *label = new QLabel();
-    label->setFont(GUIUtil::monoFont(14, QFont::DemiBold));
-    label->setTextInteractionFlags(Qt::TextSelectableByMouse);
-    label->setCursor(Qt::IBeamCursor);
-    return label;
+    return new AmountLabel(17, QFont::Medium);
 }
 
-static QWidget *statBlock(const QString& caption, QLabel *value)
+static QWidget *statBlock(const QString& caption, QWidget *value)
 {
     QWidget *block = new QWidget();
     QVBoxLayout *layout = new QVBoxLayout(block);
@@ -379,6 +320,7 @@ OverviewPage::OverviewPage(const PlatformStyle *platformStyle, QWidget *parent) 
     currentWatchImmatureBalance(-1),
     currentWatchOnlyStake(-1),
     currentLockedBalance(-1),
+    outOfSync(true),
     transactionLimit(NUM_ITEMS),
     txdelegate(new TxViewDelegate(platformStyle, this)),
     tokendelegate(new TokenViewDelegate(platformStyle, this))
@@ -389,23 +331,31 @@ OverviewPage::OverviewPage(const PlatformStyle *platformStyle, QWidget *parent) 
     pageLayout->setContentsMargins(0, 0, 0, 0);
     pageLayout->setSpacing(20);
 
-    // "out of sync" marker for the page header
-    GUIUtil::ClickableLabel *pill = new GUIUtil::ClickableLabel();
-    pill->setText(tr("Balances may differ from the real ones while synchronizing"));
-    pill->setProperty("role", "pill");
-    pill->setFont(GUIUtil::appFont(12));
-    pill->setCursor(Qt::PointingHandCursor);
-    pill->setToolTip(tr("The displayed information may be out of date. Your wallet automatically synchronizes with the AokChain network after a connection is established, but this process has not completed yet."));
-    connect(pill, SIGNAL(clicked(QPoint)), this, SLOT(handleOutOfSyncWarningClicks()));
-    syncPill = pill;
-
-    // alerts of the node
-    labelAlerts = new QLabel();
-    labelAlerts->setProperty("role", "warning");
-    labelAlerts->setWordWrap(true);
-    labelAlerts->setVisible(false);
-    labelAlerts->setTextInteractionFlags(Qt::TextSelectableByMouse);
-    pageLayout->addWidget(labelAlerts);
+    // Page header: a small hint while synchronizing and the chain status, which leads to the explorer
+    QWidget *header = new QWidget();
+    QHBoxLayout *headerLayout = new QHBoxLayout(header);
+    headerLayout->setContentsMargins(0, 0, 0, 0);
+    headerLayout->setSpacing(12);
+    GUIUtil::ClickableLabel *hint = new GUIUtil::ClickableLabel();
+    hint->setText(tr("Balances may differ from the real ones while synchronizing"));
+    hint->setFont(GUIUtil::appFont(12));
+    hint->setStyleSheet(QString("QLabel { color: %1; }").arg(theme.warnText.name()));
+    hint->setCursor(Qt::PointingHandCursor);
+    hint->setToolTip(tr("The displayed information may be out of date. Your wallet automatically synchronizes with the AokChain network after a connection is established, but this process has not completed yet."));
+    connect(hint, SIGNAL(clicked(QPoint)), this, SLOT(handleOutOfSyncWarningClicks()));
+    syncHint = hint;
+    headerLayout->addWidget(syncHint);
+    chainStrip = new QPushButton();
+    chainStrip->setProperty("look", "strip");
+    chainStrip->setCursor(Qt::PointingHandCursor);
+    chainStrip->setToolTip(tr("State of the chain and of the memory pool. Click to open the explorer."));
+    chainStrip->setLayoutDirection(Qt::RightToLeft);
+    chainStrip->setIcon(QIcon(GUIUtil::lineIcon("chevron-right", 12, theme.accent, 2.6)));
+    chainStrip->setIconSize(QSize(12, 12));
+    chainStrip->setFixedHeight(32);
+    connect(chainStrip, SIGNAL(clicked()), this, SIGNAL(explorerClicked()));
+    headerLayout->addWidget(chainStrip);
+    syncPill = header;
 
     // balance card
     QFrame *balanceCard = new QFrame();
@@ -420,7 +370,8 @@ OverviewPage::OverviewPage(const PlatformStyle *platformStyle, QWidget *parent) 
     totalCaption->setFont(GUIUtil::appFont(13, QFont::Medium));
     totalCaption->setProperty("role", "secondary");
     balanceLeft->addWidget(totalCaption);
-    labelTotal = new BalanceLabel();
+    labelTotal = new AmountLabel(40, QFont::Bold);
+    labelTotal->setUnitColor(theme.accent);
     balanceLeft->addWidget(labelTotal);
     balanceLeft->addSpacing(8);
 
@@ -442,11 +393,21 @@ OverviewPage::OverviewPage(const PlatformStyle *platformStyle, QWidget *parent) 
     stats->addStretch();
     balanceLeft->addLayout(stats);
 
-    labelWatchOnly = new QLabel();
-    labelWatchOnly->setFont(GUIUtil::monoFont(12));
-    labelWatchOnly->setProperty("role", "secondary");
-    labelWatchOnly->setTextInteractionFlags(Qt::TextSelectableByMouse);
+    // balances of watch-only addresses, shown only when the wallet has such addresses
+    labelWatchOnly = new QWidget();
     labelWatchOnly->setToolTip(tr("Balances in watch-only addresses"));
+    QHBoxLayout *watchLayout = new QHBoxLayout(labelWatchOnly);
+    watchLayout->setContentsMargins(0, 0, 0, 0);
+    watchLayout->setSpacing(6);
+    const QString watchCaptions[4] = {tr("Watch-only: available"), tr("pending"), tr("immature"), tr("total")};
+    for (int i = 0; i < 4; ++i) {
+        watchLayout->addWidget(captionLabel(watchCaptions[i]));
+        watchAmounts[i] = new AmountLabel(14, QFont::Medium);
+        watchAmounts[i]->setColor(theme.textSecondary);
+        watchLayout->addWidget(watchAmounts[i]);
+        watchLayout->addSpacing(8);
+    }
+    watchLayout->addStretch();
     labelWatchOnly->setVisible(false);
     balanceLeft->addSpacing(6);
     balanceLeft->addWidget(labelWatchOnly);
@@ -462,7 +423,7 @@ OverviewPage::OverviewPage(const PlatformStyle *platformStyle, QWidget *parent) 
     receiveButton->setIcon(QIcon(GUIUtil::lineIcon("receive", 16, theme.text, 2.4)));
     receiveButton->setCursor(Qt::PointingHandCursor);
     for (QPushButton *button : {sendButton, receiveButton}) {
-        button->setFont(GUIUtil::appFont(15, QFont::Bold));
+        button->setFont(GUIUtil::appFont(15, QFont::DemiBold));
         button->setIconSize(QSize(16, 16));
         button->setFixedHeight(46);
         button->setMinimumWidth(116);
@@ -492,7 +453,7 @@ OverviewPage::OverviewPage(const PlatformStyle *platformStyle, QWidget *parent) 
     tokenHeader->setSpacing(8);
     QLabel *tokenTitle = new QLabel(tr("Tokens"));
     tokenTitle->setProperty("role", "title");
-    tokenTitle->setFont(GUIUtil::appFont(16, QFont::Bold));
+    tokenTitle->setFont(GUIUtil::appFont(16, QFont::DemiBold));
     tokenCount = new QLabel();
     tokenCount->setProperty("role", "secondary");
     tokenCount->setFont(GUIUtil::appFont(13, QFont::Medium));
@@ -531,7 +492,7 @@ OverviewPage::OverviewPage(const PlatformStyle *platformStyle, QWidget *parent) 
     QHBoxLayout *txHeader = new QHBoxLayout();
     QLabel *txTitle = new QLabel(tr("Recent transactions"));
     txTitle->setProperty("role", "title");
-    txTitle->setFont(GUIUtil::appFont(16, QFont::Bold));
+    txTitle->setFont(GUIUtil::appFont(16, QFont::DemiBold));
     QPushButton *allTransactions = new QPushButton(tr("Show all"));
     allTransactions->setProperty("look", "link");
     allTransactions->setCursor(Qt::PointingHandCursor);
@@ -694,19 +655,18 @@ void OverviewPage::setBalance(const CAmount& balance, const CAmount& unconfirmed
     currentWatchOnlyStake = watchOnlyStake;
     currentLockedBalance = lockedBalance;
 
-    const QString total = displayAmount(unit, balance + unconfirmedBalance + immatureBalance + lockedBalance);
-    const int point = total.indexOf('.');
-    labelTotal->setAmount(point < 0 ? total : total.left(point), point < 0 ? QString() : total.mid(point), AokChainUnits::name(unit));
-    labelBalance->setText(displayAmount(unit, balance));
-    labelUnconfirmed->setText(displayAmount(unit, unconfirmedBalance + lockedBalance));
-    labelImmature->setText(displayAmount(unit, immatureBalance));
-    labelStake->setText(displayAmount(unit, stake));
+    labelTotal->setAmount(displayAmount(unit, balance + unconfirmedBalance + immatureBalance + lockedBalance), AokChainUnits::name(unit));
+    labelBalance->setAmount(displayAmount(unit, balance));
+    labelUnconfirmed->setAmount(displayAmount(unit, unconfirmedBalance + lockedBalance));
+    labelImmature->setAmount(displayAmount(unit, immatureBalance));
+    labelStake->setAmount(displayAmount(unit, stake));
     // the staked amount is only shown when there is one
     stakeBlock->setVisible(stake != 0 || watchOnlyStake != 0);
 
-    labelWatchOnly->setText(tr("Watch-only: available %1 · pending %2 · immature %3 · total %4")
-        .arg(displayAmount(unit, watchOnlyBalance), displayAmount(unit, watchUnconfBalance), displayAmount(unit, watchImmatureBalance),
-             displayAmount(unit, watchOnlyBalance + watchUnconfBalance + watchImmatureBalance + watchOnlyStake)));
+    watchAmounts[0]->setAmount(displayAmount(unit, watchOnlyBalance));
+    watchAmounts[1]->setAmount(displayAmount(unit, watchUnconfBalance));
+    watchAmounts[2]->setAmount(displayAmount(unit, watchImmatureBalance));
+    watchAmounts[3]->setAmount(displayAmount(unit, watchOnlyBalance + watchUnconfBalance + watchImmatureBalance + watchOnlyStake));
 }
 
 // show/hide watch-only labels
@@ -720,9 +680,12 @@ void OverviewPage::setClientModel(ClientModel *model)
     this->clientModel = model;
     if(model)
     {
-        // Show warning if this is a prerelease version
-        connect(model, SIGNAL(alertsChanged(QString)), this, SLOT(updateAlerts(QString)));
-        updateAlerts(model->getStatusBarWarnings());
+        // The warnings of the node are shown at the bottom of the side bar.
+        // Chain status for the page header
+        connect(model, SIGNAL(numBlocksChanged(int,QDateTime,double,bool)), this, SLOT(updateChainStrip()));
+        connect(model, SIGNAL(numConnectionsChanged(int)), this, SLOT(updateChainStrip()));
+        connect(model, SIGNAL(mempoolSizeChanged(long,size_t)), this, SLOT(updateChainStrip()));
+        updateChainStrip();
     }
 }
 
@@ -787,13 +750,28 @@ void OverviewPage::updateDisplayUnit()
 
 void OverviewPage::updateAlerts(const QString &warnings)
 {
-    labelAlerts->setVisible(!warnings.isEmpty());
-    labelAlerts->setText(warnings);
+    Q_UNUSED(warnings);
+}
+
+/** Block height, sync state, peers and the size of the memory pool; a click opens the explorer. */
+void OverviewPage::updateChainStrip()
+{
+    if (!clientModel)
+        return;
+    QStringList parts;
+    parts << tr("Block %1").arg(GUIUtil::withThousands(QString::number(clientModel->getNumBlocks())));
+    if (outOfSync)
+        parts << tr("syncing");
+    parts << tr("Peers %1").arg(clientModel->getNumConnections());
+    parts << tr("Mempool %1").arg(clientModel->getMempoolSize());
+    chainStrip->setText(parts.join(QString::fromUtf8("  ·  ")) + "  ");
 }
 
 void OverviewPage::showOutOfSyncWarning(bool fShow)
 {
-    syncPill->setVisible(fShow);
+    outOfSync = fShow;
+    syncHint->setVisible(fShow);
+    updateChainStrip();
 }
 
 void OverviewPage::showTokens()

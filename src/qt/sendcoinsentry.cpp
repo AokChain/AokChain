@@ -11,6 +11,7 @@
 #include "addresstablemodel.h"
 #include "guiutil.h"
 #include "optionsmodel.h"
+#include "pagewidgets.h"
 #include "platformstyle.h"
 #include "walletmodel.h"
 #include "guiconstants.h"
@@ -91,34 +92,52 @@ SendCoinsEntry::SendCoinsEntry(const PlatformStyle *_platformStyle, QWidget *par
     ui->messageTextLabel->setFont(GUIUtil::getSubLabelFont());
 }
 
-/** Labels above the fields, the amount in a large box of its own. */
+/**
+ * A recipient is a card: a header with its number and a remove button, the
+ * address with the address book, paste and label buttons, the amount in a
+ * large box. Label and lock time are entered in pop-ups and shown as chips.
+ */
 void SendCoinsEntry::buildLayout()
 {
     const GUIUtil::Theme& theme = GUIUtil::theme();
 
     // the grid of the form goes; its widgets stay
     delete ui->SendCoins->layout();
+    ui->SendCoins->setProperty("role", "recipient");
     QVBoxLayout *layout = new QVBoxLayout(ui->SendCoins);
-    layout->setContentsMargins(0, 0, 0, 12);
+    layout->setContentsMargins(18, 12, 18, 16);
     layout->setSpacing(8);
 
+    QHBoxLayout *header = new QHBoxLayout();
+    cardTitle = new QLabel(ui->SendCoins);
+    cardTitle->setFont(GUIUtil::appFont(13, QFont::Medium));
+    cardTitle->setProperty("role", "secondary");
+    header->addWidget(cardTitle);
+    header->addStretch();
+    ui->deleteButton->setIcon(QIcon(GUIUtil::lineIcon("remove", 14, theme.label, 2.2)));
+    ui->deleteButton->setIconSize(QSize(14, 14));
+    ui->deleteButton->setFixedSize(30, 30);
+    ui->deleteButton->setProperty("look", "icon");
+    ui->deleteButton->setToolTip(tr("Remove this recipient"));
+    ui->deleteButton->setCursor(Qt::PointingHandCursor);
+    header->addWidget(ui->deleteButton);
+    layout->addLayout(header);
+
     ui->payToLabel->setText(tr("Recipient &address"));
-    ui->labellLabel->setText(tr("&Label"));
     ui->amountLabel->setText(tr("A&mount"));
-    for (QLabel *label : {ui->payToLabel, ui->labellLabel, ui->amountLabel, ui->lockTimeLabel, ui->messageLabel}) {
+    for (QLabel *label : {ui->payToLabel, ui->amountLabel, ui->messageLabel}) {
         label->setProperty("role", "fieldLabel");
         label->setAlignment(Qt::AlignLeft | Qt::AlignVCenter);
     }
 
-    // address with the address book, paste and remove buttons
+    // address with the address book, paste and label buttons
     layout->addWidget(ui->payToLabel);
     QHBoxLayout *addressRow = new QHBoxLayout();
     addressRow->setSpacing(8);
     ui->payTo->setProperty("look", "field");
     ui->payTo->setFixedHeight(48);
     addressRow->addWidget(ui->payTo, 1);
-    const std::pair<QToolButton*, const char*> squares[] = {
-        {ui->addressBookButton, "addressbook"}, {ui->pasteButton, "paste"}, {ui->deleteButton, "remove"}};
+    const std::pair<QToolButton*, const char*> squares[] = {{ui->addressBookButton, "addressbook"}, {ui->pasteButton, "paste"}};
     for (const std::pair<QToolButton*, const char*>& square : squares) {
         square.first->setIcon(QIcon(GUIUtil::lineIcon(square.second, 18, theme.label)));
         square.first->setIconSize(QSize(18, 18));
@@ -126,18 +145,45 @@ void SendCoinsEntry::buildLayout()
         square.first->setCursor(Qt::PointingHandCursor);
         addressRow->addWidget(square.first);
     }
+    QPushButton *labelButton = new QPushButton(tr("Label"), ui->SendCoins);
+    labelButton->setIcon(QIcon(GUIUtil::lineIcon("tag", 16, theme.label)));
+    labelButton->setIconSize(QSize(16, 16));
+    labelButton->setFixedHeight(48);
+    labelButton->setAutoDefault(false);
+    labelButton->setCursor(Qt::PointingHandCursor);
+    labelButton->setToolTip(tr("Give this address a label for your address book"));
+    connect(labelButton, SIGNAL(clicked()), this, SLOT(editLabel()));
+    addressRow->addWidget(labelButton);
     layout->addLayout(addressRow);
+
+    // hint about the address, then the chips of what was set in the pop-ups
+    QHBoxLayout *chipRow = new QHBoxLayout();
+    chipRow->setSpacing(8);
     addressHint = new QLabel(ui->SendCoins);
     addressHint->setFont(GUIUtil::appFont(12));
-    addressHint->setMinimumHeight(16);
-    layout->addWidget(addressHint);
-    layout->addSpacing(6);
+    addressHint->setMinimumHeight(26);
+    chipRow->addWidget(addressHint);
+    chipRow->addStretch();
+    labelChip = new ChipButton(ui->SendCoins);
+    labelChip->setToolTip(tr("Label of the address. Click to change it."));
+    lockChip = new ChipButton(ui->SendCoins);
+    lockChip->setToolTip(tr("The recipient cannot spend the coins before this time. Click to change it."));
+    chipRow->addWidget(labelChip);
+    chipRow->addWidget(lockChip);
+    layout->addLayout(chipRow);
+    connect(labelChip, SIGNAL(clicked()), this, SLOT(editLabel()));
+    connect(labelChip, SIGNAL(removeClicked()), this, SLOT(clearLabel()));
+    connect(lockChip, SIGNAL(clicked()), this, SLOT(editLockTime()));
+    connect(lockChip, SIGNAL(removeClicked()), this, SLOT(clearLockTime()));
 
-    layout->addWidget(ui->labellLabel);
-    ui->addAsLabel->setProperty("look", "field");
-    ui->addAsLabel->setFixedHeight(48);
-    layout->addWidget(ui->addAsLabel);
-    layout->addSpacing(10);
+    // the fields of the form hold label and lock time; they are not shown
+    ui->labellLabel->hide();
+    ui->addAsLabel->hide();
+    ui->lockTimeLabel->hide();
+    ui->useLockTime->hide();
+    ui->coinLockTime->hide();
+    connect(ui->addAsLabel, SIGNAL(textChanged(QString)), this, SLOT(updateChips()));
+    connect(ui->useLockTime, SIGNAL(toggled(bool)), this, SLOT(updateChips()));
 
     // amount
     layout->addWidget(ui->amountLabel);
@@ -153,29 +199,94 @@ void SendCoinsEntry::buildLayout()
     maxButton->setProperty("look", "soft");
     maxButton->setToolTip(tr("Use the whole available balance. The fee is subtracted from the amount."));
     maxButton->setFixedHeight(40);
+    maxButton->setAutoDefault(false);
     maxButton->setCursor(Qt::PointingHandCursor);
     amountLayout->addWidget(maxButton);
     connect(maxButton, SIGNAL(clicked()), this, SLOT(useAvailableBalanceClicked()));
     layout->addWidget(amountBox);
-    ui->checkboxSubtractFeeFromAmount->setText(tr("S&ubtract the fee from the amount"));
-    layout->addWidget(ui->checkboxSubtractFeeFromAmount);
 
-    // time lock
-    QHBoxLayout *lockRow = new QHBoxLayout();
-    lockRow->setSpacing(10);
-    ui->lockTimeLabel->hide();
-    ui->coinLockTime->setFont(GUIUtil::monoFont(13));
-    ui->coinLockTime->setDisplayFormat("yyyy-MM-dd HH:mm");
-    lockRow->addWidget(ui->useLockTime);
-    lockRow->addWidget(ui->coinLockTime);
-    lockRow->addStretch();
-    layout->addLayout(lockRow);
+    QHBoxLayout *optionRow = new QHBoxLayout();
+    ui->checkboxSubtractFeeFromAmount->setText(tr("S&ubtract the fee from the amount"));
+    optionRow->addWidget(ui->checkboxSubtractFeeFromAmount);
+    optionRow->addStretch();
+    QPushButton *lockButton = new QPushButton(tr("Send with a lock"), ui->SendCoins);
+    lockButton->setProperty("look", "chipButton");
+    lockButton->setIcon(QIcon(GUIUtil::lineIcon("clock", 14, theme.label)));
+    lockButton->setIconSize(QSize(14, 14));
+    lockButton->setAutoDefault(false);
+    lockButton->setCursor(Qt::PointingHandCursor);
+    lockButton->setToolTip(tr("Send coins that the recipient cannot spend before a time you choose"));
+    connect(lockButton, SIGNAL(clicked()), this, SLOT(editLockTime()));
+    optionRow->addWidget(lockButton);
+    layout->addLayout(optionRow);
 
     // message of an aokchain: URI
     layout->addWidget(ui->messageLabel);
     layout->addWidget(ui->messageTextLabel);
 
+    setIndex(1);
+    updateChips();
     updateAddressHint(QString());
+}
+
+void SendCoinsEntry::setIndex(int index)
+{
+    cardTitle->setText(tr("Recipient %1").arg(index));
+}
+
+void SendCoinsEntry::editLabel()
+{
+    QString label = ui->addAsLabel->text();
+    if (PageDialogs::askLabel(this, label))
+        ui->addAsLabel->setText(label);
+}
+
+void SendCoinsEntry::clearLabel()
+{
+    ui->addAsLabel->clear();
+}
+
+void SendCoinsEntry::editLockTime()
+{
+    QDateTime until = lockTime();
+    if (PageDialogs::askLockTime(this, until)) {
+        ui->coinLockTime->setDateTime(until);
+        ui->useLockTime->setChecked(true);
+        updateChips();
+    }
+}
+
+void SendCoinsEntry::clearLockTime()
+{
+    ui->useLockTime->setChecked(false);
+}
+
+QDateTime SendCoinsEntry::lockTime() const
+{
+    return ui->useLockTime->isChecked() ? ui->coinLockTime->dateTime() : QDateTime();
+}
+
+void SendCoinsEntry::updateChips()
+{
+    const QString label = ui->addAsLabel->text();
+    labelChip->setText(tr("Label: %1").arg(QFontMetrics(GUIUtil::appFont(12, QFont::Medium)).elidedText(label, Qt::ElideRight, 160)));
+    labelChip->setVisible(!label.isEmpty());
+    const QDateTime until = lockTime();
+    lockChip->setText(tr("Locked until %1").arg(GUIUtil::isoDateTime(until)));
+    lockChip->setVisible(until.isValid());
+    Q_EMIT recipientChanged();
+}
+
+bool SendCoinsEntry::isComplete() const
+{
+    if (recipient.paymentRequest.IsInitialized())
+        return true;
+    if (!model)
+        return false;
+    const QString address = ui->payTo->text().trimmed();
+    if (!model->validateAddress(address) && !IsUsernameValid(address.toStdString()))
+        return false;
+    return ui->payAmount->value() > 0;
 }
 
 void SendCoinsEntry::updateAddressHint(const QString &address)

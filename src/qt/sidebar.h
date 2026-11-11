@@ -84,6 +84,8 @@ public:
     void setNetworkState(const QString& text, const QString& toolTip);
     void setWalletState(const QString& text, const QString& toolTip);
     void setStakingVisible(bool visible);
+    /** A warning of the node, shown small below the peers line */
+    void setNotice(const QString& text, const QString& toolTip, bool warning);
 
 Q_SIGNALS:
     void stakingToggled();
@@ -105,6 +107,7 @@ private:
     SideProgress* syncProgress;
     QLabel* networkLabel;
     QLabel* walletLabel;
+    QLabel* noticeLabel;
 };
 
 #endif // AOKCHAIN_QT_SIDEBAR_H

@@ -11,8 +11,10 @@
 
 #include "amount.h"
 
+#include <QDateTime>
 #include <QStackedWidget>
 
+class ChipButton;
 class WalletModel;
 
 QT_BEGIN_NAMESPACE
@@ -62,6 +64,12 @@ public:
     /** Used by "use the whole balance" */
     void setAmount(const CAmount &amount);
     void checkSubtractFeeFromAmount();
+    /** Number in the title of the card ("Recipient 2") */
+    void setIndex(int index);
+    /** Time until which the coins stay locked for the recipient; invalid when there is no lock */
+    QDateTime lockTime() const;
+    /** Address and amount are complete */
+    bool isComplete() const;
 
 public Q_SLOTS:
     void clear();
@@ -81,6 +89,11 @@ private Q_SLOTS:
     void updateDisplayUnit();
     void toggleTimeLock(bool checked);
     void useAvailableBalanceClicked();
+    void editLabel();
+    void clearLabel();
+    void editLockTime();
+    void clearLockTime();
+    void updateChips();
 
 private:
     SendCoinsRecipient recipient;
@@ -89,6 +102,9 @@ private:
     const PlatformStyle *platformStyle;
 
     QLabel *addressHint;
+    QLabel *cardTitle;
+    ChipButton *labelChip;
+    ChipButton *lockChip;
 
     bool updateLabel(const QString &address);
     void buildLayout();

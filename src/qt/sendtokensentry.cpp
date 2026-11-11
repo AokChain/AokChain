@@ -10,8 +10,10 @@
 
 #include "addressbookpage.h"
 #include "addresstablemodel.h"
+#include "aokchainunits.h"
 #include "guiutil.h"
 #include "optionsmodel.h"
+#include "pagewidgets.h"
 #include "platformstyle.h"
 #include "walletmodel.h"
 #include "tokencontroldialog.h"
@@ -21,6 +23,11 @@
 
 #include "wallet/coincontrol.h"
 
+#include <QHBoxLayout>
+#include <QLabel>
+#include <QPushButton>
+#include <QStyle>
+#include <QVBoxLayout>
 #include <QApplication>
 #include <QClipboard>
 #include <validation.h>
@@ -45,8 +52,9 @@ SendTokensEntry::SendTokensEntry(const PlatformStyle *_platformStyle, const QStr
 
     setCurrentWidget(ui->SendCoins);
 
-    if (platformStyle->getUseExtraSpacing())
-        ui->payToLayout->setSpacing(4);
+    tokenBalance = 0;
+    tokenUnits = 0;
+    buildLayout();
 #if QT_VERSION >= 0x040700
     ui->addAsLabel->setPlaceholderText(tr("Enter a label for this address to add it to your address book"));
 #endif
@@ -104,6 +112,7 @@ SendTokensEntry::SendTokensEntry(const PlatformStyle *_platformStyle, const QStr
 
     // the entries sit in the card of the tokens page
     this->setStyleSheet(".SendTokensEntry { background: transparent; border: none; }");
+    ui->payTo->setFont(GUIUtil::monoFont(14));
 
     ui->tokenBoxLabel->setStyleSheet(STRING_LABEL_COLOR);
     ui->tokenBoxLabel->setFont(GUIUtil::getSubLabelFont());
@@ -135,14 +144,277 @@ SendTokensEntry::SendTokensEntry(const PlatformStyle *_platformStyle, const QStr
 #else
     ui->useLockTime->setStyleSheet(QString(".QCheckBox{ %1; }").arg(STRING_LABEL_COLOR));
 #endif
-    ui->payTo->setFont(GUIUtil::getSubLabelFont());
     ui->addAsLabel->setFont(GUIUtil::getSubLabelFont());
     ui->tokenLockTime->setFont(GUIUtil::getSubLabelFont());
     ui->tokenLockTime->setMinimumDate(QDate::currentDate());
-    ui->payTokenAmount->setFont(GUIUtil::getSubLabelFont());
     ui->messageTextLabel->setFont(GUIUtil::getSubLabelFont());
     ui->tokenAmountLabel->setFont(GUIUtil::getSubLabelFont());
     ui->ownershipWarningMessage->setFont(GUIUtil::getSubLabelFont());
+}
+
+/** The same card as a recipient of the AOK form; the token is chosen for the whole page. */
+void SendTokensEntry::buildLayout()
+{
+    const GUIUtil::Theme& theme = GUIUtil::theme();
+
+    // the grid of the form goes; its widgets stay
+    delete ui->SendCoins->layout();
+    ui->SendCoins->setProperty("role", "recipient");
+    QVBoxLayout *layout = new QVBoxLayout(ui->SendCoins);
+    layout->setContentsMargins(18, 12, 18, 16);
+    layout->setSpacing(8);
+
+    QHBoxLayout *header = new QHBoxLayout();
+    cardTitle = new QLabel(ui->SendCoins);
+    cardTitle->setFont(GUIUtil::appFont(13, QFont::Medium));
+    cardTitle->setProperty("role", "secondary");
+    header->addWidget(cardTitle);
+    header->addStretch();
+    ui->deleteButton->setIcon(QIcon(GUIUtil::lineIcon("remove", 14, theme.label, 2.2)));
+    ui->deleteButton->setIconSize(QSize(14, 14));
+    ui->deleteButton->setFixedSize(30, 30);
+    ui->deleteButton->setProperty("look", "icon");
+    ui->deleteButton->setToolTip(tr("Remove this recipient"));
+    ui->deleteButton->setCursor(Qt::PointingHandCursor);
+    header->addWidget(ui->deleteButton);
+    layout->addLayout(header);
+
+    ui->payToLabel->setText(tr("Recipient &address"));
+    ui->amountLabel->setText(tr("Quantity"));
+    for (QLabel *label : {ui->payToLabel, ui->amountLabel, ui->messageLabel, ui->tokenBoxLabel}) {
+        label->setProperty("role", "fieldLabel");
+        label->setAlignment(Qt::AlignLeft | Qt::AlignVCenter);
+        label->setStyleSheet(QString());
+    }
+
+    layout->addWidget(ui->payToLabel);
+    QHBoxLayout *addressRow = new QHBoxLayout();
+    addressRow->setSpacing(8);
+    ui->payTo->setProperty("look", "field");
+    ui->payTo->setFixedHeight(48);
+    addressRow->addWidget(ui->payTo, 1);
+    const std::pair<QToolButton*, const char*> squares[] = {{ui->addressBookButton, "addressbook"}, {ui->pasteButton, "paste"}};
+    for (const std::pair<QToolButton*, const char*>& square : squares) {
+        square.first->setIcon(QIcon(GUIUtil::lineIcon(square.second, 18, theme.label)));
+        square.first->setIconSize(QSize(18, 18));
+        square.first->setFixedSize(48, 48);
+        square.first->setCursor(Qt::PointingHandCursor);
+        addressRow->addWidget(square.first);
+    }
+    QPushButton *labelButton = new QPushButton(tr("Label"), ui->SendCoins);
+    labelButton->setIcon(QIcon(GUIUtil::lineIcon("tag", 16, theme.label)));
+    labelButton->setIconSize(QSize(16, 16));
+    labelButton->setFixedHeight(48);
+    labelButton->setAutoDefault(false);
+    labelButton->setCursor(Qt::PointingHandCursor);
+    labelButton->setToolTip(tr("Give this address a label for your address book"));
+    connect(labelButton, SIGNAL(clicked()), this, SLOT(editLabel()));
+    addressRow->addWidget(labelButton);
+    layout->addLayout(addressRow);
+
+    QHBoxLayout *chipRow = new QHBoxLayout();
+    chipRow->setSpacing(8);
+    addressHint = new QLabel(ui->SendCoins);
+    addressHint->setFont(GUIUtil::appFont(12));
+    addressHint->setMinimumHeight(26);
+    chipRow->addWidget(addressHint);
+    chipRow->addStretch();
+    labelChip = new ChipButton(ui->SendCoins);
+    labelChip->setToolTip(tr("Label of the address. Click to change it."));
+    lockChip = new ChipButton(ui->SendCoins);
+    lockChip->setToolTip(tr("The recipient cannot spend the tokens before this time. Click to change it."));
+    chipRow->addWidget(labelChip);
+    chipRow->addWidget(lockChip);
+    layout->addLayout(chipRow);
+    connect(labelChip, SIGNAL(clicked()), this, SLOT(editLabel()));
+    connect(labelChip, SIGNAL(removeClicked()), this, SLOT(clearLabel()));
+    connect(lockChip, SIGNAL(clicked()), this, SLOT(editLockTime()));
+    connect(lockChip, SIGNAL(removeClicked()), this, SLOT(clearLockTime()));
+
+    // the fields of the form hold label, lock time and token; they are not shown
+    ui->labellLabel->hide();
+    ui->addAsLabel->hide();
+    ui->tokenLockTimeLabel->hide();
+    ui->useLockTime->hide();
+    ui->tokenLockTime->hide();
+    ui->tokenAmountLabel->hide();
+    connect(ui->addAsLabel, SIGNAL(textChanged(QString)), this, SLOT(updateChips()));
+    connect(ui->useLockTime, SIGNAL(toggled(bool)), this, SLOT(updateChips()));
+
+    // quantity
+    layout->addWidget(ui->amountLabel);
+    QFrame *amountBox = new QFrame(ui->SendCoins);
+    amountBox->setProperty("role", "amountBox");
+    amountBox->setFixedHeight(60);
+    QHBoxLayout *amountLayout = new QHBoxLayout(amountBox);
+    amountLayout->setContentsMargins(16, 0, 10, 0);
+    amountLayout->setSpacing(12);
+    ui->payTokenAmount->setHeroStyle();
+    amountLayout->addWidget(ui->payTokenAmount, 1);
+    unitLabel = new QLabel(amountBox);
+    unitLabel->setFont(GUIUtil::appFont(14, QFont::Medium));
+    unitLabel->setProperty("role", "secondary");
+    amountLayout->addWidget(unitLabel);
+    QPushButton *maxButton = new QPushButton(tr("All"), amountBox);
+    maxButton->setProperty("look", "soft");
+    maxButton->setToolTip(tr("Send everything the wallet holds of this token"));
+    maxButton->setFixedHeight(40);
+    maxButton->setAutoDefault(false);
+    maxButton->setCursor(Qt::PointingHandCursor);
+    amountLayout->addWidget(maxButton);
+    connect(maxButton, SIGNAL(clicked()), this, SLOT(useAvailableBalanceClicked()));
+    layout->addWidget(amountBox);
+
+    QHBoxLayout *optionRow = new QHBoxLayout();
+    optionRow->addWidget(ui->ownershipWarningMessage);
+    optionRow->addStretch();
+    QPushButton *lockButton = new QPushButton(tr("Send with a lock"), ui->SendCoins);
+    lockButton->setProperty("look", "chipButton");
+    lockButton->setIcon(QIcon(GUIUtil::lineIcon("clock", 14, theme.label)));
+    lockButton->setIconSize(QSize(14, 14));
+    lockButton->setAutoDefault(false);
+    lockButton->setCursor(Qt::PointingHandCursor);
+    lockButton->setToolTip(tr("Send tokens that the recipient cannot spend before a time you choose"));
+    connect(lockButton, SIGNAL(clicked()), this, SLOT(editLockTime()));
+    optionRow->addWidget(lockButton);
+    layout->addLayout(optionRow);
+
+    // With -advancedui the token can also be chosen here, which is the way to transfer an owner token
+    QHBoxLayout *advancedRow = new QHBoxLayout();
+    advancedRow->setSpacing(8);
+    advancedRow->addWidget(ui->tokenBoxLabel);
+    advancedRow->addWidget(ui->tokenSelectionBox, 1);
+    advancedRow->addWidget(ui->administratorCheckbox);
+    layout->addLayout(advancedRow);
+    if (!gArgs.GetBoolArg("-advancedui", false)) {
+        ui->tokenBoxLabel->hide();
+        ui->tokenSelectionBox->hide();
+    }
+
+    layout->addWidget(ui->messageLabel);
+    layout->addWidget(ui->messageTextLabel);
+
+    connect(ui->payTokenAmount, SIGNAL(valueChanged()), this, SIGNAL(recipientChanged()));
+    setIndex(1);
+    updateChips();
+    updateAddressHint(QString());
+}
+
+void SendTokensEntry::setIndex(int index)
+{
+    cardTitle->setText(tr("Recipient %1").arg(index));
+}
+
+void SendTokensEntry::selectToken(const QString &name)
+{
+    int index = name.isEmpty() ? 0 : ui->tokenSelectionBox->findText(name);
+    if (index < 0) {
+        // the list of the entry may be older than the wallet
+        refreshTokenList();
+        index = ui->tokenSelectionBox->findText(name);
+    }
+    if (index < 0)
+        index = 0;
+    ui->tokenSelectionBox->setCurrentIndex(index);
+    onTokenSelected(index);
+}
+
+void SendTokensEntry::updateAddressHint(const QString &address)
+{
+    const QString text = address.trimmed();
+    if (text.isEmpty() || !model) {
+        addressHint->setText(QString());
+        return;
+    }
+    if (model->validateAddress(text)) {
+        addressHint->setProperty("role", "ok");
+        addressHint->setText(tr("This is a valid AokChain address"));
+    } else if (IsUsernameValid(text.toStdString())) {
+        addressHint->setProperty("role", "secondary");
+        addressHint->setText(tr("A user name: it is resolved to its address when sending"));
+    } else {
+        addressHint->setProperty("role", "error");
+        addressHint->setText(tr("This is not a valid AokChain address"));
+    }
+    addressHint->style()->unpolish(addressHint);
+    addressHint->style()->polish(addressHint);
+}
+
+void SendTokensEntry::useAvailableBalanceClicked()
+{
+    if (tokenBalance > 0)
+        ui->payTokenAmount->setValue(tokenBalance / AokChainUnits::factorToken(8 - tokenUnits));
+}
+
+void SendTokensEntry::editLabel()
+{
+    QString label = ui->addAsLabel->text();
+    if (PageDialogs::askLabel(this, label))
+        ui->addAsLabel->setText(label);
+}
+
+void SendTokensEntry::clearLabel()
+{
+    ui->addAsLabel->clear();
+}
+
+void SendTokensEntry::editLockTime()
+{
+    QDateTime until = lockTime();
+    if (PageDialogs::askLockTime(this, until)) {
+        ui->tokenLockTime->setEnabled(true);
+        ui->tokenLockTime->setDateTime(until);
+        ui->useLockTime->setChecked(true);
+        updateChips();
+    }
+}
+
+void SendTokensEntry::clearLockTime()
+{
+    ui->useLockTime->setChecked(false);
+}
+
+QDateTime SendTokensEntry::lockTime() const
+{
+    return ui->useLockTime->isChecked() ? ui->tokenLockTime->dateTime() : QDateTime();
+}
+
+void SendTokensEntry::updateChips()
+{
+    const QString label = ui->addAsLabel->text();
+    labelChip->setText(tr("Label: %1").arg(QFontMetrics(GUIUtil::appFont(12, QFont::Medium)).elidedText(label, Qt::ElideRight, 160)));
+    labelChip->setVisible(!label.isEmpty());
+    const QDateTime until = lockTime();
+    lockChip->setText(tr("Locked until %1").arg(GUIUtil::isoDateTime(until)));
+    lockChip->setVisible(until.isValid());
+    Q_EMIT recipientChanged();
+}
+
+QString SendTokensEntry::addressText() const
+{
+    return ui->payTo->text().trimmed();
+}
+
+QString SendTokensEntry::labelText() const
+{
+    return ui->addAsLabel->text();
+}
+
+CAmount SendTokensEntry::amount() const
+{
+    return ui->payTokenAmount->value();
+}
+
+bool SendTokensEntry::isComplete() const
+{
+    if (recipient.paymentRequest.IsInitialized())
+        return true;
+    if (!model || ui->tokenSelectionBox->currentIndex() <= 0)
+        return false;
+    const QString address = ui->payTo->text().trimmed();
+    if (!model->validateAddress(address) && !IsUsernameValid(address.toStdString()))
+        return false;
+    return ui->payTokenAmount->value() > 0;
 }
 
 void SendTokensEntry::toggleTimeLock(bool checked)
@@ -176,6 +448,8 @@ void SendTokensEntry::on_addressBookButton_clicked()
 
 void SendTokensEntry::on_payTo_textChanged(const QString &address)
 {
+    updateAddressHint(address);
+    Q_EMIT recipientChanged();
     updateLabel(address);
 }
 
@@ -349,6 +623,10 @@ void SendTokensEntry::onTokenSelected(int index)
     QString name = ui->tokenSelectionBox->currentText();
     // If the name
     if (index == 0) {
+        tokenBalance = 0;
+        tokenUnits = 0;
+        unitLabel->clear();
+        Q_EMIT recipientChanged();
         ui->tokenAmountLabel->clear();
         if(!ui->administratorCheckbox->isChecked()) {
             ui->payTokenAmount->setDisabled(false);
@@ -411,6 +689,10 @@ void SendTokensEntry::onTokenSelected(int index)
     }
 
     int units = fIsOwnerToken ? OWNER_UNITS : token.units;
+    tokenBalance = amount;
+    tokenUnits = units;
+    unitLabel->setText(name);
+    Q_EMIT recipientChanged();
 
     QString displayBalance = TokenControlDialog::tokenControl->HasTokenSelected() ? tr("Selected Balance") : tr("Wallet Balance");
 

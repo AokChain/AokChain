@@ -124,6 +124,17 @@ namespace GUIUtil
     QString monoToolTip(const QString& value, const QString& caption = QString());
     /** Date and time in the form used in tables: 2024-04-13 16:06 */
     QString isoDateTime(const QDateTime& dateTime, bool seconds = false);
+    /** Is there a bundled logo for the token (looked up by its root name)? */
+    bool hasTokenLogo(const QString& tokenName);
+    /**
+     * Paint an amount: the fraction (the point and the digits after it) at 60 % of the size of
+     * the integer part, on the same base line. Every amount on the pages is painted this way.
+     * Returns the width used.
+     */
+    int paintAmount(QPainter* painter, const QRect& rect, const QString& amount, const QFont& font, const QColor& color,
+                    Qt::Alignment align = Qt::AlignRight | Qt::AlignVCenter);
+    /** Width of an amount painted by paintAmount(). */
+    int amountWidth(const QString& amount, const QFont& font);
     /** Paint a chip (small rounded label) at the position; returns its width. */
     int paintChip(QPainter* painter, int x, int centerY, const QString& text);
     /** Paint a rounded badge with its own colors, right- or left-aligned in the rectangle. */
@@ -314,13 +325,17 @@ namespace GUIUtil
     class MonoColumnDelegate : public QStyledItemDelegate
     {
     public:
-        MonoColumnDelegate(const QList<int>& columns, QObject *parent) : QStyledItemDelegate(parent), monoColumns(columns) {}
+        MonoColumnDelegate(const QList<int>& columns, QObject *parent, const QList<int>& amounts = QList<int>()) :
+            QStyledItemDelegate(parent), monoColumns(columns), amountColumns(amounts) {}
+        /** Amount columns are painted with the smaller fraction, see paintAmount() */
+        void paint(QPainter *painter, const QStyleOptionViewItem &option, const QModelIndex &index) const override;
 
     protected:
         void initStyleOption(QStyleOptionViewItem *option, const QModelIndex &index) const override;
 
     private:
         QList<int> monoColumns;
+        QList<int> amountColumns;
     };
 
     class ClickableLabel : public QLabel

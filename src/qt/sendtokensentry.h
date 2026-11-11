@@ -9,9 +9,16 @@
 
 #include "walletmodel.h"
 
+#include <QDateTime>
+#include "amount.h"
 #include <QStackedWidget>
 
+class ChipButton;
 class WalletModel;
+
+QT_BEGIN_NAMESPACE
+class QLabel;
+QT_END_NAMESPACE
 class PlatformStyle;
 class QStringListModel;
 class QSortFilterProxyModel;
@@ -59,6 +66,20 @@ public:
     bool fShowAdministratorList;
 
     void refreshTokenList();
+
+    /** The token is chosen for the whole page; the entry follows */
+    void selectToken(const QString &name);
+    /** Number in the title of the card ("Recipient 2") */
+    void setIndex(int index);
+    /** What the summary shows */
+    QString addressText() const;
+    QString labelText() const;
+    CAmount amount() const;
+    QDateTime lockTime() const;
+    bool isComplete() const;
+    /** Balance and decimals of the chosen token, as found when it was selected */
+    CAmount tokenBalance;
+    int tokenUnits;
     void switchAdministratorList(bool fSwitchStatus = true);
 
     QStringListModel* stringModel;
@@ -73,6 +94,7 @@ Q_SIGNALS:
     void removeEntry(SendTokensEntry *entry);
     void payAmountChanged();
     void subtractFeeFromAmountChanged();
+    void recipientChanged();
 
 private Q_SLOTS:
     void deleteClicked();
@@ -82,6 +104,12 @@ private Q_SLOTS:
     void onTokenSelected(int index);
     void onSendOwnershipChanged();
     void toggleTimeLock(bool checked);
+    void useAvailableBalanceClicked();
+    void editLabel();
+    void clearLabel();
+    void editLockTime();
+    void clearLockTime();
+    void updateChips();
 
 private:
     SendTokensRecipient recipient;
@@ -89,7 +117,15 @@ private:
     WalletModel *model;
     const PlatformStyle *platformStyle;
 
+    QLabel *addressHint;
+    QLabel *cardTitle;
+    QLabel *unitLabel;
+    ChipButton *labelChip;
+    ChipButton *lockChip;
+
     bool updateLabel(const QString &address);
+    void buildLayout();
+    void updateAddressHint(const QString &address);
 };
 
 #endif // AOKCHAIN_QT_SENDTOKENSENTRY_H

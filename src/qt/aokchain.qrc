@@ -114,6 +114,7 @@
         <file alias="NotoSansKR-Regular">res/fonts/NotoSansKR-Regular.ttf</file>
         <file alias="NotoSansKR-Bold">res/fonts/NotoSansKR-Bold.ttf</file>
         <file alias="NotoSansMono-Regular">res/fonts/NotoSansMono-Regular.ttf</file>
+        <file alias="NotoSansMono-Medium">res/fonts/NotoSansMono-Medium.ttf</file>
         <file alias="NotoSansMono-SemiBold">res/fonts/NotoSansMono-SemiBold.ttf</file>
         <file alias="NotoSansMono-Bold">res/fonts/NotoSansMono-Bold.ttf</file>
     </qresource>

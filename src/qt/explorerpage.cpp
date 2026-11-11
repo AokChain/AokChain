@@ -11,6 +11,7 @@
 #include "addresstablemodel.h"
 #include "clientmodel.h"
 #include "guiutil.h"
+#include "pagewidgets.h"
 #include "platformstyle.h"
 #include "walletmodel.h"
 
@@ -358,6 +359,11 @@ UniValue errorResult(const std::string& kind, const std::string& message = std::
 
 } // namespace
 
+bool NodeRPC::call(const std::string& method, const std::vector<std::string>& args, UniValue& result, std::string *error)
+{
+    return callRPC(method, args, result, error);
+}
+
 void ExplorerWorker::lookup(const QString& query)
 {
     const QString q = query.trimmed();
@@ -500,7 +506,7 @@ ExplorerPage::ExplorerPage(const PlatformStyle *platformStyle, QWidget *parent) 
     searchButton = new QPushButton(tr("Look up"));
     searchButton->setProperty("primary", true);
     searchButton->setProperty("look", "large");
-    searchButton->setFont(GUIUtil::appFont(15, QFont::Bold));
+    searchButton->setFont(GUIUtil::appFont(15, QFont::DemiBold));
     searchButton->setFixedHeight(48);
     searchButton->setCursor(Qt::PointingHandCursor);
     searchRow->addWidget(searchEdit, 1);
@@ -515,7 +521,7 @@ ExplorerPage::ExplorerPage(const PlatformStyle *platformStyle, QWidget *parent) 
     QHBoxLayout *statusLayout = new QHBoxLayout(statusCard);
     statusLayout->setContentsMargins(0, 0, 0, 0);
     statusLayout->setSpacing(0);
-    auto addStat = [&](const QString& name, QLabel *&value, bool first) {
+    auto addStat = [&](const QString& name, AmountLabel *&value, bool first) {
         if (!first)
             statusLayout->addWidget(line(true));
         QWidget *box = new QWidget();
@@ -523,9 +529,8 @@ ExplorerPage::ExplorerPage(const PlatformStyle *platformStyle, QWidget *parent) 
         layout->setContentsMargins(18, 14, 18, 14);
         layout->setSpacing(2);
         layout->addWidget(caption(name));
-        value = new QLabel(QString::fromUtf8("–"));
-        value->setFont(GUIUtil::monoFont(18, QFont::Bold));
-        value->setTextFormat(Qt::RichText);
+        value = new AmountLabel(18, QFont::DemiBold);
+        value->setAmount(QString::fromUtf8("–"));
         layout->addWidget(value);
         statusLayout->addWidget(box, 1);
     };
@@ -547,9 +552,9 @@ ExplorerPage::ExplorerPage(const PlatformStyle *platformStyle, QWidget *parent) 
     QHBoxLayout *resultHeader = new QHBoxLayout();
     resultTitle = new QLabel(tr("Result"));
     resultTitle->setProperty("role", "title");
-    resultTitle->setFont(GUIUtil::appFont(16, QFont::Bold));
+    resultTitle->setFont(GUIUtil::appFont(16, QFont::DemiBold));
     resultBadge = new QLabel();
-    resultBadge->setFont(GUIUtil::appFont(12, QFont::DemiBold));
+    resultBadge->setFont(GUIUtil::appFont(12, QFont::Medium));
     resultBadge->hide();
     resultHeader->addWidget(resultTitle);
     resultHeader->addStretch();
@@ -566,7 +571,8 @@ ExplorerPage::ExplorerPage(const PlatformStyle *platformStyle, QWidget *parent) 
     resultLayout->setContentsMargins(0, 0, 6, 0);
     resultLayout->setSpacing(0);
     resultScroll->setWidget(resultBody);
-    resultScroll->viewport()->setStyleSheet("background: transparent;");
+    resultScroll->viewport()->setObjectName("explorerResultView");
+    resultScroll->viewport()->setStyleSheet("QWidget#explorerResultView { background: transparent; }");
     resultOuter->addWidget(resultScroll, 1);
     resultButtons = new QWidget();
     QHBoxLayout *buttonLayout = new QHBoxLayout(resultButtons);
@@ -596,23 +602,22 @@ ExplorerPage::ExplorerPage(const PlatformStyle *platformStyle, QWidget *parent) 
     QHBoxLayout *poolHeader = new QHBoxLayout();
     QLabel *poolTitle = new QLabel(tr("Memory pool"));
     poolTitle->setProperty("role", "title");
-    poolTitle->setFont(GUIUtil::appFont(16, QFont::Bold));
+    poolTitle->setFont(GUIUtil::appFont(16, QFont::DemiBold));
     poolHeader->addWidget(poolTitle);
     poolHeader->addStretch();
     poolHeader->addWidget(caption(tr("Transactions waiting to be confirmed")));
     poolOuter->addLayout(poolHeader);
     QHBoxLayout *tiles = new QHBoxLayout();
     tiles->setSpacing(10);
-    auto addTile = [&](const QString& name, QLabel *&value) {
+    auto addTile = [&](const QString& name, AmountLabel *&value) {
         QFrame *tile = new QFrame();
         tile->setProperty("role", "tile");
         QVBoxLayout *layout = new QVBoxLayout(tile);
         layout->setContentsMargins(12, 12, 12, 12);
         layout->setSpacing(2);
         layout->addWidget(caption(name));
-        value = new QLabel(QString::fromUtf8("–"));
-        value->setFont(GUIUtil::monoFont(18, QFont::Bold));
-        value->setTextFormat(Qt::RichText);
+        value = new AmountLabel(18, QFont::DemiBold);
+        value->setAmount(QString::fromUtf8("–"));
         layout->addWidget(value);
         tiles->addWidget(tile, 1);
     };
@@ -631,7 +636,8 @@ ExplorerPage::ExplorerPage(const PlatformStyle *platformStyle, QWidget *parent) 
     poolLayout->setContentsMargins(0, 0, 6, 0);
     poolLayout->setSpacing(0);
     poolScroll->setWidget(poolBody);
-    poolScroll->viewport()->setStyleSheet("background: transparent;");
+    poolScroll->viewport()->setObjectName("explorerPoolView");
+    poolScroll->viewport()->setStyleSheet("QWidget#explorerPoolView { background: transparent; }");
     poolOuter->addWidget(poolScroll, 1);
     poolOuter->addWidget(line());
     const int spacing = Params().GetConsensus().nTargetSpacing;
@@ -778,15 +784,23 @@ void ExplorerPage::setBadge(const QString& text, bool ok)
 QLabel *ExplorerPage::monoLabel(const QString& text, int px, bool bold)
 {
     QLabel *label = new QLabel(text);
-    label->setFont(GUIUtil::monoFont(px, bold ? QFont::DemiBold : QFont::Normal));
+    label->setFont(GUIUtil::monoFont(px, bold ? QFont::Medium : QFont::Normal));
     label->setTextInteractionFlags(Qt::TextSelectableByMouse);
+    return label;
+}
+
+QWidget *ExplorerPage::amountValue(const QString& amount, const QString& unit, int px)
+{
+    AmountLabel *label = new AmountLabel(px, QFont::Medium);
+    label->setAlignment(Qt::AlignRight | Qt::AlignVCenter);
+    label->setAmount(amount, unit);
     return label;
 }
 
 QLabel *ExplorerPage::linkLabel(const QString& text, const QString& target, const QString& toolTip, int px)
 {
     QLabel *label = new QLabel();
-    label->setFont(GUIUtil::monoFont(px, QFont::DemiBold));
+    label->setFont(GUIUtil::monoFont(px, QFont::Medium));
     label->setTextFormat(Qt::RichText);
     label->setText(QString("<a href=\"q:%1\" style=\"color:%2; text-decoration:none;\">%3</a>")
         .arg(GUIUtil::HtmlEscape(target), GUIUtil::theme().accent.name(), GUIUtil::HtmlEscape(text)));
@@ -860,21 +874,18 @@ QWidget *ExplorerPage::transferRow(const UniValue& entry)
     layout->addWidget(left);
     if (mine) {
         QLabel *chip = new QLabel(tr("Mine"));
-        chip->setFont(GUIUtil::appFont(11, QFont::DemiBold));
+        chip->setFont(GUIUtil::appFont(11, QFont::Medium));
         chip->setStyleSheet(QString("QLabel { color: %1; background-color: %2; border-radius: 9px; padding: 1px 7px; }")
             .arg(GUIUtil::theme().chipText.name(), GUIUtil::theme().chip.name()));
         layout->addWidget(chip);
     }
     layout->addStretch();
 
-    QString value;
     const std::string token = strOf(entry, "token");
     if (!token.empty())
-        value = amountText(strOf(entry, "tokenAmount")) + " " + QString::fromStdString(token);
+        layout->addWidget(amountValue(amountText(strOf(entry, "tokenAmount")), QString::fromStdString(token), 14));
     else if (!boolOf(entry, "unknown") && !boolOf(entry, "coinbase"))
-        value = amountText(strOf(entry, "value"));
-    if (!value.isEmpty())
-        layout->addWidget(monoLabel(value, 13, true));
+        layout->addWidget(amountValue(amountText(strOf(entry, "value")), QString(), 14));
     return row;
 }
 
@@ -910,9 +921,9 @@ void ExplorerPage::showTransaction(const UniValue& result)
     resultLayout->addWidget(keyValueRow(tr("Size"), monoLabel(bytesText(intOf(result, "size")))));
     const std::string fee = strOf(result, "fee"), reward = strOf(result, "reward");
     if (!fee.empty())
-        resultLayout->addWidget(keyValueRow(tr("Fee"), monoLabel(amountText(fee) + " AOK")));
+        resultLayout->addWidget(keyValueRow(tr("Fee"), amountValue(amountText(fee), "AOK")));
     else if (!reward.empty())
-        resultLayout->addWidget(keyValueRow(tr("Staking reward"), monoLabel(amountText(reward) + " AOK")));
+        resultLayout->addWidget(keyValueRow(tr("Staking reward"), amountValue(amountText(reward), "AOK")));
     else if (boolOf(result, "coinbase"))
         resultLayout->addWidget(keyValueRow(tr("Fee"), caption(tr("None (generated coins)"))));
     else
@@ -930,7 +941,7 @@ void ExplorerPage::showTransaction(const UniValue& result)
         QVBoxLayout *column = new QVBoxLayout();
         column->setSpacing(0);
         QLabel *head = caption(heading);
-        head->setFont(GUIUtil::appFont(12, QFont::DemiBold));
+        head->setFont(GUIUtil::appFont(12, QFont::Medium));
         column->addWidget(head);
         column->addSpacing(6);
         for (size_t i = 0; entries.isArray() && i < entries.size(); ++i)
@@ -986,7 +997,7 @@ void ExplorerPage::showBlock(const UniValue& result)
     resultLayout->addSpacing(12);
 
     QLabel *head = caption(tr("%1 transactions").arg(ntx));
-    head->setFont(GUIUtil::appFont(12, QFont::DemiBold));
+    head->setFont(GUIUtil::appFont(12, QFont::Medium));
     resultLayout->addWidget(head);
     resultLayout->addSpacing(6);
     const UniValue txs = find_value(result, "tx");
@@ -1056,15 +1067,15 @@ void ExplorerPage::showAddress(const UniValue& result)
 
     const std::string balance = strOf(result, "balance");
     if (!balance.empty()) {
-        resultLayout->addWidget(keyValueRow(tr("Balance"), monoLabel(amountText(balance) + " AOK", 13, true)));
-        resultLayout->addWidget(keyValueRow(tr("Total received"), monoLabel(amountText(strOf(result, "received")) + " AOK")));
+        resultLayout->addWidget(keyValueRow(tr("Balance"), amountValue(amountText(balance), "AOK")));
+        resultLayout->addWidget(keyValueRow(tr("Total received"), amountValue(amountText(strOf(result, "received")), "AOK")));
     }
     const qint64 ntx = intOf(result, "ntx");
     resultLayout->addWidget(keyValueRow(tr("Transactions"), monoLabel(GUIUtil::withThousands(QString::number(ntx)))));
     resultLayout->addWidget(line());
     resultLayout->addSpacing(12);
     QLabel *head = caption(tr("Recent transactions"));
-    head->setFont(GUIUtil::appFont(12, QFont::DemiBold));
+    head->setFont(GUIUtil::appFont(12, QFont::Medium));
     resultLayout->addWidget(head);
     resultLayout->addSpacing(6);
     const UniValue txids = find_value(result, "txids");
@@ -1124,23 +1135,22 @@ void ExplorerPage::refreshDone(const QString& json)
     if (!result.read(json.toStdString()) || !result.isObject())
         return;
     const GUIUtil::Theme& t = GUIUtil::theme();
-    const QString unitStyle = QString("<span style=\"font-family:'Noto Sans'; font-size:12px; font-weight:400; color:%1;\"> %2</span>").arg(t.textSecondary.name());
 
-    statHeight->setText(GUIUtil::withThousands(QString::number(intOf(result, "height"))));
+    statHeight->setAmount(GUIUtil::withThousands(QString::number(intOf(result, "height"))));
     bool ok = false;
     const double difficulty = QString::fromStdString(strOf(result, "difficulty")).toDouble(&ok);
     if (ok)
-        statDifficulty->setText(difficulty >= 1000 ? GUIUtil::withThousands(QString::number(difficulty, 'f', 2)) : QString::number(difficulty, 'g', 6));
+        statDifficulty->setAmount(difficulty >= 1000 ? GUIUtil::withThousands(QString::number(difficulty, 'f', 2)) : QString::number(difficulty, 'g', 6));
     const double weight = QString::fromStdString(strOf(result, "netweight")).toDouble(&ok);
     if (ok)
-        statWeight->setText(GUIUtil::withThousands(QString::number(weight / COIN, 'f', 0)) + unitStyle.arg("AOK"));
-    statPeers->setText(QString::number(intOf(result, "peers")));
+        statWeight->setAmount(GUIUtil::withThousands(QString::number(weight / COIN, 'f', 0)), "AOK");
+    statPeers->setAmount(QString::number(intOf(result, "peers")));
 
-    poolCount->setText(GUIUtil::withThousands(QString::number(intOf(result, "poolsize"))));
-    poolSize->setText(QString::number(intOf(result, "poolbytes") / 1000.0, 'f', 2) + unitStyle.arg("kB"));
+    poolCount->setAmount(GUIUtil::withThousands(QString::number(intOf(result, "poolsize"))));
+    poolSize->setAmount(QString::number(intOf(result, "poolbytes") / 1000.0, 'f', 2), "kB");
     double minFee = QString::fromStdString(strOf(result, "relayfee")).toDouble();
     minFee = qMax(minFee, QString::fromStdString(strOf(result, "poolminfee")).toDouble());
-    poolMinFee->setText(QString::number(minFee, 'g', 4) + unitStyle.arg("/kB"));
+    poolMinFee->setAmount(QString::number(minFee, 'g', 4), "/kB");
 
     clearLayout(poolLayout);
     const UniValue entries = find_value(result, "entries");
@@ -1173,13 +1183,16 @@ void ExplorerPage::refreshDone(const QString& json)
         layout->addLayout(left, 1);
         QVBoxLayout *right = new QVBoxLayout();
         right->setSpacing(1);
-        QLabel *amount = monoLabel(amountText(strOf(entry, "amount")), 13, true);
-        amount->setAlignment(Qt::AlignRight);
-        right->addWidget(amount);
-        QLabel *fee = monoLabel(tr("fee %1").arg(amountText(strOf(entry, "fee"))), 11);
-        fee->setStyleSheet(QString("QLabel { color: %1; }").arg(t.textSecondary.name()));
-        fee->setAlignment(Qt::AlignRight);
-        right->addWidget(fee);
+        right->addWidget(amountValue(amountText(strOf(entry, "amount")), QString(), 14));
+        QHBoxLayout *feeLine = new QHBoxLayout();
+        feeLine->setSpacing(4);
+        feeLine->addStretch();
+        feeLine->addWidget(caption(tr("fee")));
+        AmountLabel *fee = new AmountLabel(13, QFont::Normal);
+        fee->setColor(t.textSecondary);
+        fee->setAmount(amountText(strOf(entry, "fee")));
+        feeLine->addWidget(fee);
+        right->addLayout(feeLine);
         layout->addLayout(right);
         outer->addLayout(layout);
         poolLayout->addWidget(row);

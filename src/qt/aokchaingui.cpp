@@ -629,6 +629,10 @@ void AokChainGUI::setClientModel(ClientModel *_clientModel)
         // Receive and report messages from client model
         connect(_clientModel, SIGNAL(message(QString,QString,unsigned int)), this, SLOT(message(QString,QString,unsigned int)));
 
+        // Warnings of the node go to the bottom of the side bar
+        connect(_clientModel, SIGNAL(alertsChanged(QString)), this, SLOT(updateAlerts(QString)));
+        updateAlerts(_clientModel->getStatusBarWarnings());
+
         // Show progress dialog
         connect(_clientModel, SIGNAL(showProgress(QString,int)), this, SLOT(showProgress(QString,int)));
 
@@ -935,6 +939,16 @@ void AokChainGUI::setNumConnections(int count)
 void AokChainGUI::setNetworkActive(bool networkActive)
 {
     updateNetworkState();
+}
+
+void AokChainGUI::updateAlerts(const QString &warnings)
+{
+    if (!sidebar)
+        return;
+    // the notice of a pre-release build is not an alarm; anything else is shown in a warning color
+    const char *prerelease = "This is a pre-release test build - use at your own risk - do not use for mining or merchant applications";
+    const bool notice = warnings == QCoreApplication::translate("aokchain-core", prerelease) || warnings == QString(prerelease);
+    sidebar->setNotice(notice ? tr("Pre-release test build. Use at your own risk.") : warnings, warnings, !notice);
 }
 
 void AokChainGUI::updateHeadersSyncProgressLabel()

@@ -146,7 +146,7 @@ void loadAppFonts()
 {
     for (const char* name : {"NotoSans-Regular", "NotoSans-Medium", "NotoSans-SemiBold", "NotoSans-Bold",
                              "NotoSansKR-Regular", "NotoSansKR-Bold",
-                             "NotoSansMono-Regular", "NotoSansMono-SemiBold", "NotoSansMono-Bold"}) {
+                             "NotoSansMono-Regular", "NotoSansMono-Medium", "NotoSansMono-SemiBold", "NotoSansMono-Bold"}) {
         if (QFontDatabase::addApplicationFont(QString(":/fonts/%1").arg(name)) < 0)
             qWarning() << "Could not load the font" << name;
     }
@@ -178,8 +178,7 @@ QFont monoFont(int pixelSize, int weight)
     font.setStyleHint(QFont::Monospace);
     font.setFixedPitch(true);
     font.setPixelSize(pixelSize);
-    // the bundled weights are regular, semi-bold and bold
-    font.setWeight(weight == QFont::Medium ? QFont::DemiBold : weight);
+    font.setWeight(weight);
     font.setStyleStrategy(QFont::PreferAntialias);
     return font;
 }
@@ -326,6 +325,15 @@ QPixmap lineIcon(const QString& name, int size, const QColor& color, qreal strok
         line(12, 4, 12, 15); poly({{7, 11}, {12, 16}, {17, 11}}); line(5, 20, 19, 20);
     } else if (name == "chevron") {
         poly({{6, 9}, {12, 15}, {18, 9}});
+    } else if (name == "chevron-right") {
+        poly({{9, 6}, {15, 12}, {9, 18}});
+    } else if (name == "tag") {
+        poly({{3, 4}, {12, 4}, {21, 13}, {13, 21}, {3, 11}, {3, 4}}); p.drawEllipse(QPointF(8, 9), 1.2, 1.2);
+    } else if (name == "clock") {
+        p.drawEllipse(QPointF(12, 12), 9, 9); poly({{12, 7}, {12, 12}, {15.5, 14}});
+    } else if (name == "qr") {
+        p.drawRect(QRectF(4, 4, 6, 6)); p.drawRect(QRectF(14, 4, 6, 6)); p.drawRect(QRectF(4, 14, 6, 6));
+        line(14, 14, 14, 20); line(17, 17, 20, 17); line(20, 14, 20, 14.1); line(17, 20, 20, 20);
     } else if (name == "plus") {
         line(12, 5, 12, 19); line(5, 12, 19, 12);
     } else if (name == "remove") {
@@ -376,7 +384,7 @@ QPixmap tokenLogo(const QString& tokenName, int size)
     } else {
         p.fillRect(QRectF(0, 0, size, size), t.accentSoft);
         p.setPen(t.accent);
-        p.setFont(appFont(qMax(10, size * 45 / 100), QFont::Bold));
+        p.setFont(appFont(qMax(10, size * 45 / 100), QFont::DemiBold));
         p.drawText(QRectF(0, 0, size, size), Qt::AlignCenter, root.left(1));
     }
     p.end();
@@ -409,6 +417,25 @@ void MonoColumnDelegate::initStyleOption(QStyleOptionViewItem *option, const QMo
         option->font = monoFont(option->font.pixelSize() > 0 ? option->font.pixelSize() : 13, option->font.weight());
 }
 
+void MonoColumnDelegate::paint(QPainter *painter, const QStyleOptionViewItem &option, const QModelIndex &index) const
+{
+    if (!amountColumns.contains(index.column())) {
+        QStyledItemDelegate::paint(painter, option, index);
+        return;
+    }
+    QStyleOptionViewItem opt = option;
+    initStyleOption(&opt, index);
+    const QString text = opt.text;
+    // background, selection and decoration as usual, the text by paintAmount()
+    opt.text.clear();
+    const QWidget *widget = opt.widget;
+    (widget ? widget->style() : QApplication::style())->drawControl(QStyle::CE_ItemViewItem, &opt, painter, widget);
+    const QVariant foreground = index.data(Qt::ForegroundRole);
+    const QColor color = foreground.canConvert<QColor>() && foreground.value<QColor>().isValid() ? foreground.value<QColor>() : theme().text;
+    const Qt::Alignment align = (opt.displayAlignment & Qt::AlignRight) ? Qt::AlignRight | Qt::AlignVCenter : Qt::AlignLeft | Qt::AlignVCenter;
+    paintAmount(painter, opt.rect.adjusted(8, 0, -8, 0), withThousands(text), monoFont(14, QFont::Medium), color, align);
+}
+
 QString monoToolTip(const QString& value, const QString& caption)
 {
     QString html = "<nobr>";
@@ -423,12 +450,82 @@ QString isoDateTime(const QDateTime& dateTime, bool seconds)
     return dateTime.toString(seconds ? "yyyy-MM-dd HH:mm:ss" : "yyyy-MM-dd HH:mm");
 }
 
+static QString tokenRootName(const QString& tokenName)
+{
+    QString root = tokenName;
+    for (const QChar sep : {QChar('/'), QChar('#'), QChar('!'), QChar(' ')}) {
+        const int pos = root.indexOf(sep);
+        if (pos >= 0)
+            root = root.left(pos);
+    }
+    return root;
+}
+
+bool hasTokenLogo(const QString& tokenName)
+{
+    const QString root = tokenRootName(tokenName);
+    return root == "AOK" || (!root.isEmpty() && QFile::exists(":/tokens/" + root.toLower()));
+}
+
+static QFont fractionFont(const QFont& font)
+{
+    QFont small = font;
+    small.setPixelSize(qMax(9, qRound(font.pixelSize() * 0.6)));
+    small.setLetterSpacing(QFont::AbsoluteSpacing, 0);
+    return small;
+}
+
+/** Where the fraction starts; -1 when there is none or when it is not plain digits (1.5e-10). */
+static int fractionStart(const QString& amount)
+{
+    const int point = amount.indexOf('.');
+    for (int i = point + 1; point >= 0 && i < amount.size(); ++i)
+        if (!amount[i].isDigit())
+            return -1;
+    return point;
+}
+
+int amountWidth(const QString& amount, const QFont& font)
+{
+    const int point = fractionStart(amount);
+    if (point < 0)
+        return QFontMetrics(font).horizontalAdvance(amount);
+    return QFontMetrics(font).horizontalAdvance(amount.left(point)) + QFontMetrics(fractionFont(font)).horizontalAdvance(amount.mid(point));
+}
+
+int paintAmount(QPainter* painter, const QRect& rect, const QString& amount, const QFont& font, const QColor& color, Qt::Alignment align)
+{
+    const int point = fractionStart(amount);
+    const QString whole = point < 0 ? amount : amount.left(point);
+    const QString fraction = point < 0 ? QString() : amount.mid(point);
+    const QFontMetrics fm(font);
+    const QFont small = fractionFont(font);
+    const int wholeWidth = fm.horizontalAdvance(whole);
+    const int width = wholeWidth + (fraction.isEmpty() ? 0 : QFontMetrics(small).horizontalAdvance(fraction));
+    int x = rect.left();
+    if (align & Qt::AlignRight)
+        x = rect.right() + 1 - width;
+    else if (align & Qt::AlignHCenter)
+        x = rect.left() + (rect.width() - width) / 2;
+    const int baseline = rect.top() + (rect.height() - fm.height()) / 2 + fm.ascent();
+    painter->save();
+    painter->setPen(color);
+    painter->setFont(font);
+    painter->drawText(x, baseline, whole);
+    if (!fraction.isEmpty()) {
+        painter->setFont(small);
+        painter->drawText(x + wholeWidth, baseline, fraction);
+    }
+    painter->restore();
+    return width;
+}
+
 int paintChip(QPainter* painter, int x, int centerY, const QString& text)
 {
     const Theme& t = theme();
     painter->save();
     painter->setRenderHint(QPainter::Antialiasing, true);
-    painter->setFont(appFont(11, QFont::DemiBold));
+    painter->setFont(appFont(11, QFont::Medium));
     const int w = painter->fontMetrics().horizontalAdvance(text) + 16;
     const QRect r(x, centerY - 10, w, 20);
     painter->setPen(Qt::NoPen);
@@ -444,7 +541,7 @@ void paintBadge(QPainter* painter, const QRect& rect, const QString& text, const
 {
     painter->save();
     painter->setRenderHint(QPainter::Antialiasing, true);
-    painter->setFont(appFont(12, QFont::DemiBold));
+    painter->setFont(appFont(12, QFont::Medium));
     const int w = qMin(rect.width(), painter->fontMetrics().horizontalAdvance(text) + 20);
     const int h = 24;
     const int x = (align & Qt::AlignRight) ? rect.right() - w + 1 : rect.left();

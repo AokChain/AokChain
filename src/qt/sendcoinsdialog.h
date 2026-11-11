@@ -24,6 +24,9 @@ namespace Ui {
 }
 
 QT_BEGIN_NAMESPACE
+class AmountLabel;
+class ChoiceButton;
+class SummaryCard;
 class QLabel;
 class QPushButton;
 class QUrl;
@@ -80,17 +83,14 @@ private:
 
     // two columns: the form on the left, the summary on the right
     QWidget *headerBox;
-    QLabel *availableLabel;
-    QPushButton *feeButtons[3];
+    AmountLabel *availableLabel;
+    ChoiceButton *feeButtons[3];
     int feeTargets[2]; //!< confirmation targets of "slow" and "normal"
     QLabel *feeInfo;
     QPushButton *feeDetailsButton;
-    QLabel *summaryRecipient;
-    QLabel *summaryAmount;
-    QLabel *summaryFee;
-    QLabel *summaryTotal;
-    QLabel *summaryAfter;
+    SummaryCard *summary;
     void buildLayout();
+    void renumberEntries();
     void updateFeeButtons();
     void updateFeeMinimizedLabel();
     // Update the passed in CCoinControl with state from the GUI

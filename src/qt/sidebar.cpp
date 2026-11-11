@@ -102,7 +102,7 @@ void SideNavButton::paintEvent(QPaintEvent*)
         color = t.sideOff;
     p.drawPixmap(12, (height() - 18) / 2, GUIUtil::lineIcon(iconName, 18, color));
     p.setPen(color);
-    p.setFont(GUIUtil::appFont(14, on ? QFont::Bold : QFont::Medium));
+    p.setFont(GUIUtil::appFont(14, on ? QFont::DemiBold : QFont::Normal));
     p.drawText(QRect(42, 0, width() - 50, height()), Qt::AlignLeft | Qt::AlignVCenter, plainActionText(action));
 }
 
@@ -171,7 +171,7 @@ Sidebar::Sidebar(QWidget* parent) : QWidget(parent)
         logo->setPixmap(rounded);
     }
     brand->addWidget(logo);
-    brand->addWidget(sideLabel("AokChain", t.sideStrong, 18, QFont::Bold));
+    brand->addWidget(sideLabel("AokChain", t.sideStrong, 18, QFont::DemiBold));
     brand->addStretch();
     layout->addLayout(brand);
     layout->addSpacing(28);
@@ -191,7 +191,7 @@ Sidebar::Sidebar(QWidget* parent) : QWidget(parent)
     stakingLayout->setContentsMargins(14, 14, 14, 14);
     stakingLayout->setSpacing(8);
     QHBoxLayout* stakingRow = new QHBoxLayout();
-    stakingRow->addWidget(sideLabel(tr("Staking"), t.sideStrong, 14, QFont::DemiBold));
+    stakingRow->addWidget(sideLabel(tr("Staking"), t.sideStrong, 14, QFont::Medium));
     stakingRow->addStretch();
     stakingSwitch = new ToggleSwitch();
     stakingSwitch->setAccessibleName(tr("Staking"));
@@ -233,6 +233,13 @@ Sidebar::Sidebar(QWidget* parent) : QWidget(parent)
     walletLabel->setContentsMargins(8, 4, 8, 0);
     walletLabel->hide();
     layout->addWidget(walletLabel);
+
+    // warnings of the node, such as the notice of a pre-release build: small, at the very bottom
+    noticeLabel = sideLabel(QString(), t.sideText, 11, QFont::Normal);
+    noticeLabel->setContentsMargins(8, 6, 8, 0);
+    noticeLabel->setWordWrap(true);
+    noticeLabel->hide();
+    layout->addWidget(noticeLabel);
 }
 
 void Sidebar::addPage(QAction* action, const QString& iconName)
@@ -271,6 +278,29 @@ void Sidebar::setWalletState(const QString& text, const QString& toolTip)
     walletLabel->setText(text);
     walletLabel->setToolTip(toolTip);
     walletLabel->setVisible(!text.isEmpty());
+}
+
+void Sidebar::setNotice(const QString& text, const QString& toolTip, bool warning)
+{
+    const GUIUtil::Theme& t = GUIUtil::theme();
+    noticeLabel->setStyleSheet(QString("QLabel { color: %1; background: transparent; }").arg((warning ? QColor("#FFD58A") : t.sideText).name()));
+    // at most two short lines; the tool tip has the whole text
+    const QFontMetrics fm(noticeLabel->font());
+    const int width = 232 - 32 - 16;
+    QString first = text, second;
+    if (fm.horizontalAdvance(text) > width) {
+        int cut = text.size();
+        while (cut > 0 && fm.horizontalAdvance(text.left(cut)) > width)
+            --cut;
+        const int space = text.lastIndexOf(' ', cut);
+        if (space > cut / 2)
+            cut = space;
+        first = text.left(cut).trimmed();
+        second = fm.elidedText(text.mid(cut).trimmed(), Qt::ElideRight, width);
+    }
+    noticeLabel->setText(second.isEmpty() ? first : first + "\n" + second);
+    noticeLabel->setToolTip(toolTip);
+    noticeLabel->setVisible(!text.isEmpty());
 }
 
 void Sidebar::paintEvent(QPaintEvent*)
