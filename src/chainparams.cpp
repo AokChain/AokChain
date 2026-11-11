@@ -169,10 +169,12 @@ public:
         consensus.vDeployments[Consensus::DEPLOYMENT_TESTDUMMY].nTimeout = 1230767999; // December 31, 2008
 
         // The best chain should have at least this much work.
-        consensus.nMinimumChainWork = uint256S("0x000000000000000000000000000000000000000000000331d1ab12e374d430be");
+        // chain work of block 3,030,000 (see defaultAssumeValid)
+        consensus.nMinimumChainWork = uint256S("0x00000000000000000000000000000000000000000000044f3a55ad8aa699012a");
 
         // By default assume that the signatures in ancestors of this block are valid.
-        consensus.defaultAssumeValid = uint256S("0x6a23569de30211b3b633d0ba3fb6fb8e64499b9a9f3d4d350ef077f25c32583b");
+        // Block 3,030,000, taken from a node that validated the whole chain with all script checks.
+        consensus.defaultAssumeValid = uint256S("0x27a0660bf43381e7d367472a74d696873ff69bb36582031f9c2ed2ae1c58bdf1");
 
         // Proof-of-Stake
         consensus.nLastPOWBlock = 1440;
@@ -244,11 +246,11 @@ public:
         };
 
         chainTxData = ChainTxData{
-            // Data from RPC: getchaintxstats 4096 f567c8244dcfe811ba15036d0b6fe7391663074bed12971c93327797bc763b4d
-            1647790464,         // * UNIX timestamp of last known number of transactions
-            3386376,            // * total number of transactions between genesis and that timestamp
+            // Data from RPC: getchaintxstats 43200 27a0660bf43381e7d367472a74d696873ff69bb36582031f9c2ed2ae1c58bdf1
+            1794237264,         // * UNIX timestamp of last known number of transactions
+            8223433,            // * total number of transactions between genesis and that timestamp
                                 //   (the tx=... number in the SetBestChain debug.log lines)
-            0.2116489703051164  // * estimated number of transactions per second after that timestamp
+            0.03012824412283564 // * estimated number of transactions per second after that timestamp
         };
 
         /** TOKENS START **/
