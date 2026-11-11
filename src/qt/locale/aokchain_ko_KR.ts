@@ -799,6 +799,62 @@
         <source>Sign messages with your addresses and verify signed messages</source>
         <translation>내 주소로 메시지에 서명하고, 서명된 메시지를 검증합니다</translation>
     </message>
+    <message>
+        <source>The blocks are fetched from a server as archives and then validated one by one, exactly like blocks from other nodes. The server does not have to be trusted.</source>
+        <translation>블록 묶음을 서버에서 받아 하나하나 검증합니다. 다른 노드에서 받은 블록과 똑같이 검증하므로 서버를 믿을 필요는 없습니다.</translation>
+    </message>
+    <message>
+        <source>Fast sync: getting ready</source>
+        <translation>빠른 동기화: 준비 중</translation>
+    </message>
+    <message>
+        <source>Fast sync: archive %1/%2</source>
+        <translation>빠른 동기화: 묶음 %1/%2</translation>
+    </message>
+    <message>
+        <source>Fast sync: fetching block archive %1/%2 · %3 / %4</source>
+        <translation>빠른 동기화: 블록 묶음 %1/%2 받는 중 · %3 / %4</translation>
+    </message>
+    <message>
+        <source>Validating blocks</source>
+        <translation>블록 검증 중</translation>
+    </message>
+    <message>
+        <source>Validating blocks %1 / %2</source>
+        <translation>블록 검증 중 %1 / %2</translation>
+    </message>
+    <message>
+        <source>Fetched %1 of %2 archives (%3 / %4), validated up to block %5 of %6.</source>
+        <translation>블록 묶음 %2개 중 %1개 받음 (%3 / %4), 블록 %6 중 %5까지 검증함.</translation>
+    </message>
+    <message>
+        <source>Fast sync was not possible: the blocks come from other nodes</source>
+        <translation>빠른 동기화를 쓰지 못했습니다. 블록은 다른 노드(피어)에서 받습니다</translation>
+    </message>
+    <message>
+        <source>Fast sync skipped: the blocks come from other nodes</source>
+        <translation>빠른 동기화를 건너뛰었습니다. 블록은 다른 노드(피어)에서 받습니다</translation>
+    </message>
+    <message>
+        <source>Fast sync finished: the remaining blocks come from other nodes</source>
+        <translation>빠른 동기화가 끝났습니다. 남은 블록은 다른 노드(피어)에서 받습니다</translation>
+    </message>
+    <message>
+        <source>Folder with block archives (manifest.json and the blocks-... files)</source>
+        <translation>블록 묶음 폴더 (manifest.json과 blocks-... 파일이 있는 폴더)</translation>
+    </message>
+    <message>
+        <source>Block archives</source>
+        <translation>블록 묶음</translation>
+    </message>
+    <message>
+        <source>A fast sync is running. Skip it first, then choose the folder.</source>
+        <translation>빠른 동기화가 진행 중입니다. 먼저 건너뛴 다음 폴더를 고르세요.</translation>
+    </message>
+    <message>
+        <source>This folder has no manifest.json. Choose the folder that holds manifest.json and the blocks-... files.</source>
+        <translation>이 폴더에 manifest.json이 없습니다. manifest.json과 blocks-... 파일이 들어 있는 폴더를 고르세요.</translation>
+    </message>
 </context>
 <context>
     <name>CoinControlDialog</name>
@@ -1537,6 +1593,10 @@
         <source>(of %n GB needed)</source>
         <translation><numerusform>(%n GB가 필요)</numerusform></translation>
     </message>
+    <message>
+        <source>Language</source>
+        <translation>언어</translation>
+    </message>
 </context>
 <context>
     <name>ModalOverlay</name>
@@ -1587,6 +1647,22 @@
     <message>
         <source>Unknown. Syncing Headers (%1)...</source>
         <translation>알수없음. 헤더 동기화중 (%1)...</translation>
+    </message>
+    <message>
+        <source>Skip and get the blocks from peers</source>
+        <translation>건너뛰고 피어에서 받기</translation>
+    </message>
+    <message>
+        <source>Stop fetching the block archives and synchronize the usual way, from other nodes</source>
+        <translation>블록 묶음 받기를 그만두고 평소처럼 다른 노드에서 동기화합니다</translation>
+    </message>
+    <message>
+        <source>Choose a folder with block archives...</source>
+        <translation>받아 둔 블록 묶음 폴더 선택...</translation>
+    </message>
+    <message>
+        <source>Import block archives that you fetched yourself (the files and manifest.json in one folder). Every block is validated.</source>
+        <translation>직접 받아 둔 블록 묶음(파일들과 manifest.json이 한 폴더에 있어야 함)을 가져옵니다. 모든 블록을 검증합니다.</translation>
     </message>
 </context>
 <context>
@@ -1933,6 +2009,62 @@
     <message>
         <source>Use separate SOCKS&amp;5 proxy to reach peers via Tor hidden services:</source>
         <translation>Tor 숨김 서비스 피어에는 별도 SOCKS5 프록시 사용(&amp;5):</translation>
+    </message>
+    <message>
+        <source>&amp;Fast first synchronization from block archives</source>
+        <translation>블록 묶음으로 빠른 첫 동기화(&amp;F)</translation>
+    </message>
+    <message>
+        <source>A new installation fetches the blocks as archives from the addresses below instead of block by block from other nodes. Every block is validated as usual, so the server does not have to be trusted.</source>
+        <translation>새로 설치했을 때 블록을 다른 노드에서 하나씩 받는 대신 아래 주소에서 묶음으로 받습니다. 모든 블록을 평소처럼 검증하므로 서버를 믿을 필요는 없습니다.</translation>
+    </message>
+    <message>
+        <source>Addresses of the block archives, one per line (mirrors are tried in this order):</source>
+        <translation>블록 묶음 주소 (한 줄에 하나, 위에서부터 차례로 시도):</translation>
+    </message>
+    <message>
+        <source>Choose a folder with block archives...</source>
+        <translation>받아 둔 블록 묶음 폴더 선택...</translation>
+    </message>
+    <message>
+        <source>Import block archives that you fetched yourself (the files and manifest.json in one folder) right now. Every block is validated.</source>
+        <translation>직접 받아 둔 블록 묶음(파일들과 manifest.json이 한 폴더에 있어야 함)을 지금 가져옵니다. 모든 블록을 검증합니다.</translation>
+    </message>
+    <message>
+        <source>Folder with block archives (manifest.json and the blocks-... files)</source>
+        <translation>블록 묶음 폴더 (manifest.json과 blocks-... 파일이 있는 폴더)</translation>
+    </message>
+    <message>
+        <source>Block archives</source>
+        <translation>블록 묶음</translation>
+    </message>
+    <message>
+        <source>The import has started. The side bar shows how far it is.</source>
+        <translation>가져오기를 시작했습니다. 진행 상황은 사이드바에 나옵니다.</translation>
+    </message>
+    <message>
+        <source>A fast sync is running. Skip it first (sync window), then choose the folder.</source>
+        <translation>빠른 동기화가 진행 중입니다. 먼저 동기화 창에서 건너뛴 다음 폴더를 고르세요.</translation>
+    </message>
+    <message>
+        <source>This folder has no manifest.json. Choose the folder that holds manifest.json and the blocks-... files.</source>
+        <translation>이 폴더에 manifest.json이 없습니다. manifest.json과 blocks-... 파일이 들어 있는 폴더를 고르세요.</translation>
+    </message>
+    <message>
+        <source>Language</source>
+        <translation>언어</translation>
+    </message>
+    <message>
+        <source>Restart to apply</source>
+        <translation>다시 시작하면 적용됩니다</translation>
+    </message>
+    <message>
+        <source>Restart now</source>
+        <translation>지금 다시 시작</translation>
+    </message>
+    <message>
+        <source>Empty: the built-in address of the main network</source>
+        <translation>비워 두면 메인넷 기본 주소를 씁니다</translation>
     </message>
 </context>
 <context>
@@ -7327,6 +7459,13 @@
     <message>
         <source>Broadcast</source>
         <translation>전송</translation>
+    </message>
+</context>
+<context>
+    <name>GUIUtil</name>
+    <message>
+        <source>System default</source>
+        <translation>시스템 기본값</translation>
     </message>
 </context>
 </TS>
