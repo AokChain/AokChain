@@ -1341,7 +1341,7 @@ bool CWallet::AddToWallet(const CWalletTx& wtxIn, bool fFlushOnClose)
     {
         wtx.nTimeReceived = GetAdjustedTime();
         wtx.nOrderPos = IncOrderPosNext(&walletdb);
-        wtxOrdered.insert(std::make_pair(wtx.nOrderPos, TxPair(&wtx, nullptr)));
+        wtx.m_it_wtxOrdered = wtxOrdered.insert(std::make_pair(wtx.nOrderPos, TxPair(&wtx, nullptr)));
         wtx.nTimeSmart = ComputeTimeSmart(wtx);
         AddToSpends(hash);
     }
@@ -1417,9 +1417,12 @@ bool CWallet::LoadToWallet(const CWalletTx& wtxIn)
 {
     uint256 hash = wtxIn.GetHash();
 
-    CWalletTx& wtx = mapWallet.emplace(hash, wtxIn).first->second;
+    const auto& ins = mapWallet.emplace(hash, wtxIn);
+    CWalletTx& wtx = ins.first->second;
     wtx.BindWallet(this);
-    wtxOrdered.insert(std::make_pair(wtx.nOrderPos, TxPair(&wtx, nullptr)));
+    if (/* insertion took place */ ins.second) {
+        wtx.m_it_wtxOrdered = wtxOrdered.insert(std::make_pair(wtx.nOrderPos, TxPair(&wtx, nullptr)));
+    }
     AddToSpends(hash);
     for (const CTxIn& txin : wtx.tx->vin) {
         auto it = mapWallet.find(txin.prevout.hash);
@@ -4745,35 +4748,26 @@ DBErrors CWallet::ZapSelectTx(std::vector<uint256>& vHashIn, std::vector<uint256
         LOCK(cs_dirty_txs);
         fLiveNeedsRebuild = true;
     }
-    // wtxOrdered points into mapWallet; drop the entries of the erased
-    // transactions first (they were left dangling before)
-    std::set<const CWalletTx*> setErased;
     for (const uint256& hash : vHashOut) {
-        std::map<uint256, CWalletTx>::const_iterator mi = mapWallet.find(hash);
-        if (mi == mapWallet.end())
+        const auto& it = mapWallet.find(hash);
+        if (it == mapWallet.end())
             continue;
-        setErased.insert(&mi->second);
-        // The erased transaction no longer spends anything: forget its
-        // spends (a stale entry would later be looked up in mapWallet by
-        // MarkConflicted(), which asserts) and let the transactions it
-        // spent from be evaluated again.
-        if (!mi->second.IsCoinBase()) {
-            for (const CTxIn& txin : mi->second.tx->vin) {
-                RemoveFromSpends(txin.prevout, hash);
-                std::map<uint256, CWalletTx>::iterator prev = mapWallet.find(txin.prevout.hash);
-                if (prev != mapWallet.end())
-                    prev->second.MarkDirty();
-            }
+        // wtxOrdered points into mapWallet (bitcoin#13437)
+        wtxOrdered.erase(it->second.m_it_wtxOrdered);
+        // Forget what the erased transaction spent, but only its own entries:
+        // a conflicting transaction that stays in the wallet still spends the
+        // same outputs (bitcoin#18850, corrected by #34358). A stale entry
+        // would later make MarkConflicted() assert. The transactions it spent
+        // from are evaluated again.
+        for (const CTxIn& txin : it->second.tx->vin) {
+            RemoveFromSpends(txin.prevout, hash);
+            auto prev = mapWallet.find(txin.prevout.hash);
+            if (prev != mapWallet.end())
+                prev->second.MarkDirty();
         }
+        mapWallet.erase(it);
+        NotifyTransactionChanged(this, hash, CT_DELETED);
     }
-    for (TxItems::iterator it = wtxOrdered.begin(); it != wtxOrdered.end();) {
-        if (it->second.first != nullptr && setErased.count(it->second.first))
-            it = wtxOrdered.erase(it);
-        else
-            ++it;
-    }
-    for (uint256 hash : vHashOut)
-        mapWallet.erase(hash);
 
     if (nZapSelectTxRet == DB_NEED_REWRITE)
     {
@@ -5259,15 +5253,20 @@ void CWallet::DisableTransaction(const CTransaction &tx)
     if(AbandonTransaction(hash))
     {
         RemoveFromSpends(hash);
-        std::set<CWalletTx*> setCoins;
         for(const CTxIn& txin : tx.vin)
         {
-            CWalletTx &coin = mapWallet.at(txin.prevout.hash);
-            coin.BindWallet(this);
-            NotifyTransactionChanged(this, coin.GetHash(), CT_UPDATED);
+            // the staked output's transaction is not necessarily in the wallet
+            auto it = mapWallet.find(txin.prevout.hash);
+            if (it != mapWallet.end()) {
+                CWalletTx &coin = it->second;
+                coin.BindWallet(this);
+                coin.MarkDirty();
+                NotifyTransactionChanged(this, coin.GetHash(), CT_UPDATED);
+            }
         }
         CWalletTx& wtx = mapWallet.at(hash);
         wtx.BindWallet(this);
+        wtx.MarkDirty();
         NotifyTransactionChanged(this, hash, CT_DELETED);
     }
 }
@@ -5802,6 +5801,31 @@ void CWallet::postInitProcess()
     // Add wallet transactions that aren't already in a block to mempool
     // Do this here as mempool requires genesis block to be loaded
     ReacceptWalletTransactions();
+
+    CleanCoinStake();
+}
+
+void CWallet::CleanCoinStake()
+{
+    // Search the coinstake transactions and abandon the ones that are not
+    // confirmed in the active chain (as Qtum does at startup). Normally a
+    // stake is abandoned when its block is disconnected; this catches the
+    // ones the wallet was not told about, for example a wallet file that is
+    // ahead of the chain. A stake whose block is connected later is taken
+    // back by AddToWallet().
+    if (fImporting || fReindex)
+        return;
+    LOCK2(cs_main, cs_wallet);
+    std::vector<CTransactionRef> vOrphaned;
+    for (const std::pair<const uint256, CWalletTx>& item : mapWallet) {
+        const CWalletTx& wtx = item.second;
+        if (wtx.IsCoinStake() && !wtx.isAbandoned() && wtx.GetDepthInMainChain() == 0 && IsFromMe(*wtx.tx))
+            vOrphaned.push_back(wtx.tx);
+    }
+    for (const CTransactionRef& ptx : vOrphaned) {
+        LogPrintf("%s: abandoning orphaned coinstake %s\n", __func__, ptx->GetHash().ToString());
+        DisableTransaction(*ptx);
+    }
 }
 
 bool CWallet::BackupWallet(const std::string& strDest)

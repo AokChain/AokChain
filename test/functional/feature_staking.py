@@ -17,6 +17,9 @@ time to let it find the next block.
  - purgeorphanstakes deletes the orphaned stakes from the wallet
 """
 
+import os
+import shutil
+
 from test_framework.test_framework import AokChainTestFramework
 from test_framework.util import (
     assert_equal,
@@ -119,6 +122,28 @@ class StakingTest(AokChainTestFramework):
         wait_until(lambda: n0.getbestblockhash() == tip, timeout=30)
         self.wait_snapshot(n0, base)
         assert_equal(n0.gettransaction(stake_tx)["confirmations"], 1)
+
+        self.log.info("A wallet file that still has a stake confirmed which the chain lost")
+        # (without the staking thread: a restarted wallet may pick another
+        # coin and stake a different, valid block in place of the invalid one)
+        no_staking = ["-lastpowblock=%d" % LAST_POW, "-mocktime=%d" % t]
+        wallet_file = os.path.join(self.options.tmpdir, "node0", "regtest", "wallets", "wallet.dat")
+        self.stop_node(0)
+        shutil.copyfile(wallet_file, wallet_file + ".ahead")
+        self.start_node(0, no_staking)
+        n0.invalidateblock(tip)
+        self.wait_snapshot(n0, below_tip)
+        self.stop_node(0)
+        shutil.copyfile(wallet_file + ".ahead", wallet_file)
+        self.start_node(0, no_staking)
+        # abandoned at startup: same state as when the wallet saw the disconnect
+        assert self.snapshot(n0) == below_tip
+        assert_equal(n0.purgeorphanstakes(10 ** 9), 0)
+        assert_equal(n0.purgeorphanstakes(0), 1)
+        n0.reconsiderblock(tip)
+        wait_until(lambda: n0.getbestblockhash() == tip, timeout=30)
+        self.wait_snapshot(n0, base)
+        self.restart_node0(t)
 
         self.log.info("node0 stakes two more blocks, node1 builds a longer chain")
         fork_a = []

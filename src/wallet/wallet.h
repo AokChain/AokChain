@@ -363,6 +363,7 @@ public:
     mutable bool fImmatureWatchCreditCached;
     mutable bool fAvailableWatchCreditCached;
     mutable bool fChangeCached;
+    std::multimap<int64_t, std::pair<CWalletTx*, CAccountingEntry*>>::const_iterator m_it_wtxOrdered;
     mutable bool fFullySpentCached;
     mutable const CBlockIndex* pindexFullySpentTip; //!< tip when fFullySpentCached was computed
     mutable uint64_t nFullySpentKeyEpoch;           //!< CWallet::nKeyEpoch when computed
@@ -1295,6 +1296,9 @@ public:
      * Wallet post-init setup
      * Gives the wallet a chance to register repetitive tasks and complete post-init tasks
      */
+    /** Abandon this wallet's coinstakes that are not in the active chain. */
+    void CleanCoinStake();
+
     void postInitProcess();
 
     bool BackupWallet(const std::string& strDest);
