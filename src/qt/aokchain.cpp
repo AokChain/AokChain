@@ -43,7 +43,6 @@
 #include <stdint.h>
 
 #include <boost/thread.hpp>
-#include "darkstyle.h"
 
 #include <QApplication>
 #include <QDebug>
@@ -705,9 +704,9 @@ int main(int argc, char *argv[])
     // Load GUI settings from QSettings
     app.createOptionsModel(gArgs.IsArgSet("-resetguisettings"));
 
-    // Fonts, palette and style sheet of the light or dark theme
+    // Fonts, palette and style sheet of the theme
     GUIUtil::loadAppFonts();
-    GUIUtil::applyTheme(app, app.getOptionsModel()->getDarkModeEnabled());
+    GUIUtil::applyTheme(app);
 
     // Subscribe to global signals from core
     uiInterface.InitMessage.connect(InitMessage);

@@ -17,8 +17,6 @@
 #include <QPalette>
 #include <QPixmap>
 
-bool darkModeEnabled = false;
-
 static const struct {
     const char *platformId;
     /** Show images on push buttons */

@@ -64,6 +64,10 @@
 
 #if QT_VERSION >= 0x50200
 #include <QFontDatabase>
+#include <QMap>
+#include <QPainter>
+#include <QPainterPath>
+#include <QPixmap>
 #include <QDebug>
 #include <QFile>
 #include <QPalette>
@@ -91,25 +95,58 @@ namespace GUIUtil {
 
 const Theme& theme()
 {
-    static const Theme light = {
-        QColor("#F4F6F8"), QColor("#FFFFFF"), QColor("#F7F9FA"), QColor("#DFE4EA"), QColor("#C5CDD6"),
-        QColor("#17212B"), QColor("#5F6B7A"), QColor("#9AA5B1"),
-        QColor("#0A6C80"), QColor("#085A6B"), QColor("#064957"), QColor("#E3F1F4"), QColor("#FFFFFF"),
-        QColor("#16855B"), QColor("#D03B3B"), QColor("#FFF6DB"), QColor("#7A5200"), QColor("#F0D58A"),
-    };
-    static const Theme dark = {
-        QColor("#12161B"), QColor("#1A2027"), QColor("#212830"), QColor("#2B343E"), QColor("#3A4552"),
-        QColor("#E7ECF1"), QColor("#9BA7B4"), QColor("#5F6B78"),
-        QColor("#2BA3BA"), QColor("#3BB5CC"), QColor("#2390A5"), QColor("#16343B"), QColor("#06181D"),
-        QColor("#3CC28A"), QColor("#F06A6A"), QColor("#3A2F12"), QColor("#F2D48A"), QColor("#5A4A1E"),
-    };
-    return darkModeEnabled ? dark : light;
+    static const Theme light = [] {
+        Theme t;
+        t.bg = QColor("#F2F6F5");
+        t.surface = QColor("#FFFFFF");
+        t.surfaceAlt = QColor("#F0F5F4");
+        t.border = QColor("#DCE6E4");
+        t.borderStrong = QColor("#BFD0CD");
+        t.line = QColor("#E6EEEC");
+        t.text = QColor("#0E1F1E");
+        t.textSecondary = QColor("#506664");
+        t.label = QColor("#33504D");
+        t.textDisabled = QColor("#8FA3A0");
+        t.fill = QColor("#054848");
+        t.fillHover = QColor("#0A5A58");
+        t.fillPressed = QColor("#033837");
+        t.onFill = QColor("#FFFFFF");
+        t.accent = QColor("#066A63");
+        t.accentHover = QColor("#0A5A58");
+        t.accentPressed = QColor("#033837");
+        t.accentSoft = QColor("#DFF1EE");
+        t.onAccent = QColor("#FFFFFF");
+        t.positive = QColor("#06705F");
+        t.positiveSoft = QColor("#DFF1EE");
+        t.negative = QColor("#A84A0B");
+        t.negativeSoft = QColor("#FBEBDD");
+        t.ok = QColor("#0B7A4B");
+        t.okSoft = QColor("#DDF3E7");
+        t.error = QColor("#B3261E");
+        t.errorSoft = QColor("#FDECEC");
+        t.warnBg = QColor("#FFF4DD");
+        t.warnText = QColor("#7A4A00");
+        t.warnBorder = QColor("#F0D58A");
+        t.chip = QColor("#E8F0EE");
+        t.chipText = QColor("#3F5957");
+        t.sideBg = QColor("#054848");
+        t.sideText = QColor("#C2DAD6");
+        t.sideStrong = QColor("#FFFFFF");
+        t.sideOnBg = QColor("#0B6460");
+        t.sideCard = QColor("#0B5F5C");
+        t.sideTrack = QColor("#0B6460");
+        t.sideBar = QColor("#7EE0CF");
+        t.sideOff = QColor("#2F7C77");
+        return t;
+    }();
+    return light;
 }
 
 void loadAppFonts()
 {
     for (const char* name : {"NotoSans-Regular", "NotoSans-Medium", "NotoSans-SemiBold", "NotoSans-Bold",
-                             "NotoSansKR-Regular", "NotoSansKR-Bold"}) {
+                             "NotoSansKR-Regular", "NotoSansKR-Bold",
+                             "NotoSansMono-Regular", "NotoSansMono-SemiBold", "NotoSansMono-Bold"}) {
         if (QFontDatabase::addApplicationFont(QString(":/fonts/%1").arg(name)) < 0)
             qWarning() << "Could not load the font" << name;
     }
@@ -130,14 +167,31 @@ QFont appFont(int pixelSize, int weight)
     return font;
 }
 
-void applyTheme(QApplication& app, bool dark)
+QFont monoFont(int pixelSize, int weight)
 {
-    darkModeEnabled = dark;
+    QFont font;
+#if QT_VERSION >= QT_VERSION_CHECK(5, 13, 0)
+    font.setFamilies({"Noto Sans Mono", "Noto Sans KR"});
+#else
+    font.setFamily("Noto Sans Mono");
+#endif
+    font.setStyleHint(QFont::Monospace);
+    font.setFixedPitch(true);
+    font.setPixelSize(pixelSize);
+    // the bundled weights are regular, semi-bold and bold
+    font.setWeight(weight == QFont::Medium ? QFont::DemiBold : weight);
+    font.setStyleStrategy(QFont::PreferAntialias);
+    return font;
+}
+
+void applyTheme(QApplication& app)
+{
     const Theme& t = theme();
 
     // The same widget style on every platform, colored by the palette
     app.setStyle(QStyleFactory::create("Fusion"));
     QFont::insertSubstitution("Noto Sans", "Noto Sans KR");
+    QFont::insertSubstitution("Noto Sans Mono", "Noto Sans KR");
     app.setFont(appFont());
     // Windows takes the fonts of these from the system settings unless told otherwise
     for (const char* cls : {"QMenuBar", "QMenu", "QToolTip", "QTipLabel", "QMessageBox", "QStatusBar",
@@ -152,11 +206,11 @@ void applyTheme(QApplication& app, bool dark)
     p.setColor(QPalette::Text, t.text);
     p.setColor(QPalette::Button, t.surface);
     p.setColor(QPalette::ButtonText, t.text);
-    p.setColor(QPalette::BrightText, t.negative);
-    p.setColor(QPalette::ToolTipBase, t.surface);
-    p.setColor(QPalette::ToolTipText, t.text);
-    p.setColor(QPalette::Highlight, t.accent);
-    p.setColor(QPalette::HighlightedText, t.onAccent);
+    p.setColor(QPalette::BrightText, t.error);
+    p.setColor(QPalette::ToolTipBase, t.text);
+    p.setColor(QPalette::ToolTipText, t.surface);
+    p.setColor(QPalette::Highlight, t.fill);
+    p.setColor(QPalette::HighlightedText, t.onFill);
     p.setColor(QPalette::Link, t.accent);
     p.setColor(QPalette::LinkVisited, t.accentPressed);
     p.setColor(QPalette::Light, t.surface);
@@ -182,12 +236,225 @@ void applyTheme(QApplication& app, bool dark)
         {"@accentPressed", t.accentPressed}, {"@accentHover", t.accentHover}, {"@accentSoft", t.accentSoft},
         {"@borderStrong", t.borderStrong}, {"@textSecondary", t.textSecondary}, {"@textDisabled", t.textDisabled},
         {"@surfaceAlt", t.surfaceAlt}, {"@warnBorder", t.warnBorder}, {"@warnText", t.warnText}, {"@warnBg", t.warnBg},
+        {"@fillPressed", t.fillPressed}, {"@fillHover", t.fillHover}, {"@onFill", t.onFill}, {"@fill", t.fill},
+        {"@positiveSoft", t.positiveSoft}, {"@negativeSoft", t.negativeSoft}, {"@errorSoft", t.errorSoft}, {"@error", t.error},
+        {"@okSoft", t.okSoft}, {"@ok", t.ok}, {"@chipText", t.chipText}, {"@chip", t.chip},
+        {"@sideStrong", t.sideStrong}, {"@sideTrack", t.sideTrack}, {"@sideText", t.sideText}, {"@sideOnBg", t.sideOnBg},
+        {"@sideCard", t.sideCard}, {"@sideBar", t.sideBar}, {"@sideOff", t.sideOff}, {"@sideBg", t.sideBg},
         {"@onAccent", t.onAccent}, {"@positive", t.positive}, {"@negative", t.negative}, {"@surface", t.surface},
-        {"@accent", t.accent}, {"@border", t.border}, {"@text", t.text}, {"@bg", t.bg},
+        {"@accent", t.accent}, {"@border", t.border}, {"@label", t.label}, {"@line", t.line}, {"@text", t.text}, {"@bg", t.bg},
     };
     for (const std::pair<const char*, QColor>& token : tokens)
         qss.replace(token.first, token.second.name());
     app.setStyleSheet(qss);
+}
+
+QString shortAddress(const QString& address)
+{
+    if (address.size() <= 9 || !IsValidDestinationString(address.toStdString()))
+        return address;
+    return address.left(4) + QChar(0x2026) + address.right(4);
+}
+
+QString shortHash(const QString& hash, int head, int tail)
+{
+    if (hash.size() <= head + tail + 1)
+        return hash;
+    return hash.left(head) + QChar(0x2026) + hash.right(tail);
+}
+
+QString withThousands(const QString& number)
+{
+    QString s = number;
+    // the unit formatter separates thousands with thin spaces
+    s.remove(QChar(0x2009));
+    int start = 0;
+    while (start < s.size() && !s[start].isDigit())
+        ++start;
+    int end = start;
+    while (end < s.size() && s[end].isDigit())
+        ++end;
+    for (int i = end - 3; i > start; i -= 3)
+        s.insert(i, ',');
+    return s;
+}
+
+QPixmap lineIcon(const QString& name, int size, const QColor& color, qreal strokeWidth)
+{
+    const qreal dpr = qApp->devicePixelRatio();
+    QPixmap pixmap(QSize(size, size) * dpr);
+    pixmap.setDevicePixelRatio(dpr);
+    pixmap.fill(Qt::transparent);
+    QPainter p(&pixmap);
+    p.setRenderHint(QPainter::Antialiasing, true);
+    // the icons are defined on a 24 unit grid
+    p.scale(size / 24.0, size / 24.0);
+    QPen pen(color, strokeWidth, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin);
+    p.setPen(pen);
+    p.setBrush(Qt::NoBrush);
+    auto line = [&p](qreal x1, qreal y1, qreal x2, qreal y2) { p.drawLine(QPointF(x1, y1), QPointF(x2, y2)); };
+    auto poly = [&p](std::initializer_list<QPointF> points) { p.drawPolyline(QPolygonF(QVector<QPointF>(points))); };
+    if (name == "overview") {
+        p.drawRect(QRectF(3, 3, 7, 9)); p.drawRect(QRectF(14, 3, 7, 5));
+        p.drawRect(QRectF(14, 12, 7, 9)); p.drawRect(QRectF(3, 16, 7, 5));
+    } else if (name == "send") {
+        line(7, 17, 17, 7); poly({{8, 7}, {17, 7}, {17, 16}});
+    } else if (name == "receive") {
+        line(17, 7, 7, 17); poly({{16, 17}, {7, 17}, {7, 8}});
+    } else if (name == "history") {
+        line(4, 6, 20, 6); line(4, 12, 20, 12); line(4, 18, 14, 18);
+    } else if (name == "tokens") {
+        p.drawEllipse(QPointF(9, 12), 6, 6);
+        p.drawArc(QRectF(7.13, 6, 12, 12), 72 * 16, -144 * 16);
+    } else if (name == "explorer" || name == "search") {
+        p.drawEllipse(QPointF(11, 11), 6.5, 6.5); line(16, 16, 20, 20);
+    } else if (name == "create") {
+        p.drawEllipse(QPointF(12, 12), 9, 9); line(12, 8, 12, 16); line(8, 12, 16, 12);
+    } else if (name == "manage") {
+        line(4, 7, 20, 7); line(4, 17, 20, 17);
+        p.setBrush(color);
+        p.drawEllipse(QPointF(9, 7), 2.2, 2.2); p.drawEllipse(QPointF(15, 17), 2.2, 2.2);
+    } else if (name == "addressbook") {
+        p.drawRoundedRect(QRectF(5, 3, 14, 18), 2, 2);
+        p.drawEllipse(QPointF(12, 10), 2.5, 2.5);
+        p.drawArc(QRectF(8, 14.44, 8, 8), 29 * 16, 122 * 16);
+    } else if (name == "paste") {
+        p.drawRoundedRect(QRectF(6, 5, 12, 16), 2, 2); poly({{9, 5}, {9, 3}, {15, 3}, {15, 5}});
+    } else if (name == "copy") {
+        p.drawRoundedRect(QRectF(9, 9, 11, 11), 2, 2); poly({{5, 15}, {4, 15}, {4, 4}, {15, 4}, {15, 5}});
+    } else if (name == "download") {
+        line(12, 4, 12, 15); poly({{7, 11}, {12, 16}, {17, 11}}); line(5, 20, 19, 20);
+    } else if (name == "chevron") {
+        poly({{6, 9}, {12, 15}, {18, 9}});
+    } else if (name == "plus") {
+        line(12, 5, 12, 19); line(5, 12, 19, 12);
+    } else if (name == "remove") {
+        line(6, 6, 18, 18); line(18, 6, 6, 18);
+    } else if (name == "lock") {
+        p.drawRoundedRect(QRectF(5, 11, 14, 10), 2, 2); p.drawArc(QRectF(8, 3, 8, 12), 0, 180 * 16); line(8, 9, 8, 11); line(16, 9, 16, 11);
+    } else if (name == "stake") {
+        poly({{12, 3}, {20, 12}, {12, 21}, {4, 12}, {12, 3}}); line(12, 9, 12, 15); line(9, 12, 15, 12);
+    } else if (name == "dots") {
+        p.setBrush(color);
+        p.drawEllipse(QPointF(5, 12), 1.2, 1.2); p.drawEllipse(QPointF(12, 12), 1.2, 1.2); p.drawEllipse(QPointF(19, 12), 1.2, 1.2);
+    }
+    return pixmap;
+}
+
+QPixmap tokenLogo(const QString& tokenName, int size)
+{
+    QString root = tokenName;
+    for (const QChar sep : {QChar('/'), QChar('#'), QChar('!'), QChar(' ')}) {
+        const int pos = root.indexOf(sep);
+        if (pos >= 0)
+            root = root.left(pos);
+    }
+    static QMap<QString, QPixmap> cache;
+    const QString key = root + QChar(':') + QString::number(size);
+    QMap<QString, QPixmap>::const_iterator it = cache.constFind(key);
+    if (it != cache.constEnd())
+        return it.value();
+
+    const Theme& t = theme();
+    const qreal dpr = qApp->devicePixelRatio();
+    QPixmap pixmap(QSize(size, size) * dpr);
+    pixmap.setDevicePixelRatio(dpr);
+    pixmap.fill(Qt::transparent);
+    QPainter p(&pixmap);
+    p.setRenderHints(QPainter::Antialiasing | QPainter::SmoothPixmapTransform, true);
+    QPainterPath circle;
+    circle.addEllipse(QRectF(0, 0, size, size));
+    p.setClipPath(circle);
+    QPixmap logo;
+    if (root == "AOK")
+        logo.load(":/icons/aok_logo");
+    else if (!root.isEmpty())
+        logo.load(":/tokens/" + root.toLower());
+    if (!logo.isNull()) {
+        p.fillRect(QRectF(0, 0, size, size), Qt::white);
+        p.drawPixmap(QRectF(0, 0, size, size), logo, QRectF(logo.rect()));
+    } else {
+        p.fillRect(QRectF(0, 0, size, size), t.accentSoft);
+        p.setPen(t.accent);
+        p.setFont(appFont(qMax(10, size * 45 / 100), QFont::Bold));
+        p.drawText(QRectF(0, 0, size, size), Qt::AlignCenter, root.left(1));
+    }
+    p.end();
+    cache.insert(key, pixmap);
+    return pixmap;
+}
+
+void paintDirectionTile(QPainter* painter, const QRect& tile, bool outgoing, bool reward)
+{
+    const Theme& t = theme();
+    painter->save();
+    painter->setRenderHint(QPainter::Antialiasing, true);
+    painter->setPen(Qt::NoPen);
+    painter->setBrush(outgoing ? t.negativeSoft : t.positiveSoft);
+    painter->drawRoundedRect(tile, 10, 10);
+    const QPixmap icon = lineIcon(reward ? "stake" : (outgoing ? "send" : "receive"), 16, outgoing ? t.negative : t.positive, 2.4);
+    painter->drawPixmap(tile.left() + (tile.width() - 16) / 2, tile.top() + (tile.height() - 16) / 2, icon);
+    painter->restore();
+}
+
+QString monoHtml(const QString& escapedText)
+{
+    return "<span style=\"font-family:'Noto Sans Mono';\">" + escapedText + "</span>";
+}
+
+void MonoColumnDelegate::initStyleOption(QStyleOptionViewItem *option, const QModelIndex &index) const
+{
+    QStyledItemDelegate::initStyleOption(option, index);
+    if (monoColumns.contains(index.column()))
+        option->font = monoFont(option->font.pixelSize() > 0 ? option->font.pixelSize() : 13, option->font.weight());
+}
+
+QString monoToolTip(const QString& value, const QString& caption)
+{
+    QString html = "<nobr>";
+    if (!caption.isEmpty())
+        html += HtmlEscape(caption) + "<br>";
+    html += "<span style=\"font-family:'Noto Sans Mono'; font-size:12px;\">" + HtmlEscape(value) + "</span></nobr>";
+    return html;
+}
+
+QString isoDateTime(const QDateTime& dateTime, bool seconds)
+{
+    return dateTime.toString(seconds ? "yyyy-MM-dd HH:mm:ss" : "yyyy-MM-dd HH:mm");
+}
+
+int paintChip(QPainter* painter, int x, int centerY, const QString& text)
+{
+    const Theme& t = theme();
+    painter->save();
+    painter->setRenderHint(QPainter::Antialiasing, true);
+    painter->setFont(appFont(11, QFont::DemiBold));
+    const int w = painter->fontMetrics().horizontalAdvance(text) + 16;
+    const QRect r(x, centerY - 10, w, 20);
+    painter->setPen(Qt::NoPen);
+    painter->setBrush(t.chip);
+    painter->drawRoundedRect(r, 10, 10);
+    painter->setPen(t.chipText);
+    painter->drawText(r, Qt::AlignCenter, text);
+    painter->restore();
+    return w;
+}
+
+void paintBadge(QPainter* painter, const QRect& rect, const QString& text, const QColor& fg, const QColor& bg, Qt::Alignment align)
+{
+    painter->save();
+    painter->setRenderHint(QPainter::Antialiasing, true);
+    painter->setFont(appFont(12, QFont::DemiBold));
+    const int w = qMin(rect.width(), painter->fontMetrics().horizontalAdvance(text) + 20);
+    const int h = 24;
+    const int x = (align & Qt::AlignRight) ? rect.right() - w + 1 : rect.left();
+    const QRect r(x, rect.center().y() - h / 2 + 1, w, h);
+    painter->setPen(Qt::NoPen);
+    painter->setBrush(bg);
+    painter->drawRoundedRect(r, 12, 12);
+    painter->setPen(fg);
+    painter->drawText(r, Qt::AlignCenter, painter->fontMetrics().elidedText(text, Qt::ElideRight, w - 12));
+    painter->restore();
 }
 
 QString labelColorStyle()
@@ -198,8 +465,8 @@ QString labelColorStyle()
 QString invalidFieldStyle()
 {
     const Theme& t = theme();
-    return QString("background-color: %1; border: 1px solid %2; border-radius: 6px; padding: 5px 8px;")
-        .arg(darkModeEnabled ? "#3A1F22" : "#FDECEC", t.negative.name());
+    return QString("background-color: %1; border: 1px solid %2;")
+        .arg(t.errorSoft.name(), t.error.name());
 }
 
 QString validFieldStyle()
@@ -210,7 +477,7 @@ QString validFieldStyle()
 QString cardFrameStyle(const QString& selector)
 {
     const Theme& t = theme();
-    return QString("%1 { background-color: %2; border: 1px solid %3; border-radius: 10px; padding: 10px 8px; }")
+    return QString("%1 { background-color: %2; border: 1px solid %3; border-radius: 16px; padding: 10px 8px; }")
         .arg(selector, t.surface.name(), t.border.name());
 }
 
@@ -251,17 +518,7 @@ QString dateTimeStr(qint64 nTime)
 
 QFont fixedPitchFont()
 {
-#if QT_VERSION >= 0x50200
-    return QFontDatabase::systemFont(QFontDatabase::FixedFont);
-#else
-    QFont font("Monospace");
-#if QT_VERSION >= 0x040800
-    font.setStyleHint(QFont::Monospace);
-#else
-    font.setStyleHint(QFont::TypeWriter);
-#endif
-    return font;
-#endif
+    return monoFont();
 }
 
 // Just some dummy data to generate an convincing random-looking (but consistent) address
@@ -286,7 +543,7 @@ void setupAddressWidget(QValidatedLineEdit *widget, QWidget *parent)
 {
     parent->setFocusProxy(widget);
 
-    widget->setFont(getSubLabelFont());
+    widget->setFont(monoFont(13));
 #if QT_VERSION >= 0x040700
     // We don't want translators to use own addresses in translations
     // and this is the only place, where this address is supplied.

@@ -115,8 +115,6 @@ ReissueTokenDialog::ReissueTokenDialog(const PlatformStyle *_platformStyle, QWid
 
     formatGreen = "%1%2 <font color=green><b>%3</b></font>";
     formatBlack = "%1%2 <font color=black><b>%3</b></font>";
-    if (darkModeEnabled)
-        formatBlack = "%1%2 <font color=white><b>%3</b></font>";
 
     setupCoinControlFrame(platformStyle);
     setupTokenDataView(platformStyle);

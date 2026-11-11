@@ -136,7 +136,6 @@ QT_MOC_CPP = \
   qt/moc_coincontroldialog.cpp \
   qt/moc_coincontroltreewidget.cpp \
   qt/moc_csvmodelwriter.cpp \
-  qt/moc_darkstyle.cpp \
   qt/moc_editaddressdialog.cpp \
   qt/moc_guiutil.cpp \
   qt/moc_intro.cpp \
@@ -217,7 +216,6 @@ AOKCHAIN_QT_H = \
   qt/coincontroldialog.h \
   qt/coincontroltreewidget.h \
   qt/csvmodelwriter.h \
-  qt/darkstyle.h \
   qt/editaddressdialog.h \
   qt/guiconstants.h \
   qt/guiutil.h \
@@ -264,6 +262,8 @@ AOKCHAIN_QT_H = \
 
 RES_ICONS = \
   qt/res/icons/check_white.png \
+  qt/res/icons/aok_logo.png \
+  qt/res/icons/chevron_down.png \
   qt/res/icons/radio_white.png \
   qt/res/icons/add.png \
   qt/res/icons/address-book.png \
@@ -327,35 +327,28 @@ RES_ICONS = \
   qt/res/icons/tx_token_output.png \
   qt/res/icons/warning.png \
   qt/res/icons/verify.png \
-  qt/res/darkstyle/icon_close.png \
-  qt/res/darkstyle/icon_restore.png \
-  qt/res/darkstyle/icon_undock.png \
-  qt/res/darkstyle/icon_branch_closed.png \
-  qt/res/darkstyle/icon_branch_end.png \
-  qt/res/darkstyle/icon_branch_more.png \
-  qt/res/darkstyle/icon_branch_open.png \
-  qt/res/darkstyle/icon_vline.png \
-  qt/res/darkstyle/icon_checkbox_checked.png \
-  qt/res/darkstyle/icon_checkbox_indeterminate.png \
-  qt/res/darkstyle/icon_checkbox_unchecked.png \
-  qt/res/darkstyle/icon_checkbox_checked_pressed.png \
-  qt/res/darkstyle/icon_checkbox_indeterminate_pressed.png \
-  qt/res/darkstyle/icon_checkbox_unchecked_pressed.png \
-  qt/res/darkstyle/icon_checkbox_checked_disabled.png \
-  qt/res/darkstyle/icon_checkbox_indeterminate_disabled.png \
-  qt/res/darkstyle/icon_checkbox_unchecked_disabled.png \
-  qt/res/darkstyle/icon_radiobutton_checked.png \
-  qt/res/darkstyle/icon_radiobutton_unchecked.png \
-  qt/res/darkstyle/icon_radiobutton_checked_pressed.png \
-  qt/res/darkstyle/icon_radiobutton_unchecked_pressed.png \
-  qt/res/darkstyle/icon_radiobutton_checked_disabled.png \
-  qt/res/darkstyle/icon_radiobutton_unchecked_disabled.png \
   qt/res/fonts/NotoSans-Regular.ttf \
   qt/res/fonts/NotoSans-Medium.ttf \
   qt/res/fonts/NotoSans-SemiBold.ttf \
   qt/res/fonts/NotoSans-Bold.ttf \
   qt/res/fonts/NotoSansKR-Regular.ttf \
   qt/res/fonts/NotoSansKR-Bold.ttf \
+  qt/res/fonts/NotoSansMono-Regular.ttf \
+  qt/res/fonts/NotoSansMono-SemiBold.ttf \
+  qt/res/fonts/NotoSansMono-Bold.ttf \
+  qt/res/tokens/artl.png \
+  qt/res/tokens/cca.png \
+  qt/res/tokens/ccl.png \
+  qt/res/tokens/dhtb.png \
+  qt/res/tokens/dztb.png \
+  qt/res/tokens/gnd.png \
+  qt/res/tokens/mec.png \
+  qt/res/tokens/nmo.png \
+  qt/res/tokens/nol.png \
+  qt/res/tokens/papt.png \
+  qt/res/tokens/plb.png \
+  qt/res/tokens/serg.png \
+  qt/res/tokens/tong.png \
   qt/res/css/theme.qss
 
 
@@ -367,7 +360,6 @@ AOKCHAIN_QT_BASE_CPP = \
   qt/aokchainunits.cpp \
   qt/clientmodel.cpp \
   qt/csvmodelwriter.cpp \
-  qt/darkstyle.cpp \
   qt/guiutil.cpp \
   qt/intro.cpp \
   qt/modaloverlay.cpp \

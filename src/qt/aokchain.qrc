@@ -51,6 +51,8 @@
         <file alias="fontbigger">res/icons/fontbigger.png</file>
         <file alias="fontsmaller">res/icons/fontsmaller.png</file>
         <file alias="check_white">res/icons/check_white.png</file>
+        <file alias="aok_logo">res/icons/aok_logo.png</file>
+        <file alias="chevron_down">res/icons/chevron_down.png</file>
         <file alias="radio_white">res/icons/radio_white.png</file>
         <file alias="prompticon">res/icons/chevron.png</file>
         <file alias="transaction_abandoned">res/icons/transaction_abandoned.png</file>
@@ -104,32 +106,6 @@
         <file alias="spinner-034">res/movies/spinner-034.png</file>
         <file alias="spinner-035">res/movies/spinner-035.png</file>
     </qresource>
-    <qresource prefix="/darkstyle">
-        <file alias="qss">res/darkstyle/darkstyle.qss</file>
-        <file alias="close">res/darkstyle/icon_close.png</file>
-        <file alias="restore">res/darkstyle/icon_restore.png</file>
-        <file alias="undock">res/darkstyle/icon_undock.png</file>
-        <file alias="branch-closed">res/darkstyle/icon_branch_closed.png</file>
-        <file alias="branch-end">res/darkstyle/icon_branch_end.png</file>
-        <file alias="branch-more">res/darkstyle/icon_branch_more.png</file>
-        <file alias="branch-open">res/darkstyle/icon_branch_open.png</file>
-        <file alias="vline">res/darkstyle/icon_vline.png</file>
-        <file alias="checkbox-checked">res/darkstyle/icon_checkbox_checked.png</file>
-        <file alias="checkbox-indeterminate">res/darkstyle/icon_checkbox_indeterminate.png</file>
-        <file alias="checkbox-unchecked">res/darkstyle/icon_checkbox_unchecked.png</file>
-        <file alias="checkbox-checked-pressed">res/darkstyle/icon_checkbox_checked_pressed.png</file>
-        <file alias="checkbox-indeterminate-pressed">res/darkstyle/icon_checkbox_indeterminate_pressed.png</file>
-        <file alias="checkbox-unchecked-pressed">res/darkstyle/icon_checkbox_unchecked_pressed.png</file>
-        <file alias="checkbox-checked-disabled">res/darkstyle/icon_checkbox_checked_disabled.png</file>
-        <file alias="checkbox-indeterminate-disabled">res/darkstyle/icon_checkbox_indeterminate_disabled.png</file>
-        <file alias="checkbox-unchecked-disabled">res/darkstyle/icon_checkbox_unchecked_disabled.png</file>
-        <file alias="radio-checked">res/darkstyle/icon_radiobutton_checked.png</file>
-        <file alias="radio-unchecked">res/darkstyle/icon_radiobutton_unchecked.png</file>
-        <file alias="radio-checked-press">res/darkstyle/icon_radiobutton_checked_pressed.png</file>
-        <file alias="radio-unchecked-press">res/darkstyle/icon_radiobutton_unchecked_pressed.png</file>
-        <file alias="radio-checked-disabled">res/darkstyle/icon_radiobutton_checked_disabled.png</file>
-        <file alias="radio-unchecked-disabled">res/darkstyle/icon_radiobutton_unchecked_disabled.png</file>
-    </qresource>
     <qresource prefix="/fonts">
         <file alias="NotoSans-Regular">res/fonts/NotoSans-Regular.ttf</file>
         <file alias="NotoSans-Medium">res/fonts/NotoSans-Medium.ttf</file>
@@ -137,6 +113,24 @@
         <file alias="NotoSans-Bold">res/fonts/NotoSans-Bold.ttf</file>
         <file alias="NotoSansKR-Regular">res/fonts/NotoSansKR-Regular.ttf</file>
         <file alias="NotoSansKR-Bold">res/fonts/NotoSansKR-Bold.ttf</file>
+        <file alias="NotoSansMono-Regular">res/fonts/NotoSansMono-Regular.ttf</file>
+        <file alias="NotoSansMono-SemiBold">res/fonts/NotoSansMono-SemiBold.ttf</file>
+        <file alias="NotoSansMono-Bold">res/fonts/NotoSansMono-Bold.ttf</file>
+    </qresource>
+    <qresource prefix="/tokens">
+        <file alias="artl">res/tokens/artl.png</file>
+        <file alias="cca">res/tokens/cca.png</file>
+        <file alias="ccl">res/tokens/ccl.png</file>
+        <file alias="dhtb">res/tokens/dhtb.png</file>
+        <file alias="dztb">res/tokens/dztb.png</file>
+        <file alias="gnd">res/tokens/gnd.png</file>
+        <file alias="mec">res/tokens/mec.png</file>
+        <file alias="nmo">res/tokens/nmo.png</file>
+        <file alias="nol">res/tokens/nol.png</file>
+        <file alias="papt">res/tokens/papt.png</file>
+        <file alias="plb">res/tokens/plb.png</file>
+        <file alias="serg">res/tokens/serg.png</file>
+        <file alias="tong">res/tokens/tong.png</file>
     </qresource>
     <qresource prefix="/css">
         <file alias="theme">res/css/theme.qss</file>

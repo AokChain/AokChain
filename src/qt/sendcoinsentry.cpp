@@ -14,7 +14,6 @@
 #include "platformstyle.h"
 #include "walletmodel.h"
 #include "guiconstants.h"
-#include "darkstyle.h"
 #include "validation.h"
 
 #include <tokens/tokens.h>

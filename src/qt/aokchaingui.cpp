@@ -38,7 +38,6 @@
 #include "ui_interface.h"
 #include "util.h"
 #include "core_io.h"
-#include "darkstyle.h"
 #include "wallet/wallet.h"
 
 #include <iostream>

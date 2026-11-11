@@ -88,6 +88,8 @@ void ReceiveCoinsDialog::setModel(WalletModel *_model)
         tableView->verticalHeader()->hide();
         tableView->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
         tableView->setModel(_model->getRecentRequestsTableModel());
+        // dates and amounts in the fixed-width font
+        tableView->setItemDelegate(new GUIUtil::MonoColumnDelegate({RecentRequestsTableModel::Date, RecentRequestsTableModel::Amount}, this));
         tableView->setAlternatingRowColors(true);
         tableView->setSelectionBehavior(QAbstractItemView::SelectRows);
         tableView->setSelectionMode(QAbstractItemView::ContiguousSelection);
