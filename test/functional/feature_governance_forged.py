@@ -9,7 +9,7 @@ are carried by a transaction that spends an output of the master address.
 Anyone can create such an output. If that spend has an invalid scriptSig the
 block must be rejected and the governance database must not change.
 
-Before 3.1.0, nodes with -par > 1 did not enforce queued script checks at all
+Before 4.0.0, nodes with -par > 1 did not enforce queued script checks at all
 (doc/aokchain/04-security-audit.md SEC-01), so such a block was accepted and
 the freeze applied. With the check restored but governance applied before
 it, the block was rejected but the freeze stayed in the database.
