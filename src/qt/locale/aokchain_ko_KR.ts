@@ -1762,8 +1762,8 @@
         <translation>AokChain 블록체인의 사본을 내려받아 저장합니다.</translation>
     </message>
     <message>
-        <source>When you continue, %1 downloads a snapshot of the state of the block chain at block %2 (less than 1 GB), checks it against the values that are built into the program, and follows the chain from there. This takes a few minutes. The blocks before the snapshot are downloaded later, and only if you need them.</source>
-        <translation>계속하면 %1이(가) 블록 %2 시점의 블록체인 상태 스냅샷(1GB 미만)을 받아 프로그램에 들어 있는 값과 대조한 뒤, 그 지점부터 체인을 따라갑니다. 몇 분이면 끝납니다. 스냅샷 이전의 블록은 나중에, 필요할 때만 받습니다.</translation>
+        <source>When you continue, %1 downloads a snapshot of the state of the block chain at block %2 (about 1 GB), checks it against the values that are built into the program, and follows the chain from there. This takes a few minutes. The blocks before the snapshot are downloaded later, and only if you need them.</source>
+        <translation>계속하면 %1이(가) 블록 %2 시점의 블록체인 상태 스냅샷(약 1GB)을 받아 프로그램에 들어 있는 값과 대조한 뒤, 그 지점부터 체인을 따라갑니다. 몇 분이면 끝납니다. 스냅샷 이전의 블록은 나중에, 필요할 때만 받습니다.</translation>
     </message>
 </context>
 <context>
