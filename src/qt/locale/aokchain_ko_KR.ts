@@ -259,7 +259,7 @@
     </message>
     <message>
         <source>&amp;Transactions</source>
-        <translation>거래(&amp;T)</translation>
+        <translation>전송 기록(&amp;T)</translation>
     </message>
     <message>
         <source>&amp;Transfer Tokens</source>
@@ -735,6 +735,10 @@
         <source>Connecting</source>
         <translation>피어 연결 중</translation>
     </message>
+    <message>
+        <source>Pre-release test build. Use at your own risk.</source>
+        <translation>출시 전 테스트 빌드입니다. 사용에 따른 책임은 본인에게 있습니다.</translation>
+    </message>
 </context>
 <context>
     <name>CoinControlDialog</name>
@@ -784,7 +788,7 @@
     </message>
     <message>
         <source>Amount</source>
-        <translation>거래액</translation>
+        <translation>금액</translation>
     </message>
     <message>
         <source>Received with label</source>
@@ -816,7 +820,7 @@
     </message>
     <message>
         <source>Copy amount</source>
-        <translation>거래액 복사</translation>
+        <translation>금액 복사</translation>
     </message>
     <message>
         <source>Copy transaction ID</source>
@@ -929,6 +933,106 @@
         <source>Use time lock</source>
         <translation>락업 기능 사용</translation>
     </message>
+    <message>
+        <source>Remove this recipient</source>
+        <translation>이 받는 사람 삭제</translation>
+    </message>
+    <message>
+        <source>Label</source>
+        <translation>라벨</translation>
+    </message>
+    <message>
+        <source>Give this address a label for your address book</source>
+        <translation>이 주소를 주소록에 저장할 이름을 붙입니다</translation>
+    </message>
+    <message>
+        <source>Label of the address. Click to change it.</source>
+        <translation>주소의 라벨입니다. 누르면 바꿀 수 있습니다.</translation>
+    </message>
+    <message>
+        <source>Send with a lock</source>
+        <translation>락업 전송</translation>
+    </message>
+    <message>
+        <source>Recipient %1</source>
+        <translation>받는 사람 %1</translation>
+    </message>
+    <message>
+        <source>Label: %1</source>
+        <translation>라벨: %1</translation>
+    </message>
+    <message>
+        <source>Locked until %1</source>
+        <translation>락업: %1</translation>
+    </message>
+    <message>
+        <source>Select to view administrator tokens to transfer</source>
+        <translation>전송할 관리 권한 토큰을 보려면 선택하세요</translation>
+    </message>
+    <message>
+        <source>Recipient &amp;address</source>
+        <translation>받는 주소(&amp;A)</translation>
+    </message>
+    <message>
+        <source>Quantity</source>
+        <translation>수량</translation>
+    </message>
+    <message>
+        <source>All</source>
+        <translation>전량</translation>
+    </message>
+    <message>
+        <source>The recipient cannot spend the tokens before this time. Click to change it.</source>
+        <translation>받는 사람은 이 시각 전에는 토큰을 사용할 수 없습니다. 누르면 바꿀 수 있습니다.</translation>
+    </message>
+    <message>
+        <source>Send everything the wallet holds of this token</source>
+        <translation>지갑에 있는 이 토큰을 모두 보냅니다</translation>
+    </message>
+    <message>
+        <source>Send tokens that the recipient cannot spend before a time you choose</source>
+        <translation>정한 시각 전에는 받는 사람이 사용할 수 없는 토큰을 보냅니다</translation>
+    </message>
+    <message>
+        <source>This is a valid AokChain address</source>
+        <translation>유효한 AokChain 주소입니다</translation>
+    </message>
+    <message>
+        <source>A user name: it is resolved to its address when sending</source>
+        <translation>사용자 이름입니다. 보낼 때 연결된 주소로 바뀝니다</translation>
+    </message>
+    <message>
+        <source>This is not a valid AokChain address</source>
+        <translation>유효한 AokChain 주소가 아닙니다</translation>
+    </message>
+    <message>
+        <source>Failed to get token metadata for: </source>
+        <translation>토큰 정보를 가져오지 못했습니다: </translation>
+    </message>
+    <message>
+        <source> The transaction in which the token was issued must be mined into a block before you can transfer it</source>
+        <translation> 토큰을 발행한 거래가 블록에 들어간 뒤에 전송할 수 있습니다</translation>
+    </message>
+    <message>
+        <source>Failed to get token outpoints from database</source>
+        <translation>데이터베이스에서 토큰 출력을 가져오지 못했습니다</translation>
+    </message>
+    <message>
+        <source>Selected Balance</source>
+        <translation>선택한 잔액</translation>
+    </message>
+    <message>
+        <source>Wallet Balance</source>
+        <translation>지갑 잔액</translation>
+    </message>
+    <message>
+        <source>Select an administrator token to transfer</source>
+        <translation>전송할 관리 권한 토큰을 선택하세요</translation>
+    </message>
+    <message>
+        <source>Warning: Transferring administrator token</source>
+        <translation>경고: 관리 권한 토큰을 전송합니다</translation>
+    </message>
 </context>
 <context>
     <name>TokensDialog</name>
@@ -954,7 +1058,7 @@
     </message>
     <message>
         <source>Copy amount</source>
-        <translation>거래액 복사</translation>
+        <translation>금액 복사</translation>
     </message>
     <message>
         <source>Copy fee</source>
@@ -1081,6 +1185,90 @@
     <message>
         <source>(no label)</source>
         <translation>(라벨 없음)</translation>
+    </message>
+    <message>
+        <source>Token to send</source>
+        <translation>보낼 토큰</translation>
+    </message>
+    <message>
+        <source>Clear all</source>
+        <translation>모두 지우기</translation>
+    </message>
+    <message>
+        <source>Available</source>
+        <translation>사용 가능</translation>
+    </message>
+    <message>
+        <source>Add recipient</source>
+        <translation>받는 사람 추가</translation>
+    </message>
+    <message>
+        <source>The wallet holds no tokens</source>
+        <translation>지갑에 토큰이 없습니다</translation>
+    </message>
+    <message>
+        <source>Choose the token to send</source>
+        <translation>보낼 토큰을 선택하세요</translation>
+    </message>
+    <message>
+        <source>Token</source>
+        <translation>토큰</translation>
+    </message>
+    <message>
+        <source>Recipient %1</source>
+        <translation>받는 사람 %1</translation>
+    </message>
+    <message>
+        <source>Recipient</source>
+        <translation>받는 주소</translation>
+    </message>
+    <message>
+        <source>Quantity %1</source>
+        <translation>수량 %1</translation>
+    </message>
+    <message>
+        <source>Locked until (%1)</source>
+        <translation>락업 해제 (%1)</translation>
+    </message>
+    <message>
+        <source>Locked until</source>
+        <translation>락업 해제</translation>
+    </message>
+    <message>
+        <source>Left of the token</source>
+        <translation>보낸 뒤 토큰 잔량</translation>
+    </message>
+    <message>
+        <source>Fee (estimated)</source>
+        <translation>수수료 (예상)</translation>
+    </message>
+    <message>
+        <source>The fee is paid in AOK. The fee that is really paid is shown for confirmation before the transaction is sent.</source>
+        <translation>수수료는 AOK로 냅니다. 실제 수수료는 보내기 전 확인 창에 표시됩니다.</translation>
+    </message>
+    <message>
+        <source>AOK balance</source>
+        <translation>AOK 잔액</translation>
+    </message>
+    <message>
+        <source>Quantity to send</source>
+        <translation>보낼 수량</translation>
+    </message>
+    <message>
+        <source>Send %1</source>
+        <translation>%1 보내기</translation>
+    </message>
+    <message>
+        <source>Send</source>
+        <translation>보내기</translation>
+    </message>
+    <message>
+        <source>The quantity exceeds what the wallet holds of this token.</source>
+        <translation>지갑에 있는 이 토큰보다 많은 수량입니다.</translation>
+    </message>
+    <message>
+        <source>Choose a token and enter a valid address and a quantity for every recipient.</source>
+        <translation>토큰을 고르고, 받는 사람마다 올바른 주소와 수량을 입력하세요.</translation>
     </message>
 </context>
 <context>
@@ -1544,7 +1732,7 @@
     </message>
     <message>
         <source>&amp;Unit to show amounts in:</source>
-        <translation>거래액을 표시할 단위(&amp;U):</translation>
+        <translation>금액을 표시할 단위(&amp;U):</translation>
     </message>
     <message>
         <source>Choose the default subdivision unit to show in the interface and when sending coins.</source>
@@ -1769,6 +1957,42 @@
         <source>%1 kinds</source>
         <translation>%1종</translation>
     </message>
+    <message>
+        <source>State of the chain and of the memory pool. Click to open the explorer.</source>
+        <translation>체인과 멤풀의 상태입니다. 누르면 탐색기가 열립니다.</translation>
+    </message>
+    <message>
+        <source>Watch-only: available</source>
+        <translation>조회 전용: 사용 가능</translation>
+    </message>
+    <message>
+        <source>pending</source>
+        <translation>미확정</translation>
+    </message>
+    <message>
+        <source>immature</source>
+        <translation>미성숙</translation>
+    </message>
+    <message>
+        <source>total</source>
+        <translation>합계</translation>
+    </message>
+    <message>
+        <source>Block %1</source>
+        <translation>블록 %1</translation>
+    </message>
+    <message>
+        <source>syncing</source>
+        <translation>동기화 중</translation>
+    </message>
+    <message>
+        <source>Peers %1</source>
+        <translation>피어 %1</translation>
+    </message>
+    <message>
+        <source>Mempool %1</source>
+        <translation>멤풀 %1</translation>
+    </message>
 </context>
 <context>
     <name>PaymentServer</name>
@@ -1884,7 +2108,7 @@
     <name>QObject</name>
     <message>
         <source>Amount</source>
-        <translation>거래액</translation>
+        <translation>금액</translation>
     </message>
     <message>
         <source>Enter an AokChain address (e.g. %1)</source>
@@ -2292,7 +2516,7 @@
     <name>ReceiveCoinsDialog</name>
     <message>
         <source>&amp;Amount:</source>
-        <translation>거래액(&amp;A):</translation>
+        <translation>금액(&amp;A):</translation>
     </message>
     <message>
         <source>&amp;Label:</source>
@@ -2336,7 +2560,7 @@
     </message>
     <message>
         <source>Requested payments history</source>
-        <translation>지출기록 확인</translation>
+        <translation>요청 기록</translation>
     </message>
     <message>
         <source>&amp;Request payment</source>
@@ -2372,7 +2596,71 @@
     </message>
     <message>
         <source>Copy amount</source>
-        <translation>거래액 복사</translation>
+        <translation>금액 복사</translation>
+    </message>
+    <message>
+        <source>New payment request</source>
+        <translation>결제 요청 만들기</translation>
+    </message>
+    <message>
+        <source>optional</source>
+        <translation>선택 사항</translation>
+    </message>
+    <message>
+        <source>All fields are optional. Without them you get a plain receiving address.</source>
+        <translation>모든 항목은 선택 사항입니다. 비워 두면 받는 주소만 만들어집니다.</translation>
+    </message>
+    <message>
+        <source>&amp;Label</source>
+        <translation>라벨(&amp;L)</translation>
+    </message>
+    <message>
+        <source>&amp;Amount</source>
+        <translation>금액(&amp;A)</translation>
+    </message>
+    <message>
+        <source>&amp;Message</source>
+        <translation>메시지(&amp;M)</translation>
+    </message>
+    <message>
+        <source>Who or what the payment is for</source>
+        <translation>누가, 무엇 때문에 보내는 돈인지</translation>
+    </message>
+    <message>
+        <source>Shown to the payer when the request is opened</source>
+        <translation>요청을 여는 사람에게 표시됩니다</translation>
+    </message>
+    <message>
+        <source>R&amp;euse an address I already gave to someone</source>
+        <translation>이미 알려 준 주소 다시 쓰기(&amp;E)</translation>
+    </message>
+    <message>
+        <source>Normally leave this off: a new address for every request is safer for your privacy. Turn it on only when you want to receive again on an address that someone already has.</source>
+        <translation>보통은 꺼 두세요. 요청마다 새 주소를 쓰는 편이 사생활 보호에 더 안전합니다. 누군가에게 이미 알려 준 주소로 다시 받고 싶을 때만 켜세요.</translation>
+    </message>
+    <message>
+        <source>Receiving address</source>
+        <translation>받는 주소</translation>
+    </message>
+    <message>
+        <source>Press "Request payment" to get an address. It is shown here with its QR code.</source>
+        <translation>"지불 요청"을 누르면 주소가 만들어지고, 여기에 QR 코드와 함께 표시됩니다.</translation>
+    </message>
+    <message>
+        <source>Copy QR code</source>
+        <translation>QR 코드 복사</translation>
+    </message>
+    <message>
+        <source>Copy address</source>
+        <translation>주소 복사</translation>
+    </message>
+    <message>
+        <source>Request history</source>
+        <translation>요청 기록</translation>
+    </message>
+    <message>
+        <source>No QR code</source>
+        <translation>QR 코드 없음</translation>
     </message>
 </context>
 <context>
@@ -2411,7 +2699,7 @@
     </message>
     <message>
         <source>Amount</source>
-        <translation>거래액</translation>
+        <translation>금액</translation>
     </message>
     <message>
         <source>Label</source>
@@ -2454,7 +2742,7 @@
     </message>
     <message>
         <source>(no amount requested)</source>
-        <translation>(요청한 거래액 없음)</translation>
+        <translation>(요청한 금액 없음)</translation>
     </message>
     <message>
         <source>Requested</source>
@@ -2493,7 +2781,7 @@
     </message>
     <message>
         <source>Amount:</source>
-        <translation>거래액:</translation>
+        <translation>금액:</translation>
     </message>
     <message>
         <source>Fee:</source>
@@ -2613,7 +2901,7 @@
     </message>
     <message>
         <source>Copy amount</source>
-        <translation>거래액 복사</translation>
+        <translation>금액 복사</translation>
     </message>
     <message>
         <source>Copy fee</source>
@@ -2829,6 +3117,38 @@
         <source>Send</source>
         <translation>보내기</translation>
     </message>
+    <message>
+        <source>Recipients</source>
+        <translation>받는 사람</translation>
+    </message>
+    <message>
+        <source>Recipient %1</source>
+        <translation>받는 사람 %1</translation>
+    </message>
+    <message>
+        <source>Amount %1</source>
+        <translation>금액 %1</translation>
+    </message>
+    <message>
+        <source>Locked until (%1)</source>
+        <translation>락업 해제 (%1)</translation>
+    </message>
+    <message>
+        <source>Locked until</source>
+        <translation>락업 해제</translation>
+    </message>
+    <message>
+        <source>Fee (estimated, taken from the amount)</source>
+        <translation>수수료 (예상, 금액에서 차감)</translation>
+    </message>
+    <message>
+        <source>Balance</source>
+        <translation>잔액</translation>
+    </message>
+    <message>
+        <source>Enter a valid address and an amount for every recipient.</source>
+        <translation>받는 사람마다 올바른 주소와 금액을 입력하세요.</translation>
+    </message>
 </context>
 <context>
     <name>SendCoinsEntry</name>
@@ -2959,6 +3279,46 @@
     <message>
         <source>This is not a valid AokChain address</source>
         <translation>유효한 AokChain 주소가 아닙니다</translation>
+    </message>
+    <message>
+        <source>Remove this recipient</source>
+        <translation>이 받는 사람 삭제</translation>
+    </message>
+    <message>
+        <source>Label</source>
+        <translation>라벨</translation>
+    </message>
+    <message>
+        <source>Give this address a label for your address book</source>
+        <translation>이 주소를 주소록에 저장할 이름을 붙입니다</translation>
+    </message>
+    <message>
+        <source>Label of the address. Click to change it.</source>
+        <translation>주소의 라벨입니다. 누르면 바꿀 수 있습니다.</translation>
+    </message>
+    <message>
+        <source>Send with a lock</source>
+        <translation>락업 전송</translation>
+    </message>
+    <message>
+        <source>Recipient %1</source>
+        <translation>받는 사람 %1</translation>
+    </message>
+    <message>
+        <source>Label: %1</source>
+        <translation>라벨: %1</translation>
+    </message>
+    <message>
+        <source>Locked until %1</source>
+        <translation>락업: %1</translation>
+    </message>
+    <message>
+        <source>The recipient cannot spend the coins before this time. Click to change it.</source>
+        <translation>받는 사람은 이 시각 전에는 코인을 사용할 수 없습니다. 누르면 바꿀 수 있습니다.</translation>
+    </message>
+    <message>
+        <source>Send coins that the recipient cannot spend before a time you choose</source>
+        <translation>정한 시각 전에는 받는 사람이 사용할 수 없는 코인을 보냅니다</translation>
     </message>
 </context>
 <context>
@@ -3252,7 +3612,7 @@
     </message>
     <message>
         <source>Net amount</source>
-        <translation>총 거래액</translation>
+        <translation>총 금액</translation>
     </message>
     <message>
         <source>Message</source>
@@ -3296,7 +3656,7 @@
     </message>
     <message>
         <source>Amount</source>
-        <translation>거래액</translation>
+        <translation>금액</translation>
     </message>
     <message>
         <source>true</source>
@@ -3577,7 +3937,7 @@
     </message>
     <message>
         <source>Min amount</source>
-        <translation>최소 거래액</translation>
+        <translation>최소 금액</translation>
     </message>
     <message>
         <source>Abandon transaction</source>
@@ -3593,7 +3953,7 @@
     </message>
     <message>
         <source>Copy amount</source>
-        <translation>거래액 복사</translation>
+        <translation>금액 복사</translation>
     </message>
     <message>
         <source>Copy transaction ID</source>
@@ -3751,12 +4111,20 @@
         <source>Copy token name</source>
         <translation>토큰 이름 복사</translation>
     </message>
+    <message>
+        <source>Show only the transactions of one coin or token</source>
+        <translation>코인 또는 토큰 하나의 거래만 표시합니다</translation>
+    </message>
+    <message>
+        <source>Past year</source>
+        <translation>최근 1년</translation>
+    </message>
 </context>
 <context>
     <name>UnitDisplayStatusBarControl</name>
     <message>
         <source>Unit to show amounts in. Click to select another unit.</source>
-        <translation>거래액을 표시하는 단위. 클릭해서 다른 단위를 선택할 수 있습니다.</translation>
+        <translation>금액을 표시하는 단위. 클릭해서 다른 단위를 선택할 수 있습니다.</translation>
     </message>
 </context>
 <context>
@@ -3817,7 +4185,7 @@
     </message>
     <message>
         <source>Transactions</source>
-        <translation>거래 내역</translation>
+        <translation>전송 기록</translation>
     </message>
     <message>
         <source>Receive</source>
@@ -5052,6 +5420,10 @@
         <source>Send</source>
         <translation>보내기</translation>
     </message>
+    <message>
+        <source>fee</source>
+        <translation>수수료</translation>
+    </message>
 </context>
 <context>
     <name>TokenViewDelegate</name>
@@ -5081,6 +5453,143 @@
     <message>
         <source>Owner</source>
         <translation>관리 권한</translation>
+    </message>
+</context>
+<context>
+    <name>PageDialogs</name>
+    <message>
+        <source>Label</source>
+        <translation>라벨</translation>
+    </message>
+    <message>
+        <source>A label for this address. It is saved in your address book and shown instead of the address in your lists. It is not sent to anyone.</source>
+        <translation>이 주소에 붙일 이름입니다. 주소록에 저장되어 목록에서 주소 대신 표시됩니다. 다른 사람에게 전송되지 않습니다.</translation>
+    </message>
+    <message>
+        <source>For example: Minsu, exchange deposit</source>
+        <translation>예: 민수, 거래소 입금</translation>
+    </message>
+    <message>
+        <source>Send with a lock</source>
+        <translation>락업 전송</translation>
+    </message>
+    <message>
+        <source>The recipient receives the amount now but cannot spend it before the time you choose here.</source>
+        <translation>받는 사람은 지금 받지만, 여기서 정한 시각 전에는 사용할 수 없습니다.</translation>
+    </message>
+    <message>
+        <source>1 month</source>
+        <translation>1개월</translation>
+    </message>
+    <message>
+        <source>3 months</source>
+        <translation>3개월</translation>
+    </message>
+    <message>
+        <source>6 months</source>
+        <translation>6개월</translation>
+    </message>
+    <message>
+        <source>1 year</source>
+        <translation>1년</translation>
+    </message>
+</context>
+<context>
+    <name>TokenPicker</name>
+    <message>
+        <source>Choose from the list of all tokens of the wallet</source>
+        <translation>지갑의 전체 토큰 목록에서 선택</translation>
+    </message>
+    <message>
+        <source>Choose a token</source>
+        <translation>토큰 선택</translation>
+    </message>
+    <message>
+        <source>Search tokens</source>
+        <translation>토큰 검색</translation>
+    </message>
+</context>
+<context>
+    <name>TokensPage</name>
+    <message>
+        <source>Tokens of this wallet</source>
+        <translation>보유 토큰</translation>
+    </message>
+    <message>
+        <source>This wallet holds no tokens yet. Tokens that are sent to one of your addresses appear here.</source>
+        <translation>이 지갑에는 아직 토큰이 없습니다. 내 주소로 토큰을 받으면 여기에 나타납니다.</translation>
+    </message>
+    <message>
+        <source>AOK tokens not held</source>
+        <translation>보유하지 않은 AOK 토큰</translation>
+    </message>
+    <message>
+        <source>Search tokens</source>
+        <translation>토큰 검색</translation>
+    </message>
+    <message>
+        <source>Tokens that exist on the AokChain block chain, as this node knows them. The total supply is shown.</source>
+        <translation>AokChain 블록체인에 있는 토큰입니다(이 노드 기준). 숫자는 총 발행량입니다.</translation>
+    </message>
+    <message>
+        <source>Show more</source>
+        <translation>더 보기</translation>
+    </message>
+    <message>
+        <source>Unique token</source>
+        <translation>고유 토큰</translation>
+    </message>
+    <message>
+        <source>Sub token</source>
+        <translation>하위 토큰</translation>
+    </message>
+    <message>
+        <source>Owner</source>
+        <translation>관리 권한</translation>
+    </message>
+    <message>
+        <source>Locked</source>
+        <translation>잠김</translation>
+    </message>
+    <message>
+        <source>None held</source>
+        <translation>보유 없음</translation>
+    </message>
+    <message>
+        <source>%1 decimals</source>
+        <translation>소수 %1자리</translation>
+    </message>
+    <message>
+        <source>reissuable</source>
+        <translation>추가 발행 가능</translation>
+    </message>
+    <message>
+        <source>fixed supply</source>
+        <translation>발행량 고정</translation>
+    </message>
+    <message>
+        <source>Send</source>
+        <translation>보내기</translation>
+    </message>
+    <message>
+        <source>Receive</source>
+        <translation>받기</translation>
+    </message>
+    <message>
+        <source>%1 kinds</source>
+        <translation>%1종</translation>
+    </message>
+    <message>
+        <source>loading...</source>
+        <translation>불러오는 중...</translation>
+    </message>
+    <message>
+        <source>none</source>
+        <translation>없음</translation>
+    </message>
+    <message>
+        <source>%1 and more</source>
+        <translation>%1종 이상</translation>
     </message>
 </context>
 </TS>
