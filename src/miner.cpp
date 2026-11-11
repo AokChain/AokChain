@@ -659,12 +659,14 @@ void ThreadStakeMiner(CWallet *pwallet)
     while (true) {
         while (pwallet->IsLocked())
         {
+            pwallet->m_last_coin_stake_search_interval = 0;
             MilliSleep(10000);
         }
 
         // Don't disable PoS mining for no connections if in regtest mode
         if (!gArgs.GetBoolArg("-emergencystaking", false)) {
             while (g_connman->vNodes.size() == 0 || IsInitialBlockDownload()) {
+                pwallet->m_last_coin_stake_search_interval = 0;
                 fTryToSync = true;
                 MilliSleep(1000);
             }
@@ -697,6 +699,7 @@ void ThreadStakeMiner(CWallet *pwallet)
         if (!pwallet->HaveAvailableCoinsForStaking()) {
             // Nothing to stake with. Sleep, instead of spinning on cs_main
             // and cs_wallet until a coin matures.
+            pwallet->m_last_coin_stake_search_interval = 0;
             MilliSleep(nMinerSleep);
             continue;
         }
@@ -720,6 +723,19 @@ void ThreadStakeMiner(CWallet *pwallet)
 
             // Try to sign a block (this also checks for a PoS stake)
             std::shared_ptr<CBlock> pblock = std::make_shared<CBlock>(pblocktemplate->block);
+
+            // Record the search for getstakinginfo, which reports "staking"
+            // only while the interval is set. Nothing ever set it before.
+            {
+                const int64_t nSearchTime = pblock->GetBlockTime();
+                const int64_t nPrevSearchTime = pwallet->m_last_coin_stake_search_time;
+                if (nSearchTime > nPrevSearchTime) {
+                    pwallet->m_last_coin_stake_search_interval = nPrevSearchTime ? nSearchTime - nPrevSearchTime : STAKE_TIMESTAMP_MASK + 1;
+                    pwallet->m_last_coin_stake_search_time = nSearchTime;
+                } else if (pwallet->m_last_coin_stake_search_interval == 0) {
+                    pwallet->m_last_coin_stake_search_interval = STAKE_TIMESTAMP_MASK + 1;
+                }
+            }
             if (SignBlock(pblock, *pwallet, nTotalFees, pindexPrev)) {
                 // Increase priority so we can build the full PoS block ASAP to ensure the timestamp doesn't expire
                 SetThreadPriority(THREAD_PRIORITY_ABOVE_NORMAL);

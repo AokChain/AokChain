@@ -109,6 +109,8 @@ class StakingTest(AokChainTestFramework):
         assert_equal(n0.getblockcount(), LAST_POW + 3)
         assert_equal(n1.getblockcount(), LAST_POW)
         base = self.snapshot(n0)
+        info = n0.getstakinginfo()
+        assert info["staking"] and info["search-interval"] > 0, info
 
         self.log.info("A stake that is disconnected and connected again on the same parent")
         # (the staking thread finds the same, now invalid, block again and gives up)

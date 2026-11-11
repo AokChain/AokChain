@@ -1328,8 +1328,11 @@ public:
     /* Stop staking coins */
     void StopStake() { StakeCoins(false); }
 
-    int64_t m_last_coin_stake_search_time{0};
-    int64_t m_last_coin_stake_search_interval{0};
+    //! Block time of the staking thread's last kernel search, and its distance
+    //! to the search before it; the interval is 0 while the thread is not
+    //! searching. Reported by getstakinginfo.
+    std::atomic<int64_t> m_last_coin_stake_search_time{0};
+    std::atomic<int64_t> m_last_coin_stake_search_interval{0};
 
     /**
      * Blocks until the wallet state is up-to-date to /at least/ the current
