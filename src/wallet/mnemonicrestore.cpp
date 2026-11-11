@@ -257,7 +257,8 @@ bool BuildPlan(const CExtKey& master, const CKeyID* pKnown, const std::atomic<bo
     };
     noteHits();
     if (chosen.empty()) {
-        error = "No coins were found on the usual key paths of these recovery words";
+        error = pKnown ? "The address does not belong to these recovery words (or the passphrase is different)"
+                       : "No coins were found on the usual key paths of these recovery words";
         return false;
     }
 

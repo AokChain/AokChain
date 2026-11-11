@@ -405,6 +405,8 @@ QString MnemonicDialog::errorText(const QString &error) const
         return tr("It was stopped.");
     if (error.startsWith("No coins were found"))
         return tr("No coins were found on the usual key paths of these words. Check the passphrase, or enter an address of that wallet so that its key path can be found.");
+    if (error.startsWith("The address does not belong"))
+        return tr("The address does not belong to these recovery words.") + " " + tr("Check the words and the passphrase.");
     if (error.startsWith("The unspent outputs"))
         return tr("The coins of the chain could not be read.");
     if (error.startsWith("The wallet is locked") || error.startsWith("The wallet is unlocked for staking"))

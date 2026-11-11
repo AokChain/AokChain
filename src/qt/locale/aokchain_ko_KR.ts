@@ -7992,6 +7992,10 @@
         <source>Stopping...</source>
         <translation>중지하는 중...</translation>
     </message>
+    <message>
+        <source>Check the words and the passphrase.</source>
+        <translation>단어와 암호를 확인하세요.</translation>
+    </message>
 </context>
 <context>
     <name>SendConfirmDialog</name>
