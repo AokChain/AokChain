@@ -6,6 +6,9 @@
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 #include "base58.h"
+#include "bip39.h"
+#include "key.h"
+#include "support/cleanse.h"
 #include "chain.h"
 #include "clientversion.h"
 #include "core_io.h"
@@ -373,6 +376,236 @@ UniValue verifymessage(const JSONRPCRequest& request)
         return false;
 
     return (pubkey.GetID() == *keyID);
+}
+
+/** Turn the mnemonic and passphrase parameters into a BIP32 master key. */
+static CExtKey MnemonicMasterKey(const UniValue& mnemonicParam, const UniValue& passphraseParam, const UniValue& validateParam, std::string& language)
+{
+    std::string mnemonic;
+    if (!bip39::Normalize(mnemonicParam.get_str(), true, mnemonic))
+        throw JSONRPCError(RPC_INVALID_PARAMETER, "The mnemonic contains characters that cannot be normalized here (only ASCII and Hangul are supported)");
+    std::string passphrase;
+    if (!passphraseParam.isNull() && !bip39::Normalize(passphraseParam.get_str(), false, passphrase))
+        throw JSONRPCError(RPC_INVALID_PARAMETER, "The passphrase contains characters that cannot be normalized here (only ASCII and Hangul are supported)");
+
+    language = "";
+    if (validateParam.isNull() || validateParam.get_bool()) {
+        std::string error;
+        if (!bip39::CheckMnemonic(mnemonic, language, error))
+            throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid mnemonic: " + error + ". Pass validate=false to skip this check for a word list other than English or Korean.");
+    }
+
+    std::vector<unsigned char> seed = bip39::MnemonicToSeed(mnemonic, passphrase);
+    CExtKey master;
+    master.SetSeed(seed.data(), seed.size());
+    memory_cleanse(seed.data(), seed.size());
+    memory_cleanse(&mnemonic[0], mnemonic.size());
+    if (!passphrase.empty())
+        memory_cleanse(&passphrase[0], passphrase.size());
+    return master;
+}
+
+static bool DerivePath(const CExtKey& master, const std::vector<uint32_t>& path, CExtKey& out)
+{
+    out = master;
+    for (uint32_t n : path) {
+        CExtKey child;
+        if (!out.Derive(child, n))
+            return false;
+        out = child;
+    }
+    return true;
+}
+
+UniValue mnemonictokeys(const JSONRPCRequest& request)
+{
+    if (request.fHelp || request.params.size() < 1 || request.params.size() > 6)
+        throw std::runtime_error(
+            "mnemonictokeys \"mnemonic\" ( \"path\" count \"passphrase\" start validate )\n"
+            "\nDerive private keys and addresses from a BIP39 mnemonic (recovery words) of another wallet.\n"
+            "Nothing is stored and the wallet is not touched; import a key with importprivkey if wanted.\n"
+            "The path depends on the wallet that created the mnemonic. If it is not known, use\n"
+            "mnemonicfindaddress with an address of that wallet.\n"
+            "WARNING: anyone who sees the mnemonic or the keys can spend the coins. Use this on an\n"
+            "offline machine if possible.\n"
+            "\nArguments:\n"
+            "1. \"mnemonic\"    (string, required) The 12 to 24 words, separated by spaces\n"
+            "2. \"path\"        (string, optional, default=m/44'/0'/0'/0) BIP32 path of the parent of the keys; ' or h marks a hardened level\n"
+            "3. count         (numeric, optional, default=5) Number of keys to derive below the path (1-1000)\n"
+            "4. \"passphrase\"  (string, optional, default=\"\") The optional BIP39 passphrase (\"25th word\")\n"
+            "5. start         (numeric, optional, default=0) Index of the first key\n"
+            "6. validate      (boolean, optional, default=true) Check the words and the checksum (English and Korean word lists)\n"
+            "\nResult:\n"
+            "{\n"
+            "  \"language\": \"xxx\",      (string) word list the mnemonic was validated against, empty if not validated\n"
+            "  \"keys\": [\n"
+            "    {\n"
+            "      \"path\": \"xxx\",      (string) path of the key\n"
+            "      \"address\": \"xxx\",   (string) its address\n"
+            "      \"pubkey\": \"hex\",    (string) its public key\n"
+            "      \"privkey\": \"xxx\"    (string) its private key, as used by importprivkey\n"
+            "    }, ...\n"
+            "  ]\n"
+            "}\n"
+            "\nExamples:\n"
+            + HelpExampleCli("mnemonictokeys", "\"word1 word2 ... word12\"")
+            + HelpExampleCli("mnemonictokeys", "\"word1 word2 ... word12\" \"m/44'/0'/0'/0\" 20")
+        );
+
+    std::vector<uint32_t> path;
+    if (!bip39::ParsePath(request.params[1].isNull() ? "m/44'/0'/0'/0" : request.params[1].get_str(), path))
+        throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid path, expected something like m/44'/0'/0'/0");
+    const int64_t nCount = request.params[2].isNull() ? 5 : request.params[2].get_int64();
+    if (nCount < 1 || nCount > 1000)
+        throw JSONRPCError(RPC_INVALID_PARAMETER, "count must be between 1 and 1000");
+    const int64_t nStart = request.params[4].isNull() ? 0 : request.params[4].get_int64();
+    if (nStart < 0 || nStart + nCount > 0x80000000LL)
+        throw JSONRPCError(RPC_INVALID_PARAMETER, "start is out of range");
+
+    std::string language;
+    const CExtKey master = MnemonicMasterKey(request.params[0], request.params[3], request.params[5], language);
+    CExtKey parent;
+    if (!DerivePath(master, path, parent))
+        throw JSONRPCError(RPC_INTERNAL_ERROR, "Key derivation failed");
+
+    UniValue keys(UniValue::VARR);
+    path.push_back(0);
+    for (int64_t i = nStart; i < nStart + nCount; i++) {
+        CExtKey child;
+        if (!parent.Derive(child, (uint32_t)i))
+            continue; // astronomically unlikely; BIP32 says to skip the index
+        path.back() = (uint32_t)i;
+        const CPubKey pubkey = child.key.GetPubKey();
+        UniValue entry(UniValue::VOBJ);
+        entry.pushKV("path", bip39::FormatPath(path));
+        entry.pushKV("address", EncodeDestination(pubkey.GetID()));
+        entry.pushKV("pubkey", HexStr(pubkey.begin(), pubkey.end()));
+        entry.pushKV("privkey", CAokChainSecret(child.key).ToString());
+        keys.push_back(entry);
+    }
+
+    UniValue result(UniValue::VOBJ);
+    result.pushKV("language", language);
+    result.pushKV("keys", keys);
+    return result;
+}
+
+UniValue mnemonicfindaddress(const JSONRPCRequest& request)
+{
+    if (request.fHelp || request.params.size() < 2 || request.params.size() > 4)
+        throw std::runtime_error(
+            "mnemonicfindaddress \"mnemonic\" \"address\" ( \"passphrase\" validate )\n"
+            "\nFind the key of an address among the keys a BIP39 mnemonic (recovery words) can produce.\n"
+            "Use this when the derivation path of the wallet that created the mnemonic is not known.\n"
+            "It tries the usual layouts: BIP44 (m/44'/coin'/account'/change/index) for coin types 0 to 2047,\n"
+            "accounts 0 and 1 and indexes 0 to 19, BIP49/84 style paths for the common coin types, and\n"
+            "simple layouts such as m/0'/0'/index' and m/0/index. This takes up to a minute.\n"
+            "Nothing is stored and the wallet is not touched.\n"
+            "WARNING: anyone who sees the mnemonic or the key can spend the coins.\n"
+            "\nArguments:\n"
+            "1. \"mnemonic\"    (string, required) The 12 to 24 words, separated by spaces\n"
+            "2. \"address\"     (string, required) An address of the wallet that created the mnemonic\n"
+            "3. \"passphrase\"  (string, optional, default=\"\") The optional BIP39 passphrase (\"25th word\")\n"
+            "4. validate      (boolean, optional, default=true) Check the words and the checksum (English and Korean word lists)\n"
+            "\nResult:\n"
+            "{\n"
+            "  \"found\": true|false,  (boolean) whether the address was found\n"
+            "  \"searched\": n,        (numeric) number of keys tried\n"
+            "  \"path\": \"xxx\",        (string) path of the key, if found; use its parent with mnemonictokeys for the other keys\n"
+            "  \"address\": \"xxx\",     (string) the address\n"
+            "  \"compressed\": true|false, (boolean) whether the address is of the compressed public key\n"
+            "  \"privkey\": \"xxx\"      (string) its private key, as used by importprivkey\n"
+            "}\n"
+            "\nExamples:\n"
+            + HelpExampleCli("mnemonicfindaddress", "\"word1 word2 ... word12\" \"address\"")
+        );
+
+    const CTxDestination dest = DecodeDestination(request.params[1].get_str());
+    const CKeyID* target = boost::get<CKeyID>(&dest);
+    if (!target)
+        throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "The address must be a pay-to-pubkey-hash address of this network");
+
+    std::string language;
+    const CExtKey master = MnemonicMasterKey(request.params[0], request.params[2], request.params[3], language);
+
+    const uint32_t H = 0x80000000;
+    uint64_t nSearched = 0;
+    std::vector<uint32_t> foundPath;
+    CKey foundKey;
+
+    // Try the nCount children of a path, from index 0; fHardened for hardened children
+    auto tryChildren = [&](const std::vector<uint32_t>& path, uint32_t nCount, bool fHardened) -> bool {
+        CExtKey parent;
+        if (!DerivePath(master, path, parent))
+            return false;
+        for (uint32_t i = 0; i < nCount; i++) {
+            CExtKey child;
+            if (!parent.Derive(child, fHardened ? (i | H) : i))
+                continue;
+            nSearched++;
+            CPubKey pubkey = child.key.GetPubKey();
+            bool fMatch = pubkey.GetID() == *target;
+            bool fCompressed = true;
+            if (!fMatch && pubkey.Decompress()) {
+                fMatch = pubkey.GetID() == *target;
+                fCompressed = false;
+            }
+            if (fMatch) {
+                foundPath = path;
+                foundPath.push_back(fHardened ? (i | H) : i);
+                foundKey.Set(child.key.begin(), child.key.end(), fCompressed);
+                return true;
+            }
+        }
+        return false;
+    };
+
+    auto search = [&]() -> bool {
+        // Layouts without a coin type
+        const std::vector<std::vector<uint32_t>> simple = {
+            {}, {0}, {0 | H}, {0 | H, 0}, {0 | H, 1}, {0 | H, 0 | H}, {0 | H, 1 | H}, {0, 0}, {0, 1},
+        };
+        for (const std::vector<uint32_t>& path : simple) {
+            if (tryChildren(path, 100, false) || tryChildren(path, 100, true))
+                return true;
+        }
+        // BIP44, and the same layout under the BIP49 and BIP84 purposes for
+        // the common coin types. Likely coin types first.
+        std::vector<uint32_t> coins = {0, 1, 175, 2, 5, 3, 7, 20, 28, 88, 105, 119, 2301};
+        const size_t nCommon = coins.size();
+        for (uint32_t c = 0; c < 2048; c++) {
+            if (std::find(coins.begin(), coins.begin() + nCommon, c) == coins.begin() + nCommon)
+                coins.push_back(c);
+        }
+        for (size_t n = 0; n < coins.size(); n++) {
+            for (uint32_t purpose : {44u, 49u, 84u}) {
+                if (purpose != 44 && n >= nCommon)
+                    continue;
+                for (uint32_t account = 0; account < 2; account++) {
+                    for (uint32_t change = 0; change < 2; change++) {
+                        if (tryChildren({purpose | H, coins[n] | H, account | H, change}, 20, false))
+                            return true;
+                    }
+                    // without the change level
+                    if (tryChildren({purpose | H, coins[n] | H, account | H}, 20, false))
+                        return true;
+                }
+            }
+        }
+        return false;
+    };
+
+    const bool fFound = search();
+    UniValue result(UniValue::VOBJ);
+    result.pushKV("found", UniValue(fFound));
+    result.pushKV("searched", nSearched);
+    if (fFound) {
+        result.pushKV("path", bip39::FormatPath(foundPath));
+        result.pushKV("address", EncodeDestination(foundKey.GetPubKey().GetID()));
+        result.pushKV("compressed", UniValue(foundKey.IsCompressed()));
+        result.pushKV("privkey", CAokChainSecret(foundKey).ToString());
+    }
+    return result;
 }
 
 UniValue signmessagewithprivkey(const JSONRPCRequest& request)
@@ -1391,6 +1624,8 @@ static const CRPCCommand commands[] =
     { "util",               "createmultisig",         &createmultisig,         {"nrequired","keys"} },
     { "util",               "verifymessage",          &verifymessage,          {"address","signature","message"} },
     { "util",               "signmessagewithprivkey", &signmessagewithprivkey, {"privkey","message"} },
+    { "util",               "mnemonictokeys",         &mnemonictokeys,         {"mnemonic","path","count","passphrase","start","validate"} },
+    { "util",               "mnemonicfindaddress",    &mnemonicfindaddress,    {"mnemonic","address","passphrase","validate"} },
 
     /* Address index */
     { "addressindex",       "getaddressmempool",      &getaddressmempool,      {"addresses","includeTokens"} },

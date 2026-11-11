@@ -32,3 +32,4 @@ wallet_resendtransactions.py
 wallet_zapwallettxes.py
 wallet_spent_cache.py
 feature_staking.py
+rpc_mnemonic.py

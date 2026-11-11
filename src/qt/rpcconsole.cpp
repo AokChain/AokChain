@@ -71,6 +71,8 @@ namespace {
 // don't add private key handling cmd's to the history
 const QStringList historyFilter = QStringList()
     << "importprivkey"
+    << "mnemonictokeys"
+    << "mnemonicfindaddress"
     << "importmulti"
     << "signmessagewithprivkey"
     << "signrawtransaction"

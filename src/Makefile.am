@@ -87,6 +87,8 @@ AOKCHAIN_CORE_H = \
   tokens/tokendb.h \
   tokens/tokentypes.h \
   base58.h \
+  bip39.h \
+  bip39_wordlists.h \
   bloom.h \
   blockencodings.h \
   chain.h \
@@ -347,6 +349,7 @@ libaokchain_common_a_CPPFLAGS = $(AM_CPPFLAGS) $(AOKCHAIN_INCLUDES)
 libaokchain_common_a_CXXFLAGS = $(AM_CXXFLAGS) $(PIE_FLAGS)
 libaokchain_common_a_SOURCES = \
   base58.cpp \
+  bip39.cpp \
   chainparams.cpp \
   coins.cpp \
   compressor.cpp \
