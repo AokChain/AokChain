@@ -1,7 +1,8 @@
 /* AokChain Core theme. @tokens are replaced with the colors of the active
    (light or dark) theme by GUIUtil::applyTheme(). */
 
-QWidget { color: @text; }
+/* Text colors come from the palette. A "color" rule for all widgets would
+   also replace the placeholder color of input fields. */
 QMainWindow, QDialog { background-color: @bg; }
 QToolTip { background-color: @surface; color: @text; border: 1px solid @borderStrong; padding: 4px 6px; }
 
