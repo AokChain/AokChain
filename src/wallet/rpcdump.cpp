@@ -4,6 +4,7 @@
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
+#include "snapshot.h"
 #include <base58.h>
 #include <chain.h>
 #include <rpc/safemode.h>
@@ -120,6 +121,8 @@ UniValue importprivkey(const JSONRPCRequest& request)
 
     if (fRescan && fPruneMode)
         throw JSONRPCError(RPC_WALLET_ERROR, "Rescan is disabled in pruned mode");
+    if (fRescan && PastBlocksMissing())
+        throw JSONRPCError(RPC_WALLET_ERROR, PastBlocksMessage());
 
     CAokChainSecret vchSecret;
     bool fGood = vchSecret.SetString(strSecret);
@@ -268,6 +271,8 @@ UniValue importaddress(const JSONRPCRequest& request)
 
     if (fRescan && fPruneMode)
         throw JSONRPCError(RPC_WALLET_ERROR, "Rescan is disabled in pruned mode");
+    if (fRescan && PastBlocksMissing())
+        throw JSONRPCError(RPC_WALLET_ERROR, PastBlocksMessage());
 
     // Whether to import a p2sh version, too
     bool fP2SH = false;
@@ -332,6 +337,8 @@ UniValue removeaddress(const JSONRPCRequest& request)
         throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Invalid AokChain address or script");
     }
 
+    if (fRescan && PastBlocksMissing())
+        fRescan = false; // nothing of the past blocks can be scanned; what the wallet has stays
     if (fRescan)
     {
         pwallet->RescanFromTime(TIMESTAMP_MIN, true /* update */);
@@ -477,6 +484,8 @@ UniValue importpubkey(const JSONRPCRequest& request)
 
     if (fRescan && fPruneMode)
         throw JSONRPCError(RPC_WALLET_ERROR, "Rescan is disabled in pruned mode");
+    if (fRescan && PastBlocksMissing())
+        throw JSONRPCError(RPC_WALLET_ERROR, PastBlocksMessage());
 
     if (!IsHex(request.params[0].get_str()))
         throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Pubkey must be a hex string");
@@ -524,6 +533,8 @@ UniValue importwallet(const JSONRPCRequest& request)
 
     if (fPruneMode)
         throw JSONRPCError(RPC_WALLET_ERROR, "Importing wallets is disabled in pruned mode");
+    if (PastBlocksMissing())
+        throw JSONRPCError(RPC_WALLET_ERROR, PastBlocksMessage());
 
     LOCK2(cs_main, pwallet->cs_wallet);
 
@@ -1196,6 +1207,12 @@ UniValue importmulti(const JSONRPCRequest& mainRequest)
         }
     }
 
+    if (fRescan && fRunScan && requests.size() && PastBlocksMissing()) {
+        // the keys are imported; what was paid to them before the snapshot cannot be found yet
+        const CBlockIndex* pindexSnapshot = chainActive[SnapshotHeight()];
+        if (pindexSnapshot && nLowestTimestamp <= pindexSnapshot->GetBlockTime() + TIMESTAMP_WINDOW)
+            throw JSONRPCError(RPC_WALLET_ERROR, "The keys were imported, but not scanned for. " + PastBlocksMessage());
+    }
     if (fRescan && fRunScan && requests.size()) {
         int64_t scannedTime = pwallet->RescanFromTime(nLowestTimestamp, true /* update */);
         pwallet->ReacceptWalletTransactions();

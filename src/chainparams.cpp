@@ -513,6 +513,11 @@ void UpdateLastPOWBlock(int nHeight)
     globalChainParams->UpdateLastPOWBlock(nHeight);
 }
 
+void UpdateSnapshotParams(const CChainParams::SnapshotParams& params)
+{
+    globalChainParams->SetSnapshot(params);
+}
+
 void UpdateOldPeerCutoffHeight(int nHeight)
 {
     globalChainParams->SetOldPeerCutoffHeight(nHeight);

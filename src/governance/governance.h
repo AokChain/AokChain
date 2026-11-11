@@ -51,6 +51,9 @@ public:
     bool DumpFreezeStats(std::vector< std::pair< CScript, bool > > *FreezeVector);
     bool GetFrozenScripts(std::vector< CScript > *FreezeVector);
 
+    /** Hash over every record of the database, in key order: the same on every node with the same chain. */
+    uint256 ContentHash();
+
     using CDBWrapper::Sync;
   
 };

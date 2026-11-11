@@ -5,6 +5,7 @@
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
+#include "snapshot.h"
 #include <init.h>
 #include <net.h>
 #include <util.h>
@@ -308,6 +309,29 @@ bool WalletInit::Open()
         }
         vpwallets.push_back(pwallet);
     }
+
+    // A node that started from a chain state snapshot: wallets that wait for the past blocks.
+    if (WalletRescanPending() && !PastBlocksMissing())
+        SetWalletRescanPending(false); // they were scanned from the beginning just now
+    SetPastBlocksRescanHook([] {
+        // in steps, so that the node is not locked for the whole scan
+        const int step = 2000;
+        for (int height = 0; ; height += step) {
+            boost::this_thread::interruption_point();
+            CBlockIndex *pindexStart, *pindexStop;
+            {
+                LOCK(cs_main);
+                pindexStart = chainActive[height];
+                if (!pindexStart)
+                    break;
+                pindexStop = chainActive[std::min(height + step - 1, chainActive.Height())];
+            }
+            for (CWallet* pwallet : vpwallets)
+                pwallet->ScanForWalletTransactions(pindexStart, pindexStop, true, true);
+        }
+        for (CWallet* pwallet : vpwallets)
+            pwallet->ReacceptWalletTransactions();
+    });
 
     return true;
 }

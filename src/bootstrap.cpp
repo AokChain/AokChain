@@ -893,11 +893,12 @@ bool Launch(const std::vector<std::string>& mirrors, const std::string& folder)
 
 } // namespace
 
-void StartBootstrap(boost::thread_group& threadGroup)
+namespace {
+
+/** The mirrors and the folder that the options (or the built-in address) name. */
+void GetSources(std::vector<std::string>& mirrors, std::string& folder, bool log)
 {
-    pthreadGroup = &threadGroup;
-    // -bootstrapurl can be given several times: mirrors, tried in this order
-    std::vector<std::string> mirrors;
+    mirrors.clear();
     for (const std::string& value : gArgs.GetArgs("-bootstrapurl")) {
         // one value may hold several addresses, separated by white space or commas (the settings page does that)
         std::vector<std::string> urls;
@@ -910,19 +911,248 @@ void StartBootstrap(boost::thread_group& threadGroup)
             mirrors.push_back(url);
         }
     }
-    const std::string folder = gArgs.GetArg("-bootstrapdir", "");
-    const bool enabled = gArgs.GetBoolArg("-bootstrap", DEFAULT_BOOTSTRAP);
-    if (mirrors.empty() && folder.empty() && enabled && Params().NetworkIDString() == CBaseChainParams::MAIN) {
+    folder = gArgs.GetArg("-bootstrapdir", "");
+    if (mirrors.empty() && folder.empty() && Params().NetworkIDString() == CBaseChainParams::MAIN) {
         // The built-in address of the main network. It is an https:// address, which the GUI can
-        // fetch and the daemon cannot: the daemon then goes on without the bootstrap.
+        // fetch and the daemon cannot: the daemon then goes on without it.
         if (fFetcherHttps) {
             mirrors.push_back(DEFAULT_BOOTSTRAP_URL_MAIN);
-        } else {
-            LogPrintf("Bootstrap: off. The block archives at %s need https, which this program does not do. "
+        } else if (log) {
+            LogPrintf("Bootstrap: off. The files at %s need https, which this program does not do. "
                       "To use them, fetch the files into a folder and start with -bootstrapdir=<folder>, or give an http:// mirror with -bootstrapurl.\n",
                       DEFAULT_BOOTSTRAP_URL_MAIN);
         }
     }
+}
+
+} // namespace
+
+bool BootstrapHasSource()
+{
+    std::vector<std::string> mirrors;
+    std::string folder;
+    GetSources(mirrors, folder, false);
+    return !mirrors.empty() || !folder.empty();
+}
+
+bool BootstrapReadFile(const std::string& name, std::string& text, std::string& error)
+{
+    std::vector<std::string> mirrors;
+    std::string folder;
+    GetSources(mirrors, folder, false);
+    if (!folder.empty()) {
+        FILE* file = fsbridge::fopen(fs::path(folder) / name, "rb");
+        if (!file) {
+            error = "there is no " + name + " in " + folder;
+            return false;
+        }
+        char buffer[65536];
+        size_t n;
+        text.clear();
+        while ((n = fread(buffer, 1, sizeof(buffer), file)) > 0 && text.size() <= MAX_MANIFEST_SIZE)
+            text.append(buffer, n);
+        fclose(file);
+        return true;
+    }
+    for (const std::string& mirror : mirrors) {
+        text.clear();
+        if (fetcher(mirror + name, std::string(), MAX_MANIFEST_SIZE, nullptr, &text, error))
+            return true;
+        LogPrintf("Bootstrap: %s%s: %s\n", mirror, name, error);
+    }
+    if (error.empty())
+        error = "no source for " + name;
+    return false;
+}
+
+bool BootstrapGetFile(const std::string& name, uint64_t size, const std::string& sha256, const std::string& dir,
+                      std::atomic<uint64_t>* progress, std::string& path, bool& temporary, std::string& error)
+{
+    if (!fHold) {
+        // no block bootstrap is running: its stop marks do not concern this transfer
+        fStop = false;
+        fSkip = false;
+    }
+    if (!IsSafeFileName(name)) {
+        error = "not a file name: " + name;
+        return false;
+    }
+    std::vector<std::string> mirrors;
+    std::string folder;
+    GetSources(mirrors, folder, false);
+    if (!folder.empty()) {
+        const fs::path source = fs::path(folder) / name;
+        std::string hash;
+        if (!FileSha256(source, hash)) {
+            error = name + " is missing in the folder";
+            return false;
+        }
+        if (hash != sha256) {
+            error = "the SHA-256 of " + name + " is not that of the manifest";
+            return false;
+        }
+        if (progress)
+            *progress += size;
+        path = source.string();
+        temporary = false;
+        return true;
+    }
+    Chunk chunk;
+    chunk.file = name;
+    chunk.compressedSize = size;
+    chunk.sha256 = sha256;
+    Shared shared;
+    if (progress)
+        shared.bytes = progress->load();
+    size_t mirror = 0;
+    boost::system::error_code ec;
+    fs::create_directories(fs::path(dir), ec);
+    // the bytes are reported while the file arrives
+    std::atomic<bool> done(false);
+    std::thread reporter;
+    if (progress) {
+        reporter = std::thread([&] {
+            while (!done) {
+                *progress = shared.bytes.load();
+                MilliSleep(200);
+            }
+        });
+    }
+    const bool ok = !mirrors.empty() && DownloadChunk(mirrors, mirror, fs::path(dir), chunk, shared, error);
+    done = true;
+    if (reporter.joinable())
+        reporter.join();
+    if (progress)
+        *progress = shared.bytes.load();
+    if (!ok) {
+        if (mirrors.empty())
+            error = "no address to fetch " + name + " from";
+        return false;
+    }
+    path = (fs::path(dir) / name).string();
+    temporary = true;
+    return true;
+}
+
+bool BootstrapVisitBlocks(int firstHeight, int lastHeight,
+                          const std::function<bool(int height, const std::vector<char>& block, std::string& error)>& visit,
+                          const std::function<bool(int lastHeightOfArchive, std::string& error)>& archiveDone,
+                          std::atomic<uint64_t>* bytesDone, std::atomic<uint64_t>* bytesTotal, std::string& error)
+{
+    if (!fHold) {
+        // no block bootstrap is running: its stop marks do not concern this transfer
+        fStop = false;
+        fSkip = false;
+    }
+    std::string text;
+    std::vector<Chunk> all;
+    if (!BootstrapReadFile("manifest.json", text, error) || !ParseManifest(text, all, error))
+        return false;
+    if (all.back().lastHeight < lastHeight) {
+        error = strprintf("the block archives end at height %d, the blocks up to %d are needed", all.back().lastHeight, lastHeight);
+        return false;
+    }
+    uint64_t total = 0;
+    for (const Chunk& chunk : all) {
+        if (chunk.firstHeight <= lastHeight)
+            total += chunk.compressedSize;
+    }
+    if (bytesTotal)
+        *bytesTotal = total;
+    const fs::path dir = GetDataDir() / "pastblocks";
+    const unsigned char* magic = Params().MessageStart();
+    boost::system::error_code ec;
+    bool ok = true;
+    for (size_t i = 0; i < all.size() && ok && all[i].firstHeight <= lastHeight; ++i) {
+        const Chunk& chunk = all[i];
+        if (chunk.lastHeight < firstHeight) {
+            // done by an earlier visit
+            if (bytesDone)
+                *bytesDone += chunk.compressedSize;
+            continue;
+        }
+        std::string path;
+        bool temporary = false;
+        if (!BootstrapGetFile(chunk.file, chunk.compressedSize, chunk.sha256, dir.string(), bytesDone, path, temporary, error))
+            return false;
+        // decompress next to the download, then read the blocks from there
+        fs::create_directories(dir, ec);
+        fs::path plain = fs::path(path);
+        if (chunk.gzip) {
+            plain = dir / (chunk.file + ".plain");
+            FILE* in = fsbridge::fopen(fs::path(path), "rb");
+            FILE* out = fsbridge::fopen(plain, "wb");
+            uint64_t size = 0;
+            std::string gzipError = "cannot open the files";
+            const bool unpacked = in && out && GunzipFile(in, out, chunk.size, size, gzipError);
+            if (in)
+                fclose(in);
+            if (out)
+                fclose(out);
+            if (!unpacked || size != chunk.size) {
+                error = "cannot decompress " + chunk.file + ": " + gzipError;
+                ok = false;
+            }
+        }
+        FILE* file = ok ? fsbridge::fopen(plain, "rb") : nullptr;
+        if (ok && !file) {
+            error = "cannot open " + plain.string();
+            ok = false;
+        }
+        std::vector<char> raw;
+        int height = chunk.firstHeight;
+        while (ok && height <= lastHeight) {
+            if (height % 256 == 0 && Cancelled()) {
+                error = "cancelled";
+                ok = false;
+                break;
+            }
+            unsigned char header[8];
+            const size_t got = fread(header, 1, 8, file);
+            if (got == 0)
+                break;
+            const uint32_t length = ReadLE32(header + 4);
+            if (got != 8 || memcmp(header, magic, 4) != 0 || length < 80 || length > MAX_BLOCK_SERIALIZED_SIZE) {
+                error = chunk.file + " is not a sequence of blocks";
+                ok = false;
+                break;
+            }
+            raw.resize(length);
+            if (fread(raw.data(), 1, length, file) != length) {
+                error = chunk.file + " ends in the middle of a block";
+                ok = false;
+                break;
+            }
+            if (!visit(height, raw, error))
+                ok = false;
+            ++height;
+        }
+        if (file)
+            fclose(file);
+        if (chunk.gzip)
+            fs::remove(plain, ec);
+        if (temporary)
+            fs::remove(fs::path(path), ec);
+        if (ok && height <= std::min(lastHeight, chunk.lastHeight)) {
+            error = chunk.file + " has fewer blocks than the manifest says";
+            ok = false;
+        }
+        if (ok && archiveDone && !archiveDone(height - 1, error))
+            ok = false;
+    }
+    if (ok)
+        fs::remove_all(dir, ec);
+    return ok;
+}
+
+void StartBootstrap(boost::thread_group& threadGroup)
+{
+    pthreadGroup = &threadGroup;
+    // -bootstrapurl can be given several times: mirrors, tried in this order
+    std::vector<std::string> mirrors;
+    std::string folder;
+    const bool enabled = gArgs.GetBoolArg("-bootstrap", DEFAULT_BOOTSTRAP);
+    GetSources(mirrors, folder, enabled);
     {
         LOCK(cs_bootstrap);
         info = BootstrapInfo();

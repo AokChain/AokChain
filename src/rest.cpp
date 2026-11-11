@@ -5,6 +5,7 @@
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
+#include "snapshot.h"
 #include "chain.h"
 #include "chainparams.h"
 #include "core_io.h"
@@ -217,6 +218,9 @@ static bool rest_block(HTTPRequest* req,
         pblockindex = mapBlockIndex[hash];
         if (fHavePruned && !(pblockindex->nStatus & BLOCK_HAVE_DATA) && pblockindex->nTx > 0)
             return RESTERR(req, HTTP_NOT_FOUND, hashStr + " not available (pruned data)");
+
+        if (IsPastBlockMissing(pblockindex))
+            return RESTERR(req, HTTP_NOT_FOUND, hashStr + " not available: " + PastBlocksMessage());
 
         if (!ReadBlockFromDisk(block, pblockindex, Params().GetConsensus()))
             return RESTERR(req, HTTP_NOT_FOUND, hashStr + " not found");

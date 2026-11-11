@@ -173,6 +173,7 @@ AOKCHAIN_CORE_H = \
   utiltime.h \
   validation.h \
   bootstrap.h \
+  snapshot.h \
   gunzip.h \
   validationinterface.h \
   versionbits.h \
@@ -248,6 +249,7 @@ libaokchain_server_a_SOURCES = \
   ui_interface.cpp \
   validation.cpp \
   bootstrap.cpp \
+  snapshot.cpp \
   gunzip.cpp \
   validationinterface.cpp \
   versionbits.cpp \

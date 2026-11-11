@@ -5,6 +5,7 @@
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
+#include "snapshot.h"
 #include <amount.h>
 #include <base58.h>
 #include <chain.h>
@@ -2247,7 +2248,7 @@ UniValue listsinceblock(const JSONRPCRequest& request)
     while (include_removed && paltindex && paltindex != pindex) {
         CBlock block;
         if (!ReadBlockFromDisk(block, paltindex, Params().GetConsensus())) {
-            throw JSONRPCError(RPC_INTERNAL_ERROR, "Can't read block from disk");
+            throw JSONRPCError(RPC_INTERNAL_ERROR, IsPastBlockMissing(paltindex) ? PastBlocksMessage() : "Can't read block from disk");
         }
         for (const CTransactionRef& tx : block.vtx) {
             auto it = pwallet->mapWallet.find(tx->GetHash());
@@ -3991,6 +3992,9 @@ UniValue rescanblockchain(const JSONRPCRequest& request)
             throw JSONRPCError(RPC_INVALID_PARAMETER, "stop_height must be greater then start_height");
         }
     }
+
+    if (PastBlocksMissing() && pindexStart->nHeight <= SnapshotHeight())
+        throw JSONRPCError(RPC_MISC_ERROR, PastBlocksMessage());
 
     // We can't rescan beyond non-pruned blocks, stop and throw an error
     if (fPruneMode) {

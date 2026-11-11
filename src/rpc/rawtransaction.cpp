@@ -5,6 +5,7 @@
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
+#include "snapshot.h"
 #include "base58.h"
 #include "chain.h"
 #include "coins.h"
@@ -214,7 +215,8 @@ UniValue getrawtransaction(const JSONRPCRequest& request)
     if (!GetTransaction(hash, tx, Params().GetConsensus(), hashBlock, true))
         throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, std::string(fTxIndex ? "No such mempool or blockchain transaction"
             : "No such mempool transaction. Use -txindex to enable blockchain transaction queries") +
-            ". Use gettransaction for wallet transactions.");
+            ". Use gettransaction for wallet transactions." +
+            (PastBlocksMissing() ? " If it is a transaction of a block up to height " + std::to_string(SnapshotHeight()) + ": " + PastBlocksMessage() : ""));
 
     if (!fVerbose)
         return EncodeHexTx(*tx, RPCSerializationFlags());
@@ -291,6 +293,9 @@ UniValue gettxoutproof(const JSONRPCRequest& request)
             throw JSONRPCError(RPC_INTERNAL_ERROR, "Transaction index corrupt");
         pblockindex = mapBlockIndex[hashBlock];
     }
+
+    if (IsPastBlockMissing(pblockindex))
+        throw JSONRPCError(RPC_MISC_ERROR, PastBlocksMessage());
 
     CBlock block;
     if(!ReadBlockFromDisk(block, pblockindex, Params().GetConsensus()))
