@@ -11,7 +11,11 @@
 #include <QValidator>
 
 class OptionsModel;
+class QCheckBox;
 class QFrame;
+class QLabel;
+class QPushButton;
+class QPlainTextEdit;
 class QVBoxLayout;
 class QValidatedLineEdit;
 
@@ -65,6 +69,8 @@ private Q_SLOTS:
     void on_cancelButton_clicked();
     
     void on_hideTrayIcon_stateChanged(int fState);
+    void chooseBootstrapFolder();
+    void languageChosen();
 
     void showRestartWarning(bool fPersistent = false);
     void clearStatusLabel();
@@ -79,6 +85,10 @@ private:
     Ui::OptionsDialog *ui;
     OptionsModel *model;
     QDataWidgetMapper *mapper;
+    QLabel *languageNotice;
+    QPushButton *languageRestart;
+    QCheckBox *bootstrapUse;
+    QPlainTextEdit *bootstrapUrls;
     bool walletEnabled;
     bool embedded;
     QVBoxLayout *extraColumn;

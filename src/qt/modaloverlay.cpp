@@ -12,6 +12,9 @@
 #include "chainparams.h"
 
 #include <QResizeEvent>
+#include <QVBoxLayout>
+#include <QPushButton>
+#include <QLabel>
 #include <QPropertyAnimation>
 
 ModalOverlay::ModalOverlay(QWidget *parent) :
@@ -30,6 +33,32 @@ userClosed(false)
     ui->warningIcon->setFlat(true);
     ui->warningIcon->setStyleSheet("QPushButton { border: none; background: transparent; }");
     connect(ui->closeButton, SIGNAL(clicked()), this, SLOT(closeClicked()));
+
+    // Block bootstrap: what it does, how far it is, and the way out. Above the buttons.
+    bootstrapBox = new QWidget(ui->contentWidget);
+    bootstrapBox->setObjectName("bootstrapBox");
+    bootstrapBox->setStyleSheet(QString("#bootstrapBox { background: %1; border-radius: 12px; }").arg(GUIUtil::theme().accentSoft.name()));
+    QVBoxLayout *boxLayout = new QVBoxLayout(bootstrapBox);
+    boxLayout->setContentsMargins(16, 12, 16, 12);
+    boxLayout->setSpacing(4);
+    bootstrapStatus = new QLabel(bootstrapBox);
+    bootstrapStatus->setFont(GUIUtil::appFont(14, QFont::DemiBold));
+    bootstrapDetail = new QLabel(bootstrapBox);
+    bootstrapDetail->setWordWrap(true);
+    bootstrapDetail->setProperty("role", "caption");
+    boxLayout->addWidget(bootstrapStatus);
+    boxLayout->addWidget(bootstrapDetail);
+    bootstrapBox->hide();
+    ui->verticalLayoutSub->insertWidget(ui->verticalLayoutSub->count() - 1, bootstrapBox);
+    bootstrapSkip = new QPushButton(tr("Skip and get the blocks from peers"), this);
+    bootstrapSkip->setToolTip(tr("Stop fetching the block archives and synchronize the usual way, from other nodes"));
+    bootstrapSkip->hide();
+    QPushButton *folder = new QPushButton(tr("Choose a folder with block archives..."), this);
+    folder->setToolTip(tr("Import block archives that you fetched yourself (the files and manifest.json in one folder). Every block is validated."));
+    ui->horizontalLayoutButtons->insertWidget(0, folder);
+    ui->horizontalLayoutButtons->insertWidget(1, bootstrapSkip);
+    connect(bootstrapSkip, SIGNAL(clicked()), this, SIGNAL(bootstrapSkipRequested()));
+    connect(folder, SIGNAL(clicked()), this, SIGNAL(bootstrapFolderRequested()));
     if (parent) {
         parent->installEventFilter(this);
         raise();
@@ -80,6 +109,14 @@ void ModalOverlay::setKnownBestHeight(int count, const QDateTime& blockDate)
         bestHeaderHeight = count;
         bestHeaderDate = blockDate;
     }
+}
+
+void ModalOverlay::setBootstrapState(bool active, const QString& status, const QString& detail)
+{
+    bootstrapBox->setVisible(active || !status.isEmpty());
+    bootstrapSkip->setVisible(active);
+    bootstrapStatus->setText(status);
+    bootstrapDetail->setText(detail);
 }
 
 void ModalOverlay::tipUpdate(int count, const QDateTime& blockDate, double nVerificationProgress)

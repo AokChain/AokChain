@@ -43,6 +43,10 @@
 
 #include <QAbstractItemView>
 #include <QApplication>
+#include <QLocale>
+#include <QDir>
+#include <QCoreApplication>
+#include <QComboBox>
 #include <QEvent>
 #include <QLayout>
 #include <QDialog>
@@ -380,6 +384,10 @@ QPixmap lineIcon(const QString& name, int size, const QColor& color, qreal strok
     } else if (name == "sign") {
         // a pen on a line
         poly({{5, 17}, {5, 13.5}, {14.5, 4}, {18, 7.5}, {8.5, 17}, {5, 17}}); line(12.5, 6, 16, 9.5); line(4, 21, 20, 21);
+    } else if (name == "globe") {
+        p.drawEllipse(QPointF(12, 12), 9, 9);
+        p.drawEllipse(QPointF(12, 12), 4, 9);
+        line(3, 12, 21, 12);
     } else if (name == "shield") {
         poly({{12, 3}, {19, 6}, {19, 11}, {17.5, 15.5}, {12, 21}, {6.5, 15.5}, {5, 11}, {5, 6}, {12, 3}});
         poly({{9, 12}, {11.2, 14.2}, {15.5, 10}});
@@ -397,6 +405,38 @@ QPixmap lineIcon(const QString& name, int size, const QColor& color, qreal strok
         p.drawEllipse(QPointF(5, 12), 1.2, 1.2); p.drawEllipse(QPointF(12, 12), 1.2, 1.2); p.drawEllipse(QPointF(19, 12), 1.2, 1.2);
     }
     return pixmap;
+}
+
+void fillLanguageCombo(QComboBox* combo)
+{
+    combo->clear();
+    // readable whatever the current language is
+    const QString translated = QCoreApplication::translate("GUIUtil", "System default");
+    combo->addItem(translated == "System default" ? translated : QString("System default / %1").arg(translated), QVariant(""));
+    QDir translations(":translations");
+    for (const QString& name : translations.entryList()) {
+        const QLocale locale(name);
+        QString label = locale.nativeLanguageName();
+        if (label.isEmpty())
+            label = QLocale::languageToString(locale.language());
+        if (!label.isEmpty())
+            label[0] = label[0].toUpper();
+        if (name.contains("_") && !locale.nativeCountryName().isEmpty())
+            label += QString(" - ") + locale.nativeCountryName();
+        combo->addItem(label + QString(" (") + name + QString(")"), QVariant(name));
+    }
+}
+
+static bool fRestartRequested = false;
+
+void requestRestart()
+{
+    fRestartRequested = true;
+}
+
+bool restartRequested()
+{
+    return fRestartRequested;
 }
 
 QPixmap tokenLogo(const QString& tokenName, int size)

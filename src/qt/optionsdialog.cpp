@@ -12,6 +12,7 @@
 #include "ui_optionsdialog.h"
 
 #include "aokchainunits.h"
+#include "bootstrap.h"
 #include "guiutil.h"
 #include "optionsmodel.h"
 
@@ -21,6 +22,11 @@
 
 #include <QDataWidgetMapper>
 #include <QDir>
+#include <QTranslator>
+#include <QApplication>
+#include <QPlainTextEdit>
+#include <QFileDialog>
+#include <QCheckBox>
 #include <QComboBox>
 #include <QVBoxLayout>
 #include <QStyle>
@@ -39,6 +45,8 @@ OptionsDialog::OptionsDialog(QWidget *parent, bool enableWallet) :
     ui(new Ui::OptionsDialog),
     model(0),
     mapper(0),
+    languageNotice(nullptr),
+    languageRestart(nullptr),
     walletEnabled(enableWallet),
     embedded(false),
     extraColumn(0)
@@ -72,6 +80,38 @@ OptionsDialog::OptionsDialog(QWidget *parent, bool enableWallet) :
     connect(ui->connectSocksTor, SIGNAL(toggled(bool)), ui->proxyPortTor, SLOT(setEnabled(bool)));
     connect(ui->connectSocksTor, SIGNAL(toggled(bool)), this, SLOT(updateProxyValidationState()));
 
+    /* Block bootstrap: where the block archives come from */
+    {
+        QVBoxLayout *network = ui->verticalLayout_Network;
+        int at = network->count();
+        for (int i = 0; i < network->count(); ++i) {
+            if (network->itemAt(i)->spacerItem())
+                at = i;
+        }
+        bootstrapUse = new QCheckBox(tr("&Fast first synchronization from block archives"), ui->tabNetwork);
+        bootstrapUse->setToolTip(tr("A new installation fetches the blocks as archives from the addresses below instead of block by block from other nodes. Every block is validated as usual, so the server does not have to be trusted."));
+        QLabel *label = new QLabel(tr("Addresses of the block archives, one per line (mirrors are tried in this order):"), ui->tabNetwork);
+        label->setWordWrap(true);
+        bootstrapUrls = new QPlainTextEdit(ui->tabNetwork);
+        bootstrapUrls->setFixedHeight(64);
+        bootstrapUrls->setPlaceholderText(tr("Empty: the built-in address of the main network"));
+        bootstrapUrls->setToolTip(QString::fromLatin1(DEFAULT_BOOTSTRAP_URL_MAIN));
+        bootstrapUrls->setLineWrapMode(QPlainTextEdit::NoWrap);
+        bootstrapUrls->setFont(GUIUtil::monoFont(12));
+        QPushButton *folder = new QPushButton(tr("Choose a folder with block archives..."), ui->tabNetwork);
+        folder->setToolTip(tr("Import block archives that you fetched yourself (the files and manifest.json in one folder) right now. Every block is validated."));
+        folder->setAutoDefault(false);
+        connect(folder, SIGNAL(clicked()), this, SLOT(chooseBootstrapFolder()));
+        connect(bootstrapUse, SIGNAL(toggled(bool)), bootstrapUrls, SLOT(setEnabled(bool)));
+        network->insertWidget(at++, bootstrapUse);
+        network->insertWidget(at++, label);
+        network->insertWidget(at++, bootstrapUrls);
+        QHBoxLayout *row = new QHBoxLayout();
+        row->addWidget(folder);
+        row->addStretch();
+        network->insertLayout(at++, row);
+    }
+
     /* Window elements init */
 #ifdef Q_OS_MAC
     /* remove Window tab on Mac */
@@ -92,33 +132,7 @@ OptionsDialog::OptionsDialog(QWidget *parent, bool enableWallet) :
     ui->openAokChainConfButton->setToolTip(ui->openAokChainConfButton->toolTip().arg(tr(PACKAGE_NAME)));
 
     ui->lang->setToolTip(ui->lang->toolTip().arg(tr(PACKAGE_NAME)));
-    ui->lang->addItem(QString("(") + tr("default") + QString(")"), QVariant(""));
-    for (const QString &langStr : translations.entryList())
-    {
-        QLocale locale(langStr);
-
-        /** check if the locale name consists of 2 parts (language_country) */
-        if(langStr.contains("_"))
-        {
-#if QT_VERSION >= 0x040800
-            /** display language strings as "native language - native country (locale name)", e.g. "Deutsch - Deutschland (de)" */
-            ui->lang->addItem(locale.nativeLanguageName() + QString(" - ") + locale.nativeCountryName() + QString(" (") + langStr + QString(")"), QVariant(langStr));
-#else
-            /** display language strings as "language - country (locale name)", e.g. "German - Germany (de)" */
-            ui->lang->addItem(QLocale::languageToString(locale.language()) + QString(" - ") + QLocale::countryToString(locale.country()) + QString(" (") + langStr + QString(")"), QVariant(langStr));
-#endif
-        }
-        else
-        {
-#if QT_VERSION >= 0x040800
-            /** display language strings as "native language (locale name)", e.g. "Deutsch (de)" */
-            ui->lang->addItem(locale.nativeLanguageName() + QString(" (") + langStr + QString(")"), QVariant(langStr));
-#else
-            /** display language strings as "language (locale name)", e.g. "German (de)" */
-            ui->lang->addItem(QLocale::languageToString(locale.language()) + QString(" (") + langStr + QString(")"), QVariant(langStr));
-#endif
-        }
-    }
+    GUIUtil::fillLanguageCombo(ui->lang);
 #if QT_VERSION >= 0x040700
     ui->thirdPartyTxUrls->setPlaceholderText("https://example.com/tx/%s");
 #endif
@@ -194,7 +208,10 @@ void OptionsDialog::embedAsPage()
     body->setStyleSheet("QWidget#settingsBody { background: transparent; }");
     scroll->setWidget(body);
     scroll->viewport()->setAutoFillBackground(false);
-    QHBoxLayout *columns = new QHBoxLayout(body);
+    QVBoxLayout *whole = new QVBoxLayout(body);
+    whole->setContentsMargins(0, 0, 0, 0);
+    whole->setSpacing(16);
+    QHBoxLayout *columns = new QHBoxLayout();
     columns->setContentsMargins(0, 0, 8, 0);
     columns->setSpacing(16);
     QVBoxLayout *left = new QVBoxLayout();
@@ -203,6 +220,58 @@ void OptionsDialog::embedAsPage()
     extraColumn->setSpacing(16);
     columns->addLayout(left, 1);
     columns->addLayout(extraColumn, 1);
+
+    // The language first, across the page, with a label that can be read in any language.
+    {
+        QVBoxLayout *cardBody = nullptr;
+        QFrame *languageCard = makeCard(QString(), this, &cardBody);
+        QHBoxLayout *row = new QHBoxLayout();
+        row->setSpacing(14);
+        QLabel *globe = new QLabel(languageCard);
+        globe->setFixedSize(40, 40);
+        globe->setAlignment(Qt::AlignCenter);
+        globe->setPixmap(GUIUtil::lineIcon("globe", 22, GUIUtil::theme().accent, 1.8));
+        globe->setStyleSheet(QString("QLabel { background-color: %1; border-radius: 12px; }").arg(GUIUtil::theme().accentSoft.name()));
+        row->addWidget(globe);
+        const QString word = tr("Language");
+        QLabel *label = new QLabel(word == "Language" ? QString::fromUtf8("Language / 언어") : QString("Language / %1").arg(word), languageCard);
+        label->setProperty("role", "title");
+        row->addWidget(label);
+        if (QLayout *displayLayout = ui->tabDisplay->layout()) {
+            // out of the display card
+            for (QLayout *inner : displayLayout->findChildren<QLayout*>())
+                inner->removeWidget(ui->lang);
+            displayLayout->removeWidget(ui->lang);
+        }
+        ui->langLabel->hide();
+        ui->lang->setParent(languageCard);
+        ui->lang->setFixedHeight(42);
+        ui->lang->setMinimumWidth(300);
+        row->addWidget(ui->lang);
+        languageNotice = new QLabel(languageCard);
+        languageNotice->setProperty("role", "secondary");
+        languageNotice->hide();
+        row->addWidget(languageNotice);
+        row->addStretch(1);
+        languageRestart = new QPushButton(languageCard);
+        languageRestart->setProperty("primary", true);
+        languageRestart->setFixedHeight(40);
+        languageRestart->setMinimumWidth(240);
+        languageRestart->setAutoDefault(false);
+        languageRestart->hide();
+        row->addWidget(languageRestart);
+        cardBody->addLayout(row);
+        whole->addWidget(languageCard);
+        QWidget *columnsHost = new QWidget(body);
+        columnsHost->setObjectName("settingsColumns");
+        columnsHost->setStyleSheet("QWidget#settingsColumns { background: transparent; }");
+        columnsHost->setLayout(columns);
+        whole->addWidget(columnsHost, 1);
+        connect(languageRestart, &QPushButton::clicked, this, [] {
+            GUIUtil::requestRestart();
+            QApplication::quit();
+        });
+    }
 
     auto addPages = [this, &pages](QVBoxLayout *column, const QString &title, const QList<QWidget*> &wanted) {
         QVBoxLayout *cardBody = nullptr;
@@ -284,6 +353,9 @@ void OptionsDialog::embedAsPage()
     ui->verticalLayout->addLayout(bar);
 }
 
+// tr("Restart to apply") and tr("Restart now") are looked up in the translation of the chosen language
+static const char *languageStrings[] = {QT_TRANSLATE_NOOP("OptionsDialog", "Restart to apply"), QT_TRANSLATE_NOOP("OptionsDialog", "Restart now")};
+
 void OptionsDialog::addCard(QWidget *card)
 {
     if (extraColumn)
@@ -335,8 +407,11 @@ void OptionsDialog::setModel(OptionsModel *_model)
     connect(ui->allowIncoming, SIGNAL(clicked(bool)), this, SLOT(showRestartWarning()));
     connect(ui->connectSocks, SIGNAL(clicked(bool)), this, SLOT(showRestartWarning()));
     connect(ui->connectSocksTor, SIGNAL(clicked(bool)), this, SLOT(showRestartWarning()));
+    connect(bootstrapUse, SIGNAL(clicked(bool)), this, SLOT(showRestartWarning()));
+    connect(bootstrapUrls, SIGNAL(textChanged()), this, SLOT(showRestartWarning()));
     /* Display */
     connect(ui->lang, SIGNAL(valueChanged()), this, SLOT(showRestartWarning()));
+    connect(ui->lang, SIGNAL(activated(int)), this, SLOT(languageChosen()));
     connect(ui->thirdPartyTxUrls, SIGNAL(textChanged(const QString &)), this, SLOT(showRestartWarning()));
 }
 
@@ -363,6 +438,8 @@ void OptionsDialog::setMapper()
     mapper->addMapping(ui->connectSocksTor, OptionsModel::ProxyUseTor);
     mapper->addMapping(ui->proxyIpTor, OptionsModel::ProxyIPTor);
     mapper->addMapping(ui->proxyPortTor, OptionsModel::ProxyPortTor);
+    mapper->addMapping(bootstrapUse, OptionsModel::BootstrapUse);
+    mapper->addMapping(bootstrapUrls, OptionsModel::BootstrapUrls, "plainText");
 
     /* Window */
 #ifndef Q_OS_MAC
@@ -441,6 +518,46 @@ void OptionsDialog::on_cancelButton_clicked()
         return;
     }
     reject();
+}
+
+/** The language is stored at once: no "Save" in a language that the user may not read. */
+void OptionsDialog::languageChosen()
+{
+    if (!embedded || !model || !languageNotice)
+        return;
+    const QString code = ui->lang->currentData().toString();
+    model->setData(model->index(OptionsModel::Language, 0), code, Qt::EditRole);
+    // in the language that was chosen and in English
+    QString chosen = "Restart to apply";
+    QString button = "Restart now";
+    QTranslator translator;
+    QString name = code.isEmpty() ? QLocale::system().name() : code;
+    if (translator.load(name, ":/translations/") || translator.load(name.left(name.indexOf('_')), ":/translations/")) {
+        const QString localNotice = translator.translate("OptionsDialog", "Restart to apply");
+        const QString localButton = translator.translate("OptionsDialog", "Restart now");
+        if (!localNotice.isEmpty())
+            chosen = QString("%1 / Restart to apply").arg(localNotice);
+        if (!localButton.isEmpty())
+            button = QString("%1 / Restart now").arg(localButton);
+    }
+    languageNotice->setText(chosen);
+    languageNotice->show();
+    languageRestart->setText(button);
+    languageRestart->show();
+}
+
+void OptionsDialog::chooseBootstrapFolder()
+{
+    const QString folder = QFileDialog::getExistingDirectory(this, tr("Folder with block archives (manifest.json and the blocks-... files)"));
+    if (folder.isEmpty())
+        return;
+    std::string error;
+    if (StartBootstrapFromFolder(folder.toStdString(), error))
+        QMessageBox::information(this, tr("Block archives"), tr("The import has started. The side bar shows how far it is."));
+    else
+        QMessageBox::warning(this, tr("Block archives"), error == "a bootstrap is running already"
+            ? tr("A fast sync is running. Skip it first (sync window), then choose the folder.")
+            : tr("This folder has no manifest.json. Choose the folder that holds manifest.json and the blocks-... files."));
 }
 
 void OptionsDialog::on_hideTrayIcon_stateChanged(int fState)

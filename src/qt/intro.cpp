@@ -17,6 +17,9 @@
 #include "util.h"
 
 #include <QFileDialog>
+#include <QLabel>
+#include <QHBoxLayout>
+#include <QComboBox>
 #include <QSettings>
 #include <QMessageBox>
 
@@ -122,6 +125,43 @@ Intro::Intro(QWidget *parent) :
     signalled(false)
 {
     ui->setupUi(this);
+
+    // The language, first of all and readable in any language
+    {
+        // the fonts of the program, so that "언어" shows on a system without a Korean font
+        static bool fontsLoaded = false;
+        if (!fontsLoaded) {
+            GUIUtil::loadAppFonts();
+            QFont::insertSubstitution("Noto Sans", "Noto Sans KR");
+            fontsLoaded = true;
+        }
+        setFont(GUIUtil::appFont(13));
+        QHBoxLayout *row = new QHBoxLayout();
+        row->setSpacing(10);
+        QLabel *globe = new QLabel(this);
+        globe->setPixmap(GUIUtil::lineIcon("globe", 20, GUIUtil::theme().accent, 1.8));
+        row->addWidget(globe);
+        const QString word = tr("Language");
+        QLabel *label = new QLabel(word == "Language" ? QString::fromUtf8("Language / 언어") : QString("Language / %1").arg(word), this);
+        row->addWidget(label);
+        QComboBox *language = new QComboBox(this);
+        GUIUtil::fillLanguageCombo(language);
+        language->setMinimumWidth(280);
+        QSettings settings;
+        const int current = language->findData(settings.value("language", "").toString());
+        language->setCurrentIndex(current < 0 ? 0 : current);
+        row->addWidget(language);
+        row->addStretch(1);
+        ui->verticalLayout->insertLayout(0, row);
+        connect(language, static_cast<void (QComboBox::*)(int)>(&QComboBox::activated), this, [this, language](int index) {
+            QSettings store;
+            if (store.value("language", "").toString() == language->itemData(index).toString())
+                return;
+            store.setValue("language", language->itemData(index).toString());
+            done(LanguageChanged);
+        });
+    }
+
     ui->welcomeLabel->setText(ui->welcomeLabel->text().arg(tr(PACKAGE_NAME)));
     ui->storageLabel->setText(ui->storageLabel->text().arg(tr(PACKAGE_NAME)));
 
@@ -188,6 +228,13 @@ QString Intro::getDefaultDataDirectory()
     return GUIUtil::boostPathToQString(GetDefaultDataDir());
 }
 
+static std::function<void()> languageChangedCallback;
+
+void Intro::setLanguageChanged(std::function<void()> callback)
+{
+    languageChangedCallback = callback;
+}
+
 bool Intro::pickDataDirectory()
 {
     QSettings settings;
@@ -203,18 +250,24 @@ bool Intro::pickDataDirectory()
     if(!fs::exists(GUIUtil::qstringToBoostPath(dataDir)) || gArgs.GetBoolArg("-choosedatadir", DEFAULT_CHOOSE_DATADIR) || settings.value("fReset", false).toBool() || gArgs.GetBoolArg("-resetguisettings", false))
     {
         /* If current default data directory does not exist, let the user choose one */
-        Intro intro;
-        intro.setDataDirectory(dataDir);
-        intro.setWindowIcon(QIcon(":icons/aokchain"));
-
         while(true)
         {
-            if(!intro.exec())
+            Intro intro;
+            intro.setDataDirectory(dataDir);
+            intro.setWindowIcon(QIcon(":icons/aokchain"));
+            const int result = intro.exec();
+            if(!result)
             {
                 /* Cancel clicked */
                 return false;
             }
             dataDir = intro.getDataDirectory();
+            if (result == LanguageChanged) {
+                /* the same dialog again, in the language that was chosen */
+                if (languageChangedCallback)
+                    languageChangedCallback();
+                continue;
+            }
             try {
                 if (TryCreateDirectories(GUIUtil::qstringToBoostPath(dataDir))) {
                     // If a new data directory has been created, make wallets subdirectory too

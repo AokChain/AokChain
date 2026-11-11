@@ -35,6 +35,7 @@ class QPainter;
 class QPixmap;
 class QLineEdit;
 class QUrl;
+class QComboBox;
 class QWidget;
 QT_END_NAMESPACE
 
@@ -111,6 +112,12 @@ namespace GUIUtil
     QString withThousands(const QString& number);
     /** A line icon drawn in the given color. Names: overview, send, receive, history, tokens, explorer,
         create, manage, addressbook, paste, download, search, chevron, plus, remove, copy, lock. */
+    /** Fill a combo box with the languages of the bundled translations, each in its own
+        language, after "System default". The item data is the locale name ("" for the default). */
+    void fillLanguageCombo(QComboBox* combo);
+    /** Ask for the program to be started again after it has shut down (see main()). */
+    void requestRestart();
+    bool restartRequested();
     QPixmap lineIcon(const QString& name, int size, const QColor& color, qreal strokeWidth = 2.0);
     /** The bundled logo of a token as a round pixmap; a letter avatar when there is none.
         The logo is looked up by the root name (before '/', '#' and '!'). */

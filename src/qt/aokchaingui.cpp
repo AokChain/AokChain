@@ -10,6 +10,8 @@
 
 #include "aokchaingui.h"
 
+#include "bootstrap.h"
+
 #include "aokchainunits.h"
 #include "clientmodel.h"
 #include "guiconstants.h"
@@ -51,6 +53,7 @@
 #include <QPainter>
 #include <QWidgetAction>
 #include <QAction>
+#include <QFileDialog>
 #include <QApplication>
 #include <QDateTime>
 #include <QDesktopWidget>
@@ -144,6 +147,7 @@ AokChainGUI::AokChainGUI(const PlatformStyle *_platformStyle, const NetworkStyle
     rpcConsole(0),
     helpMessageDialog(0),
     modalOverlay(0),
+    bootstrapActive(false),
     prevBlocks(0),
     spinnerFrame(0),
     nWeight(0),
@@ -291,6 +295,11 @@ AokChainGUI::AokChainGUI(const PlatformStyle *_platformStyle, const NetworkStyle
     connect(labelStakingIcon, SIGNAL(clicked(QPoint)), this, SLOT(toggleStakingActive()));
 
     modalOverlay = new ModalOverlay(this->centralWidget());
+    connect(modalOverlay, SIGNAL(bootstrapSkipRequested()), this, SLOT(skipBootstrap()));
+    connect(modalOverlay, SIGNAL(bootstrapFolderRequested()), this, SLOT(chooseBootstrapFolder()));
+    QTimer *bootstrapTimer = new QTimer(this);
+    connect(bootstrapTimer, SIGNAL(timeout()), this, SLOT(updateBootstrap()));
+    bootstrapTimer->start(1000);
 #ifdef ENABLE_WALLET
     if(enableWallet) {
         connect(walletFrame, SIGNAL(requestedSyncWarningInfo()), this, SLOT(showModalOverlay()));
@@ -1050,9 +1059,97 @@ void AokChainGUI::updateHeadersSyncProgressLabel()
     {
         progressBarLabel->setText(tr("Syncing Headers (%1%)...").arg(QString::number(100.0 / (headersTipHeight+estHeadersLeft)*headersTipHeight, 'f', 1)));
         if (sidebar)
-            sidebar->setSyncState(tr("Syncing headers"), QString::number(100.0 / (headersTipHeight+estHeadersLeft)*headersTipHeight, 'f', 1) + "%",
+            setSideSync(tr("Syncing headers"), QString::number(100.0 / (headersTipHeight+estHeadersLeft)*headersTipHeight, 'f', 1) + "%",
                                   1.0 / (headersTipHeight+estHeadersLeft)*headersTipHeight, true, progressBarLabel->text());
     }
+}
+
+void AokChainGUI::setSideSync(const QString& status, const QString& remaining, double progress, bool showProgress, const QString& toolTip)
+{
+    if (sidebar && !bootstrapActive)
+        sidebar->setSyncState(status, remaining, progress, showProgress, toolTip);
+}
+
+static QString megabytes(quint64 bytes)
+{
+    return bytes >= 1000000000ULL ? QString("%1 GB").arg(bytes / 1e9, 0, 'f', 1) : QString("%1 MB").arg(bytes / 1000000);
+}
+
+void AokChainGUI::updateBootstrap()
+{
+    const BootstrapInfo info = GetBootstrapInfo();
+    if (!info.configured && bootstrapLastState.isEmpty())
+        return; // nothing is shown when the bootstrap is not set up
+    const QString state = QString::fromStdString(info.state);
+    const bool active = info.active;
+    const QString explanation = tr("The blocks are fetched from a server as archives and then validated one by one, exactly like blocks from other nodes. The server does not have to be trusted.");
+    if (active) {
+        QString status, right, line;
+        double progress = 0;
+        const int height = clientModel ? clientModel->getNumBlocks() : info.startHeight;
+        if (info.chunks == 0) {
+            status = tr("Fast sync: getting ready");
+            line = status;
+        } else if (info.chunksDownloaded < info.chunks) {
+            status = tr("Fast sync: archive %1/%2").arg(info.chunksDownloaded + 1).arg(info.chunks);
+            right = QString("%1 / %2").arg(megabytes(info.bytesDownloaded), megabytes(info.bytesTotal));
+            line = tr("Fast sync: fetching block archive %1/%2 · %3 / %4").arg(info.chunksDownloaded + 1).arg(info.chunks)
+                       .arg(megabytes(info.bytesDownloaded), megabytes(info.bytesTotal));
+            progress = info.bytesTotal ? double(info.bytesDownloaded) / info.bytesTotal : 0;
+        } else {
+            status = tr("Validating blocks");
+            right = QString("%1 / %2").arg(GUIUtil::withThousands(QString::number(height)), GUIUtil::withThousands(QString::number(info.targetHeight)));
+            line = tr("Validating blocks %1 / %2").arg(GUIUtil::withThousands(QString::number(height)), GUIUtil::withThousands(QString::number(info.targetHeight)));
+            progress = info.targetHeight ? double(height) / info.targetHeight : 0;
+        }
+        const QString detail = info.chunks == 0 ? explanation
+            : explanation + "\n" + tr("Fetched %1 of %2 archives (%3 / %4), validated up to block %5 of %6.")
+                  .arg(info.chunksDownloaded).arg(info.chunks).arg(megabytes(info.bytesDownloaded), megabytes(info.bytesTotal))
+                  .arg(GUIUtil::withThousands(QString::number(height)), GUIUtil::withThousands(QString::number(info.targetHeight)));
+        if (sidebar)
+            sidebar->setSyncState(status, right, progress, true, line + "\n" + explanation);
+        if (modalOverlay)
+            modalOverlay->setBootstrapState(true, line, detail);
+    } else if (state != bootstrapLastState || bootstrapActive) {
+        // over: say how it ended, and let the ordinary sync line come back
+        QString status, detail;
+        if (state == "failed") {
+            status = tr("Fast sync was not possible: the blocks come from other nodes");
+            detail = QString::fromStdString(info.message);
+        } else if (state == "skipped") {
+            status = tr("Fast sync skipped: the blocks come from other nodes");
+        } else if (state == "done") {
+            status = tr("Fast sync finished: the remaining blocks come from other nodes");
+        }
+        if (modalOverlay)
+            modalOverlay->setBootstrapState(false, status, detail);
+        bootstrapActive = false;
+        if (clientModel)
+            setNumBlocks(clientModel->getNumBlocks(), clientModel->getLastBlockDate(), clientModel->getVerificationProgress(nullptr), false);
+    }
+    bootstrapActive = active;
+    bootstrapLastState = state;
+}
+
+void AokChainGUI::skipBootstrap()
+{
+    SkipBootstrap();
+    updateBootstrap();
+}
+
+void AokChainGUI::chooseBootstrapFolder()
+{
+    const QString folder = QFileDialog::getExistingDirectory(this, tr("Folder with block archives (manifest.json and the blocks-... files)"));
+    if (folder.isEmpty())
+        return;
+    std::string error;
+    if (!StartBootstrapFromFolder(folder.toStdString(), error)) {
+        QMessageBox::warning(this, tr("Block archives"), error == "a bootstrap is running already"
+            ? tr("A fast sync is running. Skip it first, then choose the folder.")
+            : tr("This folder has no manifest.json. Choose the folder that holds manifest.json and the blocks-... files."));
+        return;
+    }
+    updateBootstrap();
 }
 
 void AokChainGUI::setNumBlocks(int count, const QDateTime& blockDate, double nVerificationProgress, bool header)
@@ -1129,7 +1226,7 @@ void AokChainGUI::setNumBlocks(int count, const QDateTime& blockDate, double nVe
         progressBar->setVisible(false);
         fSyncing = false;
         if (sidebar)
-            sidebar->setSyncState(tr("Synced"), tr("Block %1").arg(count), 1.0, false, QString("<nobr>") + tooltip + QString("</nobr>"));
+            setSideSync(tr("Synced"), tr("Block %1").arg(count), 1.0, false, QString("<nobr>") + tooltip + QString("</nobr>"));
     }
     else
     {
@@ -1168,7 +1265,7 @@ void AokChainGUI::setNumBlocks(int count, const QDateTime& blockDate, double nVe
             // the side bar is narrow: years only when the chain is more than a year behind
             const qint64 year = 31556952;
             const QString sideBehind = secs >= year ? QObject::tr("%n year(s)", "", secs / year) : timeBehindText;
-            sidebar->setSyncState(sideStatus, tr("%1 left").arg(sideBehind), nVerificationProgress, true, QString("<nobr>") + tooltip + QString("</nobr>"));
+            setSideSync(sideStatus, tr("%1 left").arg(sideBehind), nVerificationProgress, true, QString("<nobr>") + tooltip + QString("</nobr>"));
         }
     }
 

@@ -8,6 +8,8 @@
 #define AOKCHAIN_QT_INTRO_H
 
 #include <QDialog>
+
+#include <functional>
 #include <QMutex>
 #include <QThread>
 
@@ -44,6 +46,10 @@ public:
      * will cause the wrong path to be cached.
      */
     static bool pickDataDirectory();
+    /** Called when the language was changed in the dialog, to load the translations again */
+    static void setLanguageChanged(std::function<void()> callback);
+    /** exec() returns this when the language was changed: the dialog is shown again in that language */
+    static const int LanguageChanged = 2;
 
     /**
      * Determine default data directory for operating system.

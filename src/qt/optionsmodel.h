@@ -49,6 +49,8 @@ public:
         SpendZeroConfChange,    // bool
         Listen,                 // bool
         CustomFeeFeatures,      // bool
+        BootstrapUse,           // bool
+        BootstrapUrls,          // QString: addresses of the block archives, one per line
         OptionIDRowCount,
     };
 

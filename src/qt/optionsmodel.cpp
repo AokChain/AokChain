@@ -129,6 +129,21 @@ void OptionsModel::Init(bool resetSettings)
     if (!gArgs.SoftSetBoolArg("-listen", settings.value("fListen").toBool()))
         addOverriddenOption("-listen");
 
+    // Block bootstrap
+    if (!settings.contains("fUseBootstrap"))
+        settings.setValue("fUseBootstrap", true);
+    if (!settings.contains("strBootstrapUrls"))
+        settings.setValue("strBootstrapUrls", "");
+    {
+        const QString urls = settings.value("strBootstrapUrls").toString().simplified();
+        if (!gArgs.GetArgs("-bootstrapurl").empty() || gArgs.IsArgSet("-bootstrapdir"))
+            addOverriddenOption("-bootstrapurl");
+        else if (!settings.value("fUseBootstrap").toBool())
+            gArgs.SoftSetBoolArg("-bootstrap", false);
+        else if (!urls.isEmpty())
+            gArgs.SoftSetArg("-bootstrapurl", urls.toStdString()); // none: the built-in address of the network, if it has one
+    }
+
     if (!settings.contains("fUseProxy"))
         settings.setValue("fUseProxy", false);
     if (!settings.contains("addrProxy") || !settings.value("addrProxy").toString().contains(':'))
@@ -276,6 +291,10 @@ QVariant OptionsModel::data(const QModelIndex & index, int role) const
             return settings.value("nThreadsScriptVerif");
         case Listen:
             return settings.value("fListen");
+        case BootstrapUse:
+            return settings.value("fUseBootstrap");
+        case BootstrapUrls:
+            return settings.value("strBootstrapUrls");
         case CustomFeeFeatures:
             return fCustomFeeFeatures;
         default:
@@ -423,6 +442,18 @@ bool OptionsModel::setData(const QModelIndex & index, const QVariant & value, in
         case Listen:
             if (settings.value("fListen") != value) {
                 settings.setValue("fListen", value);
+                setRestartRequired(true);
+            }
+            break;
+        case BootstrapUse:
+            if (settings.value("fUseBootstrap") != value) {
+                settings.setValue("fUseBootstrap", value);
+                setRestartRequired(true);
+            }
+            break;
+        case BootstrapUrls:
+            if (settings.value("strBootstrapUrls").toString() != value.toString()) {
+                settings.setValue("strBootstrapUrls", value.toString());
                 setRestartRequired(true);
             }
             break;

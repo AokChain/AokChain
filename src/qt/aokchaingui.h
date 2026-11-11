@@ -132,6 +132,10 @@ private:
     QWidget *footerWidget;
     QPushButton *stakingButton;
     Sidebar *sidebar;
+    bool bootstrapActive;
+    QString bootstrapLastState;
+    /** The sync line of the side bar; the block bootstrap has it while it runs */
+    void setSideSync(const QString& status, const QString& remaining, double progress, bool showProgress, const QString& toolTip);
     /** TOKENS END */
 
     QSystemTrayIcon *trayIcon;
@@ -253,6 +257,10 @@ private Q_SLOTS:
     void gotoSendingAddressesPage();
     /** Switch to the settings page */
     void gotoSettingsPage();
+    /** Show the state of the block bootstrap in the side bar and in the sync overlay */
+    void updateBootstrap();
+    void skipBootstrap();
+    void chooseBootstrapFolder();
 
 #endif // ENABLE_WALLET
     /** Show configuration dialog */

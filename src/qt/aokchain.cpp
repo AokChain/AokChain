@@ -10,6 +10,9 @@
 
 #include "aokchaingui.h"
 
+#include "bootstrap.h"
+#include "bootstrapfetch.h"
+
 #include <chainparams.h>
 #include <clientmodel.h>
 #include <fs.h>
@@ -45,6 +48,7 @@
 #include <boost/thread.hpp>
 
 #include <QApplication>
+#include <QProcess>
 #include <QDebug>
 #include <QLibraryInfo>
 #include <QLocale>
@@ -629,6 +633,8 @@ int main(int argc, char *argv[])
 
     /// 5. Now that settings and translations are available, ask user for data directory
     // User language is set up: pick a data directory
+    // (the dialog can change the language: the translations are then loaded again)
+    Intro::setLanguageChanged([&] { initTranslations(qtTranslatorBase, qtTranslator, translatorBase, translator); });
     if (!Intro::pickDataDirectory())
         return EXIT_SUCCESS;
 
@@ -710,6 +716,8 @@ int main(int argc, char *argv[])
     // Fonts, palette and style sheet of the theme
     GUIUtil::loadAppFonts();
     GUIUtil::applyTheme(app);
+    // the block bootstrap of the GUI fetches with the network stack of Qt: https and redirects
+    SetBootstrapFetcher(QtBootstrapFetch, true);
 
     // Subscribe to global signals from core
     uiInterface.InitMessage.connect(InitMessage);
@@ -743,6 +751,14 @@ int main(int argc, char *argv[])
     } catch (...) {
         PrintExceptionContinue(nullptr, "Runaway exception");
         app.handleRunawayException(QString::fromStdString(GetWarnings("gui")));
+    }
+    // "Restart now" of the settings page: the node has shut down, start the program again
+    if (GUIUtil::restartRequested()) {
+        QStringList arguments = QCoreApplication::arguments();
+        const QString program = QCoreApplication::applicationFilePath();
+        if (!arguments.isEmpty())
+            arguments.removeFirst();
+        QProcess::startDetached(program, arguments);
     }
     return rv;
 }
