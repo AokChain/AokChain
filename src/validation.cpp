@@ -2391,14 +2391,31 @@ static bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockInd
                 error("%s: tried to stake at depth %d", __func__, pindex->nHeight - coin.nHeight),
                         REJECT_INVALID, "bad-cs-premature");
 
-        CTransactionRef txPrev;
-        uint256 hashPrevBlock = block.GetBlockHash();
-        if (!GetTransaction(prevout.hash, txPrev, Params().GetConsensus(), hashPrevBlock, false)) {
-            return state.DoS(100, error("%s: read txPrev failed", __func__),
-                        REJECT_INVALID, "read-txprev-failed");
+        // The time of the transaction that is staked. The coin has it: AddCoins() stores tx.nTime
+        // in every coin. Only a coin that a disconnected block gave back has no time (0, the undo
+        // data does not keep it); for such a coin the transaction is read from disk, through the
+        // transaction index, as it used to be for every stake. Reading it for every block cost a
+        // large part of the time of the first synchronization.
+        // -checkstaketime (default on regtest) reads the transaction as well and compares.
+        unsigned int nTimeTxPrev = coin.nTime;
+        static const bool fCheckStakeTime = gArgs.GetBoolArg("-checkstaketime", chainparams.DefaultConsistencyChecks());
+        if (nTimeTxPrev == 0 || fCheckStakeTime) {
+            CTransactionRef txPrev;
+            uint256 hashPrevBlock = block.GetBlockHash();
+            if (GetTransaction(prevout.hash, txPrev, Params().GetConsensus(), hashPrevBlock, false)) {
+                if (txPrev->nTime != coin.nTime && coin.nTime != 0) {
+                    LogPrintf("%s: WARNING: time of the staked transaction %s is %u on disk and %u in the coin\n", __func__,
+                              prevout.hash.GetHex(), txPrev->nTime, coin.nTime);
+                    assert(!fCheckStakeTime);
+                }
+                nTimeTxPrev = txPrev->nTime;
+            } else if (nTimeTxPrev == 0) {
+                return state.DoS(100, error("%s: read txPrev failed", __func__),
+                            REJECT_INVALID, "read-txprev-failed");
+            }
         }
 
-        if (!CheckStakeKernelHash(pindex->pprev, block.nBits, coin.out.nValue, prevout, block.vtx[1]->nTime, txPrev->nTime))
+        if (!CheckStakeKernelHash(pindex->pprev, block.nBits, coin.out.nValue, prevout, block.vtx[1]->nTime, nTimeTxPrev))
             return state.DoS(100, error("%s: proof-of-stake hash doesn't match nBits", __func__),
                         REJECT_INVALID, "bad-cs-proofhash");
 
@@ -4595,6 +4612,22 @@ static bool CheckBlockStakeBeforeStorage(const CBlock& block, const CBlockIndex*
         return true;
 
     const COutPoint& prevout = block.vtx[1]->vin[0].prevout;
+
+    // The block extends the tip and its kernel is an unspent coin that has the time of its
+    // transaction (see ConnectBlock()): everything that is checked here is in the coin, and the
+    // transaction is not read from disk. This is the case for nearly every block.
+    if (pindexPrev == chainActive.Tip()) {
+        const Coin& coin = pcoinsTip->AccessCoin(prevout);
+        if (!coin.IsSpent() && coin.nTime != 0) {
+            if (pindex->nHeight - (int)coin.nHeight < COINSTAKE_MATURITY)
+                return state.DoS(100, error("%s: tried to stake at depth %d", __func__, pindex->nHeight - coin.nHeight),
+                                 REJECT_INVALID, "bad-cs-premature");
+            if (!CheckStakeKernelHash(pindexPrev, block.nBits, coin.out.nValue, prevout, block.vtx[1]->nTime, coin.nTime))
+                return state.DoS(100, error("%s: proof-of-stake hash doesn't match nBits", __func__),
+                                 REJECT_INVALID, "bad-cs-proofhash");
+            return true;
+        }
+    }
 
     // Same lookup ConnectBlock() uses for the kernel transaction.
     CTransactionRef txPrev;
