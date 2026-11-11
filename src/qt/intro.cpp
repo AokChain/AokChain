@@ -5,6 +5,8 @@
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 #if defined(HAVE_CONFIG_H)
+#include "chainparamsbase.h"
+#include "chainparams.h"
 #include "config/aokchain-config.h"
 #endif
 
@@ -240,12 +242,18 @@ Intro::Intro(QWidget *parent) :
     ui->welcomeLabel->setText(ui->welcomeLabel->text().arg(tr(PACKAGE_NAME)));
     ui->storageLabel->setText(ui->storageLabel->text().arg(tr(PACKAGE_NAME)));
 
+    // (all four at once: a translation that leaves one of them out must not shift the others)
     ui->lblExplanation1->setText(ui->lblExplanation1->text()
-        .arg(tr(PACKAGE_NAME))
-        .arg(BLOCK_CHAIN_SIZE)
-        .arg(2018)
-        .arg(tr("AokChain"))
-    );
+        .arg(tr(PACKAGE_NAME), QString::number(BLOCK_CHAIN_SIZE), QString::number(2018), tr("AokChain")));
+    // With a chain state snapshot for this network the first start does not process the whole chain.
+    try {
+        const std::unique_ptr<CChainParams> params = CreateChainParams(ChainNameFromCommandLine());
+        if (params->Snapshot().height > 0 && gArgs.GetBoolArg("-snapshot", true) && gArgs.GetBoolArg("-bootstrap", true)) {
+            ui->lblExplanation1->setText(tr("When you continue, %1 downloads a snapshot of the state of the block chain at block %2 (less than 1 GB), checks it against the values that are built into the program, and follows the chain from there. This takes a few minutes. The blocks before the snapshot are downloaded later, and only if you need them.")
+                .arg(tr(PACKAGE_NAME), GUIUtil::withThousands(QString::number(params->Snapshot().height))));
+        }
+    } catch (const std::exception&) {
+    }
     ui->lblExplanation2->setText(ui->lblExplanation2->text().arg(tr(PACKAGE_NAME)));
 
     uint64_t pruneTarget = std::max<int64_t>(0, gArgs.GetArg("-prune", 0));
