@@ -168,9 +168,11 @@ void TokensDialog::buildLayout()
     form->addWidget(picker);
     QHBoxLayout *pickedRow = new QHBoxLayout();
     pickedRow->setContentsMargins(0, 0, 6, 0);
-    pickedRow->setSpacing(8);
+    pickedRow->setSpacing(10);
+    // the small logo of the chosen token sits under the first round button
     pickedLogo = new QLabel(formCard);
-    pickedLogo->setFixedSize(24, 24);
+    pickedLogo->setFixedSize(40, 24);
+    pickedLogo->setAlignment(Qt::AlignCenter);
     pickedLogo->hide();
     pickedRow->addWidget(pickedLogo);
     pickedName = new QLabel(formCard);

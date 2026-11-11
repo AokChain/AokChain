@@ -389,8 +389,8 @@ bool StatsStrip::eventFilter(QObject *object, QEvent *event)
     return QFrame::eventFilter(object, event);
 }
 
-static const int PICK = 44;     // size of a round token button
-static const int PICK_GAP = 8;
+static const int PICK = 40;     // size of a round token button
+static const int PICK_GAP = 10;
 static const int PICK_MAX = TokenLimits::ICON_ROW; // root tokens shown without the list
 
 TokenPicker::TokenPicker(QWidget *parent) : QWidget(parent), index(nullptr), hover(-1)
@@ -426,7 +426,7 @@ void TokenPicker::indexChanged()
 
 bool TokenPicker::isEmpty() const
 {
-    return !index || index->roots().isEmpty();
+    return shown().isEmpty();
 }
 
 void TokenPicker::setCurrent(const QString& name)
@@ -446,10 +446,14 @@ QStringList TokenPicker::shown() const
     QStringList list;
     if (!index)
         return list;
+    // Only what can be sent: a root with a balance of its own, or with tokens held below it
+    // (these open the list of the sub tokens). A root of which only the owner token is held
+    // is not listed; owner tokens are transferred with -advancedui.
     for (const RootToken& root : index->roots()) {
         if (list.size() >= PICK_MAX)
             break;
-        list << root.name;
+        if (root.held || root.children > 0)
+            list << root.name;
     }
     const QString selectedRoot = TokenNames::root(selected);
     if (!selected.isEmpty() && !list.contains(selectedRoot)) {
@@ -497,9 +501,11 @@ void TokenPicker::paintEvent(QPaintEvent*)
     const QString selectedRoot = TokenNames::root(selected);
     for (int i = 0; i <= list.size(); ++i) {
         const QRect r = itemRect(i, width());
-        const QRectF inner = QRectF(r).adjusted(4, 4, -4, -4);
+        // the logo fills its cell, so that the first one starts at the left edge of the row
+        const QRectF inner = QRectF(r).adjusted(1, 1, -1, -1);
         if (i == list.size()) {
             // "+": the list with the search field
+            p.setOpacity(1.0);
             p.setPen(QPen(hover == i ? t.accent : t.borderStrong, 1, Qt::DashLine));
             p.setBrush(t.surface);
             p.drawEllipse(inner);
@@ -507,22 +513,40 @@ void TokenPicker::paintEvent(QPaintEvent*)
             continue;
         }
         const QString& name = list[i];
+        const bool chosen = !selected.isEmpty() && name == selectedRoot;
+        // What is not chosen is dimmed and grey; the chosen token, and the one under the pointer,
+        // are in full color.
+        const bool vivid = chosen || hover == i;
+        p.setOpacity(vivid ? 1.0 : 0.45);
         if (GUIUtil::hasTokenLogo(name)) {
-            p.drawPixmap(inner.topLeft(), GUIUtil::tokenLogo(name, PICK - 8));
+            QPixmap logo = GUIUtil::tokenLogo(name, PICK - 2);
+            if (!vivid) {
+                QImage grey = logo.toImage().convertToFormat(QImage::Format_ARGB32);
+                for (int y = 0; y < grey.height(); ++y) {
+                    QRgb *line = reinterpret_cast<QRgb*>(grey.scanLine(y));
+                    for (int x = 0; x < grey.width(); ++x) {
+                        const int g = qGray(line[x]);
+                        line[x] = qRgba(g, g, g, qAlpha(line[x]));
+                    }
+                }
+                logo = QPixmap::fromImage(grey);
+                logo.setDevicePixelRatio(GUIUtil::tokenLogo(name, PICK - 2).devicePixelRatio());
+            }
+            p.drawPixmap(inner.topLeft(), logo);
         } else {
             // no logo: the name itself
             p.setPen(Qt::NoPen);
-            p.setBrush(t.accentSoft);
+            p.setBrush(vivid ? t.accentSoft : t.chip);
             p.drawEllipse(inner);
-            p.setPen(t.accent);
+            p.setPen(vivid ? t.accent : t.textSecondary);
             QFont font = GUIUtil::appFont(name.size() <= 3 ? 11 : 9, QFont::DemiBold);
             p.setFont(font);
-            p.drawText(inner, Qt::AlignCenter, QFontMetrics(font).elidedText(name, Qt::ElideRight, PICK - 12));
+            p.drawText(inner, Qt::AlignCenter, QFontMetrics(font).elidedText(name, Qt::ElideRight, PICK - 10));
         }
-        const bool chosen = !selected.isEmpty() && name == selectedRoot;
-        if (chosen || hover == i) {
+        p.setOpacity(1.0);
+        if (chosen) {
             p.setBrush(Qt::NoBrush);
-            p.setPen(QPen(chosen ? t.accent : t.borderStrong, chosen ? 2.5 : 1.5));
+            p.setPen(QPen(t.accent, 2.5));
             p.drawEllipse(QRectF(r).adjusted(1.25, 1.25, -1.25, -1.25));
         }
     }
