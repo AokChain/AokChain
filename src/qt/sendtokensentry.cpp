@@ -307,14 +307,21 @@ void SendTokensEntry::setIndex(int index)
 
 void SendTokensEntry::selectToken(const QString &name)
 {
-    int index = name.isEmpty() ? 0 : ui->tokenSelectionBox->findText(name);
-    if (index < 0) {
-        // the list of the entry may be older than the wallet
-        refreshTokenList();
-        index = ui->tokenSelectionBox->findText(name);
+    // The (hidden) selection box holds the chosen token only, never the names of all
+    // tokens of the wallet: there can be tens of thousands of sub and unique tokens.
+    if (fShowAdministratorList && ui->tokenSelectionBox->findText(name) >= 0 && !name.isEmpty()) {
+        ui->tokenSelectionBox->setCurrentIndex(ui->tokenSelectionBox->findText(name));
+        onTokenSelected(ui->tokenSelectionBox->currentIndex());
+        return;
     }
-    if (index < 0)
-        index = 0;
+    if (fShowAdministratorList)
+        return; // an owner token is being chosen in the entry (-advancedui)
+    QStringList list;
+    list << "";
+    if (!name.isEmpty())
+        list << name;
+    stringModel->setStringList(list);
+    const int index = name.isEmpty() ? 0 : 1;
     ui->tokenSelectionBox->setCurrentIndex(index);
     onTokenSelected(index);
 }
@@ -785,15 +792,12 @@ void SendTokensEntry::switchAdministratorList(bool fSwitchStatus)
     } else {
         ui->administratorCheckbox->setChecked(false);
         if (!TokenControlDialog::tokenControl->HasTokenSelected()) {
-            std::vector<std::string> names;
-            GetAllMyTokens(model->getWallet(), names, 0);
+            // only the token chosen for the page, see selectToken()
+            const QString chosen = ui->tokenSelectionBox->currentText();
             QStringList list;
             list << "";
-            for (auto name : names) {
-                if (!IsTokenNameAnOwner(name))
-                    list << QString::fromStdString(name);
-            }
-
+            if (!chosen.isEmpty() && !IsTokenNameAnOwner(chosen.toStdString()))
+                list << chosen;
             stringModel->setStringList(list);
             ui->tokenSelectionBox->lineEdit()->setPlaceholderText(tr("Select an token to transfer"));
             ui->payTokenAmount->clear();

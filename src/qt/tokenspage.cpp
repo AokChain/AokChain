@@ -7,6 +7,7 @@
 #include "explorerpage.h"
 #include "guiutil.h"
 #include "pagewidgets.h"
+#include "tokenlists.h"
 #include "platformstyle.h"
 #include "tokentablemodel.h"
 #include "walletmodel.h"
@@ -28,16 +29,69 @@
 
 /** Tokens of the chain that are read at a time. */
 static const int PAGE_SIZE = 60;
+/** Cards that are made at most. Root tokens are few; this only bounds the number of widgets. */
+static const int MAX_CARDS = 120;
 static const int CARD_WIDTH = 250;
 static const int CARD_GAP = 16;
 
+/**
+ * Without a search: root tokens only. The names are read in batches and the sub and
+ * unique tokens are skipped, until a page of roots is full. With a search the
+ * matches are listed as they are, so that sub tokens can be found.
+ */
 void TokensWorker::list(const QString& filter, int start, int count, int generation)
 {
-    UniValue result;
-    QString json = "{}";
-    if (NodeRPC::call("listtokens", {filter.toStdString(), "true", std::to_string(count), std::to_string(start)}, result) && result.isObject())
-        json = QString::fromStdString(result.write());
-    Q_EMIT listed(json, start, generation);
+    UniValue items(UniValue::VARR);
+    int next = start;
+    bool more = false;
+    auto add = [&items](const std::string& name, const UniValue& info) {
+        UniValue item(UniValue::VOBJ);
+        item.pushKV("name", name);
+        const UniValue amount = find_value(info, "amount");
+        if (amount.isNum())
+            item.pushKV("amount", amount.getValStr());
+        items.push_back(item);
+    };
+    if (filter == "*") {
+        const int BATCH = 2000;
+        std::vector<std::string> roots;
+        while ((int)roots.size() < count) {
+            UniValue names;
+            if (!NodeRPC::call("listtokens", {"*", "false", std::to_string(BATCH), std::to_string(next)}, names) || !names.isArray())
+                break;
+            size_t used = 0;
+            for (; used < names.size() && (int)roots.size() < count; ++used) {
+                const std::string name = names[used].get_str();
+                if (name.find('/') == std::string::npos && name.find('#') == std::string::npos)
+                    roots.push_back(name);
+            }
+            next += (int)used;
+            more = used < names.size() || (int)names.size() == BATCH;
+            if (!more)
+                break;
+        }
+        for (const std::string& name : roots) {
+            UniValue info;
+            if (NodeRPC::call("listtokens", {name, "true", "1", "0"}, info) && info.isObject() && !find_value(info, name).isNull())
+                add(name, find_value(info, name));
+            else
+                add(name, NullUniValue);
+        }
+    } else {
+        UniValue result;
+        if (NodeRPC::call("listtokens", {filter.toStdString(), "true", std::to_string(count), std::to_string(start)}, result) && result.isObject()) {
+            const std::vector<std::string>& names = result.getKeys();
+            for (const std::string& name : names)
+                add(name, result[name]);
+            next = start + (int)names.size();
+            more = (int)names.size() >= count;
+        }
+    }
+    UniValue answer(UniValue::VOBJ);
+    answer.pushKV("items", items);
+    answer.pushKV("next", next);
+    answer.pushKV("more", more);
+    Q_EMIT listed(QString::fromStdString(answer.write()), start, generation);
 }
 
 static QLabel *tag(const QString& text, QWidget *parent)
@@ -57,7 +111,7 @@ static QLabel *caption(const QString& text, QWidget *parent)
 }
 
 TokensPage::TokensPage(const PlatformStyle *platformStyle, QWidget *parent) :
-    QWidget(parent), model(nullptr), columns(0), generation(0), nextStart(0), loading(false), loadedOnce(false)
+    QWidget(parent), model(nullptr), heldTokens(new HeldTokenIndex(this)), columns(0), generation(0), nextStart(0), loading(false), loadedOnce(false)
 {
     const GUIUtil::Theme& theme = GUIUtil::theme();
     QVBoxLayout *outer = new QVBoxLayout(this);
@@ -122,7 +176,7 @@ TokensPage::TokensPage(const PlatformStyle *platformStyle, QWidget *parent) :
     chainHeader->addWidget(search);
     chainOuter->addLayout(chainHeader);
     chainOuter->addSpacing(4);
-    chainOuter->addWidget(caption(tr("Tokens that exist on the AokChain block chain, as this node knows them. The total supply is shown."), chainCard));
+    chainOuter->addWidget(caption(tr("Root tokens that exist on the AokChain block chain, as this node knows them, with their total supply. Search to find sub tokens."), chainCard));
     chainOuter->addSpacing(10);
     chainLayout = new QVBoxLayout();
     chainLayout->setSpacing(0);
@@ -165,9 +219,8 @@ void TokensPage::setModel(WalletModel *_model)
 {
     model = _model;
     if (model && model->getTokenTableModel()) {
-        TokenTableModel *tokens = model->getTokenTableModel();
-        connect(tokens, SIGNAL(layoutChanged()), this, SLOT(scheduleRebuild()));
-        connect(tokens, SIGNAL(modelReset()), this, SLOT(scheduleRebuild()));
+        connect(heldTokens, SIGNAL(changed()), this, SLOT(scheduleRebuild()));
+        heldTokens->setSourceModel(model->getTokenTableModel());
         rebuildHeld();
     }
 }
@@ -177,10 +230,14 @@ void TokensPage::scheduleRebuild()
     rebuildTimer->start();
 }
 
-/** One card per token of the wallet. Owner tokens, sub tokens and unique tokens as on the overview. */
+/**
+ * One card per ROOT token of the wallet. A root is shown when the wallet holds it, its owner
+ * token, or something below it. Sub and unique tokens are not cards (there can be tens of
+ * thousands): the card of their root has a button that opens their list.
+ */
 void TokensPage::rebuildHeld()
 {
-    if (!model || !model->getTokenTableModel())
+    if (!model)
         return;
     for (QWidget *card : cards)
         card->deleteLater();
@@ -188,34 +245,17 @@ void TokensPage::rebuildHeld()
     const QSet<QString> before = heldNames;
     heldNames.clear();
 
-    struct Entry { QString key, name, amount; bool admin, locked, ownerOnly; };
-    QList<Entry> entries;
-    TokenTableModel *tokens = model->getTokenTableModel();
-    for (int row = 0; row < tokens->rowCount(QModelIndex()); ++row) {
-        const QModelIndex index = tokens->index(row, 0);
-        Entry e;
-        e.name = index.data(TokenTableModel::TokenNameRole).toString();
-        e.amount = GUIUtil::withThousands(index.data(TokenTableModel::FormattedAmountRole).toString());
-        e.admin = index.data(TokenTableModel::AdministratorRole).toBool();
-        e.locked = index.data(TokenTableModel::IsLockedRole).toBool();
-        if (e.locked && e.name.endsWith(" (LOCKED)"))
-            e.name.chop(9);
-        e.ownerOnly = e.name.endsWith('!');
-        if (e.ownerOnly)
-            e.name.chop(1);
-        e.key = e.name + (e.locked ? QString(QChar(1)) : QString());
-        entries << e;
-        heldNames.insert(e.name);
-    }
-    std::sort(entries.begin(), entries.end(), [](const Entry& a, const Entry& b) { return a.key < b.key; });
-
     const GUIUtil::Theme& theme = GUIUtil::theme();
+    const QVector<RootToken>& roots = heldTokens->roots();
     LOCK(cs_main);
     auto cache = GetCurrentTokenCache();
-    for (const Entry& e : entries) {
+    for (const RootToken& root : roots) {
+        heldNames.insert(root.name);
+        if (cards.size() >= MAX_CARDS)
+            continue;
         QFrame *card = new QFrame(this);
         card->setProperty("role", "tokenCard");
-        card->setFixedHeight(168);
+        card->setFixedHeight(180);
         QVBoxLayout *layout = new QVBoxLayout(card);
         layout->setContentsMargins(16, 14, 16, 14);
         layout->setSpacing(6);
@@ -223,25 +263,21 @@ void TokensPage::rebuildHeld()
         QHBoxLayout *top = new QHBoxLayout();
         top->setSpacing(10);
         QLabel *logo = new QLabel(card);
-        logo->setPixmap(GUIUtil::tokenLogo(e.name, 40));
+        logo->setPixmap(GUIUtil::tokenLogo(root.name, 40));
         logo->setFixedSize(40, 40);
         top->addWidget(logo);
         QVBoxLayout *names = new QVBoxLayout();
         names->setSpacing(3);
         QLabel *name = new QLabel(card);
         name->setFont(GUIUtil::appFont(14, QFont::Medium));
-        name->setText(QFontMetrics(name->font()).elidedText(e.name, Qt::ElideMiddle, 170));
-        name->setToolTip(e.name);
+        name->setText(QFontMetrics(name->font()).elidedText(root.name, Qt::ElideMiddle, 170));
+        name->setToolTip(root.name);
         names->addWidget(name);
         QHBoxLayout *chips = new QHBoxLayout();
         chips->setSpacing(4);
-        if (e.name.contains('#'))
-            chips->addWidget(tag(tr("Unique token"), card));
-        else if (e.name.contains('/'))
-            chips->addWidget(tag(tr("Sub token"), card));
-        if (e.admin || e.ownerOnly)
+        if (root.admin)
             chips->addWidget(tag(tr("Owner"), card));
-        if (e.locked)
+        if (root.locked)
             chips->addWidget(tag(tr("Locked"), card));
         chips->addStretch();
         names->addLayout(chips);
@@ -249,23 +285,40 @@ void TokensPage::rebuildHeld()
         layout->addLayout(top);
         layout->addSpacing(4);
 
-        if (e.ownerOnly) {
+        if (!root.held) {
             QLabel *none = new QLabel(tr("None held"), card);
             none->setProperty("role", "secondary");
             none->setFixedHeight(28);
             layout->addWidget(none);
         } else {
             AmountLabel *amount = new AmountLabel(20, QFont::Medium, card);
-            amount->setAmount(e.amount);
+            amount->setAmount(GUIUtil::withThousands(root.amount));
             layout->addWidget(amount);
         }
 
-        // decimals and whether more can be issued, from the token database of the node
+        // decimals and whether more can be issued; the sub and unique tokens open in a window of their own
+        QHBoxLayout *metaRow = new QHBoxLayout();
         QString meta;
         CNewToken token;
-        if (cache && cache->GetTokenMetaDataIfExists(e.name.toStdString(), token))
+        if (cache && cache->GetTokenMetaDataIfExists(root.name.toStdString(), token))
             meta = tr("%1 decimals").arg((int)token.units) + QString::fromUtf8(" · ") + (token.nReissuable ? tr("reissuable") : tr("fixed supply"));
-        layout->addWidget(caption(meta, card));
+        QLabel *metaLabel = caption(meta, card);
+        metaLabel->setMinimumHeight(30);
+        metaRow->addWidget(metaLabel);
+        metaRow->addStretch();
+        const QString tokenName = root.name;
+        if (root.children > 0) {
+            QPushButton *below = new QPushButton(tr("%1 sub tokens").arg(root.children), card);
+            below->setProperty("look", "chipButton");
+            below->setLayoutDirection(Qt::RightToLeft);
+            below->setIcon(QIcon(GUIUtil::lineIcon("chevron-right", 11, theme.label, 2.6)));
+            below->setIconSize(QSize(11, 11));
+            below->setCursor(Qt::PointingHandCursor);
+            below->setToolTip(tr("Show the sub tokens and unique tokens of this token that the wallet holds"));
+            connect(below, &QPushButton::clicked, [this, tokenName] { showTokensBelow(tokenName); });
+            metaRow->addWidget(below);
+        }
+        layout->addLayout(metaRow);
         layout->addStretch();
 
         QHBoxLayout *buttons = new QHBoxLayout();
@@ -274,8 +327,7 @@ void TokensPage::rebuildHeld()
         send->setProperty("look", "soft");
         send->setIcon(QIcon(GUIUtil::lineIcon("send", 14, theme.accent, 2.2)));
         send->setCursor(Qt::PointingHandCursor);
-        send->setEnabled(!e.ownerOnly && !e.locked);
-        const QString tokenName = e.name;
+        send->setEnabled(root.held);
         connect(send, &QPushButton::clicked, [this, tokenName] { Q_EMIT sendToken(tokenName); });
         QPushButton *receive = new QPushButton(tr("Receive"), card);
         receive->setProperty("look", "chipButton");
@@ -290,13 +342,22 @@ void TokensPage::rebuildHeld()
         layout->addLayout(buttons);
         cards << card;
     }
-    heldCount->setText(tr("%1 kinds").arg(cards.size()));
+    heldCount->setText(roots.size() > cards.size() ? tr("%1 kinds, the first %2 shown").arg(roots.size()).arg(cards.size())
+                                                    : tr("%1 kinds").arg(roots.size()));
     heldEmpty->setVisible(cards.isEmpty());
     columns = 0;
     reflow();
     // what is held is left out of the list of the chain
     if (loadedOnce && before != heldNames)
         startList(true);
+}
+
+/** The window with the held sub and unique tokens of a root; "Send" there leads to the send page. */
+void TokensPage::showTokensBelow(const QString& root)
+{
+    TokenListDialog dialog(heldTokens, root, TokenListDialog::Browse, this);
+    if (dialog.exec() == QDialog::Accepted && !dialog.chosen().isEmpty())
+        Q_EMIT sendToken(dialog.chosen());
 }
 
 /** As many cards in a row as fit. */
@@ -372,13 +433,13 @@ void TokensPage::listed(const QString& json, int start, int gen)
         chainStatus->setText(QString());
         return;
     }
-    const std::vector<std::string>& names = result.getKeys();
-    nextStart = start + (int)names.size();
-    for (const std::string& key : names) {
-        const QString name = QString::fromStdString(key);
-        if (heldNames.contains(name))
+    const UniValue items = find_value(result, "items");
+    nextStart = (int)find_value(result, "next").get_int64();
+    for (size_t i = 0; items.isArray() && i < items.size(); ++i) {
+        const QString name = QString::fromStdString(find_value(items[i], "name").get_str());
+        // what the wallet holds, or holds something below, is in the cards above
+        if (heldNames.contains(TokenNames::root(name)))
             continue;
-        const UniValue& info = result[key];
         QWidget *row = new QWidget(this);
         QVBoxLayout *outer = new QVBoxLayout(row);
         outer->setContentsMargins(0, 0, 0, 0);
@@ -403,8 +464,8 @@ void TokensPage::listed(const QString& json, int start, int gen)
         else if (name.contains('/'))
             layout->addWidget(tag(tr("Sub token"), row));
         layout->addStretch();
-        const UniValue& amount = find_value(info, "amount");
-        if (amount.isNum()) {
+        const UniValue amount = find_value(items[i], "amount");
+        if (amount.isStr() || amount.isNum()) {
             AmountLabel *supply = new AmountLabel(14, QFont::Medium, row);
             supply->setAlignment(Qt::AlignRight | Qt::AlignVCenter);
             supply->setAmount(GUIUtil::withThousands(QString::fromStdString(amount.getValStr())));
@@ -414,7 +475,8 @@ void TokensPage::listed(const QString& json, int start, int gen)
         chainLayout->addWidget(row);
     }
     const int shown = chainLayout->count();
-    const bool more = (int)names.size() >= PAGE_SIZE;
+    const UniValue moreValue = find_value(result, "more");
+    const bool more = moreValue.isBool() ? moreValue.get_bool() : moreValue.getValStr() == "1";
     chainStatus->setText(shown == 0 && !more ? tr("none") : (more ? tr("%1 and more").arg(shown) : tr("%1 kinds").arg(shown)));
     moreButton->setVisible(more);
 }

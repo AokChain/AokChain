@@ -14,6 +14,7 @@
 #include <QStringList>
 #include <QWidget>
 
+class HeldTokenIndex;
 class QLabel;
 class QVBoxLayout;
 
@@ -128,8 +129,36 @@ private:
 };
 
 /**
- * The tokens of the wallet as round logo buttons, at most 20; a "+" opens a
- * list of all of them with a search field.
+ * A strip of figures in a card: a caption and a value per cell. The chain
+ * status at the top of the overview and of the explorer.
+ */
+class StatsStrip : public QFrame
+{
+    Q_OBJECT
+
+public:
+    explicit StatsStrip(QWidget *parent = nullptr);
+    /** Add a cell; a clickable one shows a chevron and emits cellClicked() */
+    int addCell(const QString& caption, bool clickable = false);
+    void setValue(int cell, const QString& amount, const QString& unit = QString());
+    void setCompact(bool compact);
+
+Q_SIGNALS:
+    void cellClicked(int cell);
+
+protected:
+    bool eventFilter(QObject *object, QEvent *event) override;
+
+private:
+    QList<AmountLabel*> values;
+    QList<QWidget*> cells;
+};
+
+/**
+ * The root tokens of the wallet as round logo buttons, at most 20; a "+"
+ * opens a list with a search field, where sub tokens and unique tokens are
+ * found as well. Sub and unique tokens are never buttons of their own: a
+ * wallet can hold tens of thousands of them.
  */
 class TokenPicker : public QWidget
 {
@@ -137,10 +166,12 @@ class TokenPicker : public QWidget
 
 public:
     explicit TokenPicker(QWidget *parent = nullptr);
-    void setTokens(const QStringList& names);
+    void setIndex(HeldTokenIndex *index);
     void setCurrent(const QString& name);
     QString current() const { return selected; }
-    QStringList tokens() const { return all; }
+    bool isEmpty() const;
+    /** Open the list of the sub and unique tokens of a root and choose from it */
+    void chooseBelow(const QString& root);
 
     bool hasHeightForWidth() const override { return true; }
     int heightForWidth(int width) const override;
@@ -156,13 +187,15 @@ protected:
     void leaveEvent(QEvent *event) override;
     bool event(QEvent *event) override;
 
+private Q_SLOTS:
+    void indexChanged();
+
 private:
     QStringList shown() const;
     QRect itemRect(int index, int width) const;
     int itemAt(const QPoint& pos) const;
-    void chooseFromList();
 
-    QStringList all;
+    HeldTokenIndex *index;
     QString selected;
     int hover;
 };

@@ -15,6 +15,7 @@
 #include "guiutil.h"
 #include "optionsmodel.h"
 #include "pagewidgets.h"
+#include "tokenlists.h"
 #include "platformstyle.h"
 #include "sendtokensentry.h"
 #include "walletmodel.h"
@@ -160,15 +161,32 @@ void TokensDialog::buildLayout()
     formHeader->addWidget(ui->clearButton);
     form->addLayout(formHeader);
 
-    // the tokens of the wallet as round buttons; the chosen one with its name and what is available
+    // The root tokens of the wallet as round buttons; sub tokens and unique tokens are chosen
+    // from a list with a search field. Below: the chosen token with its name and what is available.
+    heldTokens = new HeldTokenIndex(this);
     picker = new TokenPicker(formCard);
+    picker->setIndex(heldTokens);
     form->addWidget(picker);
     QHBoxLayout *pickedRow = new QHBoxLayout();
     pickedRow->setContentsMargins(0, 0, 6, 0);
     pickedRow->setSpacing(8);
+    pickedLogo = new QLabel(formCard);
+    pickedLogo->setFixedSize(24, 24);
+    pickedLogo->hide();
+    pickedRow->addWidget(pickedLogo);
     pickedName = new QLabel(formCard);
     pickedName->setFont(GUIUtil::appFont(14, QFont::Medium));
     pickedRow->addWidget(pickedName);
+    belowButton = new QPushButton(formCard);
+    belowButton->setProperty("look", "chipButton");
+    belowButton->setLayoutDirection(Qt::RightToLeft);
+    belowButton->setIcon(QIcon(GUIUtil::lineIcon("chevron-right", 11, theme.label, 2.6)));
+    belowButton->setIconSize(QSize(11, 11));
+    belowButton->setCursor(Qt::PointingHandCursor);
+    belowButton->setToolTip(tr("Choose a sub token or unique token of this root"));
+    belowButton->hide();
+    connect(belowButton, SIGNAL(clicked()), this, SLOT(chooseBelow()));
+    pickedRow->addWidget(belowButton);
     pickedRow->addStretch();
     QLabel *availableCaption = new QLabel(tr("Available"), formCard);
     availableCaption->setProperty("role", "secondary");
@@ -209,27 +227,21 @@ void TokensDialog::renumberEntries()
     }
 }
 
-/** The tokens the wallet can send (owner tokens are transferred with -advancedui in the entry). */
+/** The token index follows the token table of the wallet; make sure the choice is still shown. */
 void TokensDialog::refreshTokens()
 {
-    QStringList names;
-    if (model) {
-        LOCK(cs_main);
-        std::vector<std::string> tokens;
-        GetAllMyTokens(model->getWallet(), tokens, 0);
-        for (const std::string& name : tokens) {
-            if (!IsTokenNameAnOwner(name))
-                names << QString::fromStdString(name);
-        }
-    }
-    names.sort();
-    picker->setTokens(names);
     tokenPicked(picker->current());
+}
+
+void TokensDialog::chooseBelow()
+{
+    const QString root = TokenNames::root(picker->current());
+    if (!root.isEmpty())
+        picker->chooseBelow(root);
 }
 
 void TokensDialog::selectToken(const QString &name)
 {
-    refreshTokens();
     picker->setCurrent(name);
     tokenPicked(picker->current());
 }
@@ -245,12 +257,21 @@ void TokensDialog::tokenPicked(const QString &name)
                 first = entry;
         }
     }
+    // "N sub tokens ›" next to the name of a root that has held tokens below it
+    const RootToken *root = name.isEmpty() ? nullptr : heldTokens->findRoot(TokenNames::root(name));
+    belowButton->setVisible(root && root->children > 0);
+    if (root)
+        belowButton->setText(tr("%1 sub tokens").arg(root->children));
+    pickedLogo->setVisible(!name.isEmpty());
     if (name.isEmpty()) {
-        pickedName->setText(picker->tokens().isEmpty() ? tr("The wallet holds no tokens") : tr("Choose the token to send"));
+        pickedName->setText(picker->isEmpty() ? tr("The wallet holds no tokens") : tr("Choose the token to send"));
         pickedName->setProperty("role", "secondary");
         pickedAvailable->setAmount(QString::fromUtf8("–"));
     } else {
-        pickedName->setText(name);
+        // a sub or unique token: its full name with the logo of its root
+        pickedLogo->setPixmap(GUIUtil::tokenLogo(name, 24));
+        pickedName->setText(QFontMetrics(pickedName->font()).elidedText(name, Qt::ElideMiddle, 260));
+        pickedName->setToolTip(name);
         pickedName->setProperty("role", QVariant());
         pickedAvailable->setAmount(first ? GUIUtil::withThousands(QString::fromStdString(ValueFromAmountString(first->tokenBalance, first->tokenUnits))) : QString::fromUtf8("–"));
     }
@@ -391,6 +412,7 @@ void TokensDialog::setModel(WalletModel *_model)
         connect(_model->getOptionsModel(), SIGNAL(customFeeFeaturesChanged(bool)), this, SLOT(customFeeFeatureChanged(bool)));
 
 
+        heldTokens->setSourceModel(_model->getTokenTableModel());
         refreshTokens();
         ui->frameTokenControl->setVisible(false);
         ui->frameTokenControl->setVisible(_model->getOptionsModel()->getCoinControlFeatures());
@@ -731,11 +753,8 @@ void TokensDialog::accept()
 
 SendTokensEntry *TokensDialog::addEntry()
 {
-    LOCK(cs_main);
-    std::vector<std::string> tokens;
-    if (model)
-        GetAllMyTokens(model->getWallet(), tokens, 0);
-
+    // An entry is not given the names of all tokens: there can be tens of thousands.
+    // It gets the token that is chosen for the page.
     QStringList list;
     bool fIsOwner = false;
     bool fIsTokenControl = false;
@@ -743,11 +762,6 @@ SendTokensEntry *TokensDialog::addEntry()
         list << QString::fromStdString(TokenControlDialog::tokenControl->strTokenSelected);
         fIsOwner = IsTokenNameAnOwner(TokenControlDialog::tokenControl->strTokenSelected);
         fIsTokenControl = true;
-    } else {
-        for (auto name : tokens) {
-            if (!IsTokenNameAnOwner(name))
-                list << QString::fromStdString(name);
-        }
     }
 
     SendTokensEntry *entry = new SendTokensEntry(platformStyle, list, this);

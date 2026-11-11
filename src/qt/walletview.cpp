@@ -135,6 +135,7 @@ WalletView::WalletView(const PlatformStyle *_platformStyle, QWidget *parent):
     connect(manageTokensPage, SIGNAL(message(QString,QString,unsigned int)), this, SIGNAL(message(QString,QString,unsigned int)));
     connect(overviewPage, SIGNAL(tokenSendClicked(QModelIndex)), tokensPage, SLOT(focusToken(QModelIndex)));
     connect(overviewPage, SIGNAL(tokenSendClicked(QModelIndex)), this, SLOT(showTokenSendTab()));
+    connect(overviewPage, SIGNAL(sendTokenRequested(QString)), this, SLOT(sendToken(QString)));
     connect(overviewPage, SIGNAL(tokenIssueSubClicked(QModelIndex)), createTokensPage, SLOT(focusSubToken(QModelIndex)));
     connect(overviewPage, SIGNAL(tokenIssueUniqueClicked(QModelIndex)), createTokensPage, SLOT(focusUniqueToken(QModelIndex)));
     connect(overviewPage, SIGNAL(tokenReissueClicked(QModelIndex)), manageTokensPage, SLOT(focusReissueToken(QModelIndex)));
@@ -198,6 +199,7 @@ void WalletView::setAokChainGUI(AokChainGUI *gui)
         connect(overviewPage, SIGNAL(allTransactionsClicked()), gui, SLOT(gotoHistoryPage()));
         connect(overviewPage, SIGNAL(allTokensClicked()), gui, SLOT(gotoTokensPage()));
         connect(overviewPage, SIGNAL(explorerClicked()), gui, SLOT(gotoExplorerPage()));
+        connect(overviewPage, SIGNAL(explorerRequested(QString)), gui, SLOT(gotoExplorerPage(QString)));
 
         // Look something up in the explorer
         connect(this, SIGNAL(explorerRequested(QString)), gui, SLOT(gotoExplorerPage(QString)));

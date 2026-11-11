@@ -11,6 +11,7 @@
 #include <QThread>
 #include <QWidget>
 
+class HeldTokenIndex;
 class PlatformStyle;
 class WalletModel;
 
@@ -87,6 +88,8 @@ private:
     QLabel *chainStatus;
     QPushButton *moreButton;
 
+    HeldTokenIndex *heldTokens;
+    void showTokensBelow(const QString& root);
     void reflow();
     void startList(bool reset);
 };

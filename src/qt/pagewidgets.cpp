@@ -5,6 +5,7 @@
 #include "pagewidgets.h"
 
 #include "guiutil.h"
+#include "tokenlists.h"
 
 #include <QApplication>
 #include <QDateTimeEdit>
@@ -323,11 +324,76 @@ void SummaryCard::addFooterWidget(QWidget *widget)
     footer->addWidget(widget);
 }
 
+StatsStrip::StatsStrip(QWidget *parent) : QFrame(parent)
+{
+    setProperty("role", "card");
+    QHBoxLayout *layout = new QHBoxLayout(this);
+    layout->setContentsMargins(0, 0, 0, 0);
+    layout->setSpacing(0);
+}
+
+int StatsStrip::addCell(const QString& caption, bool clickable)
+{
+    QHBoxLayout *strip = static_cast<QHBoxLayout*>(layout());
+    if (!cells.isEmpty()) {
+        QFrame *line = new QFrame(this);
+        line->setProperty("role", "vline");
+        line->setFixedWidth(1);
+        strip->addWidget(line);
+    }
+    QWidget *cell = new QWidget(this);
+    QVBoxLayout *layout = new QVBoxLayout(cell);
+    layout->setContentsMargins(18, 14, 18, 14);
+    layout->setSpacing(2);
+    QHBoxLayout *captionRow = new QHBoxLayout();
+    captionRow->setSpacing(4);
+    QLabel *label = new QLabel(caption, cell);
+    label->setProperty("role", "caption");
+    label->setFont(GUIUtil::appFont(12));
+    captionRow->addWidget(label);
+    captionRow->addStretch();
+    if (clickable) {
+        QLabel *chevron = new QLabel(cell);
+        chevron->setPixmap(GUIUtil::lineIcon("chevron-right", 12, GUIUtil::theme().accent, 2.6));
+        captionRow->addWidget(chevron);
+        cell->setCursor(Qt::PointingHandCursor);
+        cell->setProperty("cell", cells.size());
+        cell->installEventFilter(this);
+    }
+    layout->addLayout(captionRow);
+    AmountLabel *value = new AmountLabel(18, QFont::DemiBold, cell);
+    value->setAmount(QString::fromUtf8("–"));
+    layout->addWidget(value);
+    strip->addWidget(cell, 1);
+    cells << cell;
+    values << value;
+    return cells.size() - 1;
+}
+
+void StatsStrip::setValue(int cell, const QString& amount, const QString& unit)
+{
+    if (cell >= 0 && cell < values.size())
+        values[cell]->setAmount(amount, unit);
+}
+
+void StatsStrip::setCompact(bool compact)
+{
+    for (QWidget *cell : cells)
+        cell->layout()->setContentsMargins(18, compact ? 9 : 14, 18, compact ? 9 : 14);
+}
+
+bool StatsStrip::eventFilter(QObject *object, QEvent *event)
+{
+    if (event->type() == QEvent::MouseButtonRelease && object->property("cell").isValid())
+        Q_EMIT cellClicked(object->property("cell").toInt());
+    return QFrame::eventFilter(object, event);
+}
+
 static const int PICK = 44;     // size of a round token button
 static const int PICK_GAP = 8;
-static const int PICK_MAX = 20; // tokens shown without the list
+static const int PICK_MAX = 20; // root tokens shown without the list
 
-TokenPicker::TokenPicker(QWidget *parent) : QWidget(parent), hover(-1)
+TokenPicker::TokenPicker(QWidget *parent) : QWidget(parent), index(nullptr), hover(-1)
 {
     setMouseTracking(true);
     QSizePolicy policy(QSizePolicy::Expanding, QSizePolicy::Preferred);
@@ -335,42 +401,65 @@ TokenPicker::TokenPicker(QWidget *parent) : QWidget(parent), hover(-1)
     setSizePolicy(policy);
 }
 
-void TokenPicker::setTokens(const QStringList& names)
+void TokenPicker::setIndex(HeldTokenIndex *_index)
 {
-    if (all == names)
-        return;
-    all = names;
-    if (!selected.isEmpty() && !all.contains(selected))
+    index = _index;
+    connect(index, SIGNAL(changed()), this, SLOT(indexChanged()));
+    indexChanged();
+}
+
+void TokenPicker::indexChanged()
+{
+    // the chosen token may be gone
+    HeldToken token;
+    if (!selected.isEmpty() && !(index->find(selected, &token) && token.held)) {
         selected.clear();
+        Q_EMIT tokenSelected(selected);
+    }
     updateGeometry();
     update();
 }
 
+bool TokenPicker::isEmpty() const
+{
+    return !index || index->roots().isEmpty();
+}
+
 void TokenPicker::setCurrent(const QString& name)
 {
-    if (selected == name)
+    HeldToken token;
+    const QString next = index && index->find(name, &token) && token.held ? name : QString();
+    if (selected == next)
         return;
-    selected = all.contains(name) ? name : QString();
+    selected = next;
     update();
     Q_EMIT tokenSelected(selected);
 }
 
-/** The first tokens; the chosen one takes the last place when it is not among them. */
+/** The first root tokens; the root of the chosen token takes the last place when it is not among them. */
 QStringList TokenPicker::shown() const
 {
-    QStringList list = all.mid(0, PICK_MAX);
-    if (!selected.isEmpty() && !list.contains(selected)) {
+    QStringList list;
+    if (!index)
+        return list;
+    for (const RootToken& root : index->roots()) {
+        if (list.size() >= PICK_MAX)
+            break;
+        list << root.name;
+    }
+    const QString selectedRoot = TokenNames::root(selected);
+    if (!selected.isEmpty() && !list.contains(selectedRoot)) {
         if (list.size() >= PICK_MAX)
             list.removeLast();
-        list << selected;
+        list << selectedRoot;
     }
     return list;
 }
 
-QRect TokenPicker::itemRect(int index, int width) const
+QRect TokenPicker::itemRect(int item, int width) const
 {
     const int perRow = qMax(1, (width + PICK_GAP) / (PICK + PICK_GAP));
-    return QRect((index % perRow) * (PICK + PICK_GAP), (index / perRow) * (PICK + PICK_GAP), PICK, PICK);
+    return QRect((item % perRow) * (PICK + PICK_GAP), (item / perRow) * (PICK + PICK_GAP), PICK, PICK);
 }
 
 int TokenPicker::heightForWidth(int width) const
@@ -401,11 +490,12 @@ void TokenPicker::paintEvent(QPaintEvent*)
     QPainter p(this);
     p.setRenderHint(QPainter::Antialiasing, true);
     const QStringList list = shown();
+    const QString selectedRoot = TokenNames::root(selected);
     for (int i = 0; i <= list.size(); ++i) {
         const QRect r = itemRect(i, width());
         const QRectF inner = QRectF(r).adjusted(4, 4, -4, -4);
         if (i == list.size()) {
-            // "+": the list of all tokens
+            // "+": the list with the search field
             p.setPen(QPen(hover == i ? t.accent : t.borderStrong, 1, Qt::DashLine));
             p.setBrush(t.surface);
             p.drawEllipse(inner);
@@ -421,29 +511,14 @@ void TokenPicker::paintEvent(QPaintEvent*)
             p.setBrush(t.accentSoft);
             p.drawEllipse(inner);
             p.setPen(t.accent);
-            QString shortName = name;
-            if (shortName.endsWith('!'))
-                shortName.chop(1);
-            const int cut = qMax(shortName.lastIndexOf('/'), shortName.lastIndexOf('#'));
-            if (cut >= 0)
-                shortName = shortName.mid(cut + 1);
-            QFont font = GUIUtil::appFont(shortName.size() <= 3 ? 11 : 9, QFont::DemiBold);
+            QFont font = GUIUtil::appFont(name.size() <= 3 ? 11 : 9, QFont::DemiBold);
             p.setFont(font);
-            p.drawText(inner, Qt::AlignCenter, QFontMetrics(font).elidedText(shortName, Qt::ElideRight, PICK - 12));
+            p.drawText(inner, Qt::AlignCenter, QFontMetrics(font).elidedText(name, Qt::ElideRight, PICK - 12));
         }
-        // a sub token or unique token shares the logo of its parent: mark it
-        if (name.contains('/') || name.contains('#')) {
-            const QRectF badge(r.right() - 15, r.bottom() - 15, 15, 15);
-            p.setPen(QPen(t.surface, 1.5));
-            p.setBrush(t.fill);
-            p.drawEllipse(badge);
-            p.setPen(t.onFill);
-            p.setFont(GUIUtil::appFont(9, QFont::Medium));
-            p.drawText(badge, Qt::AlignCenter, name.contains('#') ? "#" : "/");
-        }
-        if (name == selected || hover == i) {
+        const bool chosen = !selected.isEmpty() && name == selectedRoot;
+        if (chosen || hover == i) {
             p.setBrush(Qt::NoBrush);
-            p.setPen(QPen(name == selected ? t.accent : t.borderStrong, name == selected ? 2.5 : 1.5));
+            p.setPen(QPen(chosen ? t.accent : t.borderStrong, chosen ? 2.5 : 1.5));
             p.drawEllipse(QRectF(r).adjusted(1.25, 1.25, -1.25, -1.25));
         }
     }
@@ -469,12 +544,28 @@ void TokenPicker::mouseReleaseEvent(QMouseEvent *event)
 {
     const QStringList list = shown();
     const int item = itemAt(event->pos());
-    if (item < 0)
+    if (item < 0 || !index)
         return;
-    if (item == list.size())
-        chooseFromList();
-    else
-        setCurrent(list[item]);
+    if (item == list.size()) {
+        TokenListDialog dialog(index, QString(), TokenListDialog::Choose, this);
+        if (dialog.exec() == QDialog::Accepted)
+            setCurrent(dialog.chosen());
+        return;
+    }
+    const RootToken *root = index->findRoot(list[item]);
+    if (root && root->held)
+        setCurrent(root->name);
+    else if (root && root->children > 0)
+        chooseBelow(root->name); // only tokens below this root are held
+}
+
+void TokenPicker::chooseBelow(const QString& root)
+{
+    if (!index)
+        return;
+    TokenListDialog dialog(index, root, TokenListDialog::Choose, this);
+    if (dialog.exec() == QDialog::Accepted)
+        setCurrent(dialog.chosen());
 }
 
 bool TokenPicker::event(QEvent *event)
@@ -486,48 +577,12 @@ bool TokenPicker::event(QEvent *event)
         if (item >= 0 && item < list.size())
             QToolTip::showText(help->globalPos(), list[item], this);
         else if (item == list.size())
-            QToolTip::showText(help->globalPos(), tr("Choose from the list of all tokens of the wallet"), this);
+            QToolTip::showText(help->globalPos(), tr("Search all tokens of the wallet, also sub tokens and unique tokens"), this);
         else
             QToolTip::hideText();
         return true;
     }
     return QWidget::event(event);
-}
-
-void TokenPicker::chooseFromList()
-{
-    QDialog dialog(this);
-    dialog.setWindowTitle(tr("Choose a token"));
-    dialog.resize(380, 460);
-    QVBoxLayout *layout = new QVBoxLayout(&dialog);
-    layout->setContentsMargins(18, 18, 18, 18);
-    layout->setSpacing(12);
-    QLineEdit *search = new QLineEdit(&dialog);
-    search->setPlaceholderText(tr("Search tokens"));
-    search->setClearButtonEnabled(true);
-    search->addAction(QIcon(GUIUtil::lineIcon("search", 14, GUIUtil::theme().textSecondary, 2.4)), QLineEdit::LeadingPosition);
-    layout->addWidget(search);
-    QListWidget *list = new QListWidget(&dialog);
-    list->setIconSize(QSize(28, 28));
-    for (const QString& name : all) {
-        QListWidgetItem *item = new QListWidgetItem(QIcon(GUIUtil::tokenLogo(name, 28)), name, list);
-        item->setSizeHint(QSize(100, 40));
-        if (name == selected)
-            list->setCurrentItem(item);
-    }
-    layout->addWidget(list, 1);
-    QDialogButtonBox *box = new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel, &dialog);
-    layout->addWidget(box);
-    connect(box, &QDialogButtonBox::accepted, &dialog, &QDialog::accept);
-    connect(box, &QDialogButtonBox::rejected, &dialog, &QDialog::reject);
-    connect(list, &QListWidget::itemDoubleClicked, &dialog, &QDialog::accept);
-    connect(search, &QLineEdit::textChanged, [list](const QString& text) {
-        for (int i = 0; i < list->count(); ++i)
-            list->item(i)->setHidden(!list->item(i)->text().contains(text, Qt::CaseInsensitive));
-    });
-    search->setFocus();
-    if (dialog.exec() == QDialog::Accepted && list->currentItem() && !list->currentItem()->isHidden())
-        setCurrent(list->currentItem()->text());
 }
 
 bool PageDialogs::askLabel(QWidget *parent, QString& label)

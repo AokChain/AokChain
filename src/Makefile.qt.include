@@ -172,6 +172,7 @@ QT_MOC_CPP = \
   qt/moc_sidebar.cpp \
   qt/moc_pagewidgets.cpp \
   qt/moc_tokenspage.cpp \
+  qt/moc_tokenlists.cpp \
   qt/moc_explorerpage.cpp \
   qt/moc_tokensdialog.cpp \
   qt/moc_createtokendialog.cpp \
@@ -264,6 +265,7 @@ AOKCHAIN_QT_H = \
   qt/sidebar.h \
   qt/pagewidgets.h \
   qt/tokenspage.h \
+  qt/tokenlists.h \
   qt/explorerpage.h \
   qt/winshutdownmonitor.h
 
@@ -384,8 +386,7 @@ AOKCHAIN_QT_BASE_CPP = \
   qt/splashscreen.cpp \
   qt/trafficgraphwidget.cpp \
   qt/utilitydialog.cpp \
-  qt/sidebar.cpp \
-  qt/pagewidgets.cpp
+  qt/sidebar.cpp
 
 AOKCHAIN_QT_WINDOWS_CPP = qt/winshutdownmonitor.cpp
 
@@ -424,7 +425,9 @@ AOKCHAIN_QT_WALLET_CPP = \
   qt/walletmodeltransaction.cpp \
   qt/walletview.cpp \
   qt/explorerpage.cpp \
-  qt/tokenspage.cpp
+  qt/tokenspage.cpp \
+  qt/tokenlists.cpp \
+  qt/pagewidgets.cpp
 
 AOKCHAIN_QT_CPP = $(AOKCHAIN_QT_BASE_CPP)
 if TARGET_WINDOWS

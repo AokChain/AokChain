@@ -18,6 +18,7 @@ class ClientModel;
 class PlatformStyle;
 class SendTokensEntry;
 class AmountLabel;
+class HeldTokenIndex;
 class SummaryCard;
 class TokenPicker;
 class SendCoinsRecipient;
@@ -28,6 +29,7 @@ namespace Ui {
 
 QT_BEGIN_NAMESPACE
 class QLabel;
+class QPushButton;
 class QUrl;
 QT_END_NAMESPACE
 
@@ -85,7 +87,10 @@ private:
     void buildLayout();
     void renumberEntries();
     TokenPicker *picker;
+    HeldTokenIndex *heldTokens;
+    QLabel *pickedLogo;
     QLabel *pickedName;
+    QPushButton *belowButton;
     AmountLabel *pickedAvailable;
     SummaryCard *summary;
 
@@ -129,6 +134,7 @@ private Q_SLOTS:
     void tokenControlUpdateSendCoinsDialog();
     void focusToken(const QModelIndex& index);
     void tokenPicked(const QString &name);
+    void chooseBelow();
     void updateSummary();
     /** TOKENS END */
 

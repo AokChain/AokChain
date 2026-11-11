@@ -391,7 +391,7 @@ void ExplorerWorker::lookup(const QString& query)
     Q_EMIT lookupDone(query, QString::fromStdString(result.write()));
 }
 
-void ExplorerWorker::refresh()
+static UniValue readChainStatus()
 {
     UniValue result(UniValue::VOBJ);
     UniValue value;
@@ -408,6 +408,35 @@ void ExplorerWorker::refresh()
         result.pushKV("poolbytes", intOf(value, "bytes"));
         result.pushKV("poolminfee", strOf(value, "mempoolminfee"));
     }
+    return result;
+}
+
+void ExplorerWorker::chainStatus()
+{
+    Q_EMIT statusDone(QString::fromStdString(readChainStatus().write()));
+}
+
+void ExplorerPage::fillChainStats(StatsStrip *strip, const QString& json)
+{
+    UniValue result;
+    if (!result.read(json.toStdString()) || !result.isObject())
+        return;
+    strip->setValue(0, GUIUtil::withThousands(QString::number(intOf(result, "height"))));
+    bool ok = false;
+    const double difficulty = QString::fromStdString(strOf(result, "difficulty")).toDouble(&ok);
+    if (ok)
+        strip->setValue(1, difficulty >= 1000 ? GUIUtil::withThousands(QString::number(difficulty, 'f', 2)) : QString::number(difficulty, 'g', 6));
+    const double weight = QString::fromStdString(strOf(result, "netweight")).toDouble(&ok);
+    if (ok)
+        strip->setValue(2, GUIUtil::withThousands(QString::number(weight / COIN, 'f', 0)), "AOK");
+    strip->setValue(3, QString::number(intOf(result, "peers")));
+    strip->setValue(4, GUIUtil::withThousands(QString::number(intOf(result, "poolsize"))));
+}
+
+void ExplorerWorker::refresh()
+{
+    UniValue result = readChainStatus();
+    UniValue value;
     if (callRPC("getnetworkinfo", {}, value) && value.isObject())
         result.pushKV("relayfee", strOf(value, "relayfee"));
 
@@ -516,29 +545,12 @@ ExplorerPage::ExplorerPage(const PlatformStyle *platformStyle, QWidget *parent) 
     connect(searchEdit, SIGNAL(returnPressed()), this, SLOT(searchClicked()));
 
     // chain status
-    QFrame *statusCard = new QFrame();
-    statusCard->setProperty("role", "card");
-    QHBoxLayout *statusLayout = new QHBoxLayout(statusCard);
-    statusLayout->setContentsMargins(0, 0, 0, 0);
-    statusLayout->setSpacing(0);
-    auto addStat = [&](const QString& name, AmountLabel *&value, bool first) {
-        if (!first)
-            statusLayout->addWidget(line(true));
-        QWidget *box = new QWidget();
-        QVBoxLayout *layout = new QVBoxLayout(box);
-        layout->setContentsMargins(18, 14, 18, 14);
-        layout->setSpacing(2);
-        layout->addWidget(caption(name));
-        value = new AmountLabel(18, QFont::DemiBold);
-        value->setAmount(QString::fromUtf8("–"));
-        layout->addWidget(value);
-        statusLayout->addWidget(box, 1);
-    };
-    addStat(tr("Block height"), statHeight, true);
-    addStat(tr("Difficulty"), statDifficulty, false);
-    addStat(tr("Network stake weight"), statWeight, false);
-    addStat(tr("Connected peers"), statPeers, false);
-    pageLayout->addWidget(statusCard);
+    chainStats = new StatsStrip();
+    chainStats->addCell(tr("Block height"));
+    chainStats->addCell(tr("Difficulty"));
+    chainStats->addCell(tr("Network stake weight"));
+    chainStats->addCell(tr("Connected peers"));
+    pageLayout->addWidget(chainStats);
 
     QHBoxLayout *cards = new QHBoxLayout();
     cards->setSpacing(20);
@@ -1136,15 +1148,7 @@ void ExplorerPage::refreshDone(const QString& json)
         return;
     const GUIUtil::Theme& t = GUIUtil::theme();
 
-    statHeight->setAmount(GUIUtil::withThousands(QString::number(intOf(result, "height"))));
-    bool ok = false;
-    const double difficulty = QString::fromStdString(strOf(result, "difficulty")).toDouble(&ok);
-    if (ok)
-        statDifficulty->setAmount(difficulty >= 1000 ? GUIUtil::withThousands(QString::number(difficulty, 'f', 2)) : QString::number(difficulty, 'g', 6));
-    const double weight = QString::fromStdString(strOf(result, "netweight")).toDouble(&ok);
-    if (ok)
-        statWeight->setAmount(GUIUtil::withThousands(QString::number(weight / COIN, 'f', 0)), "AOK");
-    statPeers->setAmount(QString::number(intOf(result, "peers")));
+    fillChainStats(chainStats, json);
 
     poolCount->setAmount(GUIUtil::withThousands(QString::number(intOf(result, "poolsize"))));
     poolSize->setAmount(QString::number(intOf(result, "poolbytes") / 1000.0, 'f', 2), "kB");

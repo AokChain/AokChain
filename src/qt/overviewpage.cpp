@@ -11,7 +11,9 @@
 #include "guiconstants.h"
 #include "guiutil.h"
 #include "optionsmodel.h"
+#include "explorerpage.h"
 #include "pagewidgets.h"
+#include "tokenlists.h"
 #include "platformstyle.h"
 #include "transactionfilterproxy.h"
 #include "transactionrecord.h"
@@ -24,6 +26,7 @@
 #include <QAbstractItemDelegate>
 #include <QAbstractItemView>
 #include <QFrame>
+#include <QHash>
 #include <QHBoxLayout>
 #include <QHelpEvent>
 #include <QLabel>
@@ -157,6 +160,10 @@ public:
 
 };
 
+namespace OverviewRootRoles {
+    enum { HeldRole = Qt::UserRole + 200, ChildrenRole, RootNameRole };
+}
+
 /**
  * One token: logo, name, chips, amount. The owner token ("NAME!") is not a row
  * of its own; it shows as a chip on the row of the token. Sub tokens and unique
@@ -187,18 +194,15 @@ public:
         QString name = index.data(TokenTableModel::TokenNameRole).toString();
         const bool admin = index.data(TokenTableModel::AdministratorRole).toBool();
         const bool locked = index.data(TokenTableModel::IsLockedRole).toBool();
-        // the model appends this to the name of a locked balance
-        if (locked && name.endsWith(" (LOCKED)"))
-            name.chop(9);
-        const bool ownerOnly = name.endsWith('!');
-        if (ownerOnly)
+        // only the owner token, or only tokens below the root, are held
+        const bool ownerOnly = !index.data(OverviewRootRoles::HeldRole).toBool();
+        if (name.endsWith('!'))
             name.chop(1);
-        const bool sub = name.contains('/');
-        const bool unique = name.contains('#');
-        const bool child = sub || unique;
+        const int children = index.data(OverviewRootRoles::ChildrenRole).toInt();
+        const bool sub = false, unique = false;
 
-        const int indent = child ? 22 : 0;
-        const int logoSize = child ? 24 : 32;
+        const int indent = 0;
+        const int logoSize = 32;
         painter->drawPixmap(r.left() + indent, r.top() + (r.height() - logoSize) / 2, GUIUtil::tokenLogo(name, logoSize));
 
         // amount
@@ -220,10 +224,13 @@ public:
             chips << tr("Unique token");
         else if (sub)
             chips << tr("Sub token");
-        if (admin || ownerOnly)
+        if (admin)
             chips << tr("Owner");
         if (locked)
             chips << tr("Locked");
+        // sub and unique tokens are not rows: the root says how many are held below it
+        if (children > 0)
+            chips << tr("%1 below").arg(children);
         painter->setFont(GUIUtil::appFont(11, QFont::Medium));
         int chipsWidth = 0;
         for (const QString& chip : chips)
@@ -235,8 +242,14 @@ public:
         const QString shown = painter->fontMetrics().elidedText(name, Qt::ElideRight, qMax(40, r.right() - left - amountWidth - chipsWidth - 12));
         painter->drawText(QRect(left, r.top(), r.width(), r.height()), Qt::AlignLeft | Qt::AlignVCenter, shown);
         int x = left + painter->fontMetrics().horizontalAdvance(shown) + 8;
-        for (const QString& chip : chips)
-            x += GUIUtil::paintChip(painter, x, r.center().y() + 1, chip) + 6;
+        childChips.remove(index.row());
+        for (const QString& chip : chips) {
+            const int w = GUIUtil::paintChip(painter, x, r.center().y() + 1, chip);
+            // the last chip of a root with tokens below it opens their list
+            if (children > 0 && &chip == &chips.last())
+                childChips.insert(index.row(), QRect(x, r.center().y() - 12, w, 24));
+            x += w + 6;
+        }
 
         painter->restore();
     }
@@ -248,29 +261,67 @@ public:
 
     int unit;
     const PlatformStyle *platformStyle;
+    /** Where the "N below" chips were painted, by row */
+    mutable QHash<int, QRect> childChips;
 };
 
-/** Sorts the tokens by name: a parent, then its sub and unique tokens. */
-class OverviewTokenProxy : public TokenFilterProxy
+/**
+ * The root tokens of the wallet for the list of the overview. A wallet can hold
+ * tens of thousands of sub and unique tokens; they are not rows here. The rows
+ * answer to the roles of the token table model, so that what is connected to a
+ * click on a token works as before.
+ */
+class OverviewRootModel : public QAbstractListModel
 {
 public:
-    explicit OverviewTokenProxy(QObject *parent = nullptr) : TokenFilterProxy(parent) {}
-
-protected:
-    bool lessThan(const QModelIndex &left, const QModelIndex &right) const override
+    explicit OverviewRootModel(HeldTokenIndex *_index, QObject *parent = nullptr) : QAbstractListModel(parent), index(_index)
     {
-        return key(left) < key(right);
+        connect(index, &HeldTokenIndex::changed, this, [this] { refill(); });
+        refill();
+    }
+
+    void setFilter(const QString& text)
+    {
+        filter = text;
+        refill();
+    }
+
+    int rowCount(const QModelIndex& parent = QModelIndex()) const override { return parent.isValid() ? 0 : rows.size(); }
+
+    QVariant data(const QModelIndex& idx, int role) const override
+    {
+        if (!idx.isValid() || idx.row() >= rows.size())
+            return QVariant();
+        const RootToken& root = rows[idx.row()];
+        switch (role) {
+        case TokenTableModel::TokenNameRole:
+            // as the table model names it: "NAME!" when only the owner token is held
+            return !root.held && root.admin ? root.name + "!" : root.name;
+        case TokenTableModel::FormattedAmountRole: return root.amount;
+        case TokenTableModel::AdministratorRole: return root.admin;
+        case TokenTableModel::IsLockedRole: return false;
+        case OverviewRootRoles::HeldRole: return root.held;
+        case OverviewRootRoles::ChildrenRole: return root.children;
+        case OverviewRootRoles::RootNameRole: return root.name;
+        }
+        return QVariant();
     }
 
 private:
-    static QString key(const QModelIndex &index)
+    void refill()
     {
-        QString name = index.data(TokenTableModel::TokenNameRole).toString();
-        // "NAME!" sorts where "NAME" would, a locked balance right after the free one
-        name.replace("!", "");
-        name.replace(" (LOCKED)", QString(QChar(1)));
-        return name;
+        beginResetModel();
+        rows.clear();
+        for (const RootToken& root : index->roots()) {
+            if (filter.isEmpty() || root.name.contains(filter, Qt::CaseInsensitive))
+                rows.push_back(root);
+        }
+        endResetModel();
     }
+
+    HeldTokenIndex *index;
+    QString filter;
+    QVector<RootToken> rows;
 };
 
 #include "overviewpage.moc"
@@ -321,6 +372,9 @@ OverviewPage::OverviewPage(const PlatformStyle *platformStyle, QWidget *parent) 
     currentWatchOnlyStake(-1),
     currentLockedBalance(-1),
     outOfSync(true),
+    statsPending(false),
+    heldTokens(new HeldTokenIndex(this)),
+    rootModel(nullptr),
     transactionLimit(NUM_ITEMS),
     txdelegate(new TxViewDelegate(platformStyle, this)),
     tokendelegate(new TokenViewDelegate(platformStyle, this))
@@ -329,7 +383,7 @@ OverviewPage::OverviewPage(const PlatformStyle *platformStyle, QWidget *parent) 
 
     QVBoxLayout *pageLayout = new QVBoxLayout(this);
     pageLayout->setContentsMargins(0, 0, 0, 0);
-    pageLayout->setSpacing(20);
+    pageLayout->setSpacing(14);
 
     // Page header: a small hint while synchronizing and the chain status, which leads to the explorer
     QWidget *header = new QWidget();
@@ -345,23 +399,56 @@ OverviewPage::OverviewPage(const PlatformStyle *platformStyle, QWidget *parent) 
     connect(hint, SIGNAL(clicked(QPoint)), this, SLOT(handleOutOfSyncWarningClicks()));
     syncHint = hint;
     headerLayout->addWidget(syncHint);
-    chainStrip = new QPushButton();
-    chainStrip->setProperty("look", "strip");
-    chainStrip->setCursor(Qt::PointingHandCursor);
-    chainStrip->setToolTip(tr("State of the chain and of the memory pool. Click to open the explorer."));
-    chainStrip->setLayoutDirection(Qt::RightToLeft);
-    chainStrip->setIcon(QIcon(GUIUtil::lineIcon("chevron-right", 12, theme.accent, 2.6)));
-    chainStrip->setIconSize(QSize(12, 12));
-    chainStrip->setFixedHeight(32);
-    connect(chainStrip, SIGNAL(clicked()), this, SIGNAL(explorerClicked()));
-    headerLayout->addWidget(chainStrip);
     syncPill = header;
+
+    // Search that continues in the explorer, and the state of the chain as at the top of the explorer
+    QHBoxLayout *searchRow = new QHBoxLayout();
+    searchRow->setSpacing(10);
+    searchEdit = new QLineEdit();
+    searchEdit->setProperty("look", "search");
+    searchEdit->setFont(GUIUtil::monoFont(13));
+    searchEdit->setPlaceholderText(tr("Search a transaction ID, an address or a block height"));
+    searchEdit->setFixedHeight(44);
+    searchEdit->addAction(QIcon(GUIUtil::lineIcon("search", 16, theme.textSecondary, 2.2)), QLineEdit::LeadingPosition);
+    searchEdit->setClearButtonEnabled(true);
+    QPushButton *searchButton = new QPushButton(tr("Look up"));
+    searchButton->setProperty("primary", true);
+    searchButton->setProperty("look", "large");
+    searchButton->setFixedHeight(44);
+    searchButton->setCursor(Qt::PointingHandCursor);
+    searchRow->addWidget(searchEdit, 1);
+    searchRow->addWidget(searchButton);
+    pageLayout->addLayout(searchRow);
+    connect(searchButton, SIGNAL(clicked()), this, SLOT(searchSubmitted()));
+    connect(searchEdit, SIGNAL(returnPressed()), this, SLOT(searchSubmitted()));
+
+    chainStats = new StatsStrip();
+    chainStats->addCell(tr("Block height"));
+    chainStats->addCell(tr("Difficulty"));
+    chainStats->addCell(tr("Network stake weight"));
+    chainStats->addCell(tr("Connected peers"));
+    chainStats->addCell(tr("Waiting in the memory pool"), true);
+    chainStats->setCompact(true);
+    chainStats->setToolTip(tr("State of the chain as this node sees it. The memory pool opens the explorer."));
+    pageLayout->addWidget(chainStats);
+    connect(chainStats, SIGNAL(cellClicked(int)), this, SIGNAL(explorerClicked()));
+
+    // the figures are read off the GUI thread, as in the explorer
+    ExplorerWorker *worker = new ExplorerWorker();
+    worker->moveToThread(&statsThread);
+    connect(&statsThread, SIGNAL(finished()), worker, SLOT(deleteLater()));
+    connect(this, SIGNAL(requestChainStatus()), worker, SLOT(chainStatus()));
+    connect(worker, SIGNAL(statusDone(QString)), this, SLOT(chainStatusDone(QString)));
+    statsThread.start();
+    statsTimer = new QTimer(this);
+    statsTimer->setInterval(10000);
+    connect(statsTimer, SIGNAL(timeout()), this, SLOT(updateChainStrip()));
 
     // balance card
     QFrame *balanceCard = new QFrame();
     balanceCard->setProperty("role", "card");
     QHBoxLayout *balanceLayout = new QHBoxLayout(balanceCard);
-    balanceLayout->setContentsMargins(28, 24, 28, 24);
+    balanceLayout->setContentsMargins(28, 16, 28, 18);
     balanceLayout->setSpacing(24);
 
     QVBoxLayout *balanceLeft = new QVBoxLayout();
@@ -373,7 +460,7 @@ OverviewPage::OverviewPage(const PlatformStyle *platformStyle, QWidget *parent) 
     labelTotal = new AmountLabel(40, QFont::Bold);
     labelTotal->setUnitColor(theme.accent);
     balanceLeft->addWidget(labelTotal);
-    balanceLeft->addSpacing(8);
+    balanceLeft->addSpacing(2);
 
     QHBoxLayout *stats = new QHBoxLayout();
     stats->setSpacing(32);
@@ -442,12 +529,12 @@ OverviewPage::OverviewPage(const PlatformStyle *platformStyle, QWidget *parent) 
 
     // tokens and recent transactions
     QHBoxLayout *cards = new QHBoxLayout();
-    cards->setSpacing(20);
+    cards->setSpacing(14);
 
     tokenFrame = new QFrame();
     tokenFrame->setProperty("role", "card");
     QVBoxLayout *tokenLayout = new QVBoxLayout(tokenFrame);
-    tokenLayout->setContentsMargins(22, 18, 22, 12);
+    tokenLayout->setContentsMargins(22, 14, 22, 10);
     tokenLayout->setSpacing(0);
     QHBoxLayout *tokenHeader = new QHBoxLayout();
     tokenHeader->setSpacing(8);
@@ -467,7 +554,7 @@ OverviewPage::OverviewPage(const PlatformStyle *platformStyle, QWidget *parent) 
     tokenHeader->addStretch();
     tokenHeader->addWidget(tokenSearch);
     tokenLayout->addLayout(tokenHeader);
-    tokenLayout->addSpacing(12);
+    tokenLayout->addSpacing(8);
     listTokens = new QListView();
     tokenLayout->addWidget(listTokens, 1);
     tokenLayout->addWidget(hline());
@@ -487,7 +574,7 @@ OverviewPage::OverviewPage(const PlatformStyle *platformStyle, QWidget *parent) 
     QFrame *txFrame = new QFrame();
     txFrame->setProperty("role", "card");
     QVBoxLayout *txLayout = new QVBoxLayout(txFrame);
-    txLayout->setContentsMargins(22, 18, 22, 12);
+    txLayout->setContentsMargins(22, 14, 22, 10);
     txLayout->setSpacing(0);
     QHBoxLayout *txHeader = new QHBoxLayout();
     QLabel *txTitle = new QLabel(tr("Recent transactions"));
@@ -504,7 +591,7 @@ OverviewPage::OverviewPage(const PlatformStyle *platformStyle, QWidget *parent) 
     txHeader->setContentsMargins(0, 0, 0, 0);
     txHeaderBox->setFixedHeight(40);
     txLayout->addWidget(txHeaderBox);
-    txLayout->addSpacing(12);
+    txLayout->addSpacing(8);
     listTransactions = new QListView();
     txLayout->addWidget(listTransactions, 1);
     connect(allTransactions, SIGNAL(clicked()), this, SIGNAL(allTransactionsClicked()));
@@ -561,7 +648,9 @@ OverviewPage::OverviewPage(const PlatformStyle *platformStyle, QWidget *parent) 
 
     // context menu
     contextMenu = new QMenu(this);
+    belowAction = new QAction(this);
     contextMenu->addAction(sendAction);
+    contextMenu->addAction(belowAction);
     contextMenu->addAction(issueSub);
     contextMenu->addAction(issueUnique);
     contextMenu->addAction(reissue);
@@ -578,7 +667,17 @@ void OverviewPage::handleTransactionClicked(const QModelIndex &index)
 
 void OverviewPage::handleTokenClicked(const QModelIndex &index)
 {
-    if(tokenFilter) {
+    if(rootModel) {
+        const int children = index.data(OverviewRootRoles::ChildrenRole).toInt();
+        const QString rootName = index.data(OverviewRootRoles::RootNameRole).toString();
+        // a click on the "N below" chip opens the list of the sub and unique tokens
+        if (children > 0 && tokendelegate->childChips.value(index.row()).contains(listTokens->viewport()->mapFromGlobal(QCursor::pos()))) {
+            showTokensBelow(rootName);
+            return;
+        }
+        belowAction->setVisible(children > 0);
+        belowAction->setText(tr("Show the %1 sub tokens").arg(children));
+
         QString name = index.data(TokenTableModel::TokenNameRole).toString();
         bool fOwner = false;
         if (IsTokenNameAnOwner(name.toStdString())) {
@@ -586,7 +685,8 @@ void OverviewPage::handleTokenClicked(const QModelIndex &index)
             name = name.left(name.size() - 1);
             sendAction->setDisabled(true);
         } else {
-            sendAction->setDisabled(false);
+            // a root of which only sub tokens are held cannot be sent itself
+            sendAction->setDisabled(!index.data(OverviewRootRoles::HeldRole).toBool());
         }
         Q_UNUSED(fOwner);
 
@@ -610,13 +710,15 @@ void OverviewPage::handleTokenClicked(const QModelIndex &index)
 
         if (action) {
             if (action->objectName() == "Send")
-                    Q_EMIT tokenSendClicked(tokenFilter->mapToSource(index));
+                    Q_EMIT tokenSendClicked(index);
             else if (action->objectName() == "Sub")
-                    Q_EMIT tokenIssueSubClicked(tokenFilter->mapToSource(index));
+                    Q_EMIT tokenIssueSubClicked(index);
             else if (action->objectName() == "Unique")
-                    Q_EMIT tokenIssueUniqueClicked(tokenFilter->mapToSource(index));
+                    Q_EMIT tokenIssueUniqueClicked(index);
             else if (action->objectName() == "Reissue")
-                    Q_EMIT tokenReissueClicked(tokenFilter->mapToSource(index));
+                    Q_EMIT tokenReissueClicked(index);
+            else if (action == belowAction)
+                showTokensBelow(rootName);
             else if (action->objectName() == "Copy Name")
                 GUIUtil::setClipboard(index.data(TokenTableModel::TokenNameRole).toString());
             else if (action->objectName() == "Copy Amount")
@@ -633,6 +735,8 @@ void OverviewPage::handleOutOfSyncWarningClicks()
 OverviewPage::~OverviewPage()
 {
     // the header widget may have been given to the page shell
+    statsThread.quit();
+    statsThread.wait();
     if (syncPill && !syncPill->parent())
         delete syncPill;
 }
@@ -684,8 +788,6 @@ void OverviewPage::setClientModel(ClientModel *model)
         // Chain status for the page header
         connect(model, SIGNAL(numBlocksChanged(int,QDateTime,double,bool)), this, SLOT(updateChainStrip()));
         connect(model, SIGNAL(numConnectionsChanged(int)), this, SLOT(updateChainStrip()));
-        connect(model, SIGNAL(mempoolSizeChanged(long,size_t)), this, SLOT(updateChainStrip()));
-        updateChainStrip();
     }
 }
 
@@ -706,15 +808,10 @@ void OverviewPage::setWalletModel(WalletModel *model)
         listTransactions->setModel(filter.get());
         listTransactions->setModelColumn(TransactionTableModel::ToAddress);
 
-        tokenFilter.reset(new OverviewTokenProxy());
-        tokenFilter->setSourceModel(model->getTokenTableModel());
-        tokenFilter->setDynamicSortFilter(true);
-        tokenFilter->sort(0, Qt::AscendingOrder);
-        listTokens->setModel(tokenFilter.get());
-        connect(tokenFilter.get(), SIGNAL(layoutChanged()), this, SLOT(updateTokenCount()));
-        connect(tokenFilter.get(), SIGNAL(modelReset()), this, SLOT(updateTokenCount()));
-        connect(tokenFilter.get(), SIGNAL(rowsInserted(QModelIndex,int,int)), this, SLOT(updateTokenCount()));
-        connect(tokenFilter.get(), SIGNAL(rowsRemoved(QModelIndex,int,int)), this, SLOT(updateTokenCount()));
+        heldTokens->setSourceModel(model->getTokenTableModel());
+        rootModel = new OverviewRootModel(heldTokens, this);
+        listTokens->setModel(rootModel);
+        connect(rootModel, SIGNAL(modelReset()), this, SLOT(updateTokenCount()));
         updateTokenCount();
 
         // Keep up to date with wallet
@@ -753,25 +850,43 @@ void OverviewPage::updateAlerts(const QString &warnings)
     Q_UNUSED(warnings);
 }
 
-/** Block height, sync state, peers and the size of the memory pool; a click opens the explorer. */
+/** Ask for the figures of the chain status strip; nothing while the page is not shown. */
 void OverviewPage::updateChainStrip()
 {
-    if (!clientModel)
+    if (!clientModel || !isVisible() || statsPending)
         return;
-    QStringList parts;
-    parts << tr("Block %1").arg(GUIUtil::withThousands(QString::number(clientModel->getNumBlocks())));
-    if (outOfSync)
-        parts << tr("syncing");
-    parts << tr("Peers %1").arg(clientModel->getNumConnections());
-    parts << tr("Mempool %1").arg(clientModel->getMempoolSize());
-    chainStrip->setText(parts.join(QString::fromUtf8("  ·  ")) + "  ");
+    statsPending = true;
+    Q_EMIT requestChainStatus();
+}
+
+void OverviewPage::chainStatusDone(const QString &json)
+{
+    statsPending = false;
+    ExplorerPage::fillChainStats(chainStats, json);
+}
+
+/** The search of the overview is answered by the explorer. */
+void OverviewPage::searchSubmitted()
+{
+    const QString query = searchEdit->text().trimmed();
+    if (query.isEmpty())
+        return;
+    searchEdit->clear();
+    Q_EMIT explorerRequested(query);
+}
+
+/** The window with the sub and unique tokens of a root. "Send" there leads to the send page. */
+void OverviewPage::showTokensBelow(const QString &root)
+{
+    TokenListDialog dialog(heldTokens, root, TokenListDialog::Browse, this);
+    if (dialog.exec() == QDialog::Accepted && !dialog.chosen().isEmpty())
+        Q_EMIT sendTokenRequested(dialog.chosen());
 }
 
 void OverviewPage::showOutOfSyncWarning(bool fShow)
 {
     outOfSync = fShow;
     syncHint->setVisible(fShow);
-    updateChainStrip();
 }
 
 void OverviewPage::showTokens()
@@ -781,17 +896,17 @@ void OverviewPage::showTokens()
 
 void OverviewPage::tokenSearchChanged()
 {
-    if (!tokenFilter)
+    if (!rootModel)
         return;
-    tokenFilter->setTokenNamePrefix(tokenSearch->text());
+    rootModel->setFilter(tokenSearch->text().trimmed());
     updateTokenCount();
 }
 
 void OverviewPage::updateTokenCount()
 {
-    if (!tokenFilter)
+    if (!rootModel)
         return;
-    tokenCount->setText(tr("%1 kinds").arg(tokenFilter->rowCount()));
+    tokenCount->setText(tr("%1 kinds").arg(rootModel->rowCount()));
 }
 
 /** Show as many recent transactions as fit into the card. */
@@ -813,9 +928,17 @@ void OverviewPage::resizeEvent(QResizeEvent *event)
     QTimer::singleShot(0, this, [this] { updateTransactionLimit(); });
 }
 
+void OverviewPage::hideEvent(QHideEvent *event)
+{
+    statsTimer->stop();
+    QWidget::hideEvent(event);
+}
+
 void OverviewPage::showEvent(QShowEvent *event)
 {
     QWidget::showEvent(event);
+    statsTimer->start();
+    QTimer::singleShot(0, this, [this] { updateChainStrip(); });
     QTimer::singleShot(0, this, [this] { updateTransactionLimit(); });
 }
 

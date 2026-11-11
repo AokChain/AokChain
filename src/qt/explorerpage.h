@@ -16,6 +16,7 @@
 #include <vector>
 
 class AmountLabel;
+class StatsStrip;
 class ClientModel;
 class PlatformStyle;
 class UniValue;
@@ -48,10 +49,13 @@ public Q_SLOTS:
     void lookup(const QString& query);
     /** Read the chain status and the memory pool. */
     void refresh();
+    /** Read the chain status only: height, difficulty, network stake weight, peers, size of the memory pool. */
+    void chainStatus();
 
 Q_SIGNALS:
     void lookupDone(const QString& query, const QString& json);
     void refreshDone(const QString& json);
+    void statusDone(const QString& json);
 };
 
 /** Explorer page: transactions, addresses, blocks and the memory pool as this node sees them. */
@@ -65,6 +69,9 @@ public:
 
     void setClientModel(ClientModel *clientModel);
     void setWalletModel(WalletModel *walletModel);
+    /** Fill the cells of a chain status strip (height, difficulty, stake weight, peers and, when it has
+        a fifth cell, the transactions waiting in the memory pool) from what the worker read. */
+    static void fillChainStats(StatsStrip *strip, const QString& json);
     /** Note shown next to the page title */
     QWidget *headerWidget() const;
 
@@ -105,10 +112,7 @@ private:
     QPointer<QLabel> headerNote;
     QLineEdit *searchEdit;
     QPushButton *searchButton;
-    AmountLabel *statHeight;
-    AmountLabel *statDifficulty;
-    AmountLabel *statWeight;
-    AmountLabel *statPeers;
+    StatsStrip *chainStats;
     QLabel *resultTitle;
     QLabel *resultBadge;
     QVBoxLayout *resultLayout;

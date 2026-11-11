@@ -13,9 +13,13 @@
 #include <QWidget>
 #include <QMenu>
 #include <QPointer>
+#include <QThread>
 #include <memory>
 
 class AmountLabel;
+class HeldTokenIndex;
+class OverviewRootModel;
+class StatsStrip;
 class ClientModel;
 class TransactionFilterProxy;
 class TxViewDelegate;
@@ -31,6 +35,7 @@ class QLineEdit;
 class QListView;
 class QModelIndex;
 class QPushButton;
+class QTimer;
 QT_END_NAMESPACE
 
 /** Overview ("home") page widget */
@@ -65,10 +70,15 @@ Q_SIGNALS:
     void allTransactionsClicked();
     void allTokensClicked();
     void explorerClicked();
+    /** Look something up in the explorer */
+    void explorerRequested(const QString &query);
+    void sendTokenRequested(const QString &name);
+    void requestChainStatus();
 
 protected:
     void resizeEvent(QResizeEvent *event) override;
     void showEvent(QShowEvent *event) override;
+    void hideEvent(QHideEvent *event) override;
 
 private:
     ClientModel *clientModel;
@@ -85,8 +95,16 @@ private:
 
     QPointer<QWidget> syncPill;
     QWidget *syncHint;
-    QPushButton *chainStrip;
+    QLineEdit *searchEdit;
+    StatsStrip *chainStats;
+    QThread statsThread;
+    QTimer *statsTimer;
     bool outOfSync;
+    bool statsPending;
+    HeldTokenIndex *heldTokens;
+    OverviewRootModel *rootModel;
+    QAction *belowAction;
+    void showTokensBelow(const QString &root);
     AmountLabel *labelTotal;
     AmountLabel *labelBalance;
     AmountLabel *labelUnconfirmed;
@@ -103,7 +121,6 @@ private:
 
     TxViewDelegate *txdelegate;
     std::unique_ptr<TransactionFilterProxy> filter;
-    std::unique_ptr<TokenFilterProxy> tokenFilter;
 
     TokenViewDelegate *tokendelegate;
     QMenu *contextMenu;
@@ -125,6 +142,8 @@ private Q_SLOTS:
     void tokenSearchChanged();
     void updateTokenCount();
     void updateChainStrip();
+    void chainStatusDone(const QString &json);
+    void searchSubmitted();
 };
 
 #endif // AOKCHAIN_QT_OVERVIEWPAGE_H
