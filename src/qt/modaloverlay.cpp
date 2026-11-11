@@ -27,6 +27,8 @@ userClosed(false)
     ui->contentWidget->setStyleSheet(QString("#contentWidget { background: %1; border: 1px solid %2; border-radius: 10px; }")
         .arg(GUIUtil::theme().surface.name(), GUIUtil::theme().border.name()));
     ui->bgWidget->setStyleSheet("#bgWidget { background: rgba(10,14,18,150); }");
+    ui->warningIcon->setFlat(true);
+    ui->warningIcon->setStyleSheet("QPushButton { border: none; background: transparent; }");
     connect(ui->closeButton, SIGNAL(clicked()), this, SLOT(closeClicked()));
     if (parent) {
         parent->installEventFilter(this);

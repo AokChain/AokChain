@@ -139,6 +139,10 @@ void applyTheme(QApplication& app, bool dark)
     app.setStyle(QStyleFactory::create("Fusion"));
     QFont::insertSubstitution("Noto Sans", "Noto Sans KR");
     app.setFont(appFont());
+    // Windows takes the fonts of these from the system settings unless told otherwise
+    for (const char* cls : {"QMenuBar", "QMenu", "QToolTip", "QTipLabel", "QMessageBox", "QStatusBar",
+                            "QHeaderView", "QAbstractItemView", "QToolButton", "QDockWidgetTitle"})
+        app.setFont(appFont(), cls);
 
     QPalette p;
     p.setColor(QPalette::Window, t.bg);
