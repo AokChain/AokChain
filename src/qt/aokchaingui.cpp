@@ -1609,6 +1609,13 @@ void AokChainGUI::updateStakingIcon()
     if (walletFrame) {
         nWeight = walletFrame->updateWeight();
     }
+    // The wallet was locked from elsewhere (walletlock, or the time of walletpassphrase ran out):
+    // nothing is staked any more, and the switch says so.
+    if (this->nStaking && walletFrame && !walletFrame->isWalletUnlocked()) {
+        this->nStaking = false;
+        for (CWallet* pwallet : vpwallets)
+            pwallet->StopStake();
+    }
 
     QString detail;
     if (this->nStaking && nWeight) {

@@ -2551,10 +2551,22 @@ UniValue keypoolrefill(const JSONRPCRequest& request)
 }
 
 
+/** The wallet was open for staking only (the staking switch of the GUI) when walletpassphrase opened it for a time. */
+static bool fRestoreStakingOnlyUnlock = false;
+
 static void LockWallet(CWallet* pWallet)
 {
     LOCK(pWallet->cs_wallet);
     pWallet->nRelockTime = 0;
+    if (fRestoreStakingOnlyUnlock && !pWallet->IsLocked()) {
+        // The time of walletpassphrase is over: back to what was before it, open for staking only.
+        // Locking here would stop the staking that the user switched on.
+        fRestoreStakingOnlyUnlock = false;
+        fWalletUnlockStakingOnly = true;
+        pWallet->NotifyStatusChanged(pWallet);
+        return;
+    }
+    fRestoreStakingOnlyUnlock = false;
     pWallet->Lock();
 }
 
@@ -2602,6 +2614,9 @@ UniValue walletpassphrase(const JSONRPCRequest& request)
     // Alternately, find a way to make request.params[0] mlock()'d to begin with.
     strWalletPass = request.params[0].get_str().c_str();
 
+    // open for staking only before this call, and not by an earlier call with a time
+    const bool fWasStakingOnly = !pwallet->IsLocked() && fWalletUnlockStakingOnly && pwallet->nRelockTime == 0;
+
     if (strWalletPass.length() > 0)
     {
         if (!pwallet->Unlock(strWalletPass)) {
@@ -2614,6 +2629,9 @@ UniValue walletpassphrase(const JSONRPCRequest& request)
             "Stores the wallet decryption key in memory for <timeout> seconds.");
 
     pwallet->TopUpKeyPool();
+
+    if (fWasStakingOnly)
+        fRestoreStakingOnlyUnlock = true;
 
     int64_t nSleepTime = request.params[1].get_int64();
     pwallet->nRelockTime = GetTime() + nSleepTime;
@@ -2714,6 +2732,7 @@ UniValue walletlock(const JSONRPCRequest& request)
     }
 
     pwallet->Lock();
+    fRestoreStakingOnlyUnlock = false;
     pwallet->nRelockTime = 0;
 
     return NullUniValue;
