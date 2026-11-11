@@ -36,3 +36,4 @@ rpc_mnemonic.py
 wallet_multisig_flow.py
 feature_bootstrap.py
 p2p_old_peer_cutoff.py
+feature_snapshot.py
