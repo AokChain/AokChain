@@ -53,6 +53,9 @@ class ReceiveRequestDialog : public QDialog
 
 public:
     explicit ReceiveRequestDialog(QWidget *parent = 0);
+
+    /** The QR code of a URI as an image of the given size; a null image when it cannot be made. */
+    static QImage qrCodeImage(const QString &uri, int size);
     ~ReceiveRequestDialog();
 
     void setModel(OptionsModel *model);

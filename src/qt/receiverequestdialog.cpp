@@ -134,6 +134,32 @@ void ReceiveRequestDialog::setInfo(const SendCoinsRecipient &_info)
     update();
 }
 
+QImage ReceiveRequestDialog::qrCodeImage(const QString &uri, int size)
+{
+#ifdef USE_QRCODE
+    if (uri.isEmpty() || uri.length() > MAX_URI_LENGTH)
+        return QImage();
+    QRcode *code = QRcode_encodeString(uri.toUtf8().constData(), 0, QR_ECLEVEL_L, QR_MODE_8, 1);
+    if (!code)
+        return QImage();
+    QImage image(code->width + 8, code->width + 8, QImage::Format_RGB32);
+    image.fill(0xffffff);
+    unsigned char *p = code->data;
+    for (int y = 0; y < code->width; y++) {
+        for (int x = 0; x < code->width; x++) {
+            image.setPixel(x + 4, y + 4, ((*p & 1) ? 0x0 : 0xffffff));
+            p++;
+        }
+    }
+    QRcode_free(code);
+    return image.scaled(size, size);
+#else
+    Q_UNUSED(uri);
+    Q_UNUSED(size);
+    return QImage();
+#endif
+}
+
 void ReceiveRequestDialog::update()
 {
     if(!model)
