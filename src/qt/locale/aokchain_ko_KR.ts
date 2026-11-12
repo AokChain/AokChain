@@ -775,6 +775,22 @@
         <source>Stored blocks: %1</source>
         <translation>저장한 블록: %1</translation>
     </message>
+    <message numerus="yes">
+        <source>24 h: %n reward(s)</source>
+        <translation>
+            <numerusform>24시간: 보상 %n회</numerusform>
+        </translation>
+    </message>
+    <message numerus="yes">
+        <source>%n lost</source>
+        <translation>
+            <numerusform>밀림 %n회</numerusform>
+        </translation>
+    </message>
+    <message>
+        <source>In the last 24 hours this wallet made %1 blocks that are in the chain and earned %2. %3 of its blocks lost against a block of another staker that arrived first; those earn nothing.</source>
+        <translation>지난 24시간 동안 이 지갑이 만든 블록 %1개가 체인에 들어갔고 %2를 받았습니다. 블록 %3개는 다른 스테이커의 블록이 먼저 도착해 밀려났고, 그 블록은 보상이 없습니다.</translation>
+    </message>
     <message>
         <source>Syncing headers</source>
         <translation>헤더 동기화 중</translation>

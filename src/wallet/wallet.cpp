@@ -4659,6 +4659,34 @@ bool CWallet::CommitTransaction(CWalletTx& wtxNew, CReserveKey& reservekey, CCon
     return true;
 }
 
+CWallet::StakeStats CWallet::GetStakeStats(int64_t nSince) const
+{
+    AssertLockHeld(cs_main);
+    AssertLockHeld(cs_wallet);
+    StakeStats stats;
+    // newest first; the order is that of arrival, which follows the time closely
+    int nOlder = 0;
+    for (TxItems::const_reverse_iterator it = wtxOrdered.rbegin(); it != wtxOrdered.rend() && nOlder < 1000; ++it) {
+        const CWalletTx* pwtx = it->second.first;
+        if (!pwtx)
+            continue;
+        if (pwtx->GetTxTime() < nSince) {
+            nOlder++;
+            continue;
+        }
+        if (!pwtx->IsCoinStake() || !IsFromMe(*pwtx->tx))
+            continue;
+        if (pwtx->isAbandoned() || pwtx->GetDepthInMainChain() <= 0) {
+            stats.nOrphaned++;
+            continue;
+        }
+        stats.nStakes++;
+        // (what the outputs pay to this wallet, mature or not, less what the inputs took from it)
+        stats.nReward += GetCredit(*pwtx->tx, ISMINE_ALL) - GetDebit(*pwtx->tx, ISMINE_ALL);
+    }
+    return stats;
+}
+
 uint64_t CWallet::GetStakeWeight() const
 {
     // Choose coins to use

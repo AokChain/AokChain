@@ -123,6 +123,10 @@ class StakingTest(AokChainTestFramework):
         base = self.snapshot(n0)
         info = n0.getstakinginfo()
         assert info["staking"] and info["search-interval"] > 0, info
+        # the last 24 hours: three stakes in the chain, each with the block reward, none lost
+        assert_equal(info["stakes_24h"], 3)
+        assert_equal(info["orphaned_24h"], 0)
+        assert_equal(info["reward_24h"], 3 * 4)
 
         self.log.info("A stake that is disconnected and connected again on the same parent")
         # (the staking thread finds the same, now invalid, block again and gives up)
@@ -193,6 +197,12 @@ class StakingTest(AokChainTestFramework):
         for txid in stakes_a:
             assert n0.gettransaction(txid)["confirmations"] <= 0
         wait_until(lambda: all(k in set((u["txid"], u["vout"]) for u in n0.listunspent(0)) for k in kernels_a), timeout=30)
+        # every stake of node0 lost against node1's chain, and says so
+        lost = n0.getstakinginfo()
+        assert_equal(lost["stakes_24h"], 0)
+        assert lost["orphaned_24h"] >= 3, lost
+        assert_equal(lost["reward_24h"], 0)
+        assert n1.getstakinginfo()["stakes_24h"] > 0
         on_fork_b = self.snapshot(n0)
         # node0's first three stakes were orphaned too, back to the proof-of-work balance
         assert on_fork_b["balance"] < base["balance"] or on_fork_b["immature"] < base["immature"]

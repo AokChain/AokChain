@@ -1645,7 +1645,9 @@ void AokChainGUI::updateStakingIcon()
     }
     // The wallet was locked from elsewhere (walletlock, or the time of walletpassphrase ran out):
     // nothing is staked any more, and the switch says so.
-    if (this->nStaking && walletFrame && !walletFrame->isWalletUnlocked()) {
+    // (not before the wallet is shown: during the start there is none to ask, and staking that
+    // -staking=1 switched on would be shown as off while the wallet stakes)
+    if (this->nStaking && walletFrame && walletFrame->hasWallet() && !walletFrame->isWalletUnlocked()) {
         this->nStaking = false;
         for (CWallet* pwallet : vpwallets)
             pwallet->StopStake();
@@ -1676,6 +1678,34 @@ void AokChainGUI::updateStakingIcon()
         if (stakingButton)
             stakingButton->setText(tr("Stop Staking"));
         detail = tr("On · a reward about every %1").arg(text);
+        // the last 24 hours, when the wallet can be asked without waiting
+        if (!vpwallets.empty()) {
+            TRY_LOCK(cs_main, lockMain);
+            if (lockMain) {
+                TRY_LOCK(vpwallets[0]->cs_wallet, lockWallet);
+                if (lockWallet) {
+                    const CWallet::StakeStats stats = vpwallets[0]->GetStakeStats(GetTime() - 24 * 60 * 60);
+                    stakeStatsLine.clear();
+                    if (stats.nStakes > 0 || stats.nOrphaned > 0) {
+                        // (a short amount: the line is narrow)
+                        QString amount = QString::number(double(stats.nReward) / COIN, 'f', 3);
+                        while (amount.endsWith('0'))
+                            amount.chop(1);
+                        if (amount.endsWith('.'))
+                            amount.chop(1);
+                        stakeStatsLine = tr("24 h: %n reward(s)", "", stats.nStakes) + " · " + amount + " AOK";
+                        if (stats.nOrphaned > 0)
+                            stakeStatsLine += " · " + tr("%n lost", "", stats.nOrphaned);
+                        stakeStatsTip = tr("In the last 24 hours this wallet made %1 blocks that are in the chain and earned %2. %3 of its blocks lost against a block of another staker that arrived first; those earn nothing.")
+                                            .arg(stats.nStakes).arg(AokChainUnits::formatWithUnit(AokChainUnits::AOK, stats.nReward, false, AokChainUnits::separatorAlways)).arg(stats.nOrphaned);
+                    }
+                }
+            }
+        }
+        if (!stakeStatsLine.isEmpty()) {
+            detail += "\n" + stakeStatsLine;
+            labelStakingIcon->setToolTip(labelStakingIcon->toolTip() + "<br><br>" + stakeStatsTip);
+        }
     } else {
         labelStakingIcon->setPixmap(platformStyle->SingleColorIcon(":/icons/staking_off").pixmap(STATUSBAR_ICONSIZE, STATUSBAR_ICONSIZE));
         const QString state = this->nStaking ? tr("On") : tr("Off");

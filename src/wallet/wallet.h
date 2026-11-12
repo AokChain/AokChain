@@ -985,6 +985,15 @@ public:
                         const int& nMinDepth = 0, const int& nMaxDepth = 9999999) const EXCLUSIVE_LOCKS_REQUIRED(cs_main, cs_wallet);
 
     uint64_t GetStakeWeight() const;
+
+    /** What staking brought since a time: stakes that are in the chain, their gain, and stakes
+     *  that lost against another block (which earn nothing). */
+    struct StakeStats {
+        int nStakes = 0;
+        int nOrphaned = 0;
+        CAmount nReward = 0;
+    };
+    StakeStats GetStakeStats(int64_t nSince) const EXCLUSIVE_LOCKS_REQUIRED(cs_main, cs_wallet);
     bool HaveAvailableCoinsForStaking() const EXCLUSIVE_LOCKS_REQUIRED(cs_main, cs_wallet);
 
     /**

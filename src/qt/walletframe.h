@@ -94,6 +94,8 @@ public Q_SLOTS:
     void lockWalletAfterStaking();
     /** Check if wallet is unlocked */
     bool isWalletUnlocked();
+    /** A wallet is shown (not yet during the start) */
+    bool hasWallet() const;
 
     unsigned long long updateWeight();
 

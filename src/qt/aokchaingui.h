@@ -138,6 +138,9 @@ private:
     bool bootstrapSamplesAreBlocks;
     bool pastBlocksAsked;
     bool pastBlocksWereFetching;
+    /** The staking of the last 24 hours, for the side bar (kept while the wallet is busy) */
+    QString stakeStatsLine;
+    QString stakeStatsTip;
     /** Start of the measured span of the past block download, for the time that is left */
     qint64 pastBlocksSeenAt;
     quint64 pastBlocksSeenBytes;

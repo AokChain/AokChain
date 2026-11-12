@@ -244,6 +244,11 @@ void WalletFrame::lockWalletAfterStaking()
         walletView->lockWalletAfterStaking();
 }
 
+bool WalletFrame::hasWallet() const
+{
+    return !mapWalletViews.isEmpty();
+}
+
 bool WalletFrame::isWalletUnlocked()
 {
     WalletView *walletView = currentWalletView();
