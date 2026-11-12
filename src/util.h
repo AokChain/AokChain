@@ -129,6 +129,16 @@ bool GetLogCategory(uint32_t *f, const std::string *str);
 /** Send a string to the log output */
 int LogPrintStr(const std::string &str);
 
+static const bool DEFAULT_LOGRATELIMIT = true;
+extern bool fLogRateLimit;
+/** Bytes that one source location may log within an hour. */
+static const uint64_t LOG_RATELIMIT_BYTES = 1024 * 1024;
+/**
+ * Account for a message of a source location (a file and a line, or a format string with line 0).
+ * True when the message is to be dropped. now: seconds, for tests; 0 takes the system time.
+ */
+bool LogRateLimitDrop(const char* source, int line, size_t bytes, int64_t now = 0);
+
 /** Get format string from VA_ARGS for error reporting */
 template<typename... Args>
 std::string FormatStringFromLogArgs(const char *fmt, const Args &... args)
@@ -148,7 +158,7 @@ static inline void MarkUsed(const T &t, const Args &... args)
 #define LogPrintf(...) do { MarkUsed(__VA_ARGS__); } while(0)
 #define LogPrint(category, ...) do { MarkUsed(__VA_ARGS__); } while(0)
 #else
-#define LogPrintf(...) do { \
+#define LogPrintfImpl_(limited, ...) do { \
     std::string _log_msg_; /* Unlikely name to avoid shadowing variables */ \
     try { \
         _log_msg_ = tfm::format(__VA_ARGS__); \
@@ -156,12 +166,20 @@ static inline void MarkUsed(const T &t, const Args &... args)
         /* Original format string will have newline so don't add one here */ \
         _log_msg_ = "Error \"" + std::string(fmterr.what()) + "\" while formatting log message: " + FormatStringFromLogArgs(__VA_ARGS__); \
     } \
-    LogPrintStr(_log_msg_); \
+    if (!(limited) || !LogRateLimitDrop(__FILE__, __LINE__, _log_msg_.size())) \
+        LogPrintStr(_log_msg_); \
 } while(0)
+
+/** Unconditional logging. A source location that writes more than 1 MiB within an hour is
+ *  suppressed for the rest of that hour (-logratelimit), so that nobody can fill the disk
+ *  through a message that he can provoke. */
+#define LogPrintf(...) LogPrintfImpl_(true, __VA_ARGS__)
+/** For the few messages that are large in normal operation (the tip during the initial sync). */
+#define LogPrintfUnlimited(...) LogPrintfImpl_(false, __VA_ARGS__)
 
 #define LogPrint(category, ...) do { \
     if (LogAcceptCategory((category))) { \
-        LogPrintf(__VA_ARGS__); \
+        LogPrintfUnlimited(__VA_ARGS__); \
     } \
 } while(0)
 #endif
@@ -169,7 +187,10 @@ static inline void MarkUsed(const T &t, const Args &... args)
 template<typename... Args>
 bool error(const char *fmt, const Args &... args)
 {
-    LogPrintStr("ERROR: " + tfm::format(fmt, args...) + "\n");
+    const std::string message = "ERROR: " + tfm::format(fmt, args...) + "\n";
+    // every caller has its own format string: that is the source location here
+    if (!LogRateLimitDrop(fmt, 0, message.size()))
+        LogPrintStr(message);
     return false;
 }
 

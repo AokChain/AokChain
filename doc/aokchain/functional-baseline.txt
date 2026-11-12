@@ -40,3 +40,4 @@ p2p_old_peer_cutoff.py
 feature_snapshot.py
 feature_stake_cointime.py
 wallet_unload.py
+rpc_upstream.py

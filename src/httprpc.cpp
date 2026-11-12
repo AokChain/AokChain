@@ -6,6 +6,12 @@
 
 #include "httprpc.h"
 
+#include <algorithm>
+
+#include <sstream>
+
+#include <set>
+
 #include "base58.h"
 #include "chainparams.h"
 #include "httpserver.h"
@@ -144,6 +150,22 @@ static bool RPCAuthorized(const std::string& strAuth, std::string& strAuthUserna
     return multiUserAuthorized(strUserPass);
 }
 
+/** -rpcwhitelist: the methods that a user may call. A user without an entry may call
+ *  everything, unless -rpcwhitelistdefault is on. */
+static std::map<std::string, std::set<std::string>> g_rpc_whitelist;
+static bool g_rpc_whitelist_default = false;
+static bool g_rpc_whitelist_active = false;
+
+static bool RPCMethodAllowed(const std::string& user, const std::string& method)
+{
+    if (!g_rpc_whitelist_active)
+        return true;
+    std::map<std::string, std::set<std::string>>::const_iterator it = g_rpc_whitelist.find(user);
+    if (it == g_rpc_whitelist.end())
+        return !g_rpc_whitelist_default;
+    return it->second.count(method) > 0;
+}
+
 static bool HTTPReq_JSONRPC(HTTPRequest* req, const std::string &)
 {
     // JSONRPC handles only POST
@@ -186,6 +208,11 @@ static bool HTTPReq_JSONRPC(HTTPRequest* req, const std::string &)
         // singleton request
         if (valRequest.isObject()) {
             jreq.parse(valRequest);
+            if (!RPCMethodAllowed(jreq.authUser, jreq.strMethod)) {
+                LogPrintf("RPC User %s not allowed to call method %s\n", jreq.authUser, jreq.strMethod);
+                req->WriteReply(HTTP_FORBIDDEN);
+                return false;
+            }
 
             UniValue result = tableRPC.execute(jreq);
 
@@ -193,9 +220,24 @@ static bool HTTPReq_JSONRPC(HTTPRequest* req, const std::string &)
             strReply = JSONRPCReply(result, NullUniValue, jreq.id);
 
         // array of requests
-        } else if (valRequest.isArray())
+        } else if (valRequest.isArray()) {
+            if (g_rpc_whitelist_active) {
+                // every method of the batch must be allowed
+                const UniValue& batch = valRequest.get_array();
+                for (unsigned int n = 0; n < batch.size(); n++) {
+                    if (!batch[n].isObject())
+                        continue; // answered with a parse error below
+                    const UniValue& method = find_value(batch[n], "method");
+                    const std::string name = method.isStr() ? method.get_str() : "";
+                    if (!RPCMethodAllowed(jreq.authUser, name)) {
+                        LogPrintf("RPC User %s not allowed to call method %s\n", jreq.authUser, name);
+                        req->WriteReply(HTTP_FORBIDDEN);
+                        return false;
+                    }
+                }
+            }
             strReply = JSONRPCExecBatch(jreq, valRequest.get_array());
-        else
+        } else
             throw JSONRPCError(RPC_PARSE_ERROR, "Top-level object parse error");
 
         req->WriteHeader("Content-Type", "application/json");
@@ -212,6 +254,26 @@ static bool HTTPReq_JSONRPC(HTTPRequest* req, const std::string &)
 
 static bool InitRPCAuthentication()
 {
+    g_rpc_whitelist.clear();
+    g_rpc_whitelist_default = gArgs.GetBoolArg("-rpcwhitelistdefault", gArgs.IsArgSet("-rpcwhitelist"));
+    for (const std::string& entry : gArgs.GetArgs("-rpcwhitelist")) {
+        const size_t colon = entry.find(':');
+        const std::string user = entry.substr(0, colon);
+        std::set<std::string>& methods = g_rpc_whitelist[user]; // (a user without methods may call nothing)
+        if (colon == std::string::npos)
+            continue;
+        std::string rest = entry.substr(colon + 1), name;
+        std::stringstream stream(rest);
+        while (std::getline(stream, name, ',')) {
+            name.erase(std::remove_if(name.begin(), name.end(), ::isspace), name.end());
+            if (!name.empty())
+                methods.insert(name);
+        }
+    }
+    g_rpc_whitelist_active = !g_rpc_whitelist.empty() || g_rpc_whitelist_default;
+    if (g_rpc_whitelist_active)
+        LogPrintf("RPC method whitelist: %u user(s), users without an entry may call %s\n", (unsigned int)g_rpc_whitelist.size(), g_rpc_whitelist_default ? "nothing" : "everything");
+
     if (gArgs.GetArg("-rpcpassword", "") == "")
     {
         LogPrintf("No rpcpassword set - using random cookie authentication\n");

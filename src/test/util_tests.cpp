@@ -667,4 +667,32 @@ BOOST_FIXTURE_TEST_SUITE(util_tests, BasicTestingSetup)
         BOOST_CHECK(!ParseFixedPoint("42000000001", 8, &amount));
     }
 
+    BOOST_AUTO_TEST_CASE(log_rate_limit_test)
+    {
+        const bool before = fLogRateLimit;
+        fLogRateLimit = true;
+        static const char source[] = "test-source";
+        static const char other[] = "other-source";
+        const int64_t t = 2000000000;
+        // up to 1 MiB within an hour passes
+        for (int n = 0; n < 1024; n++)
+            BOOST_CHECK(!LogRateLimitDrop(source, 1, 1024, t + n));
+        // the next message is dropped, and so are the following ones of that hour
+        BOOST_CHECK(LogRateLimitDrop(source, 1, 1, t + 1500));
+        BOOST_CHECK(LogRateLimitDrop(source, 1, 100, t + 3599));
+        // another line and another source are not affected
+        BOOST_CHECK(!LogRateLimitDrop(source, 2, 1024, t + 1500));
+        BOOST_CHECK(!LogRateLimitDrop(other, 1, 1024, t + 1500));
+        // a new hour begins with the next message after the old one has passed
+        BOOST_CHECK(!LogRateLimitDrop(source, 1, 1024, t + 3600));
+        BOOST_CHECK(!LogRateLimitDrop(source, 1, LOG_RATELIMIT_BYTES - 1024, t + 3601));
+        BOOST_CHECK(LogRateLimitDrop(source, 1, 1, t + 3602));
+        // one message larger than the limit is dropped as well
+        BOOST_CHECK(LogRateLimitDrop(other, 7, LOG_RATELIMIT_BYTES + 1, t));
+        // switched off, nothing is dropped
+        fLogRateLimit = false;
+        BOOST_CHECK(!LogRateLimitDrop(source, 1, 1, t + 3603));
+        fLogRateLimit = before;
+    }
+
 BOOST_AUTO_TEST_SUITE_END()

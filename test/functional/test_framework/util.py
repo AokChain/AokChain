@@ -322,6 +322,7 @@ def initialize_datadir(dirname, n):
         f.write("listenonion=0\n")
         # Verify the wallet's live transaction index against a full scan on every use
         f.write("checkwalletlive=1\n")
+        f.write("logratelimit=0\n")
     return datadir
 
 def get_datadir_path(dirname, n):
