@@ -2976,6 +2976,118 @@ UniValue settxfee(const JSONRPCRequest& request)
     return true;
 }
 
+UniValue validateaddress(const JSONRPCRequest& request);
+
+UniValue getaddressinfo(const JSONRPCRequest& request)
+{
+    CWallet * const pwallet = GetWalletForJSONRPCRequest(request);
+    if (!EnsureWalletIsAvailable(pwallet, request.fHelp))
+        return NullUniValue;
+
+    if (request.fHelp || request.params.size() != 1)
+        throw std::runtime_error(
+            "getaddressinfo \"address\"\n"
+            "\nReturns what the wallet knows about an address. The fields are those of validateaddress without\n"
+            "\"isvalid\" (an invalid address is an error here), with the label of the address.\n"
+            "\nArguments:\n"
+            "1. \"address\"     (string, required) The address to look up\n"
+            "\nResult:\n"
+            "{\n"
+            "  \"address\" : \"address\",   (string) The address\n"
+            "  \"scriptPubKey\" : \"hex\",  (string) The hex encoded scriptPubKey of the address\n"
+            "  \"ismine\" : true|false,    (boolean) If the address is yours\n"
+            "  \"iswatchonly\" : true|false, (boolean) If the address is watch-only\n"
+            "  \"isscript\" : true|false,  (boolean) If the key is a script\n"
+            "  \"pubkey\" : \"hex\",        (string) The hex value of the raw public key (when the wallet has it)\n"
+            "  \"label\" : \"label\",       (string) The label of the address (\"\" without one)\n"
+            "  \"labels\" : [ { \"name\": \"label\", \"purpose\": \"send|receive\" } ],\n"
+            "  ...                        (the other fields of validateaddress)\n"
+            "}\n"
+            "\nExamples:\n"
+            + HelpExampleCli("getaddressinfo", "\"address\"")
+            + HelpExampleRpc("getaddressinfo", "\"address\"")
+        );
+
+    const CTxDestination dest = DecodeDestination(request.params[0].get_str());
+    if (!IsValidDestination(dest))
+        throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Invalid address");
+
+    const UniValue info = validateaddress(request);
+    UniValue result(UniValue::VOBJ);
+    const std::vector<std::string>& keys = info.getKeys();
+    const std::vector<UniValue>& values = info.getValues();
+    for (size_t n = 0; n < keys.size(); n++) {
+        if (keys[n] != "isvalid" && keys[n] != "account")
+            result.pushKV(keys[n], values[n]);
+    }
+    LOCK(pwallet->cs_wallet);
+    UniValue labels(UniValue::VARR);
+    std::string label;
+    std::map<CTxDestination, CAddressBookData>::const_iterator mi = pwallet->mapAddressBook.find(dest);
+    if (mi != pwallet->mapAddressBook.end()) {
+        label = mi->second.name;
+        UniValue entry(UniValue::VOBJ);
+        entry.pushKV("name", mi->second.name);
+        entry.pushKV("purpose", mi->second.purpose);
+        labels.push_back(entry);
+    }
+    result.pushKV("label", label);
+    result.pushKV("labels", labels);
+    return result;
+}
+
+UniValue getbalances(const JSONRPCRequest& request)
+{
+    CWallet * const pwallet = GetWalletForJSONRPCRequest(request);
+    if (!EnsureWalletIsAvailable(pwallet, request.fHelp))
+        return NullUniValue;
+
+    if (request.fHelp || request.params.size() != 0)
+        throw std::runtime_error(
+            "getbalances\n"
+            "\nReturns all balances of the wallet in " + CURRENCY_UNIT + ".\n"
+            "\nResult:\n"
+            "{\n"
+            "  \"mine\": {\n"
+            "    \"trusted\": xxx,            (numeric) balance that can be spent\n"
+            "    \"untrusted_pending\": xxx,  (numeric) received and not confirmed yet\n"
+            "    \"immature\": xxx,           (numeric) stake and coinbase rewards that are not mature yet\n"
+            "    \"staked\": xxx,             (numeric) coins that are tied up in stakes that are not mature yet\n"
+            "    \"locked\": xxx,             (numeric) coins in time locked outputs\n"
+            "    \"offline_staking\": xxx     (numeric) coins in offline staking outputs\n"
+            "  },\n"
+            "  \"watchonly\": {               (only when the wallet watches addresses)\n"
+            "    \"trusted\": xxx, \"untrusted_pending\": xxx, \"immature\": xxx\n"
+            "  }\n"
+            "}\n"
+            "\nExamples:\n"
+            + HelpExampleCli("getbalances", "")
+            + HelpExampleRpc("getbalances", "")
+        );
+
+    ObserveSafeMode();
+    pwallet->BlockUntilSyncedToCurrentChain();
+    LOCK2(cs_main, pwallet->cs_wallet);
+
+    UniValue mine(UniValue::VOBJ);
+    mine.pushKV("trusted", ValueFromAmount(pwallet->GetBalance()));
+    mine.pushKV("untrusted_pending", ValueFromAmount(pwallet->GetUnconfirmedBalance()));
+    mine.pushKV("immature", ValueFromAmount(pwallet->GetImmatureBalance()));
+    mine.pushKV("staked", ValueFromAmount(pwallet->GetStake()));
+    mine.pushKV("locked", ValueFromAmount(pwallet->GetLockedBalance()));
+    mine.pushKV("offline_staking", ValueFromAmount(pwallet->GetOfflineStakingBalance()));
+    UniValue result(UniValue::VOBJ);
+    result.pushKV("mine", mine);
+    if (pwallet->HaveWatchOnly()) {
+        UniValue watch(UniValue::VOBJ);
+        watch.pushKV("trusted", ValueFromAmount(pwallet->GetWatchOnlyBalance()));
+        watch.pushKV("untrusted_pending", ValueFromAmount(pwallet->GetUnconfirmedWatchOnlyBalance()));
+        watch.pushKV("immature", ValueFromAmount(pwallet->GetImmatureWatchOnlyBalance()));
+        result.pushKV("watchonly", watch);
+    }
+    return result;
+}
+
 UniValue getwalletinfo(const JSONRPCRequest& request)
 {
     CWallet * const pwallet = GetWalletForJSONRPCRequest(request);
@@ -4253,6 +4365,8 @@ static const CRPCCommand commands[] =
     { "wallet",             "gettransaction",           &gettransaction,           {"txid","include_watchonly"} },
     { "wallet",             "getunconfirmedbalance",    &getunconfirmedbalance,    {} },
     { "wallet",             "getwalletinfo",            &getwalletinfo,            {} },
+    { "wallet",             "getaddressinfo",           &getaddressinfo,           {"address"} },
+    { "wallet",             "getbalances",              &getbalances,              {} },
     { "wallet",             "importmnemonic",           &importmnemonic,           {"mnemonic","passphrase","address","rescan"} },
     { "wallet",             "importmulti",              &importmulti,              {"requests","options"} },
     { "wallet",             "importprivkey",            &importprivkey,            {"privkey","label","rescan"} },

@@ -40,6 +40,7 @@
 #include <governance/governance.h>
 
 class CBlockIndex;
+class CBlockUndo;
 class CBlockTreeDB;
 class CChainParams;
 class CCoinsViewDB;
@@ -342,6 +343,8 @@ void UnlinkPrunedFiles(const std::set<int>& setFilesToPrune);
 CBlockIndex * InsertBlockIndex(uint256 hash);
 /** Flush all state, indexes and buffers to disk. */
 void FlushStateToDisk();
+/** Read the undo data of a block that has a parent. */
+bool ReadBlockUndo(CBlockUndo& blockundo, const CBlockIndex* pindex);
 /** Prune block files and flush state to disk. */
 void PruneAndFlush();
 /** Prune block files up to a given height */
@@ -351,7 +354,7 @@ void PruneBlockFilesManual(int nManualPruneHeight);
  * plTxnReplaced will be appended to with all transactions replaced from mempool **/
 bool AcceptToMemoryPool(CTxMemPool& pool, CValidationState &state, const CTransactionRef &tx,
                         bool* pfMissingInputs, std::list<CTransactionRef>* plTxnReplaced,
-                        bool bypass_limits, const CAmount nAbsurdFee);
+                        bool bypass_limits, const CAmount nAbsurdFee, bool test_accept = false);
 
 /** Convert CValidationState to a human-readable message for logging */
 std::string FormatStateMessage(const CValidationState &state);

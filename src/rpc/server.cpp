@@ -7,6 +7,8 @@
 
 #include "rpc/server.h"
 
+#include <list>
+
 #include "base58.h"
 #include "fs.h"
 #include "init.h"
@@ -247,6 +249,48 @@ UniValue stop(const JSONRPCRequest& jsonRequest)
     return "AokChain server stopping";
 }
 
+struct RPCCommandExecutionInfo
+{
+    std::string method;
+    int64_t start;
+};
+static CCriticalSection cs_rpcActive;
+static std::list<RPCCommandExecutionInfo> rpcActiveCommands;
+
+UniValue getrpcinfo(const JSONRPCRequest& request)
+{
+    if (request.fHelp || request.params.size() > 0)
+        throw std::runtime_error(
+            "getrpcinfo\n"
+            "\nReturns details of the RPC server.\n"
+            "\nResult:\n"
+            "{\n"
+            "  \"active_commands\": [        (array) The commands that are running now, this one included\n"
+            "    {\n"
+            "      \"method\": \"name\",       (string) The name of the command\n"
+            "      \"duration\": n            (numeric) The running time in microseconds\n"
+            "    }, ...\n"
+            "  ]\n"
+            "}\n"
+            "\nExamples:\n"
+            + HelpExampleCli("getrpcinfo", "")
+            + HelpExampleRpc("getrpcinfo", "")
+        );
+
+    LOCK(cs_rpcActive);
+    UniValue commands(UniValue::VARR);
+    const int64_t now = GetTimeMicros();
+    for (const RPCCommandExecutionInfo& info : rpcActiveCommands) {
+        UniValue entry(UniValue::VOBJ);
+        entry.pushKV("method", info.method);
+        entry.pushKV("duration", now - info.start);
+        commands.push_back(entry);
+    }
+    UniValue result(UniValue::VOBJ);
+    result.pushKV("active_commands", commands);
+    return result;
+}
+
 UniValue uptime(const JSONRPCRequest& jsonRequest)
 {
     if (jsonRequest.fHelp || jsonRequest.params.size() > 1)
@@ -273,6 +317,7 @@ static const CRPCCommand vRPCCommands[] =
     { "control",            "help",                   &help,                   {"command"}  },
     { "control",            "stop",                   &stop,                   {}  },
     { "control",            "uptime",                 &uptime,                 {}  },
+    { "control",            "getrpcinfo",             &getrpcinfo,             {}  },
     
    
 };
@@ -493,6 +538,19 @@ UniValue CRPCTable::execute(const JSONRPCRequest &request) const
         throw JSONRPCError(RPC_METHOD_NOT_FOUND, "Method not found");
 
     g_rpcSignals.PreCommand(*pcmd);
+
+    // for getrpcinfo: this call is listed while it runs
+    struct ActiveCommand {
+        std::list<RPCCommandExecutionInfo>::iterator it;
+        explicit ActiveCommand(const std::string& method) {
+            LOCK(cs_rpcActive);
+            it = rpcActiveCommands.insert(rpcActiveCommands.end(), {method, GetTimeMicros()});
+        }
+        ~ActiveCommand() {
+            LOCK(cs_rpcActive);
+            rpcActiveCommands.erase(it);
+        }
+    } active(request.strMethod);
 
     try
     {

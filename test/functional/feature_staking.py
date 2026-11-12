@@ -75,6 +75,18 @@ class StakingTest(AokChainTestFramework):
     def coinstake_of(self, node, blockhash):
         block = node.getblock(blockhash)
         assert "proof-of-stake" in block["flags"]
+        # getblockstats: the stake is no fee paying transaction, its gain is the reward
+        stats = node.getblockstats(blockhash)
+        assert_equal(stats["proof_of_stake"], True)
+        assert stats["stake_reward"] > 0, stats
+        assert stats["totalfee"] >= 0
+        assert_equal(stats["txs"], len(block["tx"]))
+        # scantxoutset: a stake pays to the public key; the scan of the address finds that output
+        stake = node.getrawtransaction(block["tx"][1], True)
+        paid = [out for out in stake["vout"] if out["value"] > 0][0]
+        assert_equal(paid["scriptPubKey"]["type"], "pubkey")
+        scan = node.scantxoutset("start", paid["scriptPubKey"]["addresses"])
+        assert (stake["txid"], paid["n"]) in [(u["txid"], u["vout"]) for u in scan["unspents"] if u.get("coinstake")], scan
         return block["tx"][1]
 
     def run_test(self):
