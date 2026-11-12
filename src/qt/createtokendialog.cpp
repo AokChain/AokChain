@@ -248,7 +248,7 @@ void CreateTokenDialog::setUpValues()
     CheckFormState();
     ui->availabilityButton->setDisabled(true);
 
-    ui->unitExampleLabel->setStyleSheet("font-weight: bold");
+    ui->unitExampleLabel->setStyleSheet("font-weight: 600");
 
     // Setup the token types
     QStringList list;
@@ -264,9 +264,9 @@ void CreateTokenDialog::setUpValues()
     updateTokenList();
 
     ui->tokenFullName->setTextFormat(Qt::RichText);
-    ui->tokenFullName->setStyleSheet("font-weight: bold");
+    ui->tokenFullName->setStyleSheet("font-weight: 600");
 
-    ui->tokenType->setStyleSheet("font-weight: bold");
+    ui->tokenType->setStyleSheet("font-weight: 600");
 }
 
 void CreateTokenDialog::setupCoinControlFrame(const PlatformStyle *platformStyle)
@@ -408,14 +408,14 @@ void CreateTokenDialog::toggleIPFSText()
 
 void CreateTokenDialog::showMessage(QString string)
 {
-    ui->messageLabel->setStyleSheet("color: red; font-size: 15pt;font-weight: bold;");
+    ui->messageLabel->setStyleSheet("color: red; font-size: 15pt;font-weight: 600;");
     ui->messageLabel->setText(string);
     ui->messageLabel->show();
 }
 
 void CreateTokenDialog::showValidMessage(QString string)
 {
-    ui->messageLabel->setStyleSheet("color: green; font-size: 15pt;font-weight: bold;");
+    ui->messageLabel->setStyleSheet("color: green; font-size: 15pt;font-weight: 600;");
     ui->messageLabel->setText(string);
     ui->messageLabel->show();
 }

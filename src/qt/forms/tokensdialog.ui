@@ -96,7 +96,7 @@
               </property>
               <property name="font">
                <font>
-                <weight>50</weight>
+                <weight>57</weight>
                 <bold>false</bold>
                </font>
               </property>
@@ -145,7 +145,7 @@
              <widget class="QLabel" name="labelTokenControlInsuffFunds">
               <property name="font">
                <font>
-                <weight>50</weight>
+                <weight>57</weight>
                 <bold>false</bold>
                </font>
               </property>
@@ -237,7 +237,7 @@
                   <widget class="QLabel" name="labelTokenControlQuantityText">
                    <property name="font">
                     <font>
-                     <weight>50</weight>
+                     <weight>57</weight>
                      <bold>false</bold>
                     </font>
                    </property>
@@ -272,7 +272,7 @@
                   <widget class="QLabel" name="labelTokenControlBytesText">
                    <property name="font">
                     <font>
-                     <weight>50</weight>
+                     <weight>57</weight>
                      <bold>false</bold>
                     </font>
                    </property>
@@ -320,7 +320,7 @@
                   <widget class="QLabel" name="labelTokenControlAmountText">
                    <property name="font">
                     <font>
-                     <weight>50</weight>
+                     <weight>57</weight>
                      <bold>false</bold>
                     </font>
                    </property>
@@ -352,7 +352,7 @@
                   <widget class="QLabel" name="labelTokenControlLowOutputText">
                    <property name="font">
                     <font>
-                     <weight>50</weight>
+                     <weight>57</weight>
                      <bold>false</bold>
                     </font>
                    </property>
@@ -400,7 +400,7 @@
                   <widget class="QLabel" name="labelTokenControlFeeText">
                    <property name="font">
                     <font>
-                     <weight>50</weight>
+                     <weight>57</weight>
                      <bold>false</bold>
                     </font>
                    </property>
@@ -451,7 +451,7 @@
                   <widget class="QLabel" name="labelTokenControlAfterFeeText">
                    <property name="font">
                     <font>
-                     <weight>50</weight>
+                     <weight>57</weight>
                      <bold>false</bold>
                     </font>
                    </property>
@@ -483,7 +483,7 @@
                   <widget class="QLabel" name="labelTokenControlChangeText">
                    <property name="font">
                     <font>
-                     <weight>50</weight>
+                     <weight>57</weight>
                      <bold>false</bold>
                     </font>
                    </property>
@@ -733,7 +733,7 @@
                   </property>
                   <property name="font">
                    <font>
-                    <weight>50</weight>
+                    <weight>57</weight>
                     <bold>false</bold>
                    </font>
                   </property>
@@ -780,7 +780,7 @@
              <widget class="QLabel" name="fallbackFeeWarningLabel">
               <property name="font">
                <font>
-                <weight>50</weight>
+                <weight>57</weight>
                 <bold>false</bold>
                </font>
               </property>

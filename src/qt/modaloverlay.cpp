@@ -42,7 +42,7 @@ userClosed(false)
     boxLayout->setContentsMargins(16, 12, 16, 12);
     boxLayout->setSpacing(4);
     bootstrapStatus = new QLabel(bootstrapBox);
-    bootstrapStatus->setFont(GUIUtil::appFont(14, QFont::Medium));
+    bootstrapStatus->setFont(GUIUtil::appFont(14, QFont::DemiBold));
     bootstrapDetail = new QLabel(bootstrapBox);
     bootstrapDetail->setWordWrap(true);
     bootstrapDetail->setProperty("role", "caption");

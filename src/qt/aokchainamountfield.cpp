@@ -274,7 +274,7 @@ void AokChainAmountField::setHeroStyle()
     amount->setMaximumWidth(QWIDGETSIZE_MAX);
     amount->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
     amount->setProperty("look", "bare");
-    amount->setEditStyle(GUIUtil::monoFont(24, QFont::Medium), Qt::AlignLeft);
+    amount->setEditStyle(GUIUtil::monoFont(24, QFont::DemiBold), Qt::AlignLeft);
     amount->setButtonSymbols(QAbstractSpinBox::NoButtons);
     amount->setMinimumHeight(44);
     // the trailing stretch would keep the amount narrow
@@ -282,7 +282,7 @@ void AokChainAmountField::setHeroStyle()
     if (l->count() > 0 && l->itemAt(l->count() - 1)->spacerItem())
         delete l->takeAt(l->count() - 1);
     for (QLabel *label : findChildren<QLabel*>()) {
-        label->setFont(GUIUtil::appFont(14, QFont::Medium));
+        label->setFont(GUIUtil::appFont(14, QFont::DemiBold));
         label->setProperty("role", "secondary");
     }
 }
@@ -400,7 +400,7 @@ void TokenAmountField::setHeroStyle()
     amount->setMaximumWidth(QWIDGETSIZE_MAX);
     amount->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
     amount->setProperty("look", "bare");
-    amount->setEditStyle(GUIUtil::monoFont(24, QFont::Medium), Qt::AlignLeft);
+    amount->setEditStyle(GUIUtil::monoFont(24, QFont::DemiBold), Qt::AlignLeft);
     amount->setButtonSymbols(QAbstractSpinBox::NoButtons);
     amount->setMinimumHeight(44);
     QLayout *l = layout();

@@ -40,7 +40,7 @@ QFont AmountLabel::amountFont() const
 
 QFont AmountLabel::unitFont() const
 {
-    return GUIUtil::appFont(qMax(11, qRound(px * 0.6)), px >= 24 ? QFont::Medium : QFont::Medium);
+    return GUIUtil::appFont(qMax(11, qRound(px * 0.6)), px >= 24 ? QFont::DemiBold : QFont::DemiBold);
 }
 
 void AmountLabel::setAmount(const QString& _amount, const QString& _unit)
@@ -116,7 +116,7 @@ QSize ChoiceButton::sizeHint() const
 {
     const QStringList lines = text().split('\n');
     int w = 0;
-    const QFontMetrics fm(GUIUtil::appFont(13, QFont::Medium));
+    const QFontMetrics fm(GUIUtil::appFont(13, QFont::DemiBold));
     for (const QString& line : lines)
         w = qMax(w, fm.horizontalAdvance(line));
     return look == Box ? QSize(w + 24, 56) : QSize(w + 32, 40);
@@ -158,10 +158,10 @@ void ChoiceButton::paintEvent(QPaintEvent*)
     const QStringList lines = text().split('\n');
     p.setPen(textColor);
     if (lines.size() == 1) {
-        p.setFont(GUIUtil::appFont(13, QFont::Medium));
+        p.setFont(GUIUtil::appFont(13, QFont::DemiBold));
         p.drawText(rect(), Qt::AlignCenter, lines[0]);
     } else {
-        p.setFont(GUIUtil::appFont(13, QFont::Medium));
+        p.setFont(GUIUtil::appFont(13, QFont::DemiBold));
         p.drawText(QRect(0, height() / 2 - 20, width(), 20), Qt::AlignCenter, lines[0]);
         p.setFont(GUIUtil::appFont(12));
         p.drawText(QRect(0, height() / 2, width(), 18), Qt::AlignCenter, lines[1]);
@@ -183,7 +183,7 @@ void ChipButton::setText(const QString& _text)
 
 QSize ChipButton::sizeHint() const
 {
-    return QSize(QFontMetrics(GUIUtil::appFont(12, QFont::Medium)).horizontalAdvance(text) + 12 + 26, 26);
+    return QSize(QFontMetrics(GUIUtil::appFont(12, QFont::DemiBold)).horizontalAdvance(text) + 12 + 26, 26);
 }
 
 void ChipButton::paintEvent(QPaintEvent*)
@@ -195,7 +195,7 @@ void ChipButton::paintEvent(QPaintEvent*)
     p.setBrush(t.accentSoft);
     p.drawRoundedRect(rect(), 13, 13);
     p.setPen(t.accent);
-    p.setFont(GUIUtil::appFont(12, QFont::Medium));
+    p.setFont(GUIUtil::appFont(12, QFont::DemiBold));
     p.drawText(QRect(12, 0, width() - 12 - 24, height()), Qt::AlignLeft | Qt::AlignVCenter, text);
     p.drawPixmap(width() - 21, (height() - 12) / 2, GUIUtil::lineIcon("remove", 12, t.accent, 2.4));
 }
@@ -219,7 +219,7 @@ SummaryCard::SummaryCard(const QString& title, QWidget *parent) : QFrame(parent)
 
     QLabel *titleLabel = new QLabel(title, this);
     titleLabel->setProperty("role", "title");
-    titleLabel->setFont(GUIUtil::appFont(15, QFont::Medium));
+    titleLabel->setFont(GUIUtil::appFont(15, QFont::DemiBold));
     layout->addWidget(titleLabel);
     layout->addSpacing(18);
 
@@ -232,7 +232,7 @@ SummaryCard::SummaryCard(const QString& title, QWidget *parent) : QFrame(parent)
     totalCaption = new QLabel(totalBox);
     totalCaption->setProperty("role", "caption");
     totalCaption->setFont(GUIUtil::appFont(12));
-    total = new AmountLabel(28, QFont::Medium, totalBox);
+    total = new AmountLabel(28, QFont::DemiBold, totalBox);
     total->setUnitColor(GUIUtil::theme().accent);
     totalLayout->addWidget(totalCaption);
     totalLayout->addWidget(total);
@@ -292,7 +292,7 @@ void SummaryCard::setRows(const QList<Row>& rows)
         layout->addWidget(caption);
         layout->addStretch(1);
         if (row.isAmount) {
-            AmountLabel *value = new AmountLabel(15, QFont::Medium, line);
+            AmountLabel *value = new AmountLabel(15, QFont::DemiBold, line);
             value->setAlignment(Qt::AlignRight | Qt::AlignVCenter);
             value->setAmount(row.value, row.unit);
             if (row.alert)
@@ -300,7 +300,7 @@ void SummaryCard::setRows(const QList<Row>& rows)
             layout->addWidget(value);
         } else {
             QLabel *value = new QLabel(row.value, line);
-            value->setFont(row.mono ? GUIUtil::monoFont(13, QFont::Medium) : GUIUtil::appFont(13, QFont::Medium));
+            value->setFont(row.mono ? GUIUtil::monoFont(13, QFont::DemiBold) : GUIUtil::appFont(13, QFont::DemiBold));
             value->setAlignment(Qt::AlignRight | Qt::AlignVCenter);
             if (row.alert)
                 value->setStyleSheet(QString("QLabel { color: %1; }").arg(t.error.name()));
@@ -361,7 +361,7 @@ int StatsStrip::addCell(const QString& caption, bool clickable)
         cell->installEventFilter(this);
     }
     layout->addLayout(captionRow);
-    AmountLabel *value = new AmountLabel(18, QFont::Medium, cell);
+    AmountLabel *value = new AmountLabel(18, QFont::DemiBold, cell);
     value->setAmount(QString::fromUtf8("–"));
     layout->addWidget(value);
     strip->addWidget(cell, 1);
@@ -539,7 +539,7 @@ void TokenPicker::paintEvent(QPaintEvent*)
             p.setBrush(vivid ? t.accentSoft : t.chip);
             p.drawEllipse(inner);
             p.setPen(vivid ? t.accent : t.textSecondary);
-            QFont font = GUIUtil::appFont(name.size() <= 3 ? 11 : 9, QFont::Medium);
+            QFont font = GUIUtil::appFont(name.size() <= 3 ? 11 : 9, QFont::DemiBold);
             p.setFont(font);
             p.drawText(inner, Qt::AlignCenter, QFontMetrics(font).elidedText(name, Qt::ElideRight, PICK - 10));
         }

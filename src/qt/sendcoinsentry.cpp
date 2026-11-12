@@ -110,7 +110,7 @@ void SendCoinsEntry::buildLayout()
 
     QHBoxLayout *header = new QHBoxLayout();
     cardTitle = new QLabel(ui->SendCoins);
-    cardTitle->setFont(GUIUtil::appFont(13, QFont::Medium));
+    cardTitle->setFont(GUIUtil::appFont(13, QFont::DemiBold));
     cardTitle->setProperty("role", "secondary");
     header->addWidget(cardTitle);
     header->addStretch();
@@ -269,7 +269,7 @@ QDateTime SendCoinsEntry::lockTime() const
 void SendCoinsEntry::updateChips()
 {
     const QString label = ui->addAsLabel->text();
-    labelChip->setText(tr("Label: %1").arg(QFontMetrics(GUIUtil::appFont(12, QFont::Medium)).elidedText(label, Qt::ElideRight, 160)));
+    labelChip->setText(tr("Label: %1").arg(QFontMetrics(GUIUtil::appFont(12, QFont::DemiBold)).elidedText(label, Qt::ElideRight, 160)));
     labelChip->setVisible(!label.isEmpty());
     const QDateTime until = lockTime();
     lockChip->setText(tr("Locked until %1").arg(GUIUtil::isoDateTime(until)));

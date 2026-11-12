@@ -342,7 +342,7 @@ void AokChainGUI::loadFonts()
 void AokChainGUI::createActions()
 {
     // size and weight of the page tabs come from the style sheet
-    QFont font = GUIUtil::appFont(14, QFont::Medium);
+    QFont font = GUIUtil::appFont(14, QFont::DemiBold);
 
     QActionGroup *tabGroup = new QActionGroup(this);
 

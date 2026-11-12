@@ -138,7 +138,7 @@ void SendCoinsDialog::buildLayout()
     QLabel *availableCaption = new QLabel(tr("Available"), headerBox);
     availableCaption->setProperty("role", "secondary");
     headerLayout->addWidget(availableCaption);
-    availableLabel = new AmountLabel(15, QFont::Medium, headerBox);
+    availableLabel = new AmountLabel(15, QFont::DemiBold, headerBox);
     headerLayout->addWidget(availableLabel);
     ui->label->hide();
     ui->labelBalance->hide();
@@ -160,7 +160,7 @@ void SendCoinsDialog::buildLayout()
     formHeader->setContentsMargins(0, 0, 6, 0);
     QLabel *formTitle = new QLabel(tr("Recipients"), formCard);
     formTitle->setProperty("role", "title");
-    formTitle->setFont(GUIUtil::appFont(15, QFont::Medium));
+    formTitle->setFont(GUIUtil::appFont(15, QFont::DemiBold));
     formHeader->addWidget(formTitle);
     formHeader->addStretch();
     // "clear all" is an icon in the corner of the card
@@ -359,7 +359,7 @@ void SendCoinsDialog::updateSummary()
         SummaryCard::Row row(entries.size() > 1 ? tr("Recipient %1").arg(number) : tr("Recipient"), dash, QString(), false);
         if (!address.isEmpty()) {
             row.value = !entry->labelText().isEmpty() ? entry->labelText() : (valid ? GUIUtil::shortAddress(address) : address);
-            row.value = QFontMetrics(GUIUtil::appFont(13, QFont::Medium)).elidedText(row.value, Qt::ElideMiddle, 200);
+            row.value = QFontMetrics(GUIUtil::appFont(13, QFont::DemiBold)).elidedText(row.value, Qt::ElideMiddle, 200);
             row.mono = valid && entry->labelText().isEmpty();
             row.toolTip = GUIUtil::monoToolTip(address, entry->labelText());
         }

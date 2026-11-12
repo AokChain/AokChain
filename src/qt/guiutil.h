@@ -92,9 +92,9 @@ namespace GUIUtil
     /** Register the bundled fonts (Noto Sans, Noto Sans KR, Noto Sans Mono). Call once, before any widget is created. */
     void loadAppFonts();
     /** The application font at a pixel size and weight. */
-    QFont appFont(int pixelSize = 13, int weight = QFont::Normal);
+    QFont appFont(int pixelSize = 13, int weight = QFont::Medium);
     /** The fixed-width font for amounts, addresses, transaction ids, dates in tables and block heights. */
-    QFont monoFont(int pixelSize = 13, int weight = QFont::Normal);
+    QFont monoFont(int pixelSize = 13, int weight = QFont::Medium);
     /** Apply style, palette, font and style sheet of the theme to the application. */
     void applyTheme(QApplication& app);
     /** Style sheet snippets that follow the theme. */

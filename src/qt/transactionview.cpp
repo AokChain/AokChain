@@ -185,7 +185,7 @@ public:
         case TransactionTableModel::ToAddress: {
             const QRect topRect(r.left(), r.top() + 9, r.width() - 12, 20);
             const QRect bottomRect(r.left(), r.top() + 29, r.width() - 12, 18);
-            painter->setFont(GUIUtil::appFont(14, QFont::Medium));
+            painter->setFont(GUIUtil::appFont(14, QFont::DemiBold));
             painter->setPen(failed ? theme.textDisabled : theme.text);
             const bool owner = index.data(TransactionTableModel::OwnerTokenRole).toBool();
             const QString title = painter->fontMetrics().elidedText(index.data(TransactionTableModel::TitleRole).toString(), Qt::ElideRight, topRect.width() - (owner ? 80 : 0));
@@ -237,7 +237,7 @@ public:
             if (!confirmed || failed)
                 color = theme.textDisabled;
             const QRect amountRect = cell.adjusted(0, 0, -(assetWidth + 6), 0);
-            GUIUtil::paintAmount(painter, amountRect, index.data(TransactionTableModel::DisplayAmountRole).toString(), GUIUtil::monoFont(15, QFont::Medium), color);
+            GUIUtil::paintAmount(painter, amountRect, index.data(TransactionTableModel::DisplayAmountRole).toString(), GUIUtil::monoFont(15, QFont::DemiBold), color);
             break;
         }
         default:
@@ -435,7 +435,7 @@ TransactionView::TransactionView(const PlatformStyle *platformStyle, QWidget *pa
     pageFirst->setToolTip(tr("First page"));
     pageLast->setToolTip(tr("Last page"));
     pageLabel = new QLabel(card);
-    pageLabel->setFont(GUIUtil::monoFont(13, QFont::Medium));
+    pageLabel->setFont(GUIUtil::monoFont(13, QFont::DemiBold));
     pageLabel->setMinimumWidth(80);
     pageLabel->setAlignment(Qt::AlignCenter);
     footer->addWidget(pageFirst);

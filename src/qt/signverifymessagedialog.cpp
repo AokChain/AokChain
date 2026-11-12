@@ -87,7 +87,7 @@ SignVerifyMessageDialog::SignVerifyMessageDialog(const PlatformStyle *_platformS
         result.first->insertSpacing(2, 8);
         result.first->insertWidget(3, result.second);
         result.second->setWordWrap(false);
-        result.second->setFont(GUIUtil::appFont(13, QFont::Medium));
+        result.second->setFont(GUIUtil::appFont(13, QFont::DemiBold));
         result.second->hide();
     }
 

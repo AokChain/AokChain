@@ -144,7 +144,7 @@ QLabel { color: rgb(40,40,40);  }</string>
               <widget class="QLabel" name="infoTextStrong">
                <property name="font">
                 <font>
-                 <weight>50</weight>
+                 <weight>57</weight>
                  <bold>false</bold>
                 </font>
                </property>
@@ -207,7 +207,7 @@ QLabel { color: rgb(40,40,40);  }</string>
             <widget class="QLabel" name="labelNumberOfBlocksLeft">
              <property name="font">
               <font>
-               <weight>50</weight>
+               <weight>57</weight>
                <bold>false</bold>
               </font>
              </property>
@@ -227,7 +227,7 @@ QLabel { color: rgb(40,40,40);  }</string>
             <widget class="QLabel" name="labelLastBlockTime">
              <property name="font">
               <font>
-               <weight>50</weight>
+               <weight>57</weight>
                <bold>false</bold>
               </font>
              </property>
@@ -253,7 +253,7 @@ QLabel { color: rgb(40,40,40);  }</string>
             <widget class="QLabel" name="labelSyncDone">
              <property name="font">
               <font>
-               <weight>50</weight>
+               <weight>57</weight>
                <bold>false</bold>
               </font>
              </property>
@@ -287,7 +287,7 @@ QLabel { color: rgb(40,40,40);  }</string>
             <widget class="QLabel" name="labelProgressIncrease">
              <property name="font">
               <font>
-               <weight>50</weight>
+               <weight>57</weight>
                <bold>false</bold>
               </font>
              </property>
@@ -307,7 +307,7 @@ QLabel { color: rgb(40,40,40);  }</string>
             <widget class="QLabel" name="labelEstimatedTimeLeft">
              <property name="font">
               <font>
-               <weight>50</weight>
+               <weight>57</weight>
                <bold>false</bold>
               </font>
              </property>

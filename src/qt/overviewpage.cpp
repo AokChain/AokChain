@@ -99,7 +99,7 @@ public:
         QColor amountColor = outgoing ? theme.negative : theme.positive;
         if (!confirmed)
             amountColor = theme.textDisabled;
-        const int amountWidth = GUIUtil::paintAmount(painter, topRect, amountText, GUIUtil::monoFont(15, QFont::Medium), amountColor);
+        const int amountWidth = GUIUtil::paintAmount(painter, topRect, amountText, GUIUtil::monoFont(15, QFont::DemiBold), amountColor);
         painter->setFont(GUIUtil::appFont(12));
         painter->setPen(theme.textSecondary);
         const QString asset = index.data(TransactionTableModel::TokenNameRole).toString();
@@ -107,7 +107,7 @@ public:
         const int assetWidth = painter->fontMetrics().horizontalAdvance(asset);
 
         // title and chip
-        painter->setFont(GUIUtil::appFont(14, QFont::Medium));
+        painter->setFont(GUIUtil::appFont(14, QFont::DemiBold));
         painter->setPen(theme.text);
         const bool owner = index.data(TransactionTableModel::OwnerTokenRole).toBool();
         const QString chip = owner ? tr("Owner") : QString();
@@ -215,7 +215,7 @@ public:
             painter->drawText(r, Qt::AlignRight | Qt::AlignVCenter, amountText);
             amountWidth = painter->fontMetrics().horizontalAdvance(amountText);
         } else {
-            amountWidth = GUIUtil::paintAmount(painter, r, amountText, GUIUtil::monoFont(15, QFont::Medium), theme.text);
+            amountWidth = GUIUtil::paintAmount(painter, r, amountText, GUIUtil::monoFont(15, QFont::DemiBold), theme.text);
         }
 
         // name and chips
@@ -231,13 +231,13 @@ public:
         // sub and unique tokens are not rows: the root says how many are held below it
         if (children > 0)
             chips << tr("%1 below").arg(children);
-        painter->setFont(GUIUtil::appFont(11, QFont::Medium));
+        painter->setFont(GUIUtil::appFont(11, QFont::DemiBold));
         int chipsWidth = 0;
         for (const QString& chip : chips)
             chipsWidth += painter->fontMetrics().horizontalAdvance(chip) + 16 + 8;
 
         const int left = r.left() + indent + logoSize + 12;
-        painter->setFont(GUIUtil::appFont(14, QFont::Medium));
+        painter->setFont(GUIUtil::appFont(14, QFont::DemiBold));
         painter->setPen(theme.text);
         const QString shown = painter->fontMetrics().elidedText(name, Qt::ElideRight, qMax(40, r.right() - left - amountWidth - chipsWidth - 12));
         painter->drawText(QRect(left, r.top(), r.width(), r.height()), Qt::AlignLeft | Qt::AlignVCenter, shown);
@@ -336,7 +336,7 @@ static QLabel *captionLabel(const QString& text)
 
 static AmountLabel *amountLabel()
 {
-    return new AmountLabel(17, QFont::Medium);
+    return new AmountLabel(17, QFont::DemiBold);
 }
 
 static QWidget *statBlock(const QString& caption, QWidget *value)
@@ -454,10 +454,10 @@ OverviewPage::OverviewPage(const PlatformStyle *platformStyle, QWidget *parent) 
     QVBoxLayout *balanceLeft = new QVBoxLayout();
     balanceLeft->setSpacing(4);
     QLabel *totalCaption = new QLabel(tr("Total balance"));
-    totalCaption->setFont(GUIUtil::appFont(13, QFont::Medium));
+    totalCaption->setFont(GUIUtil::appFont(13, QFont::DemiBold));
     totalCaption->setProperty("role", "secondary");
     balanceLeft->addWidget(totalCaption);
-    labelTotal = new AmountLabel(32, QFont::Medium);
+    labelTotal = new AmountLabel(32, QFont::DemiBold);
     labelTotal->setUnitColor(theme.accent);
     balanceLeft->addWidget(labelTotal);
     balanceLeft->addSpacing(2);
@@ -489,7 +489,7 @@ OverviewPage::OverviewPage(const PlatformStyle *platformStyle, QWidget *parent) 
     const QString watchCaptions[4] = {tr("Watch-only: available"), tr("pending"), tr("immature"), tr("total")};
     for (int i = 0; i < 4; ++i) {
         watchLayout->addWidget(captionLabel(watchCaptions[i]));
-        watchAmounts[i] = new AmountLabel(14, QFont::Medium);
+        watchAmounts[i] = new AmountLabel(14, QFont::DemiBold);
         watchAmounts[i]->setColor(theme.textSecondary);
         watchLayout->addWidget(watchAmounts[i]);
         watchLayout->addSpacing(8);
@@ -510,7 +510,7 @@ OverviewPage::OverviewPage(const PlatformStyle *platformStyle, QWidget *parent) 
     receiveButton->setIcon(QIcon(GUIUtil::lineIcon("receive", 16, theme.text, 2.4)));
     receiveButton->setCursor(Qt::PointingHandCursor);
     for (QPushButton *button : {sendButton, receiveButton}) {
-        button->setFont(GUIUtil::appFont(14, QFont::Medium));
+        button->setFont(GUIUtil::appFont(14, QFont::DemiBold));
         button->setIconSize(QSize(16, 16));
         button->setFixedHeight(40);
         button->setMinimumWidth(116);
@@ -540,10 +540,10 @@ OverviewPage::OverviewPage(const PlatformStyle *platformStyle, QWidget *parent) 
     tokenHeader->setSpacing(8);
     QLabel *tokenTitle = new QLabel(tr("Tokens"));
     tokenTitle->setProperty("role", "title");
-    tokenTitle->setFont(GUIUtil::appFont(15, QFont::Medium));
+    tokenTitle->setFont(GUIUtil::appFont(15, QFont::DemiBold));
     tokenCount = new QLabel();
     tokenCount->setProperty("role", "secondary");
-    tokenCount->setFont(GUIUtil::appFont(13, QFont::Medium));
+    tokenCount->setFont(GUIUtil::appFont(13, QFont::DemiBold));
     tokenSearch = new QLineEdit();
     tokenSearch->setPlaceholderText(tr("Search tokens"));
     tokenSearch->setFixedSize(200, 40);
@@ -579,7 +579,7 @@ OverviewPage::OverviewPage(const PlatformStyle *platformStyle, QWidget *parent) 
     QHBoxLayout *txHeader = new QHBoxLayout();
     QLabel *txTitle = new QLabel(tr("Recent transactions"));
     txTitle->setProperty("role", "title");
-    txTitle->setFont(GUIUtil::appFont(15, QFont::Medium));
+    txTitle->setFont(GUIUtil::appFont(15, QFont::DemiBold));
     QPushButton *allTransactions = new QPushButton(tr("Show all"));
     allTransactions->setProperty("look", "link");
     allTransactions->setCursor(Qt::PointingHandCursor);

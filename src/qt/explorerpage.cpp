@@ -536,7 +536,7 @@ ExplorerPage::ExplorerPage(const PlatformStyle *platformStyle, QWidget *parent) 
     searchButton = new QPushButton(tr("Look up"));
     searchButton->setProperty("primary", true);
     searchButton->setProperty("look", "large");
-    searchButton->setFont(GUIUtil::appFont(15, QFont::Medium));
+    searchButton->setFont(GUIUtil::appFont(15, QFont::DemiBold));
     searchButton->setFixedHeight(48);
     searchButton->setCursor(Qt::PointingHandCursor);
     searchRow->addWidget(searchEdit, 1);
@@ -565,9 +565,9 @@ ExplorerPage::ExplorerPage(const PlatformStyle *platformStyle, QWidget *parent) 
     QHBoxLayout *resultHeader = new QHBoxLayout();
     resultTitle = new QLabel(tr("Result"));
     resultTitle->setProperty("role", "title");
-    resultTitle->setFont(GUIUtil::appFont(15, QFont::Medium));
+    resultTitle->setFont(GUIUtil::appFont(15, QFont::DemiBold));
     resultBadge = new QLabel();
-    resultBadge->setFont(GUIUtil::appFont(12, QFont::Medium));
+    resultBadge->setFont(GUIUtil::appFont(12, QFont::DemiBold));
     resultBadge->hide();
     resultHeader->addWidget(resultTitle);
     resultHeader->addStretch();
@@ -615,7 +615,7 @@ ExplorerPage::ExplorerPage(const PlatformStyle *platformStyle, QWidget *parent) 
     QHBoxLayout *poolHeader = new QHBoxLayout();
     QLabel *poolTitle = new QLabel(tr("Memory pool"));
     poolTitle->setProperty("role", "title");
-    poolTitle->setFont(GUIUtil::appFont(15, QFont::Medium));
+    poolTitle->setFont(GUIUtil::appFont(15, QFont::DemiBold));
     poolHeader->addWidget(poolTitle);
     poolHeader->addStretch();
     poolHeader->addWidget(caption(tr("Transactions waiting to be confirmed")));
@@ -629,7 +629,7 @@ ExplorerPage::ExplorerPage(const PlatformStyle *platformStyle, QWidget *parent) 
         layout->setContentsMargins(12, 12, 12, 12);
         layout->setSpacing(2);
         layout->addWidget(caption(name));
-        value = new AmountLabel(18, QFont::Medium);
+        value = new AmountLabel(18, QFont::DemiBold);
         value->setAmount(QString::fromUtf8("–"));
         layout->addWidget(value);
         tiles->addWidget(tile, 1);
@@ -797,14 +797,14 @@ void ExplorerPage::setBadge(const QString& text, bool ok)
 QLabel *ExplorerPage::monoLabel(const QString& text, int px, bool bold)
 {
     QLabel *label = new QLabel(text);
-    label->setFont(GUIUtil::monoFont(px, bold ? QFont::Medium : QFont::Normal));
+    label->setFont(GUIUtil::monoFont(px, bold ? QFont::DemiBold : QFont::Medium));
     label->setTextInteractionFlags(Qt::TextSelectableByMouse);
     return label;
 }
 
 QWidget *ExplorerPage::amountValue(const QString& amount, const QString& unit, int px)
 {
-    AmountLabel *label = new AmountLabel(px, QFont::Medium);
+    AmountLabel *label = new AmountLabel(px, QFont::DemiBold);
     label->setAlignment(Qt::AlignRight | Qt::AlignVCenter);
     label->setAmount(amount, unit);
     return label;
@@ -813,7 +813,7 @@ QWidget *ExplorerPage::amountValue(const QString& amount, const QString& unit, i
 QLabel *ExplorerPage::linkLabel(const QString& text, const QString& target, const QString& toolTip, int px)
 {
     QLabel *label = new QLabel();
-    label->setFont(GUIUtil::monoFont(px, QFont::Medium));
+    label->setFont(GUIUtil::monoFont(px, QFont::DemiBold));
     label->setTextFormat(Qt::RichText);
     label->setText(QString("<a href=\"q:%1\" style=\"color:%2; text-decoration:none;\">%3</a>")
         .arg(GUIUtil::HtmlEscape(target), GUIUtil::theme().accent.name(), GUIUtil::HtmlEscape(text)));
@@ -887,7 +887,7 @@ QWidget *ExplorerPage::transferRow(const UniValue& entry)
     layout->addWidget(left);
     if (mine) {
         QLabel *chip = new QLabel(tr("Mine"));
-        chip->setFont(GUIUtil::appFont(11, QFont::Medium));
+        chip->setFont(GUIUtil::appFont(11, QFont::DemiBold));
         chip->setStyleSheet(QString("QLabel { color: %1; background-color: %2; border-radius: 6px; padding: 1px 7px; }")
             .arg(GUIUtil::theme().chipText.name(), GUIUtil::theme().chip.name()));
         layout->addWidget(chip);
@@ -968,7 +968,7 @@ void ExplorerPage::showTransaction(const UniValue& result)
         QVBoxLayout *column = new QVBoxLayout();
         column->setSpacing(0);
         QLabel *head = caption(heading);
-        head->setFont(GUIUtil::appFont(12, QFont::Medium));
+        head->setFont(GUIUtil::appFont(12, QFont::DemiBold));
         column->addWidget(head);
         column->addSpacing(6);
         for (size_t i = 0; entries.isArray() && i < entries.size(); ++i)
@@ -1024,7 +1024,7 @@ void ExplorerPage::showBlock(const UniValue& result)
     resultLayout->addSpacing(12);
 
     QLabel *head = caption(tr("%1 transactions").arg(ntx));
-    head->setFont(GUIUtil::appFont(12, QFont::Medium));
+    head->setFont(GUIUtil::appFont(12, QFont::DemiBold));
     resultLayout->addWidget(head);
     resultLayout->addSpacing(6);
     const UniValue txs = find_value(result, "tx");
@@ -1102,7 +1102,7 @@ void ExplorerPage::showAddress(const UniValue& result)
     resultLayout->addWidget(line());
     resultLayout->addSpacing(12);
     QLabel *head = caption(tr("Recent transactions"));
-    head->setFont(GUIUtil::appFont(12, QFont::Medium));
+    head->setFont(GUIUtil::appFont(12, QFont::DemiBold));
     resultLayout->addWidget(head);
     resultLayout->addSpacing(6);
     const UniValue txids = find_value(result, "txids");
@@ -1216,7 +1216,7 @@ void ExplorerPage::refreshDone(const QString& json)
         feeLine->setSpacing(4);
         feeLine->addStretch();
         feeLine->addWidget(caption(tr("fee")));
-        AmountLabel *fee = new AmountLabel(13, QFont::Normal);
+        AmountLabel *fee = new AmountLabel(13, QFont::Medium);
         fee->setColor(t.textSecondary);
         fee->setAmount(amountText(strOf(entry, "fee")));
         feeLine->addWidget(fee);

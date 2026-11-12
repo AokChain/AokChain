@@ -26,7 +26,7 @@ class QVBoxLayout;
 class AmountLabel : public QWidget
 {
 public:
-    explicit AmountLabel(int pixelSize = 14, int weight = QFont::Medium, QWidget *parent = nullptr);
+    explicit AmountLabel(int pixelSize = 14, int weight = QFont::DemiBold, QWidget *parent = nullptr);
 
     void setAmount(const QString& amount, const QString& unit = QString());
     void setColor(const QColor& color);

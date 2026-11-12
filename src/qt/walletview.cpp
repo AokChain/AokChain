@@ -126,7 +126,7 @@ WalletView::WalletView(const PlatformStyle *_platformStyle, QWidget *parent):
         head->addWidget(title);
         QLabel *count = new QLabel("0", card);
         count->setProperty("role", "tag");
-        count->setFont(GUIUtil::monoFont(11, QFont::Medium));
+        count->setFont(GUIUtil::monoFont(11, QFont::DemiBold));
         head->addWidget(count);
         head->addStretch();
         cardLayout->addLayout(head);
@@ -243,7 +243,7 @@ QWidget *WalletView::addPage(QWidget *page, const QString &title, QWidget *conte
     header->setSpacing(12);
     QLabel *titleLabel = new QLabel(title, shell);
     titleLabel->setProperty("role", "pageTitle");
-    titleLabel->setFont(GUIUtil::appFont(28, QFont::Medium));
+    titleLabel->setFont(GUIUtil::appFont(28, QFont::DemiBold));
     titleLabel->setMinimumHeight(40);
     header->addWidget(titleLabel);
     header->addStretch();

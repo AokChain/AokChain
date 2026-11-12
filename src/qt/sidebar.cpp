@@ -106,7 +106,7 @@ void SideNavButton::paintEvent(QPaintEvent*)
         color = t.sideOff;
     p.drawPixmap(12, (height() - 18) / 2, GUIUtil::lineIcon(iconName, 18, color));
     p.setPen(color);
-    p.setFont(GUIUtil::appFont(14, on ? QFont::Medium : QFont::Normal));
+    p.setFont(GUIUtil::appFont(14, on ? QFont::DemiBold : QFont::Medium));
     p.drawText(QRect(42, 0, width() - 50, height()), Qt::AlignLeft | Qt::AlignVCenter, plainActionText(action));
 }
 
@@ -175,7 +175,7 @@ Sidebar::Sidebar(QWidget* parent) : QWidget(parent)
         logo->setPixmap(rounded);
     }
     brand->addWidget(logo);
-    brand->addWidget(sideLabel("AokChain", t.sideStrong, 17, QFont::Medium));
+    brand->addWidget(sideLabel("AokChain", t.sideStrong, 17, QFont::DemiBold));
     brand->addStretch();
     layout->addLayout(brand);
     layout->addSpacing(28);
@@ -213,13 +213,13 @@ Sidebar::Sidebar(QWidget* parent) : QWidget(parent)
     stakingLayout->setContentsMargins(8, 14, 8, 6);
     stakingLayout->setSpacing(8);
     QHBoxLayout* stakingRow = new QHBoxLayout();
-    stakingRow->addWidget(sideLabel(tr("Staking"), t.sideStrong, 14, QFont::Medium));
+    stakingRow->addWidget(sideLabel(tr("Staking"), t.sideStrong, 14, QFont::DemiBold));
     stakingRow->addStretch();
     stakingSwitch = new ToggleSwitch();
     stakingSwitch->setAccessibleName(tr("Staking"));
     stakingRow->addWidget(stakingSwitch);
     stakingLayout->addLayout(stakingRow);
-    stakingDetail = sideLabel(QString(), t.sideText, 12, QFont::Normal);
+    stakingDetail = sideLabel(QString(), t.sideText, 12, QFont::Medium);
     stakingDetail->setWordWrap(true);
     stakingLayout->addWidget(stakingDetail);
     layout->addWidget(stakingCard);
@@ -234,8 +234,8 @@ Sidebar::Sidebar(QWidget* parent) : QWidget(parent)
     syncLayout->setContentsMargins(8, 0, 8, 0);
     syncLayout->setSpacing(8);
     QHBoxLayout* syncRow = new QHBoxLayout();
-    syncStatus = sideLabel(QString(), t.sideText, 12, QFont::Normal);
-    syncRemaining = sideLabel(QString(), t.sideText, 12, QFont::Normal);
+    syncStatus = sideLabel(QString(), t.sideText, 12, QFont::Medium);
+    syncRemaining = sideLabel(QString(), t.sideText, 12, QFont::Medium);
     syncRow->addWidget(syncStatus);
     syncRow->addStretch();
     syncRow->addWidget(syncRemaining);
@@ -245,19 +245,19 @@ Sidebar::Sidebar(QWidget* parent) : QWidget(parent)
     layout->addWidget(syncBox);
     layout->addSpacing(8);
 
-    networkLabel = sideLabel(QString(), t.sideText, 12, QFont::Normal);
+    networkLabel = sideLabel(QString(), t.sideText, 12, QFont::Medium);
     networkLabel->setContentsMargins(8, 0, 8, 0);
     networkLabel->setCursor(Qt::PointingHandCursor);
     networkLabel->installEventFilter(this);
     layout->addWidget(networkLabel);
 
-    walletLabel = sideLabel(QString(), t.sideText, 12, QFont::Normal);
+    walletLabel = sideLabel(QString(), t.sideText, 12, QFont::Medium);
     walletLabel->setContentsMargins(8, 4, 8, 0);
     walletLabel->hide();
     layout->addWidget(walletLabel);
 
     // warnings of the node, such as the notice of a pre-release build: small, at the very bottom
-    noticeLabel = sideLabel(QString(), t.sideText, 11, QFont::Normal);
+    noticeLabel = sideLabel(QString(), t.sideText, 11, QFont::Medium);
     noticeLabel->setContentsMargins(8, 6, 8, 0);
     noticeLabel->setWordWrap(true);
     noticeLabel->hide();

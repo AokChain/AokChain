@@ -168,7 +168,7 @@ void SendTokensEntry::buildLayout()
 
     QHBoxLayout *header = new QHBoxLayout();
     cardTitle = new QLabel(ui->SendCoins);
-    cardTitle->setFont(GUIUtil::appFont(13, QFont::Medium));
+    cardTitle->setFont(GUIUtil::appFont(13, QFont::DemiBold));
     cardTitle->setProperty("role", "secondary");
     header->addWidget(cardTitle);
     header->addStretch();
@@ -254,7 +254,7 @@ void SendTokensEntry::buildLayout()
     ui->payTokenAmount->setHeroStyle();
     amountLayout->addWidget(ui->payTokenAmount, 1);
     unitLabel = new QLabel(amountBox);
-    unitLabel->setFont(GUIUtil::appFont(14, QFont::Medium));
+    unitLabel->setFont(GUIUtil::appFont(14, QFont::DemiBold));
     unitLabel->setProperty("role", "secondary");
     amountLayout->addWidget(unitLabel);
     QPushButton *maxButton = new QPushButton(tr("All"), amountBox);
@@ -391,7 +391,7 @@ QDateTime SendTokensEntry::lockTime() const
 void SendTokensEntry::updateChips()
 {
     const QString label = ui->addAsLabel->text();
-    labelChip->setText(tr("Label: %1").arg(QFontMetrics(GUIUtil::appFont(12, QFont::Medium)).elidedText(label, Qt::ElideRight, 160)));
+    labelChip->setText(tr("Label: %1").arg(QFontMetrics(GUIUtil::appFont(12, QFont::DemiBold)).elidedText(label, Qt::ElideRight, 160)));
     labelChip->setVisible(!label.isEmpty());
     const QDateTime until = lockTime();
     lockChip->setText(tr("Locked until %1").arg(GUIUtil::isoDateTime(until)));

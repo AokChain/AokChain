@@ -232,7 +232,7 @@
          <widget class="QLabel" name="label_6">
           <property name="font">
            <font>
-            <weight>50</weight>
+            <weight>57</weight>
             <bold>false</bold>
            </font>
           </property>

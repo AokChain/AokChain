@@ -270,7 +270,7 @@ void TokenRowDelegate::paint(QPainter *painter, const QStyleOptionViewItem& opti
     int amountWidth;
     if (held) {
         amountWidth = GUIUtil::paintAmount(painter, r, GUIUtil::withThousands(index.data(TokenListModel::AmountRole).toString()),
-                                          GUIUtil::monoFont(15, QFont::Medium), theme.text);
+                                          GUIUtil::monoFont(15, QFont::DemiBold), theme.text);
     } else {
         const QString none = TokenListDialog::tr("None held");
         painter->setFont(GUIUtil::appFont(13));
@@ -290,12 +290,12 @@ void TokenRowDelegate::paint(QPainter *painter, const QStyleOptionViewItem& opti
     const int children = index.data(TokenListModel::ChildrenRole).toInt();
     if (children > 0)
         chips << TokenListDialog::tr("%1 below").arg(children);
-    painter->setFont(GUIUtil::appFont(11, QFont::Medium));
+    painter->setFont(GUIUtil::appFont(11, QFont::DemiBold));
     int chipsWidth = 0;
     for (const QString& chip : chips)
         chipsWidth += painter->fontMetrics().horizontalAdvance(chip) + 16 + 6;
     const int left = r.left() + 28 + 10;
-    painter->setFont(GUIUtil::appFont(14, QFont::Medium));
+    painter->setFont(GUIUtil::appFont(14, QFont::DemiBold));
     painter->setPen(theme.text);
     const QString shown = painter->fontMetrics().elidedText(name, Qt::ElideMiddle, qMax(60, r.right() - left - amountWidth - chipsWidth - 16));
     painter->drawText(QRect(left, r.top(), r.width(), r.height()), Qt::AlignLeft | Qt::AlignVCenter, shown);
@@ -326,7 +326,7 @@ TokenListDialog::TokenListDialog(HeldTokenIndex *_index, const QString& _root, P
         logo->setPixmap(GUIUtil::tokenLogo(root, 32));
         logo->setFixedSize(32, 32);
         QLabel *title = new QLabel(root, this);
-        title->setFont(GUIUtil::appFont(15, QFont::Medium));
+        title->setFont(GUIUtil::appFont(15, QFont::DemiBold));
         const RootToken *info = index->findRoot(root);
         QLabel *count = new QLabel(tr("%1 sub and unique tokens held").arg(info ? info->children : 0), this);
         count->setProperty("role", "secondary");

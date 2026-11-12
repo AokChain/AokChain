@@ -150,7 +150,7 @@ void TokensDialog::buildLayout()
     formHeader->setContentsMargins(0, 0, 6, 0);
     QLabel *formTitle = new QLabel(tr("Token to send"), formCard);
     formTitle->setProperty("role", "title");
-    formTitle->setFont(GUIUtil::appFont(15, QFont::Medium));
+    formTitle->setFont(GUIUtil::appFont(15, QFont::DemiBold));
     formHeader->addWidget(formTitle);
     formHeader->addStretch();
     ui->clearButton->setText(QString());
@@ -178,7 +178,7 @@ void TokensDialog::buildLayout()
     pickedLogo->hide();
     pickedRow->addWidget(pickedLogo);
     pickedName = new QLabel(formCard);
-    pickedName->setFont(GUIUtil::appFont(14, QFont::Medium));
+    pickedName->setFont(GUIUtil::appFont(14, QFont::DemiBold));
     pickedRow->addWidget(pickedName);
     belowButton = new QPushButton(formCard);
     belowButton->setProperty("look", "chipButton");
@@ -194,7 +194,7 @@ void TokensDialog::buildLayout()
     QLabel *availableCaption = new QLabel(tr("Available"), formCard);
     availableCaption->setProperty("role", "secondary");
     pickedRow->addWidget(availableCaption);
-    pickedAvailable = new AmountLabel(15, QFont::Medium, formCard);
+    pickedAvailable = new AmountLabel(15, QFont::DemiBold, formCard);
     pickedRow->addWidget(pickedAvailable);
     form->addLayout(pickedRow);
     connect(picker, SIGNAL(tokenSelected(QString)), this, SLOT(tokenPicked(QString)));
@@ -327,7 +327,7 @@ void TokensDialog::updateSummary()
         SummaryCard::Row row(entries.size() > 1 ? tr("Recipient %1").arg(number) : tr("Recipient"), dash, QString(), false);
         if (!address.isEmpty()) {
             row.value = !entry->labelText().isEmpty() ? entry->labelText() : (valid ? GUIUtil::shortAddress(address) : address);
-            row.value = QFontMetrics(GUIUtil::appFont(13, QFont::Medium)).elidedText(row.value, Qt::ElideMiddle, 200);
+            row.value = QFontMetrics(GUIUtil::appFont(13, QFont::DemiBold)).elidedText(row.value, Qt::ElideMiddle, 200);
             row.mono = valid && entry->labelText().isEmpty();
             row.toolTip = GUIUtil::monoToolTip(address, entry->labelText());
         }
@@ -875,7 +875,7 @@ void TokensDialog::setBalance(const CAmount& balance, const CAmount& unconfirmed
     Q_UNUSED(watchUnconfirmedBalance);
     Q_UNUSED(watchImmatureBalance);
 
-    ui->labelBalance->setFont(GUIUtil::monoFont(13, QFont::Medium));
+    ui->labelBalance->setFont(GUIUtil::monoFont(13, QFont::DemiBold));
     ui->label->setFont(GUIUtil::getSubLabelFont());
 
     if(model && model->getOptionsModel())

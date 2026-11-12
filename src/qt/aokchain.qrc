@@ -113,6 +113,7 @@
         <file alias="NotoSans-Bold">res/fonts/NotoSans-Bold.ttf</file>
         <file alias="NotoSansKR-Regular">res/fonts/NotoSansKR-Regular.ttf</file>
         <file alias="NotoSansKR-Medium">res/fonts/NotoSansKR-Medium.ttf</file>
+        <file alias="NotoSansKR-SemiBold">res/fonts/NotoSansKR-SemiBold.ttf</file>
         <file alias="NotoSansKR-Bold">res/fonts/NotoSansKR-Bold.ttf</file>
         <file alias="NotoSansMono-Regular">res/fonts/NotoSansMono-Regular.ttf</file>
         <file alias="NotoSansMono-Medium">res/fonts/NotoSansMono-Medium.ttf</file>

@@ -232,7 +232,7 @@ void ReissueTokenDialog::setUpValues()
     ui->reissuableBox->setCheckState(Qt::CheckState::Checked);
     hideMessage();
 
-    ui->unitExampleLabel->setStyleSheet("font-weight: bold");
+    ui->unitExampleLabel->setStyleSheet("font-weight: 600");
 
     updateTokensList();
 

@@ -154,7 +154,7 @@ const Theme& theme()
 void loadAppFonts()
 {
     for (const char* name : {"NotoSans-Regular", "NotoSans-Medium", "NotoSans-SemiBold", "NotoSans-Bold",
-                             "NotoSansKR-Regular", "NotoSansKR-Medium", "NotoSansKR-Bold",
+                             "NotoSansKR-Regular", "NotoSansKR-Medium", "NotoSansKR-SemiBold", "NotoSansKR-Bold",
                              "NotoSansMono-Regular", "NotoSansMono-Medium", "NotoSansMono-SemiBold", "NotoSansMono-Bold"}) {
         if (QFontDatabase::addApplicationFont(QString(":/fonts/%1").arg(name)) < 0)
             qWarning() << "Could not load the font" << name;
@@ -250,7 +250,7 @@ static QPixmap messageBadge(QStyle::StandardPixmap which, int size)
     p.setBrush(fill);
     p.drawEllipse(QRectF(0, 0, size, size));
     p.setPen(ink);
-    p.setFont(appFont(size * 55 / 100, QFont::Medium));
+    p.setFont(appFont(size * 55 / 100, QFont::DemiBold));
     p.drawText(QRectF(0, 0, size, size), Qt::AlignCenter, sign);
     return pixmap;
 }
@@ -554,7 +554,7 @@ QPixmap tokenLogo(const QString& tokenName, int size)
     } else {
         p.fillRect(QRectF(0, 0, size, size), t.accentSoft);
         p.setPen(t.accent);
-        p.setFont(appFont(qMax(10, size * 45 / 100), QFont::Medium));
+        p.setFont(appFont(qMax(10, size * 45 / 100), QFont::DemiBold));
         p.drawText(QRectF(0, 0, size, size), Qt::AlignCenter, root.left(1));
     }
     p.end();
@@ -610,7 +610,7 @@ void MonoColumnDelegate::paint(QPainter *painter, const QStyleOptionViewItem &op
     const QVariant foreground = index.data(Qt::ForegroundRole);
     const QColor color = foreground.canConvert<QColor>() && foreground.value<QColor>().isValid() ? foreground.value<QColor>() : theme().text;
     const Qt::Alignment align = (opt.displayAlignment & Qt::AlignRight) ? Qt::AlignRight | Qt::AlignVCenter : Qt::AlignLeft | Qt::AlignVCenter;
-    paintAmount(painter, opt.rect.adjusted(8, 0, -8, 0), withThousands(text), monoFont(14, QFont::Medium), color, align);
+    paintAmount(painter, opt.rect.adjusted(8, 0, -8, 0), withThousands(text), monoFont(14, QFont::DemiBold), color, align);
 }
 
 QString monoToolTip(const QString& value, const QString& caption)
@@ -702,7 +702,7 @@ int paintChip(QPainter* painter, int x, int centerY, const QString& text)
     const Theme& t = theme();
     painter->save();
     painter->setRenderHint(QPainter::Antialiasing, true);
-    painter->setFont(appFont(11, QFont::Medium));
+    painter->setFont(appFont(11, QFont::DemiBold));
     const int w = painter->fontMetrics().horizontalAdvance(text) + 16;
     const QRect r(x, centerY - 10, w, 20);
     painter->setPen(Qt::NoPen);
@@ -718,7 +718,7 @@ void paintBadge(QPainter* painter, const QRect& rect, const QString& text, const
 {
     painter->save();
     painter->setRenderHint(QPainter::Antialiasing, true);
-    painter->setFont(appFont(12, QFont::Medium));
+    painter->setFont(appFont(12, QFont::DemiBold));
     const int w = qMin(rect.width(), painter->fontMetrics().horizontalAdvance(text) + 16);
     const int h = 20;
     const int x = (align & Qt::AlignRight) ? rect.right() - w + 1 : rect.left();
@@ -757,17 +757,17 @@ QString cardFrameStyle(const QString& selector)
 
 QFont getSubLabelFont()
 {
-    return appFont(13, QFont::Normal);
+    return appFont(13, QFont::Medium);
 }
 
 QFont getSubLabelFontBolded()
 {
-    return appFont(13, QFont::Medium);
+    return appFont(13, QFont::DemiBold);
 }
 
 QFont getTopLabelFontBolded()
 {
-    return appFont(15, QFont::Medium);
+    return appFont(15, QFont::DemiBold);
 }
 
 QFont getTopLabelFont(int weight, int pxsize)
@@ -777,7 +777,7 @@ QFont getTopLabelFont(int weight, int pxsize)
 
 QFont getTopLabelFont()
 {
-    return appFont(15, QFont::Medium);
+    return appFont(15, QFont::DemiBold);
 }
 
 QString dateTimeStr(const QDateTime &date)

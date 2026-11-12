@@ -32,7 +32,7 @@ static QLabel *tag(const QString& text, QWidget *parent)
 {
     QLabel *label = new QLabel(text, parent);
     label->setProperty("role", "tag");
-    label->setFont(GUIUtil::appFont(11, QFont::Medium));
+    label->setFont(GUIUtil::appFont(11, QFont::DemiBold));
     return label;
 }
 
@@ -71,7 +71,7 @@ TokensPage::TokensPage(const PlatformStyle *platformStyle, QWidget *parent) :
     heldHeader->setSpacing(8);
     QLabel *heldTitle = new QLabel(tr("Tokens of this wallet"), body);
     heldTitle->setProperty("role", "title");
-    heldTitle->setFont(GUIUtil::appFont(15, QFont::Medium));
+    heldTitle->setFont(GUIUtil::appFont(15, QFont::DemiBold));
     heldCount = new QLabel(body);
     heldCount->setProperty("role", "secondary");
     heldHeader->addWidget(heldTitle);
@@ -164,7 +164,7 @@ void TokensPage::rebuildHeld()
         QVBoxLayout *names = new QVBoxLayout();
         names->setSpacing(3);
         QLabel *name = new QLabel(card);
-        name->setFont(GUIUtil::appFont(14, QFont::Medium));
+        name->setFont(GUIUtil::appFont(14, QFont::DemiBold));
         name->setText(QFontMetrics(name->font()).elidedText(root.name, Qt::ElideMiddle, 170));
         name->setToolTip(root.name);
         names->addWidget(name);
@@ -186,7 +186,7 @@ void TokensPage::rebuildHeld()
             none->setFixedHeight(28);
             layout->addWidget(none);
         } else {
-            AmountLabel *amount = new AmountLabel(20, QFont::Medium, card);
+            AmountLabel *amount = new AmountLabel(20, QFont::DemiBold, card);
             amount->setAmount(GUIUtil::withThousands(root.amount));
             layout->addWidget(amount);
         }

@@ -109,7 +109,7 @@ void ReceiveCoinsDialog::buildLayout()
     formHeader->setSpacing(8);
     QLabel *formTitle = new QLabel(tr("New payment request"), ui->frame2);
     formTitle->setProperty("role", "title");
-    formTitle->setFont(GUIUtil::appFont(15, QFont::Medium));
+    formTitle->setFont(GUIUtil::appFont(15, QFont::DemiBold));
     QLabel *optional = new QLabel(tr("optional"), ui->frame2);
     optional->setProperty("role", "tag");
     optional->setToolTip(tr("All fields are optional. Without them you get a plain receiving address."));
@@ -189,7 +189,7 @@ void ReceiveCoinsDialog::buildLayout()
     qr->setSpacing(10);
     QLabel *qrTitle = new QLabel(tr("Receiving address"), qrCard);
     qrTitle->setProperty("role", "title");
-    qrTitle->setFont(GUIUtil::appFont(15, QFont::Medium));
+    qrTitle->setFont(GUIUtil::appFont(15, QFont::DemiBold));
     qr->addWidget(qrTitle);
     qr->addStretch(1);
     qrImage = new QLabel(qrCard);
@@ -203,7 +203,7 @@ void ReceiveCoinsDialog::buildLayout()
     qrPlaceholder->setAlignment(Qt::AlignCenter);
     qr->addWidget(qrPlaceholder);
     qrAddress = new QLabel(qrCard);
-    qrAddress->setFont(GUIUtil::monoFont(13, QFont::Medium));
+    qrAddress->setFont(GUIUtil::monoFont(13, QFont::DemiBold));
     qrAddress->setAlignment(Qt::AlignCenter);
     qrAddress->setWordWrap(true);
     qrAddress->setTextInteractionFlags(Qt::TextSelectableByMouse);
@@ -242,14 +242,14 @@ void ReceiveCoinsDialog::buildLayout()
     ui->label_6->setText(tr("Request history"));
     ui->label_6->setProperty("role", "title");
     ui->label_6->setStyleSheet(QString());
-    ui->label_6->setFont(GUIUtil::appFont(15, QFont::Medium));
+    ui->label_6->setFont(GUIUtil::appFont(15, QFont::DemiBold));
     if (ui->frame->layout())
         ui->frame->layout()->setContentsMargins(24, 18, 24, 16);
     ui->recentRequestsView->setFrameShape(QFrame::NoFrame);
     ui->recentRequestsView->setStyleSheet("QTableView { border: none; }");
     // a style sheet on the view makes Windows fall back to a system font for the header: name it again
     ui->recentRequestsView->setFont(GUIUtil::getSubLabelFont());
-    ui->recentRequestsView->horizontalHeader()->setFont(GUIUtil::appFont(12, QFont::Medium));
+    ui->recentRequestsView->horizontalHeader()->setFont(GUIUtil::appFont(12, QFont::DemiBold));
     ui->recentRequestsView->setShowGrid(false);
     ui->recentRequestsView->setMinimumHeight(90);
     page->addWidget(ui->frame, 1);
