@@ -98,7 +98,9 @@ CAmount nReserveBalance = 0;
 
 unsigned int GetStakeMaxCombineInputs() { return 100; }
 
-int64_t GetStakeCombineThreshold() { return 100 * COIN; }
+CAmount nStakeCombineThreshold = DEFAULT_STAKE_COMBINE_THRESHOLD;
+
+int64_t GetStakeCombineThreshold() { return nStakeCombineThreshold; }
 
 unsigned int GetStakeSplitOutputs() { return 2; }
 
@@ -3321,6 +3323,10 @@ bool CWallet::CreateCoinStake(const CKeyStore& keystore, unsigned int nBits, con
             // Do not add additional significant input
             if (pcoin.first->tx->vout[pcoin.second].nValue >= GetStakeCombineThreshold())
                 continue;
+            // Enough for two outputs of the threshold: more would only tie up more coins while the
+            // stake matures
+            if (nCredit >= GetStakeSplitThreshold())
+                break;
 
             txNew.vin.push_back(CTxIn(pcoin.first->GetHash(), pcoin.second));
             nCredit += pcoin.first->tx->vout[pcoin.second].nValue;

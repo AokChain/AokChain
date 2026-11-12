@@ -72,6 +72,8 @@ std::string WalletInit::GetHelpString(bool showDebug)
     strUsage += HelpMessageOpt("-rescan", _("Rescan the block chain for missing wallet transactions on startup"));
     strUsage += HelpMessageOpt("-salvagewallet", _("Attempt to recover private keys from a corrupt wallet on startup"));
     strUsage += HelpMessageOpt("-spendzeroconfchange", strprintf(_("Spend unconfirmed change when sending transactions (default: %u)"), DEFAULT_SPEND_ZEROCONF_CHANGE));
+    strUsage += HelpMessageOpt("-stakecombinethreshold=<amt>", strprintf(_("A stake gathers the coins of its address that are smaller than this amount (in %s) and is split in two when it reaches twice the amount, so the staking coins end up between one and two times this size (default: %s)"),
+                                                            CURRENCY_UNIT, FormatMoney(DEFAULT_STAKE_COMBINE_THRESHOLD)));
     strUsage += HelpMessageOpt("-txconfirmtarget=<n>", strprintf(_("If paytxfee is not set, include enough fee so transactions begin confirmation on average within n blocks (default: %u)"), DEFAULT_TX_CONFIRM_TARGET));
     strUsage += HelpMessageOpt("-walletrbf", strprintf(_("Send transactions with full-RBF opt-in enabled (default: %u)"), DEFAULT_WALLET_RBF));
     strUsage += HelpMessageOpt("-upgradewallet", _("Upgrade wallet to latest format on startup"));
@@ -185,6 +187,13 @@ bool WalletInit::ParameterInteraction()
             InitWarning(AmountHighWarn("-discardfee") + " " +
                         _("This is the transaction fee you may discard if change is smaller than dust at this level"));
         CWallet::m_discard_rate = CFeeRate(nFeePerK);
+    }
+    if (gArgs.IsArgSet("-stakecombinethreshold"))
+    {
+        CAmount nThreshold = 0;
+        if (!ParseMoney(gArgs.GetArg("-stakecombinethreshold", ""), nThreshold) || nThreshold < COIN)
+            return InitError(strprintf(_("Invalid amount for -stakecombinethreshold=<amount>: '%s' (must be at least %s)"), gArgs.GetArg("-stakecombinethreshold", ""), FormatMoney(COIN)));
+        nStakeCombineThreshold = nThreshold;
     }
     if (gArgs.IsArgSet("-paytxfee"))
     {

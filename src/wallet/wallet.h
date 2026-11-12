@@ -35,6 +35,15 @@
 #include <utility>
 #include <vector>
 
+/**
+ * A stake gathers the coins of its address that are smaller than this, until it has twice this
+ * amount, and is paid out in two halves when it has: the staking coins of a wallet end up
+ * between one and two times the threshold. Larger coins mean fewer of them (a smaller wallet
+ * file, faster wallet), smaller coins mean that less is tied up while a stake matures.
+ */
+static const CAmount DEFAULT_STAKE_COMBINE_THRESHOLD = 1000 * COIN;
+/** -stakecombinethreshold */
+extern CAmount nStakeCombineThreshold;
 extern std::vector<CWallet*> vpwallets;
 /** Wallets that unloadwallet took out of vpwallets. They are deleted at shutdown only: another
  *  thread may still hold a pointer to one of them. */
