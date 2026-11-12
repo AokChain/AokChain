@@ -3276,6 +3276,62 @@ UniValue loadwallet(const JSONRPCRequest& request)
     return obj;
 }
 
+UniValue restorewallet(const JSONRPCRequest& request)
+{
+    if (request.fHelp || request.params.size() != 2)
+        throw std::runtime_error(
+            "restorewallet \"wallet_name\" \"backup_file\"\n"
+            "\nRestores a wallet from a backup file (of backupwallet, or a copy of a wallet.dat) and loads it.\n"
+            "The backup is copied to the folder <wallet_name> in the wallet directory; the backup file\n"
+            "itself is not changed. What happened to the wallet after the backup is found by the rescan\n"
+            "that loading does.\n"
+            "\nArguments:\n"
+            "1. \"wallet_name\"    (string, required) The name of the new wallet; there must be no wallet of that name\n"
+            "2. \"backup_file\"    (string, required) The backup file to restore from\n"
+            "\nResult:\n"
+            "{\n"
+            "  \"name\" :    <wallet_name>,        (string) The wallet name if restored successfully.\n"
+            "  \"warning\" : <warning>,            (string) Warning message if wallet was not loaded cleanly.\n"
+            "}\n"
+            "\nExamples:\n"
+            + HelpExampleCli("restorewallet", "\"restored\" \"/home/user/backup.dat\"")
+            + HelpExampleRpc("restorewallet", "\"restored\", \"/home/user/backup.dat\"")
+        );
+
+    const std::string name = request.params[0].get_str();
+    const fs::path backup = fs::absolute(request.params[1].get_str());
+    if (name.empty() || fs::path(name).filename().string() != name)
+        throw JSONRPCError(RPC_INVALID_PARAMETER, "The wallet name must be a plain name without a path");
+    if (!fs::exists(backup) || !fs::is_regular_file(backup))
+        throw JSONRPCError(RPC_INVALID_PARAMETER, "Backup file does not exist");
+    if (GetWallet(name))
+        throw JSONRPCError(RPC_WALLET_ERROR, "Wallet " + name + " is already loaded.");
+    const fs::path folder = fs::absolute(name, GetWalletDir());
+    if (fs::exists(folder))
+        throw JSONRPCError(RPC_WALLET_ERROR, "There is a wallet or a file of that name already: " + folder.string());
+
+    boost::system::error_code ec;
+    fs::create_directories(folder, ec);
+    if (!ec)
+        fs::copy_file(backup, folder / "wallet.dat", ec);
+    if (ec) {
+        fs::remove_all(folder, ec);
+        throw JSONRPCError(RPC_WALLET_ERROR, "Cannot copy the backup to " + folder.string());
+    }
+
+    JSONRPCRequest inner(request);
+    inner.params = UniValue(UniValue::VARR);
+    inner.params.push_back(name);
+    try {
+        return loadwallet(inner);
+    } catch (...) {
+        // nothing of a failed restore is left behind
+        if (!GetWallet(name))
+            fs::remove_all(folder, ec);
+        throw;
+    }
+}
+
 UniValue unloadwallet(const JSONRPCRequest& request)
 {
     if (request.fHelp || request.params.size() > 1)
@@ -4396,6 +4452,7 @@ static const CRPCCommand commands[] =
     { "wallet",             "listwallets",              &listwallets,              {} },
     { "wallet",             "loadwallet",               &loadwallet,               {"filename"} },
     { "wallet",             "unloadwallet",             &unloadwallet,             {"wallet_name"} },
+    { "wallet",             "restorewallet",            &restorewallet,            {"wallet_name","backup_file"} },
     { "wallet",             "createwallet",             &createwallet,             {"wallet_name"} },
     { "wallet",             "lockunspent",              &lockunspent,              {"unlock","transactions"} },
     // { "wallet",             "move",                     &movecmd,                  {"fromaccount","toaccount","amount","minconf","comment"} },
