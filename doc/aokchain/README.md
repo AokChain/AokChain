@@ -21,6 +21,7 @@ The upstream Bitcoin Core documentation is in the parent `doc/` directory; this 
 | [14-first-run-and-wallet-security.md](14-first-run-and-wallet-security.md) | First-run wizard and mandatory wallet encryption, staking-only unlock, restore from recovery words (`importmnemonic`), settings and address book changes, send confirmation |
 | [15-snapshot.md](15-snapshot.md) | Chain state snapshot — a new node starts from the state at a fixed height whose hashes are compiled into the program; trust model, what a snapshot node can do without the past blocks, fetching them on demand, making a snapshot, faster block validation, measurements, consensus notes |
 | [16-stake-coin-time.md](16-stake-coin-time.md) | Coins lost the time of their transaction in a reorganization and then produced stake blocks that every node rejects; what was observed on the main network, the fix in staking and in block disconnection, the `repaircoins` RPC |
+| [17-upstream-features.md](17-upstream-features.md) | Features taken over from later Bitcoin Core versions: the plan in four phases, and phase 1 — `unloadwallet`, `scantxoutset`, `testmempoolaccept`, the fee rate limit of `sendrawtransaction`, `getaddressinfo`, `getbalances`, `-rpcwhitelist`, `-daemonwait`, the log rate limit and others |
 | [release-notes-4.0.0.md](release-notes-4.0.0.md) | Release notes of 4.0.0 (candidate) |
 | [CHANGELOG-4.0.0.md](CHANGELOG-4.0.0.md) | Changes compared with 3.0.5 |
 | [functional-baseline.txt](functional-baseline.txt) | List of functional tests that currently pass (for regression checks) |

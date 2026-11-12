@@ -36,7 +36,7 @@
 | U-11 | DoS through sorting of the inv-to-send set | 25.0, PR #27610 | [V] `setInventoryTxToSend` | P2 | S | ⏳ |
 | U-12 | Censorship of transaction re-requests | CVE-2024-52913, 0.21 (`TxRequestTracker`) | [V] uses `mapAlreadyAskedFor` | P2 | L | ⏳ |
 | U-13 | Cap on GETDATA processing | CVE-2024-52920, 0.20 | [V/U] Not an infinite loop. Serves an unlimited number of blocks per request | P3 | S | ⏳ |
-| U-14 | Filling the disk with logs | CVE-2025-54604/54605 [source], PR #32604 | [U] No log rate limit | P2 | S | ⏳ |
+| U-14 | Filling the disk with logs | CVE-2025-54604/54605 [source], PR #32604 | [U] Applies → **fixed**: 1 MiB per hour and source location, `-logratelimit` (17-upstream-features.md) | P2 | S | ✅ |
 | U-15 | Legacy sighash CPU DoS | CVE-2025-46598 [source] | [U] | P2 | M | investigate |
 | U-16 | Undo file 4GiB position overflow | advisory id unverified [source] | [V] 32-bit `nUndoPos` | P3 | S | ⏳ |
 
