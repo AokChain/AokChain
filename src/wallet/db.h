@@ -189,6 +189,9 @@ public:
     /* flush the wallet passively (TRY_LOCK)
        ideal to be called periodically */
     static bool PeriodicFlush(CWalletDBWrapper& dbw);
+    /* Close the file of a wallet that is being unloaded and make it self contained.
+       False while the file is in use. */
+    static bool CloseForUnload(CWalletDBWrapper& dbw);
     /* verifies the database environment */
     static bool VerifyEnvironment(const fs::path& file_path, std::string& errorStr);
     /* verifies the database file */

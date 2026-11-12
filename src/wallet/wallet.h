@@ -36,6 +36,9 @@
 #include <vector>
 
 extern std::vector<CWallet*> vpwallets;
+/** Wallets that unloadwallet took out of vpwallets. They are deleted at shutdown only: another
+ *  thread may still hold a pointer to one of them. */
+extern std::vector<CWallet*> vpwalletsUnloaded;
 
 bool AddWallet(CWallet* wallet);
 bool RemoveWallet(CWallet* wallet);

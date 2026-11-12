@@ -3141,6 +3141,9 @@ UniValue loadwallet(const JSONRPCRequest& request)
         }
     }
 
+    if (GetWallet(wallet_file))
+        throw JSONRPCError(RPC_WALLET_ERROR, "Wallet " + wallet_file + " is already loaded.");
+
     std::string warning;
     if (!CWallet::Verify(wallet_file, false, error, warning)) {
         throw JSONRPCError(RPC_WALLET_ERROR, "Wallet file verification failed: " + error);
@@ -3158,6 +3161,64 @@ UniValue loadwallet(const JSONRPCRequest& request)
     obj.pushKV("name", wallet->GetName());
     obj.pushKV("warning", warning);
 
+    return obj;
+}
+
+UniValue unloadwallet(const JSONRPCRequest& request)
+{
+    if (request.fHelp || request.params.size() > 1)
+        throw std::runtime_error(
+            "unloadwallet ( \"wallet_name\" )\n"
+            "\nUnloads a wallet that was loaded with loadwallet, createwallet or a second -wallet option.\n"
+            "The wallet is taken from the request endpoint (/wallet/<name>) if no name is given.\n"
+            "The first wallet cannot be unloaded: it stakes, and the GUI shows it. To run without it,\n"
+            "restart the node with another -wallet option.\n"
+            "\nArguments:\n"
+            "1. \"wallet_name\"    (string, optional) The name of the wallet to unload, as listwallets shows it.\n"
+            "\nExamples:\n"
+            + HelpExampleCli("unloadwallet", "\"test.dat\"")
+            + HelpExampleRpc("unloadwallet", "\"test.dat\"")
+        );
+
+    CWallet* pwallet = nullptr;
+    if (!request.params[0].isNull()) {
+        pwallet = GetWallet(request.params[0].get_str());
+        if (!pwallet)
+            throw JSONRPCError(RPC_WALLET_NOT_FOUND, "Requested wallet does not exist or is not loaded");
+    } else {
+        // without a name: only the wallet of the request endpoint, never a wallet chosen by default
+        if (request.URI.substr(0, WALLET_ENDPOINT_BASE.size()) != WALLET_ENDPOINT_BASE)
+            throw JSONRPCError(RPC_INVALID_PARAMETER, "Give the name of the wallet to unload, or call this through the /wallet/<name> endpoint");
+        pwallet = GetWalletForJSONRPCRequest(request);
+        if (!pwallet)
+            throw JSONRPCError(RPC_WALLET_NOT_FOUND, "Requested wallet does not exist or is not loaded");
+    }
+
+    {
+        LOCK(cs_main);
+        if (vpwallets.empty() || pwallet == vpwallets[0])
+            throw JSONRPCError(RPC_MISC_ERROR, "The first wallet cannot be unloaded (it stakes, and the GUI shows it). Restart the node with another -wallet option to run without it.");
+        if (pwallet->IsScanning())
+            throw JSONRPCError(RPC_WALLET_ERROR, "The wallet is being rescanned. Wait for the rescan or stop it with abortrescan.");
+        // no more blocks and transactions for it, and no more requests
+        UnregisterValidationInterface(pwallet);
+        RemoveWallet(pwallet);
+        vpwalletsUnloaded.push_back(pwallet);
+    }
+    pwallet->StopStake();
+    pwallet->Flush(false);
+    // close its file, so that it can be copied, moved or loaded again
+    bool closed = false;
+    for (int i = 0; i < 100 && !closed; i++) {
+        closed = CDB::CloseForUnload(pwallet->GetDBHandle());
+        if (!closed)
+            MilliSleep(100);
+    }
+    LogPrintf("unloadwallet: %s unloaded%s\n", pwallet->GetName(), closed ? "" : " (its file is still in use and is closed at shutdown)");
+
+    UniValue obj(UniValue::VOBJ);
+    obj.pushKV("name", pwallet->GetName());
+    obj.pushKV("warning", closed ? "" : "The wallet file is still in use by a running request. It is closed when the node shuts down; do not copy or move it before.");
     return obj;
 }
 
@@ -4214,6 +4275,7 @@ static const CRPCCommand commands[] =
     { "wallet",             "listwalletdir",            &listwalletdir,            {} },
     { "wallet",             "listwallets",              &listwallets,              {} },
     { "wallet",             "loadwallet",               &loadwallet,               {"filename"} },
+    { "wallet",             "unloadwallet",             &unloadwallet,             {"wallet_name"} },
     { "wallet",             "createwallet",             &createwallet,             {"wallet_name"} },
     { "wallet",             "lockunspent",              &lockunspent,              {"unlock","transactions"} },
     // { "wallet",             "move",                     &movecmd,                  {"fromaccount","toaccount","amount","minconf","comment"} },

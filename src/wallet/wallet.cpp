@@ -48,6 +48,7 @@
 #include "tokens/tokens.h"
 
 std::vector<CWallet*> vpwallets;
+std::vector<CWallet*> vpwalletsUnloaded;
 
 bool AddWallet(CWallet* wallet)
 {

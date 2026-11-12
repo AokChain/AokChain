@@ -376,4 +376,8 @@ void WalletInit::Close()
         delete pwallet;
     }
     vpwallets.clear();
+    for (CWallet* pwallet : vpwalletsUnloaded) {
+        delete pwallet;
+    }
+    vpwalletsUnloaded.clear();
 }

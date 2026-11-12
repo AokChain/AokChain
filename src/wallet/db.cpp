@@ -701,6 +701,25 @@ void CDBEnv::Flush(bool fShutdown)
     }
 }
 
+bool CDB::CloseForUnload(CWalletDBWrapper& dbw)
+{
+    if (dbw.IsDummy())
+        return true;
+    CDBEnv *env = dbw.env;
+    const std::string& strFile = dbw.strFile;
+    LOCK(cs_db);
+    std::map<std::string, int>::iterator mi = env->mapFileUseCount.find(strFile);
+    if (mi == env->mapFileUseCount.end())
+        return true; // not open
+    if (mi->second > 0)
+        return false;
+    // as the periodic flush and backupwallet do it: the other files of the environment stay open
+    env->CloseDb(strFile);
+    env->CheckpointLSN(strFile);
+    env->mapFileUseCount.erase(mi);
+    return true;
+}
+
 bool CDB::PeriodicFlush(CWalletDBWrapper& dbw)
 {
     if (dbw.IsDummy()) {
