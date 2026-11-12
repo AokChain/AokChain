@@ -57,6 +57,7 @@ static const CRPCConvertParam vRPCConvertParams[] =
     { "listtokens", 2, "count" },
     { "listtokens", 3, "start" },
     { "setmocktime", 0, "timestamp" },
+    { "repaircoins", 0, "checkonly" },
     { "generate", 0, "nblocks" },
     { "generate", 1, "maxtries" },
     { "setgenerate", 0, "generate" },

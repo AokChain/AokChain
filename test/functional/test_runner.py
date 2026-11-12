@@ -122,6 +122,7 @@ BASE_SCRIPTS= [
     'wallet_zapwallettxes.py',
     'wallet_spent_cache.py',
     'feature_staking.py',
+    'feature_stake_cointime.py',
     'rpc_mnemonic.py',
     'wallet_importmnemonic.py',
     'wallet_multisig_flow.py',

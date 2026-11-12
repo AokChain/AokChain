@@ -302,6 +302,20 @@ void ThreadScriptCheck();
 /** Check whether we are doing an initial block download (synchronizing from disk or network) */
 bool IsInitialBlockDownload();
 bool IsInitialSyncSpeedUp();
+/**
+ * Time and coinstake mark of the transaction that created a coin. For a coin that lost them: the
+ * undo data keeps neither, so before 4.0 a coin that a disconnected block gave back had time 0.
+ * False if they cannot be found (no transaction index, or the past blocks are missing).
+ */
+bool ReadCoinTxInfo(const COutPoint& out, int nCoinHeight, unsigned int& nTime, bool& fCoinStake);
+/**
+ * Look for unspent coins without a time in the chain state and, with fWrite, give them the time
+ * and the coinstake mark of their transaction.
+ */
+bool RepairCoins(bool fWrite, uint64_t& nScanned, uint64_t& nDamaged, uint64_t& nRepaired, uint64_t& nUnreadable);
+/** Regtest only: -restorecointime=0 restores coins of disconnected blocks without their time. */
+void SetRestoreCoinTime(bool fRestore);
+
 /** Retrieve a transaction (from memory pool, or from disk, if possible) */
 bool GetTransaction(const uint256 &hash, CTransactionRef &tx, const Consensus::Params& params, uint256 &hashBlock, bool fAllowSlow = false);
 /** Find the best known block, and make it the tip of the block chain */

@@ -493,6 +493,7 @@ std::string HelpMessage(HelpMessageMode mode)
         strUsage += HelpMessageOpt("-limitdescendantcount=<n>", strprintf("Do not accept transactions if any ancestor would have <n> or more in-mempool descendants (default: %u)", DEFAULT_DESCENDANT_LIMIT));
         strUsage += HelpMessageOpt("-limitdescendantsize=<n>", strprintf("Do not accept transactions if any ancestor would have more than <n> kilobytes of in-mempool descendants (default: %u).", DEFAULT_DESCENDANT_SIZE_LIMIT));
         strUsage += HelpMessageOpt("-lastpowblock=<height>", "Height of the last proof-of-work block; later blocks must be proof-of-stake (regtest-only)");
+        strUsage += HelpMessageOpt("-restorecointime", "Give the coins of a disconnected block their transaction time back; 0 loses it as versions before 4.0 did (regtest-only, default: 1)");
         strUsage += HelpMessageOpt("-snapshotparams=<height:block:utxo:tokens:governance:index>", "The chain state snapshot that is accepted, as getstatehashes prints it (regtest-only)");
         strUsage += HelpMessageOpt("-oldpeercutoffheight=<height>", "Chain height from which peers below the current protocol version are disconnected (regtest-only)");
         strUsage += HelpMessageOpt("-vbparams=deployment:start:end", "Use given start/end times for specified version bits deployment (regtest-only)");
@@ -1158,6 +1159,14 @@ bool AppInitParameterInteraction()
         std::vector<std::string> vstrReplacementModes;
         boost::split(vstrReplacementModes, strReplacementModeList, boost::is_any_of(","));
         fEnableReplacement = (std::find(vstrReplacementModes.begin(), vstrReplacementModes.end(), "fee") != vstrReplacementModes.end());
+    }
+
+    if (!gArgs.GetBoolArg("-restorecointime", true)) {
+        // Lets tests produce the damaged chain state of versions before 4.0
+        if (!chainparams.MineBlocksOnDemand()) {
+            return InitError("-restorecointime may only be turned off on regtest.");
+        }
+        SetRestoreCoinTime(false);
     }
 
     if (gArgs.IsArgSet("-lastpowblock")) {

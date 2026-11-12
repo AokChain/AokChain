@@ -2005,6 +2005,42 @@ UniValue getstatehashes(const JSONRPCRequest& request)
     return result;
 }
 
+UniValue repaircoins(const JSONRPCRequest& request)
+{
+    if (request.fHelp || request.params.size() > 1)
+        throw std::runtime_error(
+            "repaircoins ( checkonly )\n"
+            "\nLook for unspent outputs that have no transaction time in the chain state of this node, and give\n"
+            "them the time and the coinstake mark of their transaction again.\n"
+            "Versions before 4.0 lost both when a block was disconnected in a reorganization. A wallet then\n"
+            "staked such a coin with a wrong kernel: its blocks were rejected by every node (bad-cs-proofhash)\n"
+            "and the coin never staked again. Reads every unspent output; this takes a while.\n"
+            "\nArguments:\n"
+            "1. checkonly    (boolean, optional, default=false) only count, change nothing\n"
+            "\nResult:\n"
+            "{\n"
+            "  \"scanned\": n,      (numeric) unspent outputs read\n"
+            "  \"damaged\": n,      (numeric) unspent outputs without a time\n"
+            "  \"repaired\": n,     (numeric) of those, the ones that were repaired (with checkonly: that can be repaired)\n"
+            "  \"unreadable\": n    (numeric) of those, the ones whose transaction cannot be read on this node\n"
+            "}\n"
+            "\nExamples:\n"
+            + HelpExampleCli("repaircoins", "true")
+            + HelpExampleCli("repaircoins", "")
+            + HelpExampleRpc("repaircoins", "")
+        );
+    const bool fCheckOnly = request.params.size() > 0 && !request.params[0].isNull() && request.params[0].get_bool();
+    uint64_t nScanned = 0, nDamaged = 0, nRepaired = 0, nUnreadable = 0;
+    if (!RepairCoins(!fCheckOnly, nScanned, nDamaged, nRepaired, nUnreadable))
+        throw JSONRPCError(RPC_DATABASE_ERROR, "Unable to read or write the chain state");
+    UniValue result(UniValue::VOBJ);
+    result.pushKV("scanned", nScanned);
+    result.pushKV("damaged", nDamaged);
+    result.pushKV("repaired", nRepaired);
+    result.pushKV("unreadable", nUnreadable);
+    return result;
+}
+
 UniValue getsnapshotinfo(const JSONRPCRequest& request)
 {
     if (request.fHelp || request.params.size() != 0)
@@ -2072,6 +2108,7 @@ static const CRPCCommand commands[] =
     { "blockchain",         "getblockchaininfo",      &getblockchaininfo,      {} },
     { "blockchain",         "getstatehashes",         &getstatehashes,         {} },
     { "blockchain",         "getsnapshotinfo",        &getsnapshotinfo,        {} },
+    { "blockchain",         "repaircoins",            &repaircoins,            {"checkonly"} },
     { "blockchain",         "fetchblocks",            &fetchblocks,            {} },
     { "blockchain",         "getbootstrapinfo",       &getbootstrapinfo,       {} },
     { "blockchain",         "skipbootstrap",          &skipbootstrap,          {} },

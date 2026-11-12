@@ -88,6 +88,48 @@ bool CheckStakeBlockTimestamp(int64_t nTimeBlock, int nHeight, const Consensus::
     return (nTimeBlock & params.nStakeTimestampMask) == 0;
 }
 
+/**
+ * The time that the kernel hash takes for a staked coin: the time of its transaction. The coin
+ * has it, except a coin that a disconnected block gave back before 4.0 (the undo data does not
+ * keep the time, such a coin has time 0). ConnectBlock() reads the transaction for those; the
+ * staking code hashed with 0, found kernels that no node accepts (bad-cs-proofhash) and missed
+ * the real ones. Read the transaction here as well. The time of a transaction never changes, so
+ * it is remembered.
+ */
+static bool GetStakeCoinTime(const COutPoint& prevout, const Coin& coin, unsigned int& nTimeOut)
+{
+    if (coin.nTime != 0) {
+        nTimeOut = coin.nTime;
+        return true;
+    }
+    static CCriticalSection cs_times;
+    static std::map<uint256, unsigned int> mapTimes;
+    {
+        LOCK(cs_times);
+        auto it = mapTimes.find(prevout.hash);
+        if (it != mapTimes.end()) {
+            nTimeOut = it->second;
+            return nTimeOut != 0;
+        }
+    }
+    unsigned int nTimeTx = 0;
+    bool fCoinStake = false;
+    if (!ReadCoinTxInfo(prevout, coin.nHeight, nTimeTx, fCoinStake))
+        nTimeTx = 0;
+    if (nTimeTx != 0)
+        LogPrintf("Stake: coin %s:%u has no time in the chain state, %u read from its transaction (repaircoins fixes the chain state)\n", prevout.hash.GetHex(), prevout.n, nTimeTx);
+    else
+        LogPrintf("Stake: coin %s:%u has no time in the chain state and its transaction cannot be read; it is not staked\n", prevout.hash.GetHex(), prevout.n);
+    {
+        LOCK(cs_times);
+        if (mapTimes.size() > 100000)
+            mapTimes.clear();
+        mapTimes[prevout.hash] = nTimeTx;
+    }
+    nTimeOut = nTimeTx;
+    return nTimeTx != 0;
+}
+
 bool CheckKernel(CBlockIndex* pindexPrev, unsigned int nBits, uint32_t nTimeBlock, const COutPoint& prevout, CCoinsViewCache& view)
 {
     std::map<COutPoint, CStakeCache> tmp;
@@ -121,18 +163,26 @@ bool CheckKernel(CBlockIndex* pindexPrev, unsigned int nBits, uint32_t nTimeBloc
             return false;
         }
 
+        unsigned int nTimeCoin = 0;
+        if (!GetStakeCoinTime(prevout, coinPrev, nTimeCoin))
+            return false;
+
         return CheckStakeKernelHash(pindexPrev, nBits, coinPrev.out.nValue, prevout,
-                                    nTimeBlock, coinPrev.nTime);
+                                    nTimeBlock, nTimeCoin);
     } else {
         Coin coinPrev;
         if(!view.GetCoin(prevout, coinPrev)){
             return false;
         }
 
+        unsigned int nTimeCoin = 0;
+        if (!GetStakeCoinTime(prevout, coinPrev, nTimeCoin))
+            return false;
+
         // found in cache
         const CStakeCache& stake = it->second;
         if (CheckStakeKernelHash(pindexPrev, nBits, stake.amount, prevout,
-                                    nTimeBlock, coinPrev.nTime)) {
+                                    nTimeBlock, nTimeCoin)) {
             // Cache could potentially cause false positive stakes in the event of deep reorgs, so check without cache also
             return CheckKernel(pindexPrev, nBits, nTimeBlock, prevout, view);
         }
@@ -173,7 +223,12 @@ bool CheckProofOfStake(CBlockIndex* pindexPrev, CValidationState& state, const C
         return state.DoS(100, error("CheckProofOfStake() : VerifySignature failed on coinstake %s", tx.GetHash().ToString()));
     }
 
-    if (!CheckStakeKernelHash(pindexPrev, nBits, coinPrev.out.nValue, txin.prevout, nTimeBlock, coinPrev.nTime)) {
+    unsigned int nTimeCoin = 0;
+    if (!GetStakeCoinTime(txin.prevout, coinPrev, nTimeCoin)) {
+        return state.DoS(1, error("CheckProofOfStake() : the time of the staked transaction %s is unknown", txin.prevout.hash.ToString()));
+    }
+
+    if (!CheckStakeKernelHash(pindexPrev, nBits, coinPrev.out.nValue, txin.prevout, nTimeBlock, nTimeCoin)) {
         return state.DoS(1, error("CheckProofOfStake() : INFO: check kernel failed on coinstake %s, hashProof=%s", tx.GetHash().ToString(), hashProofOfStake.ToString())); // may occur during initial download or if behind on block chain sync
     }
 

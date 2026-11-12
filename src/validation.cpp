@@ -1708,6 +1708,86 @@ bool AbortNode(CValidationState& state, const std::string& strMessage, const std
 
 } // namespace
 
+/** Regtest only (-restorecointime=0): give coins back without their time, as versions before 4.0 did. */
+static bool fRestoreCoinTime = true;
+
+void SetRestoreCoinTime(bool fRestore)
+{
+    fRestoreCoinTime = fRestore;
+}
+
+bool ReadCoinTxInfo(const COutPoint& out, int nCoinHeight, unsigned int& nTime, bool& fCoinStake)
+{
+    LOCK(cs_main);
+    if (!pblocktree)
+        return false;
+    // A node that started from a chain state snapshot kept both for the coins from before the
+    // snapshot that it spent (see ConnectBlock): it cannot read the past blocks.
+    if (nCoinHeight <= SnapshotHeight()) {
+        std::pair<unsigned int, unsigned char> kept;
+        if (pblocktree->Read(std::make_pair(DB_SNAPSHOT_SPENT_COIN, out), kept) && kept.first != 0) {
+            nTime = kept.first;
+            fCoinStake = kept.second != 0;
+            return true;
+        }
+    }
+    // The transaction id covers the time and the form of the transaction, so any copy will do.
+    CTransactionRef tx;
+    uint256 hashBlock;
+    if (!GetTransaction(out.hash, tx, Params().GetConsensus(), hashBlock, false) || !tx || tx->nTime == 0)
+        return false;
+    nTime = tx->nTime;
+    fCoinStake = tx->IsCoinStake();
+    return true;
+}
+
+bool RepairCoins(bool fWrite, uint64_t& nScanned, uint64_t& nDamaged, uint64_t& nRepaired, uint64_t& nUnreadable)
+{
+    LOCK(cs_main);
+    nScanned = nDamaged = nRepaired = nUnreadable = 0;
+    CValidationState state;
+    if (!FlushStateToDisk(Params(), state, FLUSH_STATE_ALWAYS))
+        return false;
+
+    std::vector<std::pair<COutPoint, Coin>> damaged;
+    {
+        std::unique_ptr<CCoinsViewCursor> pcursor(pcoinsdbview->Cursor());
+        while (pcursor->Valid()) {
+            boost::this_thread::interruption_point();
+            COutPoint key;
+            Coin coin;
+            if (!pcursor->GetKey(key) || !pcursor->GetValue(coin))
+                return error("%s: unable to read a coin", __func__);
+            nScanned++;
+            if (coin.nTime == 0 && !coin.IsSpent() && !coin.out.scriptPubKey.IsUnspendable())
+                damaged.emplace_back(key, std::move(coin));
+            pcursor->Next();
+        }
+    }
+    nDamaged = damaged.size();
+
+    for (std::pair<COutPoint, Coin>& entry : damaged) {
+        unsigned int nTimeTx = 0;
+        bool fCoinStakeTx = false;
+        if (!ReadCoinTxInfo(entry.first, entry.second.nHeight, nTimeTx, fCoinStakeTx)) {
+            nUnreadable++;
+            continue;
+        }
+        if (fWrite) {
+            entry.second.nTime = nTimeTx;
+            entry.second.fCoinStake = fCoinStakeTx;
+            pcoinsTip->AddCoin(entry.first, std::move(entry.second), true);
+        }
+        nRepaired++;
+    }
+    if (fWrite && nRepaired > 0) {
+        if (!FlushStateToDisk(Params(), state, FLUSH_STATE_ALWAYS))
+            return false;
+        LogPrintf("%s: %u of %u coins without a time repaired (%u could not be read)\n", __func__, nRepaired, nDamaged, nUnreadable);
+    }
+    return true;
+}
+
 enum DisconnectResult
 {
     DISCONNECT_OK,      // All good.
@@ -1755,11 +1835,19 @@ int ApplyTxInUndo(Coin&& undo, CCoinsViewCache& view, const COutPoint& out, CTok
     // The undo data has neither the time of the transaction nor its coinstake mark. A node that
     // started from a chain state snapshot kept them for the coins from before the snapshot when
     // it spent them (see ConnectBlock): it cannot read them from the past blocks.
-    if (undo.nTime == 0 && (int)undo.nHeight <= SnapshotHeight()) {
-        std::pair<unsigned int, unsigned char> kept;
-        if (pblocktree->Read(std::make_pair(DB_SNAPSHOT_SPENT_COIN, out), kept)) {
-            undo.nTime = kept.first;
-            undo.fCoinStake = kept.second != 0;
+    //
+    // Every other coin gets them back from its transaction, read from disk. Without this the
+    // coin came back with time 0 and no coinstake mark, and stayed that way: the staking code,
+    // which hashed the kernel with the time of the coin, then produced blocks that every node
+    // rejected (bad-cs-proofhash), and the coin never staked again.
+    if (undo.nTime == 0 && fRestoreCoinTime) {
+        unsigned int nTimeTx = 0;
+        bool fCoinStakeTx = false;
+        if (ReadCoinTxInfo(out, undo.nHeight, nTimeTx, fCoinStakeTx)) {
+            undo.nTime = nTimeTx;
+            undo.fCoinStake = fCoinStakeTx;
+        } else {
+            LogPrintf("%s: the transaction of coin %s:%u could not be read; the coin is restored without its time\n", __func__, out.hash.GetHex(), out.n);
         }
     }
 
