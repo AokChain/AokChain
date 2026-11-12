@@ -154,7 +154,7 @@ const Theme& theme()
 void loadAppFonts()
 {
     for (const char* name : {"NotoSans-Regular", "NotoSans-Medium", "NotoSans-SemiBold", "NotoSans-Bold",
-                             "NotoSansKR-Regular", "NotoSansKR-Bold",
+                             "NotoSansKR-Regular", "NotoSansKR-Medium", "NotoSansKR-Bold",
                              "NotoSansMono-Regular", "NotoSansMono-Medium", "NotoSansMono-SemiBold", "NotoSansMono-Bold"}) {
         if (QFontDatabase::addApplicationFont(QString(":/fonts/%1").arg(name)) < 0)
             qWarning() << "Could not load the font" << name;
@@ -567,10 +567,7 @@ void paintDirectionTile(QPainter* painter, const QRect& tile, bool outgoing, boo
     const Theme& t = theme();
     painter->save();
     painter->setRenderHint(QPainter::Antialiasing, true);
-    painter->setPen(Qt::NoPen);
-    painter->setBrush(outgoing ? t.negativeSoft : t.positiveSoft);
-    painter->drawRoundedRect(tile, 8, 8);
-    const QPixmap icon = lineIcon(reward ? "stake" : (outgoing ? "send" : "receive"), 16, outgoing ? t.negative : t.positive, 2.4);
+    const QPixmap icon = lineIcon(reward ? "stake" : (outgoing ? "send" : "receive"), 16, t.textSecondary, 2.0);
     painter->drawPixmap(tile.left() + (tile.width() - 16) / 2, tile.top() + (tile.height() - 16) / 2, icon);
     painter->restore();
 }
@@ -710,7 +707,7 @@ int paintChip(QPainter* painter, int x, int centerY, const QString& text)
     const QRect r(x, centerY - 10, w, 20);
     painter->setPen(Qt::NoPen);
     painter->setBrush(t.chip);
-    painter->drawRoundedRect(r, 8, 8);
+    painter->drawRoundedRect(r, 4, 4);
     painter->setPen(t.chipText);
     painter->drawText(r, Qt::AlignCenter, text);
     painter->restore();
@@ -722,13 +719,13 @@ void paintBadge(QPainter* painter, const QRect& rect, const QString& text, const
     painter->save();
     painter->setRenderHint(QPainter::Antialiasing, true);
     painter->setFont(appFont(12, QFont::Medium));
-    const int w = qMin(rect.width(), painter->fontMetrics().horizontalAdvance(text) + 20);
-    const int h = 24;
+    const int w = qMin(rect.width(), painter->fontMetrics().horizontalAdvance(text) + 16);
+    const int h = 20;
     const int x = (align & Qt::AlignRight) ? rect.right() - w + 1 : rect.left();
     const QRect r(x, rect.center().y() - h / 2 + 1, w, h);
     painter->setPen(Qt::NoPen);
     painter->setBrush(bg);
-    painter->drawRoundedRect(r, 8, 8);
+    painter->drawRoundedRect(r, 4, 4);
     painter->setPen(fg);
     painter->drawText(r, Qt::AlignCenter, painter->fontMetrics().elidedText(text, Qt::ElideRight, w - 12));
     painter->restore();

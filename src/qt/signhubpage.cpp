@@ -299,11 +299,7 @@ QWidget *SignHubPage::buildHub()
     for (const Task& task : list) {
         QVBoxLayout *body = nullptr;
         QFrame *frame = card(page, &body, 10);
-        frame->setMinimumHeight(250);
-        if (task.main)
-            frame->setStyleSheet(QString("QFrame[role=\"card\"] { border-color: %1; }").arg(GUIUtil::theme().accent.name()));
-        body->addWidget(iconTile(task.icon, 44, frame));
-        body->addSpacing(4);
+        frame->setMinimumHeight(192);
         QHBoxLayout *titleRow = new QHBoxLayout();
         titleRow->setSpacing(8);
         QLabel *name = new QLabel(task.title, frame);
@@ -326,7 +322,7 @@ QWidget *SignHubPage::buildHub()
         QPushButton *go = button(task.action, task.main, frame);
         connect(go, SIGNAL(clicked()), this, task.slot);
         body->addWidget(go);
-        tasks->addWidget(frame, 1);
+        tasks->addWidget(frame, task.main ? 3 : 2);
     }
     layout->addLayout(tasks);
 
