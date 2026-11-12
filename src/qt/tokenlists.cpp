@@ -260,7 +260,7 @@ void TokenRowDelegate::paint(QPainter *painter, const QStyleOptionViewItem& opti
     if (option.state & QStyle::State_Selected) {
         painter->setPen(Qt::NoPen);
         painter->setBrush(theme.accentSoft);
-        painter->drawRoundedRect(option.rect.adjusted(0, 1, -4, -1), 8, 8);
+        painter->drawRoundedRect(option.rect.adjusted(0, 1, -4, -1), 3, 3);
     }
     const QString name = index.data(TokenListModel::NameRole).toString();
     const bool held = index.data(TokenListModel::HeldRole).toBool();

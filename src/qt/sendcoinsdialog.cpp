@@ -512,7 +512,7 @@ SendCoinsDialog::~SendCoinsDialog()
 void SendCoinsDialog::setupCoinControl(const PlatformStyle *platformStyle)
 {
     /** Update the coincontrol frame */
-    ui->frameCoinControl->setStyleSheet(QString(".QFrame { background-color: %1; border: none; border-radius: 12px; padding: 10px 8px; }").arg(GUIUtil::theme().surfaceAlt.name()));
+    ui->frameCoinControl->setStyleSheet(QString(".QFrame { background-color: %1; border: none; border-radius: 4px; padding: 10px 8px; }").arg(GUIUtil::theme().surfaceAlt.name()));
     ui->widgetCoinControl->setStyleSheet(".QWidget {background-color: transparent;}");
     /** Create the shadow effects on the frames */
 
@@ -573,7 +573,7 @@ void SendCoinsDialog::setupScrollView(const PlatformStyle *platformStyle)
 void SendCoinsDialog::setupFeeControl(const PlatformStyle *platformStyle)
 {
     /** Update the fee frame */
-    ui->frameFee->setStyleSheet(QString(".QFrame#frameFee { background-color: %1; border: none; border-radius: 12px; padding: 6px 8px; }").arg(GUIUtil::theme().surfaceAlt.name()));
+    ui->frameFee->setStyleSheet(QString(".QFrame#frameFee { background-color: %1; border: none; border-radius: 4px; padding: 6px 8px; }").arg(GUIUtil::theme().surfaceAlt.name()));
     /** Create the shadow effects on the frames */
 
     ui->labelFeeHeadline->setStyleSheet(STRING_LABEL_COLOR);

@@ -98,8 +98,9 @@ void SideNavButton::paintEvent(QPaintEvent*)
     p.setRenderHint(QPainter::Antialiasing, true);
     if (on) {
         p.setPen(Qt::NoPen);
-        p.setBrush(t.sideOnBg);
-        p.drawRoundedRect(rect(), 10, 10);
+        // flat band with a marker at the left edge
+        p.fillRect(rect(), t.sideOnBg);
+        p.fillRect(QRect(0, 0, 3, height()), t.sideBar);
     }
     QColor color = (on || hovered || hasFocus()) ? t.sideStrong : t.sideText;
     if (!isEnabled())
@@ -168,7 +169,7 @@ Sidebar::Sidebar(QWidget* parent) : QWidget(parent)
         QPainter p(&rounded);
         p.setRenderHints(QPainter::Antialiasing | QPainter::SmoothPixmapTransform, true);
         QPainterPath clip;
-        clip.addRoundedRect(QRectF(0, 0, 36, 36), 9, 9);
+        clip.addRoundedRect(QRectF(0, 0, 36, 36), 4, 4);
         p.setClipPath(clip);
         p.drawPixmap(QRectF(0, 0, 36, 36), source, QRectF(source.rect()));
         p.end();
@@ -208,9 +209,9 @@ Sidebar::Sidebar(QWidget* parent) : QWidget(parent)
     stakingCard = new QWidget();
     stakingCard->setObjectName("sideCard");
     stakingCard->setAttribute(Qt::WA_StyledBackground, true);
-    stakingCard->setStyleSheet(QString("QWidget#sideCard { background-color: %1; border-radius: 12px; }").arg(t.sideCard.name()));
+    stakingCard->setStyleSheet(QString("QWidget#sideCard { background: transparent; border-top: 1px solid %1; border-radius: 0; }").arg(t.sideCard.name()));
     QVBoxLayout* stakingLayout = new QVBoxLayout(stakingCard);
-    stakingLayout->setContentsMargins(14, 14, 14, 14);
+    stakingLayout->setContentsMargins(8, 14, 8, 6);
     stakingLayout->setSpacing(8);
     QHBoxLayout* stakingRow = new QHBoxLayout();
     stakingRow->addWidget(sideLabel(tr("Staking"), t.sideStrong, 14, QFont::Medium));

@@ -195,7 +195,7 @@ void ReceiveCoinsDialog::buildLayout()
     qrImage = new QLabel(qrCard);
     qrImage->setFixedSize(188, 188);
     qrImage->setAlignment(Qt::AlignCenter);
-    qrImage->setStyleSheet(QString("QLabel { background-color: #FFFFFF; border: 1px solid %1; border-radius: 12px; }").arg(theme.border.name()));
+    qrImage->setStyleSheet(QString("QLabel { background-color: #FFFFFF; border: 1px solid %1; border-radius: 4px; }").arg(theme.border.name()));
     qr->addWidget(qrImage, 0, Qt::AlignHCenter);
     qrPlaceholder = new QLabel(tr("Press \"Request payment\" to get an address. It is shown here with its QR code."), qrCard);
     qrPlaceholder->setProperty("role", "secondary");

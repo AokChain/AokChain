@@ -237,7 +237,7 @@ void OptionsDialog::embedAsPage()
         globe->setFixedSize(40, 40);
         globe->setAlignment(Qt::AlignCenter);
         globe->setPixmap(GUIUtil::lineIcon("globe", 22, GUIUtil::theme().accent, 1.8));
-        globe->setStyleSheet(QString("QLabel { background-color: %1; border-radius: 12px; }").arg(GUIUtil::theme().accentSoft.name()));
+        globe->setStyleSheet(QString("QLabel { background-color: %1; border-radius: 4px; }").arg(GUIUtil::theme().accentSoft.name()));
         row->addWidget(globe);
         const QString word = tr("Language");
         QLabel *label = new QLabel(word == "Language" ? QString::fromUtf8("Language / 언어") : QString("Language / %1").arg(word), languageCard);

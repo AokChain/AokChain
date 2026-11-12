@@ -143,7 +143,7 @@ void ChoiceButton::paintEvent(QPaintEvent*)
     p.setRenderHint(QPainter::Antialiasing, true);
     const bool on = isChecked();
     const QRectF r = QRectF(rect()).adjusted(0.5, 0.5, -0.5, -0.5);
-    const qreal radius = look == Box ? 12 : 9;
+    const qreal radius = 3;
     if (look == Box) {
         p.setPen(QPen(on || hovered || hasFocus() ? t.accent : t.borderStrong, 1));
         p.setBrush(on ? t.accentSoft : t.surface);

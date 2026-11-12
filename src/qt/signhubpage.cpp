@@ -98,7 +98,7 @@ QLabel *badge(const QString& text, const char *kind, QWidget *parent = nullptr)
         front = t.error;
     }
     QLabel *label = new QLabel(text, parent);
-    label->setStyleSheet(QString("QLabel { background-color: %1; color: %2; border-radius: 12px; padding: 4px 11px; font-size: 12px; font-weight: 600; }")
+    label->setStyleSheet(QString("QLabel { background-color: %1; color: %2; border-radius: 4px; padding: 4px 11px; font-size: 12px; font-weight: 600; }")
                              .arg(back.name(), front.name()));
     label->setSizePolicy(QSizePolicy::Maximum, QSizePolicy::Fixed);
     return label;
@@ -124,7 +124,7 @@ QLabel *iconTile(const QString& icon, int size, QWidget *parent = nullptr)
     label->setFixedSize(size, size);
     label->setAlignment(Qt::AlignCenter);
     label->setPixmap(GUIUtil::lineIcon(icon, size / 2, t.accent, 2.0));
-    label->setStyleSheet(QString("QLabel { background-color: %1; border-radius: 12px; }").arg(t.accentSoft.name()));
+    label->setStyleSheet(QString("QLabel { background-color: %1; border-radius: 4px; }").arg(t.accentSoft.name()));
     return label;
 }
 
@@ -685,7 +685,7 @@ void SignHubPage::showVerifyResult(bool checked, bool valid, const QString& reas
     const GUIUtil::Theme& t = GUIUtil::theme();
     const QColor back = !checked ? t.surfaceAlt : valid ? t.okSoft : t.errorSoft;
     const QColor front = !checked ? t.textSecondary : valid ? t.ok : t.error;
-    verifyBanner->setStyleSheet(QString("QWidget#verifyBanner { background-color: %1; border-radius: 12px; } QLabel { color: %2; background: transparent; }")
+    verifyBanner->setStyleSheet(QString("QWidget#verifyBanner { background-color: %1; border-radius: 4px; } QLabel { color: %2; background: transparent; }")
                                     .arg(back.name(), front.name()));
     verifyResult->setText(!checked ? tr("Not checked yet") : valid ? tr("Valid") : tr("Not valid"));
     verifyReason->setText(!checked ? tr("The result appears here.") : reason);
@@ -1238,7 +1238,7 @@ void SignHubPage::participantsChanged()
         if (kind == "bad") { back = t.errorSoft; front = t.error; }
         otherStatus[i]->setText(text);
         otherStatus[i]->setToolTip(error);
-        otherStatus[i]->setStyleSheet(QString("QLabel { background-color: %1; color: %2; border-radius: 12px; padding: 4px 11px; font-size: 12px; font-weight: 600; }").arg(back.name(), front.name()));
+        otherStatus[i]->setStyleSheet(QString("QLabel { background-color: %1; color: %2; border-radius: 4px; padding: 4px 11px; font-size: 12px; font-weight: 600; }").arg(back.name(), front.name()));
     }
     participantsTitle->setText(tr("%1 of %2 participants ready").arg(ready).arg(n));
     participantsRule->setText(tr("Name: %1 · %2").arg(createName->text().trimmed(), ruleText(m, n)));
@@ -2065,7 +2065,7 @@ void SignHubPage::fillRequestPage()
     QFrame *next = new QFrame(what);
     next->setObjectName("nextBox");
     const bool alarm = !sent && !view.spent && !view.problems.isEmpty() && known;
-    next->setStyleSheet(QString("QFrame#nextBox { background-color: %1; border-radius: 12px; }").arg((alarm ? t.errorSoft : t.accentSoft).name()));
+    next->setStyleSheet(QString("QFrame#nextBox { background-color: %1; border-radius: 4px; }").arg((alarm ? t.errorSoft : t.accentSoft).name()));
     QVBoxLayout *nextLayout = new QVBoxLayout(next);
     nextLayout->setContentsMargins(16, 12, 16, 12);
     nextLayout->setSpacing(4);

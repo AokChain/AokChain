@@ -106,16 +106,16 @@ const Theme& theme()
 {
     static const Theme light = [] {
         Theme t;
-        t.bg = QColor("#F2F6F5");
+        t.bg = QColor("#F3F3F1");
         t.surface = QColor("#FFFFFF");
-        t.surfaceAlt = QColor("#F0F5F4");
-        t.border = QColor("#DCE6E4");
-        t.borderStrong = QColor("#BFD0CD");
-        t.line = QColor("#E6EEEC");
-        t.text = QColor("#0E1F1E");
-        t.textSecondary = QColor("#506664");
-        t.label = QColor("#33504D");
-        t.textDisabled = QColor("#8FA3A0");
+        t.surfaceAlt = QColor("#F7F7F5");
+        t.border = QColor("#DCDCD8");
+        t.borderStrong = QColor("#B9B9B4");
+        t.line = QColor("#E8E8E4");
+        t.text = QColor("#171717");
+        t.textSecondary = QColor("#5F5F5B");
+        t.label = QColor("#3B3B38");
+        t.textDisabled = QColor("#9B9B96");
         t.fill = QColor("#054848");
         t.fillHover = QColor("#0A5A58");
         t.fillPressed = QColor("#033837");
@@ -123,10 +123,10 @@ const Theme& theme()
         t.accent = QColor("#066A63");
         t.accentHover = QColor("#0A5A58");
         t.accentPressed = QColor("#033837");
-        t.accentSoft = QColor("#DFF1EE");
+        t.accentSoft = QColor("#E4EEEC");
         t.onAccent = QColor("#FFFFFF");
         t.positive = QColor("#06705F");
-        t.positiveSoft = QColor("#DFF1EE");
+        t.positiveSoft = QColor("#E4EEEC");
         t.negative = QColor("#A84A0B");
         t.negativeSoft = QColor("#FBEBDD");
         t.ok = QColor("#0B7A4B");
@@ -136,13 +136,13 @@ const Theme& theme()
         t.warnBg = QColor("#FFF4DD");
         t.warnText = QColor("#7A4A00");
         t.warnBorder = QColor("#F0D58A");
-        t.chip = QColor("#E8F0EE");
-        t.chipText = QColor("#3F5957");
+        t.chip = QColor("#EBEBE7");
+        t.chipText = QColor("#4B4B47");
         t.sideBg = QColor("#054848");
         t.sideText = QColor("#C2DAD6");
         t.sideStrong = QColor("#FFFFFF");
-        t.sideOnBg = QColor("#0B6460");
-        t.sideCard = QColor("#0B5F5C");
+        t.sideOnBg = QColor("#033A3A");
+        t.sideCard = QColor("#1A5C5A");
         t.sideTrack = QColor("#0B6460");
         t.sideBar = QColor("#7EE0CF");
         t.sideOff = QColor("#2F7C77");
@@ -569,7 +569,7 @@ void paintDirectionTile(QPainter* painter, const QRect& tile, bool outgoing, boo
     painter->setRenderHint(QPainter::Antialiasing, true);
     painter->setPen(Qt::NoPen);
     painter->setBrush(outgoing ? t.negativeSoft : t.positiveSoft);
-    painter->drawRoundedRect(tile, 10, 10);
+    painter->drawRoundedRect(tile, 3, 3);
     const QPixmap icon = lineIcon(reward ? "stake" : (outgoing ? "send" : "receive"), 16, outgoing ? t.negative : t.positive, 2.4);
     painter->drawPixmap(tile.left() + (tile.width() - 16) / 2, tile.top() + (tile.height() - 16) / 2, icon);
     painter->restore();
@@ -710,7 +710,7 @@ int paintChip(QPainter* painter, int x, int centerY, const QString& text)
     const QRect r(x, centerY - 10, w, 20);
     painter->setPen(Qt::NoPen);
     painter->setBrush(t.chip);
-    painter->drawRoundedRect(r, 10, 10);
+    painter->drawRoundedRect(r, 3, 3);
     painter->setPen(t.chipText);
     painter->drawText(r, Qt::AlignCenter, text);
     painter->restore();
@@ -728,7 +728,7 @@ void paintBadge(QPainter* painter, const QRect& rect, const QString& text, const
     const QRect r(x, rect.center().y() - h / 2 + 1, w, h);
     painter->setPen(Qt::NoPen);
     painter->setBrush(bg);
-    painter->drawRoundedRect(r, 12, 12);
+    painter->drawRoundedRect(r, 3, 3);
     painter->setPen(fg);
     painter->drawText(r, Qt::AlignCenter, painter->fontMetrics().elidedText(text, Qt::ElideRight, w - 12));
     painter->restore();
@@ -754,7 +754,7 @@ QString validFieldStyle()
 QString cardFrameStyle(const QString& selector)
 {
     const Theme& t = theme();
-    return QString("%1 { background-color: %2; border: 1px solid %3; border-radius: 16px; padding: 10px 8px; }")
+    return QString("%1 { background-color: %2; border: 1px solid %3; border-radius: 4px; padding: 10px 8px; }")
         .arg(selector, t.surface.name(), t.border.name());
 }
 

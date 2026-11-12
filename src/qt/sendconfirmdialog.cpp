@@ -43,7 +43,7 @@ static QFrame *assetCard(const SendConfirmData &data, QWidget *parent)
     const GUIUtil::Theme &t = GUIUtil::theme();
     QFrame *card = new QFrame(parent);
     card->setObjectName("assetCard");
-    card->setStyleSheet(QString("QFrame#assetCard { background-color: %1; border: 2px solid %2; border-radius: 16px; }")
+    card->setStyleSheet(QString("QFrame#assetCard { background-color: %1; border: 2px solid %2; border-radius: 4px; }")
         .arg((data.token ? t.warnBg : t.surface).name(), (data.token ? t.warnBorder : t.accent).name()));
     QVBoxLayout *layout = new QVBoxLayout(card);
     layout->setContentsMargins(20, 16, 20, 16);

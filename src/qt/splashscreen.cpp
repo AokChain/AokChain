@@ -83,7 +83,7 @@ SplashScreen::SplashScreen(Qt::WindowFlags f, const NetworkStyle *networkStyle) 
         const QRectF chip(width - chipWidth - 14, 18, chipWidth, 22);
         pixPaint.setPen(Qt::NoPen);
         pixPaint.setBrush(t.warnBg);
-        pixPaint.drawRoundedRect(chip, 11, 11);
+        pixPaint.drawRoundedRect(chip, 3, 3);
         pixPaint.setPen(t.warnText);
         pixPaint.drawText(chip, Qt::AlignCenter, titleAddText);
     }

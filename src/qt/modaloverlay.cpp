@@ -27,7 +27,7 @@ userClosed(false)
 {
     ui->setupUi(this);
     // colors of the active theme (the form has fixed light colors)
-    ui->contentWidget->setStyleSheet(QString("#contentWidget { background: %1; border: 1px solid %2; border-radius: 10px; }")
+    ui->contentWidget->setStyleSheet(QString("#contentWidget { background: %1; border: 1px solid %2; border-radius: 3px; }")
         .arg(GUIUtil::theme().surface.name(), GUIUtil::theme().border.name()));
     ui->bgWidget->setStyleSheet("#bgWidget { background: rgba(10,14,18,150); }");
     ui->warningIcon->setFlat(true);
@@ -37,7 +37,7 @@ userClosed(false)
     // Block bootstrap: what it does, how far it is, and the way out. Above the buttons.
     bootstrapBox = new QWidget(ui->contentWidget);
     bootstrapBox->setObjectName("bootstrapBox");
-    bootstrapBox->setStyleSheet(QString("#bootstrapBox { background: %1; border-radius: 12px; }").arg(GUIUtil::theme().accentSoft.name()));
+    bootstrapBox->setStyleSheet(QString("#bootstrapBox { background: %1; border-radius: 4px; }").arg(GUIUtil::theme().accentSoft.name()));
     QVBoxLayout *boxLayout = new QVBoxLayout(bootstrapBox);
     boxLayout->setContentsMargins(16, 12, 16, 12);
     boxLayout->setSpacing(4);

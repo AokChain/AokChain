@@ -156,7 +156,7 @@ Intro::Intro(QWidget *parent) :
         globe->setFixedSize(36, 36);
         globe->setAlignment(Qt::AlignCenter);
         globe->setPixmap(GUIUtil::lineIcon("globe", 20, GUIUtil::theme().accent, 1.8));
-        globe->setStyleSheet(QString("QLabel { background-color: %1; border-radius: 10px; }").arg(GUIUtil::theme().accentSoft.name()));
+        globe->setStyleSheet(QString("QLabel { background-color: %1; border-radius: 3px; }").arg(GUIUtil::theme().accentSoft.name()));
         row->addWidget(globe);
         const QString word = tr("Language");
         QLabel *label = new QLabel(word == "Language" ? QString::fromUtf8("Language / 언어") : QString("Language / %1").arg(word), card);

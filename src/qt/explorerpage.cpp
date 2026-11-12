@@ -789,7 +789,7 @@ void ExplorerPage::setBadge(const QString& text, bool ok)
 {
     const GUIUtil::Theme& t = GUIUtil::theme();
     resultBadge->setText(text);
-    resultBadge->setStyleSheet(QString("QLabel { color: %1; background-color: %2; border-radius: 12px; padding: 4px 10px; }")
+    resultBadge->setStyleSheet(QString("QLabel { color: %1; background-color: %2; border-radius: 4px; padding: 4px 10px; }")
         .arg((ok ? t.ok : t.negative).name(), (ok ? t.okSoft : t.negativeSoft).name()));
     resultBadge->setVisible(!text.isEmpty());
 }
@@ -888,7 +888,7 @@ QWidget *ExplorerPage::transferRow(const UniValue& entry)
     if (mine) {
         QLabel *chip = new QLabel(tr("Mine"));
         chip->setFont(GUIUtil::appFont(11, QFont::Medium));
-        chip->setStyleSheet(QString("QLabel { color: %1; background-color: %2; border-radius: 9px; padding: 1px 7px; }")
+        chip->setStyleSheet(QString("QLabel { color: %1; background-color: %2; border-radius: 3px; padding: 1px 7px; }")
             .arg(GUIUtil::theme().chipText.name(), GUIUtil::theme().chip.name()));
         layout->addWidget(chip);
     }
