@@ -2551,15 +2551,9 @@ static bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockInd
             return state.DoS(100, error("%s: proof-of-stake hash doesn't match nBits", __func__),
                         REJECT_INVALID, "bad-cs-proofhash");
 
-        // Check offline stake script
-        if (coin.out.scriptPubKey.IsOfflineStaking()) {
-            for (unsigned int i = 1; i < block.vtx[1]->vout.size(); i++) {
-                if (block.vtx[1]->vout[i].scriptPubKey != coin.out.scriptPubKey) {
-                    return state.DoS(100, error("%s: Coinstake output %d tried to move offline staking coins to a non authorised script",
-                                 __func__, i), REJECT_INVALID, "bad-offline-stake");;
-                }
-            }
-        }
+        // Check offline stake script: every input and output, not the kernel alone
+        if (!CheckOfflineStakeScripts(*block.vtx[1], view, state))
+            return false;
     }
 
     nBlocksTotal++;

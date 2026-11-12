@@ -4,6 +4,7 @@
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 #include <pos.h>
+#include <utilmoneystr.h>
 
 #include <txdb.h>
 #include <validation.h>
@@ -233,14 +234,48 @@ bool CheckProofOfStake(CBlockIndex* pindexPrev, CValidationState& state, const C
     }
 
     // Check offline stake script
-    if (coinPrev.out.scriptPubKey.IsOfflineStaking()) {
-        for (unsigned int i = 1; i < tx.vout.size(); i++) {
-            if (tx.vout[i].scriptPubKey != coinPrev.out.scriptPubKey) {
-                return state.DoS(100, error("CheckProofOfStake(): Coinstake output %d tried to move offline staking coins to a non authorised script", i));
-            }
-        }
-    }
+    if (!CheckOfflineStakeScripts(tx, view, state))
+        return false;
 
+    return true;
+}
+
+bool CheckOfflineStakeScripts(const CTransaction& tx, const CCoinsViewCache& view, CValidationState& state)
+{
+    // the script of an offline staking input, if there is one
+    const CScript* script = nullptr;
+    std::vector<const Coin*> coins;
+    coins.reserve(tx.vin.size());
+    for (const CTxIn& txin : tx.vin) {
+        const Coin& coin = view.AccessCoin(txin.prevout);
+        if (coin.IsSpent())
+            return state.DoS(100, error("%s: input %s of the coinstake is missing or spent", __func__, txin.prevout.ToString()),
+                             REJECT_INVALID, "bad-cs-inputs-missingorspent");
+        coins.push_back(&coin);
+        if (!script && coin.out.scriptPubKey.IsOfflineStaking())
+            script = &coin.out.scriptPubKey;
+    }
+    if (!script)
+        return true;
+
+    CAmount nValueIn = 0;
+    for (size_t i = 0; i < coins.size(); i++) {
+        // (also a kernel that is no offline staking output, with offline staking coins behind it)
+        if (coins[i]->out.scriptPubKey != *script)
+            return state.DoS(100, error("%s: input %u of the coinstake mixes offline staking coins with coins of another script", __func__, (unsigned int)i),
+                             REJECT_INVALID, "bad-offline-stake");
+        nValueIn += coins[i]->out.nValue;
+    }
+    CAmount nValueOut = 0;
+    for (unsigned int i = 1; i < tx.vout.size(); i++) {
+        if (tx.vout[i].scriptPubKey != *script)
+            return state.DoS(100, error("%s: Coinstake output %d tried to move offline staking coins to a non authorised script", __func__, i),
+                             REJECT_INVALID, "bad-offline-stake");
+        nValueOut += tx.vout[i].nValue;
+    }
+    if (nValueOut < nValueIn)
+        return state.DoS(100, error("%s: the coinstake pays back less offline staking coins (%s) than it takes (%s)", __func__, FormatMoney(nValueOut), FormatMoney(nValueIn)),
+                         REJECT_INVALID, "bad-offline-stake");
     return true;
 }
 
