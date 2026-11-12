@@ -111,8 +111,8 @@ than the maximum reorganization depth (500 blocks on the main network) past H th
 restriction, because such a fork is refused by every node.
 
 The undo data of a block keeps neither the time nor the coinstake mark of a spent coin
-(an existing property: an ordinary node gives such a coin back with time 0 and reads the
-transaction from disk when it is staked again). A snapshot node cannot read a transaction
+(an existing property; since 4.0 an ordinary node reads both from the transaction when it
+gives such a coin back, see 16-stake-coin-time.md). A snapshot node cannot read a transaction
 of the past blocks, so it keeps time and mark of every coin from before the snapshot that
 it spends (block index database, key `k`) and puts them back when the block is
 disconnected.
@@ -157,8 +157,12 @@ wallets that wait are scanned, and from the next start the node advertises `NODE
 The GUI asks before it downloads ("... needs the past blocks, about 1.4 GB. Download them
 now?") when a restored wallet needs them, when keys are restored from recovery words,
 when a multisig address is added with a search for earlier transactions, or when the
-explorer is asked for a transaction that the node does not have. The state and the
-button are in Settings, Network settings.
+explorer is asked for a transaction that the node does not have. The button is in
+Settings, Network settings. While the download runs, the sync line at the bottom of the
+side bar shows it ("Downloading past blocks", megabytes) and returns to the ordinary sync
+state when it ends. Between two archives the blocks of the last one are written to the
+disk and the byte count stands still: both the side bar and the card in Settings then say
+"Storing past blocks" with the count of stored blocks.
 
 Restoring from recovery words (`importmnemonic`, the restore window) finds the funded
 addresses in the UTXO set, which a snapshot node has, but the wallet needs the
@@ -234,7 +238,7 @@ later heights were not profiled.
 
 ## 7. Measurements and checks
 
-All on 2026-11-11/12, main network, files served over the LAN by plain http.
+All on 2026-11-11/12, main network, files served over the LAN (`http://10.0.0.15:8080/`).
 
 ### The snapshot
 
@@ -264,7 +268,7 @@ The databases are packed as LevelDB left them (not compacted).
 
 ### First start from the snapshot (daemon, new data directory)
 
-| | build server | second server |
+| | this server | 10.0.0.16 |
 |---|---|---|
 | download (LAN) | 8 s | 8.5 s |
 | unpacking | 35 s | 35 s |
@@ -333,7 +337,8 @@ wallet passphrase step, the backup step, the main window.
    same difference exists today between an ordinary node that went through the
    reorganization and one that did not (it synchronized later), so this adds no new kind
    of disagreement.
-5. **Existing property, found during this work, not changed:** the undo data
+5. **Existing property, found during this work; repaired later without touching the undo
+   format, see 16-stake-coin-time.md:** the undo data
    (`TxInUndoSerializer`) stores neither `nTime` nor `fCoinStake`. After a reorganization
    the restored coins have `nTime = 0` and `fCoinStake = false` in the UTXO database of
    the nodes that reorganized. Consequences: (a) the two `tx_verify.cpp` checks above are

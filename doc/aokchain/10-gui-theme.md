@@ -38,7 +38,7 @@ When making a new page, do not write colour values or font names directly.
 An amount is drawn with **the decimal point and the digits after it at 60% of the font size of the integer part**, on the same baseline, in the fixed-width font. Only one implementation is used: `AmountLabel` (`src/qt/pagewidgets.h`) for widgets, `GUIUtil::paintAmount()`/`amountWidth()` for the delegates of lists and tables, and the amount column of `GUIUtil::MonoColumnDelegate` for ordinary tables. The balances on Overview, token amounts, recent transactions, the Transactions table, the summary and header of Send, the explorer, the request history of Receive and coin control all use it. Input fields stay at one size. So that the fractional part does not get too small, the integer part in lists is 15px and the minimum size of the fractional part is 9px.
 
 ### Weight
-Bold text was reduced. **Bold is used only for page titles and large balances (total balance, the total in the summary).** Card titles and primary buttons are SemiBold (600); body text, list titles, amounts in lists and tables, chips and badges are Medium (500) or lighter. A Medium weight was added for the fixed-width font as well.
+Only two weights are used. **Body text, lists, tables and amounts are Medium (500); titles, buttons and emphasis are SemiBold (600).** Regular (400) looked faint on screen, so every weight was raised one step. Code uses `QFont::Medium` (body) and `QFont::DemiBold` (emphasis) only, and `theme.qss` uses `font-weight: 500` and `600` only. Bold (700) is not used.
 
 ### Fixed-width font
 Amounts, addresses, transaction IDs, block hashes, block heights and dates inside tables are drawn with `monoFont()`. Overview, the transaction table, the explorer and the Send summary show thousands separators (`GUIUtil::withThousands()`, display only). Parsing of input values and the values for copy and export were not changed.
@@ -124,7 +124,7 @@ They are in `src/qt/res/fonts/`. All are under the SIL Open Font License 1.1, an
 |---|---|
 | `NotoSans-{Regular,Medium,SemiBold,Bold}.ttf` | notofonts/notofonts.github.io (hinted TTF) |
 | `NotoSansMono-{Regular,Medium,SemiBold,Bold}.ttf` | notofonts/notofonts.github.io (hinted TTF) |
-| `NotoSansKR-{Regular,Bold}.ttf` | Static fonts made from the variable font `NotoSansKR[wght].ttf` of google/fonts by fixing the weights 400 and 700 with `fonttools varLib.instancer`. Qt 5's support for variable fonts is incomplete, so static fonts were included |
+| `NotoSansKR-{Regular,Medium,SemiBold,Bold}.ttf` | Static fonts made from the variable font `NotoSansKR[wght].ttf` of google/fonts by fixing the weights 400, 500, 600 and 700 with `fonttools varLib.instancer`. Qt 5's support for variable fonts is incomplete, so static fonts were included |
 
 The 2 Korean fonts are 12 MB and the 4 fixed-width fonts 2.4 MB, so the executable grows by that much.
 
