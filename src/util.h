@@ -205,6 +205,8 @@ int RaiseFileDescriptorLimit(int nMinFD);
 void AllocateFileRange(FILE *file, unsigned int offset, unsigned int length);
 
 bool LockDirectory(const fs::path& directory, const std::string lockfile_name, bool probe_only=false);
+/** Give up a lock that LockDirectory() took. */
+void UnlockDirectory(const fs::path& directory, const std::string& lockfile_name);
 
 bool RenameOver(fs::path src, fs::path dest);
 

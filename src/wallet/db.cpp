@@ -701,7 +701,7 @@ void CDBEnv::Flush(bool fShutdown)
     }
 }
 
-bool CDB::CloseForUnload(CWalletDBWrapper& dbw)
+bool CDB::CloseForUnload(CWalletDBWrapper& dbw, const std::vector<CWalletDBWrapper*>& loaded)
 {
     if (dbw.IsDummy())
         return true;
@@ -709,14 +709,25 @@ bool CDB::CloseForUnload(CWalletDBWrapper& dbw)
     const std::string& strFile = dbw.strFile;
     LOCK(cs_db);
     std::map<std::string, int>::iterator mi = env->mapFileUseCount.find(strFile);
-    if (mi == env->mapFileUseCount.end())
-        return true; // not open
-    if (mi->second > 0)
-        return false;
-    // as the periodic flush and backupwallet do it: the other files of the environment stay open
-    env->CloseDb(strFile);
-    env->CheckpointLSN(strFile);
-    env->mapFileUseCount.erase(mi);
+    if (mi != env->mapFileUseCount.end()) {
+        if (mi->second > 0)
+            return false;
+        // as the periodic flush and backupwallet do it: the other files of the environment stay open
+        env->CloseDb(strFile);
+        env->CheckpointLSN(strFile);
+        env->mapFileUseCount.erase(mi);
+    }
+    for (const CWalletDBWrapper* other : loaded) {
+        if (other != &dbw && other->env == env)
+            return true; // a loaded wallet shares the environment
+    }
+    if (!env->mapFileUseCount.empty() || env->IsMock())
+        return true;
+    // nobody else uses this environment: close it and let go of the directory
+    const fs::path directory = env->Directory();
+    env->Close();
+    env->Reset();
+    UnlockDirectory(directory, ".walletlock");
     return true;
 }
 

@@ -41,3 +41,4 @@ feature_snapshot.py
 feature_stake_cointime.py
 wallet_unload.py
 rpc_upstream.py
+tool_wallet.py

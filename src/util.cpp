@@ -436,6 +436,23 @@ int LogPrintStr(const std::string &str)
     return ret;
 }
 
+/** The directory locks of this process, by the path of the lock file. */
+static std::map<std::string, boost::interprocess::file_lock> dir_locks;
+static std::mutex cs_dir_locks;
+
+void UnlockDirectory(const fs::path& directory, const std::string& lockfile_name)
+{
+    std::lock_guard<std::mutex> guard(cs_dir_locks);
+    auto it = dir_locks.find((directory / lockfile_name).string());
+    if (it == dir_locks.end())
+        return;
+    try {
+        it->second.unlock();
+    } catch (const boost::interprocess::interprocess_exception&) {
+    }
+    dir_locks.erase(it);
+}
+
 bool LockDirectory(const fs::path& directory, const std::string lockfile_name, bool probe_only)
 {
     fs::path pathLockFile = directory / lockfile_name;
@@ -443,8 +460,8 @@ bool LockDirectory(const fs::path& directory, const std::string lockfile_name, b
     if (file) fclose(file);
 
     try {
-        static std::map<std::string, boost::interprocess::file_lock> locks;
-        boost::interprocess::file_lock& lock = locks.emplace(pathLockFile.string(), pathLockFile.string().c_str()).first->second;
+        std::lock_guard<std::mutex> guard(cs_dir_locks);
+        boost::interprocess::file_lock& lock = dir_locks.emplace(pathLockFile.string(), pathLockFile.string().c_str()).first->second;
         if (!lock.try_lock()) {
             return false;
         }

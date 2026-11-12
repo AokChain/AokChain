@@ -3322,7 +3322,13 @@ UniValue unloadwallet(const JSONRPCRequest& request)
     // close its file, so that it can be copied, moved or loaded again
     bool closed = false;
     for (int i = 0; i < 100 && !closed; i++) {
-        closed = CDB::CloseForUnload(pwallet->GetDBHandle());
+        std::vector<CWalletDBWrapper*> loaded;
+        {
+            LOCK(cs_main);
+            for (CWallet* other : vpwallets)
+                loaded.push_back(&other->GetDBHandle());
+        }
+        closed = CDB::CloseForUnload(pwallet->GetDBHandle(), loaded);
         if (!closed)
             MilliSleep(100);
     }

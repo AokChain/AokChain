@@ -190,8 +190,10 @@ public:
        ideal to be called periodically */
     static bool PeriodicFlush(CWalletDBWrapper& dbw);
     /* Close the file of a wallet that is being unloaded and make it self contained.
-       False while the file is in use. */
-    static bool CloseForUnload(CWalletDBWrapper& dbw);
+       False while the file is in use. When none of the loaded wallets uses its database
+       environment, that is closed too and the lock on the wallet directory is given up:
+       another program may open the wallet then. */
+    static bool CloseForUnload(CWalletDBWrapper& dbw, const std::vector<CWalletDBWrapper*>& loaded);
     /* verifies the database environment */
     static bool VerifyEnvironment(const fs::path& file_path, std::string& errorStr);
     /* verifies the database file */

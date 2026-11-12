@@ -69,6 +69,12 @@ if BUILD_AOKCHAIND
   bin_PROGRAMS += aokchaind
 endif
 
+if BUILD_AOKCHAIND
+if ENABLE_WALLET
+  bin_PROGRAMS += aokchain-wallet
+endif
+endif
+
 if BUILD_AOKCHAIN_CLI
   bin_PROGRAMS += aokchain-cli
 endif
@@ -495,6 +501,14 @@ aokchain_tx_LDADD = \
 
 aokchain_tx_LDADD += $(BOOST_LIBS) $(BDB_LIBS) $(SSL_LIBS) $(CRYPTO_LIBS) $(MINIUPNPC_LIBS) $(EVENT_PTHREADS_LIBS) $(EVENT_LIBS) $(ZMQ_LIBS)
 #
+
+# aokchain-wallet binary #
+aokchain_wallet_SOURCES = aokchain-wallet.cpp
+aokchain_wallet_CPPFLAGS = $(AM_CPPFLAGS) $(AOKCHAIN_INCLUDES)
+aokchain_wallet_CXXFLAGS = $(AM_CXXFLAGS) $(PIE_FLAGS)
+aokchain_wallet_LDFLAGS = $(RELDFLAGS) $(AM_LDFLAGS) $(LIBTOOL_APP_LDFLAGS)
+# (the archives are scanned twice, see aokchain-tx below)
+aokchain_wallet_LDADD = $(aokchain_tx_LDADD)
 
 # aokchainconsensus library #
 if BUILD_AOKCHAIN_LIBS

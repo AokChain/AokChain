@@ -125,6 +125,7 @@ BASE_SCRIPTS= [
     'feature_stake_cointime.py',
     'wallet_unload.py',
     'rpc_upstream.py',
+    'tool_wallet.py',
     'rpc_mnemonic.py',
     'wallet_importmnemonic.py',
     'wallet_multisig_flow.py',
