@@ -2140,6 +2140,8 @@ UniValue scantxoutset(const JSONRPCRequest& request)
             "2. \"scanobjects\"  (array, required) What to look for. Each item is a string or {\"desc\": \"string\"}:\n"
             "      \"address\" or \"addr(address)\"   outputs that pay to the address (also to its public key, as stakes do), with or without token data\n"
             "      \"raw(hex script)\"              outputs with exactly this script\n"
+            "      \"staking(address)\"             offline staking outputs whose staking key is this address: what\n"
+            "                                       was delegated to a staker; \"staking(*)\" finds all of them\n"
             "\nResult:\n"
             "{\n"
             "  \"success\": true,\n"
@@ -2173,10 +2175,29 @@ UniValue scantxoutset(const JSONRPCRequest& request)
     std::map<CScript, std::string> exact;
     std::vector<std::pair<CScript, std::string>> prefixes;
     std::map<CKeyID, std::string> keys;
+    // offline staking outputs by their staking key; fAllStaking: every offline staking output
+    std::map<CKeyID, std::string> stakingKeys;
+    bool fAllStaking = false;
     const UniValue& objects = request.params[1].get_array();
     for (size_t n = 0; n < objects.size(); n++) {
         CScript script;
         bool fAddress = false;
+        if (objects[n].isStr() || objects[n].isObject()) {
+            const std::string object = objects[n].isObject() ? find_value(objects[n], "desc").get_str() : objects[n].get_str();
+            if (object.size() > 9 && object.compare(0, 8, "staking(") == 0 && object.back() == ')') {
+                const std::string inner = object.substr(8, object.size() - 9);
+                if (inner == "*") {
+                    fAllStaking = true;
+                    continue;
+                }
+                const CTxDestination dest = DecodeDestination(inner);
+                const CKeyID* keyid = boost::get<CKeyID>(&dest);
+                if (!keyid)
+                    throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, strprintf("Invalid scan object %u: staking(address) takes the address of a staking key, or *", (unsigned int)n));
+                stakingKeys[*keyid] = object;
+                continue;
+            }
+        }
         if (!(objects[n].isStr() || objects[n].isObject()) || !ScanObjectScript(objects[n], script, fAddress))
             throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, strprintf("Invalid scan object %u: an address, addr(address) or raw(hex script) is expected", (unsigned int)n));
         const std::string text = objects[n].isObject() ? find_value(objects[n], "desc").get_str() : objects[n].get_str();
@@ -2189,8 +2210,9 @@ UniValue scantxoutset(const JSONRPCRequest& request)
                 keys[*keyid] = text;
         }
     }
-    if (exact.empty())
+    if (exact.empty() && stakingKeys.empty() && !fAllStaking)
         throw JSONRPCError(RPC_INVALID_PARAMETER, "No scan objects");
+    static const std::string allStaking = "staking(*)";
 
     UniValue unspents(UniValue::VARR);
     CAmount total = 0;
@@ -2221,6 +2243,13 @@ UniValue scantxoutset(const JSONRPCRequest& request)
         auto it = exact.find(script);
         if (it != exact.end()) {
             match = &it->second;
+        } else if ((fAllStaking || !stakingKeys.empty()) && script.IsOfflineStaking()) {
+            // OP_OFFLINE_STAKE OP_IF OP_DUP OP_HASH160 <20 bytes: staking key> ...
+            auto found = stakingKeys.find(CKeyID(uint160(std::vector<unsigned char>(script.begin() + 5, script.begin() + 25))));
+            if (found != stakingKeys.end())
+                match = &found->second;
+            else if (fAllStaking)
+                match = &allStaking;
         } else if (!keys.empty() && ((script.size() == 35 && script[0] == 33 && script[34] == OP_CHECKSIG) || (script.size() == 67 && script[0] == 65 && script[66] == OP_CHECKSIG))) {
             // pay-to-pubkey
             const CPubKey pubkey(script.begin() + 1, script.end() - 1);
