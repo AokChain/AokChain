@@ -122,8 +122,12 @@ UniValue importprivkey(const JSONRPCRequest& request)
 
     if (fRescan && fPruneMode)
         throw JSONRPCError(RPC_WALLET_ERROR, "Rescan is disabled in pruned mode");
-    if (fRescan && PastBlocksMissing())
-        throw JSONRPCError(RPC_WALLET_ERROR, PastBlocksMessage());
+    // A node that started from a chain state snapshot cannot scan the blocks before it yet. The
+    // key is imported all the same, and the wallet is scanned from the first block when the
+    // past blocks have been downloaded.
+    const bool fWaitForPastBlocks = fRescan && PastBlocksMissing();
+    if (fWaitForPastBlocks)
+        fRescan = false;
 
     CAokChainSecret vchSecret;
     bool fGood = vchSecret.SetString(strSecret);
@@ -144,6 +148,8 @@ UniValue importprivkey(const JSONRPCRequest& request)
 
         // Don't throw error in case a key is already there
         if (pwallet->HaveKey(vchAddress)) {
+            if (fWaitForPastBlocks)
+                SetWalletRescanPending(true);
             return NullUniValue;
         }
 
@@ -161,6 +167,12 @@ UniValue importprivkey(const JSONRPCRequest& request)
         }
     }
 
+    if (fWaitForPastBlocks) {
+        SetWalletRescanPending(true);
+        return GetPastBlocksInfo().fetching
+            ? "The key is imported. Its transactions and balance appear when the download of the past blocks, which is running, has finished."
+            : "The key is imported. This node started from a chain state snapshot and does not have the past blocks yet: the transactions and the balance of the key appear after they have been downloaded (about 1.4 GB). Start the download with the RPC \"fetchblocks\" or in the wallet under Settings, Network settings.";
+    }
     return NullUniValue;
 }
 

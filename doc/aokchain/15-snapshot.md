@@ -125,7 +125,8 @@ they are there:
 
 | operation | without the past blocks |
 |---|---|
-| `rescanblockchain` from a height ≤ H, `importprivkey`/`importaddress`/`importpubkey` with rescan, `importwallet`, `importmulti` with a timestamp before the snapshot | error |
+| `rescanblockchain` from a height ≤ H, `importaddress`/`importpubkey` with rescan, `importwallet`, `importmulti` with a timestamp before the snapshot | error |
+| `importprivkey` with rescan | the key is imported and the answer says that its transactions and balance appear after the past blocks have been downloaded; the wallet is marked as waiting (`wallet_waits`) and is scanned from the first block when they are there. The GUI then asks whether to download them |
 | a wallet file from elsewhere (restore, `-rescan`) | loaded; transactions after H are found; the wallet is marked as waiting and scanned from the first block when the past blocks have arrived |
 | `getblock`, `getblockdeltas`, REST block, `gettxoutproof` for a block ≤ H | error |
 | `getrawtransaction` of a transaction in a block ≤ H | "not found", with the hint |

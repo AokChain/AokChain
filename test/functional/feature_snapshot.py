@@ -343,8 +343,16 @@ class SnapshotTest(AokChainTestFramework):
         assert_raises_rpc_error(-1, NEEDS_PAST_BLOCKS, node2.getblock, old_block)
         assert_raises_rpc_error(-5, NEEDS_PAST_BLOCKS, node2.getrawtransaction, old_tx, True)
         assert_raises_rpc_error(-1, NEEDS_PAST_BLOCKS, node2.rescanblockchain)
-        key = node0.dumpprivkey(node0.getnewaddress())
-        assert_raises_rpc_error(-4, NEEDS_PAST_BLOCKS, node2.importprivkey, key)
+        # (a key of node0 that received coins before the snapshot)
+        oldest = max(node0.listunspent(), key=lambda u: u["confirmations"])
+        assert node0.getblockcount() - oldest["confirmations"] + 1 <= HEIGHT
+        imported_address = oldest["address"]
+        key = node0.dumpprivkey(imported_address)
+        # a key is imported all the same; the wallet waits for the past blocks to look for its transactions
+        assert_equal(node2.getsnapshotinfo()["wallet_waits"], False)
+        assert "past blocks" in node2.importprivkey(key)
+        assert_equal(node2.getsnapshotinfo()["wallet_waits"], True)
+        assert_raises_rpc_error(-5, "Invalid or non-wallet transaction", node2.gettransaction, oldest["txid"])
         assert_raises_rpc_error(-4, "fetchblocks", node2.importaddress, node0.getnewaddress())
         # what the node has works
         node2.getblock(node2.getblockhash(HEIGHT + 3))
@@ -365,7 +373,10 @@ class SnapshotTest(AokChainTestFramework):
         self.start_node(2, COMMON + [source, self.params(), "-mocktime=%d" % t])
         connect_nodes(node2, 0)
         old_coin_staked = False
-        for _ in range(4):
+        # (which coin wins a slot is not fixed: go on until one from before the snapshot has)
+        for n in range(16):
+            if old_coin_staked and n >= 4:
+                break
             t += SLOT
             height = node0.getblockcount()
             node0.setmocktime(t)
@@ -417,6 +428,9 @@ class SnapshotTest(AokChainTestFramework):
         assert_equal(info["blocks_stored"], HEIGHT + 1)
         assert_equal(info["snapshot_height"], HEIGHT)
         assert_equal(node2.fetchblocks(), False)
+        # the key that was imported without the past blocks: its transactions are there now
+        wait_until(lambda: not node2.getsnapshotinfo()["wallet_waits"], timeout=60)
+        node2.gettransaction(oldest["txid"])
         for height in (0, 1, 59, 60, 141, HEIGHT, HEIGHT + 1, LAST_POW + 3):
             assert_equal(node2.getblock(node2.getblockhash(height), 0), node0.getblock(node0.getblockhash(height), 0))
         assert_equal(node2.getrawtransaction(old_tx, True)["blockhash"], old_block)

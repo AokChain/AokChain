@@ -1086,6 +1086,8 @@ void AokChainGUI::updateBootstrap()
 {
     // A wallet that started from a chain state snapshot and needs the past blocks (it was
     // restored from a file, say): ask once whether to download them.
+    if (!WalletRescanPending())
+        pastBlocksAsked = false; // a key that is imported later is asked about again
     if (!pastBlocksAsked && walletFrame && clientModel && WalletRescanPending() && PastBlocks::missing() && isVisible() && !QApplication::activeModalWidget()) {
         pastBlocksAsked = true;
         PastBlocks::offer(this, tr("Showing the earlier transactions of this wallet"));
