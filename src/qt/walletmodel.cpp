@@ -548,7 +548,7 @@ bool WalletModel::ensurePastBlocksAvailable(QString *reason) const
         const bool downloading = PastBlocks::offerForWallet(QApplication::activeWindow(), tr("Looking for the earlier transactions of these keys"));
         if (reason)
             *reason = downloading
-                ? tr("The blocks of the past are being downloaded (Settings, Network settings shows how far the download is). Open this again when the download has finished.")
+                ? tr("The blocks of the past are being downloaded (the sync line at the bottom of the side bar shows how far the download is). Open this again when the download has finished.")
                 : tr("This wallet started from a snapshot of the chain state and does not hold the blocks of the past, so it cannot look for earlier transactions yet. Download them under Settings, Network settings, then open this again.");
         return false;
     }

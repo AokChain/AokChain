@@ -138,6 +138,9 @@ private:
     bool bootstrapSamplesAreBlocks;
     bool pastBlocksAsked;
     bool pastBlocksWereFetching;
+    /** Start of the measured span of the past block download, for the time that is left */
+    qint64 pastBlocksSeenAt;
+    quint64 pastBlocksSeenBytes;
     /** "about 12 min left" for the fast sync: value now, and its end */
     QString bootstrapTimeLeft(bool blocks, double value, double end);
     QString bootstrapLastState;

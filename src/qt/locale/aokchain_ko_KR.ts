@@ -752,6 +752,30 @@
         <translation>네트워크 꺼짐 · %1</translation>
     </message>
     <message>
+        <source>Downloading past blocks</source>
+        <translation>과거 블록 받는 중</translation>
+    </message>
+    <message>
+        <source>Storing past blocks</source>
+        <translation>과거 블록 저장 중</translation>
+    </message>
+    <message>
+        <source>Finding earlier transactions</source>
+        <translation>이전 거래 찾는 중</translation>
+    </message>
+    <message>
+        <source>Downloading the blocks from before the snapshot: %1 of %2</source>
+        <translation>스냅샷 이전의 블록을 받는 중: %1 / %2</translation>
+    </message>
+    <message>
+        <source>You can keep using the wallet while this runs.</source>
+        <translation>받는 동안에도 지갑을 계속 쓸 수 있습니다.</translation>
+    </message>
+    <message>
+        <source>Stored blocks: %1</source>
+        <translation>저장한 블록: %1</translation>
+    </message>
+    <message>
         <source>Syncing headers</source>
         <translation>헤더 동기화 중</translation>
     </message>
@@ -4719,8 +4743,8 @@
         <translation>이 키들의 이전 거래 찾기</translation>
     </message>
     <message>
-        <source>The blocks of the past are being downloaded (Settings, Network settings shows how far the download is). Open this again when the download has finished.</source>
-        <translation>과거 블록을 받는 중입니다 (진행 상황은 설정의 네트워크 설정에서 볼 수 있습니다). 다 받은 뒤 이 창을 다시 열어 주세요.</translation>
+        <source>The blocks of the past are being downloaded (the sync line at the bottom of the side bar shows how far the download is). Open this again when the download has finished.</source>
+        <translation>과거 블록을 받는 중입니다 (진행 상황은 왼쪽 아래 동기화 표시에서 볼 수 있습니다). 다 받은 뒤 이 창을 다시 열어 주세요.</translation>
     </message>
     <message>
         <source>This wallet started from a snapshot of the chain state and does not hold the blocks of the past, so it cannot look for earlier transactions yet. Download them under Settings, Network settings, then open this again.</source>
@@ -8229,8 +8253,12 @@
         <translation>내려받기를 시작하지 못했습니다: %1</translation>
     </message>
     <message>
-        <source>%1 needs the past blocks. They are being downloaded: Settings, Network settings shows how far the download is. Try again when it has finished.</source>
-        <translation>%1에는 과거 블록이 필요합니다. 지금 받는 중이며 진행 상황은 설정의 네트워크 설정에서 볼 수 있습니다. 다 받은 뒤 다시 해 보세요.</translation>
+        <source>Storing the past blocks: block %1 of %2 · downloaded %3 of %4 MB</source>
+        <translation>과거 블록 저장 중: 블록 %1 / %2 · 받은 양 %3 / %4 MB</translation>
+    </message>
+    <message>
+        <source>%1 needs the past blocks. They are being downloaded: the sync line at the bottom of the side bar shows how far the download is. Try again when it has finished.</source>
+        <translation>%1에는 과거 블록이 필요합니다. 지금 받는 중이며 진행 상황은 왼쪽 아래 동기화 표시에서 볼 수 있습니다. 다 받은 뒤 다시 해 보세요.</translation>
     </message>
     <message>
         <source>%1 needs the past blocks. Download them now?</source>

@@ -28,6 +28,11 @@ public:
     /** "about 3 min left" from a number of seconds */
     static QString timeLeft(qint64 seconds);
     /**
+     * The download is between two archives: the blocks of the last one are being written to the
+     * disk, and the count of downloaded bytes stands still meanwhile.
+     */
+    static bool storing(quint64 bytesDone);
+    /**
      * Something needs the past blocks: ask whether to download them now and start the download on
      * yes. purpose names what needs them ("Showing the earlier transactions of this wallet").
      * Returns true when a download runs afterwards.

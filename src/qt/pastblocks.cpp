@@ -34,6 +34,19 @@ QString PastBlocks::sizeText()
     return QString();
 }
 
+bool PastBlocks::storing(quint64 bytesDone)
+{
+    // (asked by several views each second: the answer depends on the clock only)
+    static quint64 lastBytes = 0;
+    static qint64 lastChange = 0;
+    const qint64 now = QDateTime::currentMSecsSinceEpoch();
+    if (bytesDone != lastBytes || lastChange == 0) {
+        lastBytes = bytesDone;
+        lastChange = now;
+    }
+    return bytesDone > 0 && now - lastChange > 3000;
+}
+
 QString PastBlocks::timeLeft(qint64 seconds)
 {
     if (seconds < 60)
@@ -59,7 +72,7 @@ bool PastBlocks::offer(QWidget *parent, const QString& purpose)
         return false;
     if (GetPastBlocksInfo().fetching) {
         QMessageBox::information(parent, tr("Past blocks"),
-                                 tr("%1 needs the past blocks. They are being downloaded: Settings, Network settings shows how far the download is. Try again when it has finished.").arg(purpose));
+                                 tr("%1 needs the past blocks. They are being downloaded: the sync line at the bottom of the side bar shows how far the download is. Try again when it has finished.").arg(purpose));
         return true;
     }
     const QString size = sizeText();
@@ -132,6 +145,8 @@ QFrame *PastBlocks::settingsCard(QWidget *parent)
                 left = " · " + timeLeft(qint64(double(now - seen->at) / 1000 * (info.bytesTotal - info.bytesDone) / (info.bytesDone - seen->bytes)));
             if (info.bytesTotal > 0 && info.bytesDone >= info.bytesTotal && WalletRescanPending() && info.blocksStored > info.snapshotHeight)
                 state->setText(tr("The past blocks are stored. Looking for the earlier transactions of the wallet..."));
+            else if (storing(info.bytesDone))
+                state->setText(tr("Storing the past blocks: block %1 of %2 · downloaded %3 of %4 MB").arg(GUIUtil::withThousands(QString::number(info.blocksStored)), height).arg(info.bytesDone / 1000000).arg(info.bytesTotal / 1000000));
             else
                 state->setText(tr("Downloading the past blocks: %1 of %2 MB%3").arg(info.bytesDone / 1000000).arg(info.bytesTotal / 1000000).arg(left));
             hint->setText(tr("You can keep using the wallet. After a restart the download starts again from here when you ask for it.") + waits);

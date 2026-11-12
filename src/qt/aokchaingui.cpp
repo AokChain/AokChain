@@ -305,6 +305,8 @@ AokChainGUI::AokChainGUI(const PlatformStyle *_platformStyle, const NetworkStyle
     bootstrapSamplesAreBlocks = false;
     pastBlocksAsked = false;
     pastBlocksWereFetching = false;
+    pastBlocksSeenAt = 0;
+    pastBlocksSeenBytes = 0;
 #ifdef ENABLE_WALLET
     if(enableWallet) {
         connect(walletFrame, SIGNAL(requestedSyncWarningInfo()), this, SLOT(showModalOverlay()));
@@ -1071,7 +1073,7 @@ void AokChainGUI::updateHeadersSyncProgressLabel()
 
 void AokChainGUI::setSideSync(const QString& status, const QString& remaining, double progress, bool showProgress, const QString& toolTip)
 {
-    if (sidebar && !bootstrapActive)
+    if (sidebar && !bootstrapActive && !pastBlocksWereFetching)
         sidebar->setSyncState(status, remaining, progress, showProgress, toolTip);
 }
 
@@ -1090,14 +1092,44 @@ void AokChainGUI::updateBootstrap()
     }
     {
         const bool fetching = GetPastBlocksInfo().fetching;
-        if (pastBlocksWereFetching && !fetching) {
+        // (set before the message boxes below: this runs again while one of them is open)
+        const bool ended = pastBlocksWereFetching && !fetching;
+        pastBlocksWereFetching = fetching;
+        if (fetching && !bootstrapActive && sidebar) {
+            // the download has the sync line of the side bar while it runs
+            const PastBlocksInfo past = GetPastBlocksInfo();
+            const qint64 now = QDateTime::currentMSecsSinceEpoch();
+            if (pastBlocksSeenAt == 0 || past.bytesDone < pastBlocksSeenBytes) {
+                pastBlocksSeenAt = now;
+                pastBlocksSeenBytes = past.bytesDone;
+            }
+            const bool finding = past.bytesTotal > 0 && past.bytesDone >= past.bytesTotal && WalletRescanPending() && past.blocksStored > past.snapshotHeight;
+            const bool stored = finding || PastBlocks::storing(past.bytesDone);
+            QString left;
+            if (!stored && now - pastBlocksSeenAt > 5000 && past.bytesDone > pastBlocksSeenBytes)
+                left = PastBlocks::timeLeft(qint64(double(now - pastBlocksSeenAt) / 1000 * (past.bytesTotal - past.bytesDone) / (past.bytesDone - pastBlocksSeenBytes)));
+            const QString status = finding ? tr("Finding earlier transactions") : stored ? tr("Storing past blocks") : tr("Downloading past blocks");
+            const QString blocks = QString("%1 / %2").arg(GUIUtil::withThousands(QString::number(past.blocksStored)), GUIUtil::withThousands(QString::number(past.snapshotHeight)));
+            const QString right = stored && !finding ? tr("Block %1").arg(GUIUtil::withThousands(QString::number(past.blocksStored))) : QString("%1 / %2").arg(megabytes(past.bytesDone), megabytes(past.bytesTotal));
+            QString tip = tr("Downloading the blocks from before the snapshot: %1 of %2").arg(megabytes(past.bytesDone), megabytes(past.bytesTotal));
+            tip += "\n" + tr("Stored blocks: %1").arg(blocks);
+            if (!left.isEmpty())
+                tip += " · " + left;
+            tip += "\n" + tr("You can keep using the wallet while this runs.");
+            sidebar->setSyncState(status, right, past.bytesTotal ? double(past.bytesDone) / past.bytesTotal : 0, true, tip);
+        } else if (ended) {
+            // over: the ordinary sync line comes back
+            pastBlocksSeenAt = 0;
+            if (clientModel && !bootstrapActive)
+                setNumBlocks(clientModel->getNumBlocks(), clientModel->getLastBlockDate(), clientModel->getVerificationProgress(nullptr), false);
+        }
+        if (ended) {
             const PastBlocksInfo past = GetPastBlocksInfo();
             if (!past.missing)
                 message(tr("Past blocks"), tr("The past blocks are downloaded."), CClientUIInterface::MSG_INFORMATION | CClientUIInterface::MODAL);
             else if (!past.error.empty() && past.error != "cancelled")
                 message(tr("Past blocks"), tr("The download of the past blocks stopped: %1").arg(QString::fromStdString(past.error)), CClientUIInterface::MSG_WARNING | CClientUIInterface::MODAL);
         }
-        pastBlocksWereFetching = fetching;
     }
     const BootstrapInfo info = GetBootstrapInfo();
     if (!info.configured && bootstrapLastState.isEmpty())
