@@ -55,7 +55,7 @@ WizardHeader::WizardHeader(Step step, const QString &title, const QString &subti
     name->setStyleSheet(QString("color: %1;").arg(t.textSecondary.name()));
     words->addWidget(name);
     QLabel *titleLabel = new QLabel(title, this);
-    titleLabel->setFont(GUIUtil::appFont(20, QFont::Bold));
+    titleLabel->setFont(GUIUtil::appFont(20, QFont::Medium));
     titleLabel->setStyleSheet(QString("color: %1;").arg(t.text.name()));
     words->addWidget(titleLabel);
     brand->addLayout(words, 1);
@@ -71,12 +71,12 @@ WizardHeader::WizardHeader(Step step, const QString &title, const QString &subti
         QLabel *dot = new QLabel(done ? QString::fromUtf8("✓") : QString::number(i + 1), this);
         dot->setFixedSize(22, 22);
         dot->setAlignment(Qt::AlignCenter);
-        dot->setFont(GUIUtil::appFont(11, QFont::DemiBold));
+        dot->setFont(GUIUtil::appFont(11, QFont::Medium));
         dot->setStyleSheet(QString("background-color: %1; color: %2; border-radius: 11px;")
             .arg((current ? t.fill : done ? t.accentSoft : t.chip).name(), (current ? t.onFill : done ? t.accent : t.chipText).name()));
         steps->addWidget(dot);
         QLabel *label = new QLabel(names.at(i), this);
-        label->setFont(GUIUtil::appFont(12, current ? QFont::DemiBold : QFont::Normal));
+        label->setFont(GUIUtil::appFont(12, current ? QFont::Medium : QFont::Normal));
         label->setStyleSheet(QString("color: %1;").arg((current ? t.text : t.textSecondary).name()));
         steps->addWidget(label);
         if (i + 1 < names.size()) {

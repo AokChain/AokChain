@@ -98,7 +98,7 @@ QLabel *badge(const QString& text, const char *kind, QWidget *parent = nullptr)
         front = t.error;
     }
     QLabel *label = new QLabel(text, parent);
-    label->setStyleSheet(QString("QLabel { background-color: %1; color: %2; border-radius: 4px; padding: 4px 11px; font-size: 12px; font-weight: 600; }")
+    label->setStyleSheet(QString("QLabel { background-color: %1; color: %2; border-radius: 8px; padding: 4px 11px; font-size: 12px; font-weight: 500; }")
                              .arg(back.name(), front.name()));
     label->setSizePolicy(QSizePolicy::Maximum, QSizePolicy::Fixed);
     return label;
@@ -111,7 +111,7 @@ QLabel *avatar(const QString& text, int size, bool filled, QWidget *parent = nul
     QLabel *label = new QLabel(text, parent);
     label->setFixedSize(size, size);
     label->setAlignment(Qt::AlignCenter);
-    label->setStyleSheet(QString("QLabel { background-color: %1; color: %2; border-radius: %3px; font-size: %4px; font-weight: 600; }")
+    label->setStyleSheet(QString("QLabel { background-color: %1; color: %2; border-radius: %3px; font-size: %4px; font-weight: 500; }")
                              .arg((filled ? t.fill : t.accentSoft).name(), (filled ? t.onFill : t.accent).name())
                              .arg(size / 2).arg(size >= 36 ? 14 : 12));
     return label;
@@ -124,7 +124,7 @@ QLabel *iconTile(const QString& icon, int size, QWidget *parent = nullptr)
     label->setFixedSize(size, size);
     label->setAlignment(Qt::AlignCenter);
     label->setPixmap(GUIUtil::lineIcon(icon, size / 2, t.accent, 2.0));
-    label->setStyleSheet(QString("QLabel { background-color: %1; border-radius: 4px; }").arg(t.accentSoft.name()));
+    label->setStyleSheet(QString("QLabel { background-color: %1; border-radius: 8px; }").arg(t.accentSoft.name()));
     return label;
 }
 
@@ -248,7 +248,7 @@ QLayout *SignHubPage::subHeader(const QString& title, QLabel **titleLabel, QWidg
     header->addWidget(back);
     QLabel *label = new QLabel(title);
     label->setProperty("role", "pageTitle");
-    label->setFont(GUIUtil::appFont(24, QFont::Bold));
+    label->setFont(GUIUtil::appFont(28, QFont::Medium));
     label->setMinimumHeight(40);
     header->addWidget(label);
     if (titleLabel)
@@ -272,7 +272,7 @@ QWidget *SignHubPage::buildHub()
     header->setSpacing(14);
     QLabel *title = new QLabel(tr("Sign"), page);
     title->setProperty("role", "pageTitle");
-    title->setFont(GUIUtil::appFont(24, QFont::Bold));
+    title->setFont(GUIUtil::appFont(28, QFont::Medium));
     title->setMinimumHeight(40);
     header->addWidget(title);
     QLabel *lead = caption(tr("Choose what you want to do and the wallet guides you step by step"), page);
@@ -307,7 +307,7 @@ QWidget *SignHubPage::buildHub()
         QHBoxLayout *titleRow = new QHBoxLayout();
         titleRow->setSpacing(8);
         QLabel *name = new QLabel(task.title, frame);
-        name->setFont(GUIUtil::appFont(17, QFont::DemiBold));
+        name->setFont(GUIUtil::appFont(17, QFont::Medium));
         titleRow->addWidget(name);
         if (!task.chip.isEmpty()) {
             QLabel *chip = new QLabel(task.chip, frame);
@@ -391,7 +391,7 @@ void SignHubPage::fillHub()
         QHBoxLayout *nameRow = new QHBoxLayout();
         nameRow->setSpacing(8);
         QLabel *name = new QLabel(wallet.name.isEmpty() ? tr("(no name)") : wallet.name, row);
-        name->setFont(GUIUtil::appFont(14, QFont::DemiBold));
+        name->setFont(GUIUtil::appFont(14, QFont::Medium));
         nameRow->addWidget(name);
         QLabel *chip = new QLabel(ruleText(wallet.required, wallet.keys.size()), row);
         chip->setProperty("role", "tag");
@@ -660,7 +660,7 @@ QWidget *SignHubPage::buildVerify()
     banner->setContentsMargins(18, 14, 18, 14);
     banner->setSpacing(4);
     verifyResult = new QLabel(verifyBanner);
-    verifyResult->setFont(GUIUtil::appFont(20, QFont::Bold));
+    verifyResult->setFont(GUIUtil::appFont(20, QFont::Medium));
     verifyReason = new QLabel(verifyBanner);
     verifyReason->setWordWrap(true);
     banner->addWidget(verifyResult);
@@ -685,7 +685,7 @@ void SignHubPage::showVerifyResult(bool checked, bool valid, const QString& reas
     const GUIUtil::Theme& t = GUIUtil::theme();
     const QColor back = !checked ? t.surfaceAlt : valid ? t.okSoft : t.errorSoft;
     const QColor front = !checked ? t.textSecondary : valid ? t.ok : t.error;
-    verifyBanner->setStyleSheet(QString("QWidget#verifyBanner { background-color: %1; border-radius: 4px; } QLabel { color: %2; background: transparent; }")
+    verifyBanner->setStyleSheet(QString("QWidget#verifyBanner { background-color: %1; border-radius: 8px; } QLabel { color: %2; background: transparent; }")
                                     .arg(back.name(), front.name()));
     verifyResult->setText(!checked ? tr("Not checked yet") : valid ? tr("Valid") : tr("Not valid"));
     verifyReason->setText(!checked ? tr("The result appears here.") : reason);
@@ -743,7 +743,7 @@ void SignHubPage::showHelp()
         }
     };
     QLabel *title = new QLabel(tr("Multisig (multi-signature)"), body);
-    title->setFont(GUIUtil::appFont(22, QFont::Bold));
+    title->setFont(GUIUtil::appFont(22, QFont::Medium));
     layout->addWidget(title);
     section(tr("What it is"), {
         tr("A multisig address is an address from which coins go out only when <b>M of the N people you decided on</b> sign. Receiving works like with any address: anyone can send coins to it."),
@@ -781,7 +781,7 @@ void SignHubPage::showHelp()
         top->setSpacing(8);
         top->addWidget(avatar(QString::number(i + 1), 26, true, box));
         QLabel *name = new QLabel(stepTitles[i], box);
-        name->setFont(GUIUtil::appFont(14, QFont::DemiBold));
+        name->setFont(GUIUtil::appFont(14, QFont::Medium));
         top->addWidget(name, 1);
         boxLayout->addLayout(top);
         boxLayout->addWidget(caption(stepTexts[i], box));
@@ -1128,7 +1128,7 @@ void SignHubPage::buildParticipantRows()
     QHBoxLayout *mineTop = new QHBoxLayout();
     mineTop->setSpacing(8);
     QLabel *me = new QLabel(tr("Me (this wallet)"), mine);
-    me->setFont(GUIUtil::appFont(14, QFont::DemiBold));
+    me->setFont(GUIUtil::appFont(14, QFont::Medium));
     mineTop->addWidget(me);
     myNameEdit = new QLineEdit(mine);
     myNameEdit->setPlaceholderText(tr("My name, as the others will see it"));
@@ -1238,7 +1238,7 @@ void SignHubPage::participantsChanged()
         if (kind == "bad") { back = t.errorSoft; front = t.error; }
         otherStatus[i]->setText(text);
         otherStatus[i]->setToolTip(error);
-        otherStatus[i]->setStyleSheet(QString("QLabel { background-color: %1; color: %2; border-radius: 4px; padding: 4px 11px; font-size: 12px; font-weight: 600; }").arg(back.name(), front.name()));
+        otherStatus[i]->setStyleSheet(QString("QLabel { background-color: %1; color: %2; border-radius: 8px; padding: 4px 11px; font-size: 12px; font-weight: 500; }").arg(back.name(), front.name()));
     }
     participantsTitle->setText(tr("%1 of %2 participants ready").arg(ready).arg(n));
     participantsRule->setText(tr("Name: %1 · %2").arg(createName->text().trimmed(), ruleText(m, n)));
@@ -1278,7 +1278,7 @@ static void describeWallet(QVBoxLayout *layout, const MultisigWallet& wallet, QW
     QHBoxLayout *ruleRow = new QHBoxLayout();
     ruleRow->setSpacing(10);
     QLabel *name = new QLabel(wallet.name.isEmpty() ? SignHubPage::tr("(no name)") : wallet.name, parent);
-    name->setFont(GUIUtil::appFont(18, QFont::DemiBold));
+    name->setFont(GUIUtil::appFont(18, QFont::Medium));
     ruleRow->addWidget(name);
     QLabel *chip = new QLabel(ruleText(wallet.required, wallet.keys.size()), parent);
     chip->setProperty("role", "tag");
@@ -1556,7 +1556,7 @@ QWidget *SignHubPage::buildWallet()
     QLabel *balanceCaption = caption(tr("Multisig balance"), right);
     balanceCaption->setWordWrap(false);
     rightLayout->addWidget(balanceCaption);
-    sendBalance = new AmountLabel(15, QFont::DemiBold, right);
+    sendBalance = new AmountLabel(15, QFont::Medium, right);
     rightLayout->addWidget(sendBalance);
     QHBoxLayout *header = static_cast<QHBoxLayout*>(subHeader(QString(), &sendTitle, right));
     sendRule = new QLabel(page);
@@ -1935,7 +1935,7 @@ void SignHubPage::fillRequestPage()
     QLabel *balanceCaption = caption(tr("Multisig balance"), right);
     balanceCaption->setWordWrap(false);
     rightLayout->addWidget(balanceCaption);
-    AmountLabel *balance = new AmountLabel(15, QFont::DemiBold, right);
+    AmountLabel *balance = new AmountLabel(15, QFont::Medium, right);
     balance->setAmount(amountText(wallet.balance), "AOK");
     rightLayout->addWidget(balance);
     QHBoxLayout *header = static_cast<QHBoxLayout*>(subHeader(tr("Send from %1").arg(known ? wallet.name : request.walletName), nullptr, right));
@@ -1963,12 +1963,12 @@ void SignHubPage::fillRequestPage()
         QLabel *dot = new QLabel(stage.mark, strip);
         dot->setFixedSize(26, 26);
         dot->setAlignment(Qt::AlignCenter);
-        dot->setStyleSheet(QString("QLabel { background-color: %1; color: %2; border-radius: 13px; font-size: 12px; font-weight: 700; }")
+        dot->setStyleSheet(QString("QLabel { background-color: %1; color: %2; border-radius: 13px; font-size: 12px; font-weight: 500; }")
                                .arg((stage.state == 2 ? t.okSoft : stage.state == 1 ? t.fill : t.chip).name(),
                                     (stage.state == 2 ? t.ok : stage.state == 1 ? t.onFill : t.chipText).name()));
         progress->addWidget(dot);
         QLabel *text = new QLabel(stage.text, strip);
-        text->setFont(GUIUtil::appFont(13, stage.state == 1 ? QFont::DemiBold : QFont::Normal));
+        text->setFont(GUIUtil::appFont(13, stage.state == 1 ? QFont::Medium : QFont::Normal));
         if (stage.state == 0)
             text->setProperty("role", "secondary");
         progress->addWidget(text);
@@ -2065,12 +2065,12 @@ void SignHubPage::fillRequestPage()
     QFrame *next = new QFrame(what);
     next->setObjectName("nextBox");
     const bool alarm = !sent && !view.spent && !view.problems.isEmpty() && known;
-    next->setStyleSheet(QString("QFrame#nextBox { background-color: %1; border-radius: 4px; }").arg((alarm ? t.errorSoft : t.accentSoft).name()));
+    next->setStyleSheet(QString("QFrame#nextBox { background-color: %1; border-radius: 8px; }").arg((alarm ? t.errorSoft : t.accentSoft).name()));
     QVBoxLayout *nextLayout = new QVBoxLayout(next);
     nextLayout->setContentsMargins(16, 12, 16, 12);
     nextLayout->setSpacing(4);
     QLabel *nextHead = new QLabel(nextTitle, next);
-    nextHead->setFont(GUIUtil::appFont(14, QFont::DemiBold));
+    nextHead->setFont(GUIUtil::appFont(14, QFont::Medium));
     nextHead->setWordWrap(true);
     nextLayout->addWidget(nextHead);
     QLabel *nextBody = caption(nextText, next);

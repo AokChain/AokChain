@@ -106,16 +106,16 @@ const Theme& theme()
 {
     static const Theme light = [] {
         Theme t;
-        t.bg = QColor("#F3F3F1");
+        t.bg = QColor("#FAFAFA");
         t.surface = QColor("#FFFFFF");
-        t.surfaceAlt = QColor("#F7F7F5");
-        t.border = QColor("#DCDCD8");
-        t.borderStrong = QColor("#B9B9B4");
-        t.line = QColor("#E8E8E4");
+        t.surfaceAlt = QColor("#F4F4F5");
+        t.border = QColor("#E5E5E5");
+        t.borderStrong = QColor("#D0D0D0");
+        t.line = QColor("#EDEDED");
         t.text = QColor("#171717");
-        t.textSecondary = QColor("#5F5F5B");
-        t.label = QColor("#3B3B38");
-        t.textDisabled = QColor("#9B9B96");
+        t.textSecondary = QColor("#525252");
+        t.label = QColor("#404040");
+        t.textDisabled = QColor("#A3A3A3");
         t.fill = QColor("#054848");
         t.fillHover = QColor("#0A5A58");
         t.fillPressed = QColor("#033837");
@@ -123,10 +123,10 @@ const Theme& theme()
         t.accent = QColor("#066A63");
         t.accentHover = QColor("#0A5A58");
         t.accentPressed = QColor("#033837");
-        t.accentSoft = QColor("#E4EEEC");
+        t.accentSoft = QColor("#E6EFEE");
         t.onAccent = QColor("#FFFFFF");
         t.positive = QColor("#06705F");
-        t.positiveSoft = QColor("#E4EEEC");
+        t.positiveSoft = QColor("#E6EFEE");
         t.negative = QColor("#A84A0B");
         t.negativeSoft = QColor("#FBEBDD");
         t.ok = QColor("#0B7A4B");
@@ -136,12 +136,12 @@ const Theme& theme()
         t.warnBg = QColor("#FFF4DD");
         t.warnText = QColor("#7A4A00");
         t.warnBorder = QColor("#F0D58A");
-        t.chip = QColor("#EBEBE7");
-        t.chipText = QColor("#4B4B47");
+        t.chip = QColor("#F4F4F5");
+        t.chipText = QColor("#525252");
         t.sideBg = QColor("#054848");
         t.sideText = QColor("#C2DAD6");
         t.sideStrong = QColor("#FFFFFF");
-        t.sideOnBg = QColor("#033A3A");
+        t.sideOnBg = QColor("#0B5A57");
         t.sideCard = QColor("#1A5C5A");
         t.sideTrack = QColor("#0B6460");
         t.sideBar = QColor("#7EE0CF");
@@ -250,7 +250,7 @@ static QPixmap messageBadge(QStyle::StandardPixmap which, int size)
     p.setBrush(fill);
     p.drawEllipse(QRectF(0, 0, size, size));
     p.setPen(ink);
-    p.setFont(appFont(size * 55 / 100, QFont::Bold));
+    p.setFont(appFont(size * 55 / 100, QFont::Medium));
     p.drawText(QRectF(0, 0, size, size), Qt::AlignCenter, sign);
     return pixmap;
 }
@@ -554,7 +554,7 @@ QPixmap tokenLogo(const QString& tokenName, int size)
     } else {
         p.fillRect(QRectF(0, 0, size, size), t.accentSoft);
         p.setPen(t.accent);
-        p.setFont(appFont(qMax(10, size * 45 / 100), QFont::DemiBold));
+        p.setFont(appFont(qMax(10, size * 45 / 100), QFont::Medium));
         p.drawText(QRectF(0, 0, size, size), Qt::AlignCenter, root.left(1));
     }
     p.end();
@@ -569,7 +569,7 @@ void paintDirectionTile(QPainter* painter, const QRect& tile, bool outgoing, boo
     painter->setRenderHint(QPainter::Antialiasing, true);
     painter->setPen(Qt::NoPen);
     painter->setBrush(outgoing ? t.negativeSoft : t.positiveSoft);
-    painter->drawRoundedRect(tile, 3, 3);
+    painter->drawRoundedRect(tile, 8, 8);
     const QPixmap icon = lineIcon(reward ? "stake" : (outgoing ? "send" : "receive"), 16, outgoing ? t.negative : t.positive, 2.4);
     painter->drawPixmap(tile.left() + (tile.width() - 16) / 2, tile.top() + (tile.height() - 16) / 2, icon);
     painter->restore();
@@ -710,7 +710,7 @@ int paintChip(QPainter* painter, int x, int centerY, const QString& text)
     const QRect r(x, centerY - 10, w, 20);
     painter->setPen(Qt::NoPen);
     painter->setBrush(t.chip);
-    painter->drawRoundedRect(r, 3, 3);
+    painter->drawRoundedRect(r, 8, 8);
     painter->setPen(t.chipText);
     painter->drawText(r, Qt::AlignCenter, text);
     painter->restore();
@@ -728,7 +728,7 @@ void paintBadge(QPainter* painter, const QRect& rect, const QString& text, const
     const QRect r(x, rect.center().y() - h / 2 + 1, w, h);
     painter->setPen(Qt::NoPen);
     painter->setBrush(bg);
-    painter->drawRoundedRect(r, 3, 3);
+    painter->drawRoundedRect(r, 8, 8);
     painter->setPen(fg);
     painter->drawText(r, Qt::AlignCenter, painter->fontMetrics().elidedText(text, Qt::ElideRight, w - 12));
     painter->restore();
@@ -754,7 +754,7 @@ QString validFieldStyle()
 QString cardFrameStyle(const QString& selector)
 {
     const Theme& t = theme();
-    return QString("%1 { background-color: %2; border: 1px solid %3; border-radius: 4px; padding: 10px 8px; }")
+    return QString("%1 { background-color: %2; border: 1px solid %3; border-radius: 12px; padding: 10px 8px; }")
         .arg(selector, t.surface.name(), t.border.name());
 }
 
@@ -765,12 +765,12 @@ QFont getSubLabelFont()
 
 QFont getSubLabelFontBolded()
 {
-    return appFont(13, QFont::DemiBold);
+    return appFont(13, QFont::Medium);
 }
 
 QFont getTopLabelFontBolded()
 {
-    return appFont(16, QFont::DemiBold);
+    return appFont(15, QFont::Medium);
 }
 
 QFont getTopLabelFont(int weight, int pxsize)
@@ -780,7 +780,7 @@ QFont getTopLabelFont(int weight, int pxsize)
 
 QFont getTopLabelFont()
 {
-    return appFont(16, QFont::DemiBold);
+    return appFont(15, QFont::Medium);
 }
 
 QString dateTimeStr(const QDateTime &date)

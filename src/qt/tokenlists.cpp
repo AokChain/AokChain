@@ -260,7 +260,7 @@ void TokenRowDelegate::paint(QPainter *painter, const QStyleOptionViewItem& opti
     if (option.state & QStyle::State_Selected) {
         painter->setPen(Qt::NoPen);
         painter->setBrush(theme.accentSoft);
-        painter->drawRoundedRect(option.rect.adjusted(0, 1, -4, -1), 3, 3);
+        painter->drawRoundedRect(option.rect.adjusted(0, 1, -4, -1), 8, 8);
     }
     const QString name = index.data(TokenListModel::NameRole).toString();
     const bool held = index.data(TokenListModel::HeldRole).toBool();
@@ -326,7 +326,7 @@ TokenListDialog::TokenListDialog(HeldTokenIndex *_index, const QString& _root, P
         logo->setPixmap(GUIUtil::tokenLogo(root, 32));
         logo->setFixedSize(32, 32);
         QLabel *title = new QLabel(root, this);
-        title->setFont(GUIUtil::appFont(16, QFont::DemiBold));
+        title->setFont(GUIUtil::appFont(15, QFont::Medium));
         const RootToken *info = index->findRoot(root);
         QLabel *count = new QLabel(tr("%1 sub and unique tokens held").arg(info ? info->children : 0), this);
         count->setProperty("role", "secondary");

@@ -49,7 +49,7 @@ SideNavButton::SideNavButton(QAction* _action, const QString& _iconName, QWidget
 {
     setCheckable(true);
     setCursor(Qt::PointingHandCursor);
-    setFixedHeight(44);
+    setFixedHeight(36);
     setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
     setFocusPolicy(Qt::TabFocus);
     connect(this, SIGNAL(clicked()), action, SLOT(trigger()));
@@ -98,16 +98,15 @@ void SideNavButton::paintEvent(QPaintEvent*)
     p.setRenderHint(QPainter::Antialiasing, true);
     if (on) {
         p.setPen(Qt::NoPen);
-        // flat band with a marker at the left edge
-        p.fillRect(rect(), t.sideOnBg);
-        p.fillRect(QRect(0, 0, 3, height()), t.sideBar);
+        p.setBrush(t.sideOnBg);
+        p.drawRoundedRect(rect(), 8, 8);
     }
     QColor color = (on || hovered || hasFocus()) ? t.sideStrong : t.sideText;
     if (!isEnabled())
         color = t.sideOff;
     p.drawPixmap(12, (height() - 18) / 2, GUIUtil::lineIcon(iconName, 18, color));
     p.setPen(color);
-    p.setFont(GUIUtil::appFont(14, on ? QFont::DemiBold : QFont::Normal));
+    p.setFont(GUIUtil::appFont(14, on ? QFont::Medium : QFont::Normal));
     p.drawText(QRect(42, 0, width() - 50, height()), Qt::AlignLeft | Qt::AlignVCenter, plainActionText(action));
 }
 
@@ -148,7 +147,7 @@ Sidebar::Sidebar(QWidget* parent) : QWidget(parent)
 {
     const GUIUtil::Theme& t = GUIUtil::theme();
     setObjectName("sidebar");
-    setFixedWidth(232);
+    setFixedWidth(240);
 
     QVBoxLayout* layout = new QVBoxLayout(this);
     layout->setContentsMargins(16, 24, 16, 20);
@@ -169,14 +168,14 @@ Sidebar::Sidebar(QWidget* parent) : QWidget(parent)
         QPainter p(&rounded);
         p.setRenderHints(QPainter::Antialiasing | QPainter::SmoothPixmapTransform, true);
         QPainterPath clip;
-        clip.addRoundedRect(QRectF(0, 0, 36, 36), 4, 4);
+        clip.addRoundedRect(QRectF(0, 0, 36, 36), 8, 8);
         p.setClipPath(clip);
         p.drawPixmap(QRectF(0, 0, 36, 36), source, QRectF(source.rect()));
         p.end();
         logo->setPixmap(rounded);
     }
     brand->addWidget(logo);
-    brand->addWidget(sideLabel("AokChain", t.sideStrong, 18, QFont::DemiBold));
+    brand->addWidget(sideLabel("AokChain", t.sideStrong, 17, QFont::Medium));
     brand->addStretch();
     layout->addLayout(brand);
     layout->addSpacing(28);
@@ -190,7 +189,7 @@ Sidebar::Sidebar(QWidget* parent) : QWidget(parent)
     navOuter->setSpacing(0);
     navLayout = new QVBoxLayout();
     navLayout->setContentsMargins(0, 0, 0, 0);
-    navLayout->setSpacing(4);
+    navLayout->setSpacing(2);
     navOuter->addLayout(navLayout);
     navOuter->addStretch(1);
     QScrollArea* navScroll = new QScrollArea();

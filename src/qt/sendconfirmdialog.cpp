@@ -43,7 +43,7 @@ static QFrame *assetCard(const SendConfirmData &data, QWidget *parent)
     const GUIUtil::Theme &t = GUIUtil::theme();
     QFrame *card = new QFrame(parent);
     card->setObjectName("assetCard");
-    card->setStyleSheet(QString("QFrame#assetCard { background-color: %1; border: 2px solid %2; border-radius: 4px; }")
+    card->setStyleSheet(QString("QFrame#assetCard { background-color: %1; border: 1px solid %2; border-radius: 12px; }")
         .arg((data.token ? t.warnBg : t.surface).name(), (data.token ? t.warnBorder : t.accent).name()));
     QVBoxLayout *layout = new QVBoxLayout(card);
     layout->setContentsMargins(20, 16, 20, 16);
@@ -65,11 +65,11 @@ static QFrame *assetCard(const SendConfirmData &data, QWidget *parent)
     QHBoxLayout *nameRow = new QHBoxLayout();
     nameRow->setSpacing(10);
     QLabel *name = new QLabel(data.asset, card);
-    name->setFont(GUIUtil::appFont(28, QFont::Bold));
+    name->setFont(GUIUtil::appFont(28, QFont::Medium));
     name->setStyleSheet(QString("color: %1;").arg(t.text.name()));
     nameRow->addWidget(name);
     QLabel *chip = new QLabel(data.token ? SendConfirmDialog::tr("Token") : SendConfirmDialog::tr("Coin"), card);
-    chip->setFont(GUIUtil::appFont(12, QFont::DemiBold));
+    chip->setFont(GUIUtil::appFont(12, QFont::Medium));
     chip->setStyleSheet(QString("background-color: %1; color: %2; border-radius: 11px; padding: 3px 12px;")
         .arg((data.token ? t.warnText : t.accentSoft).name(), (data.token ? t.surface : t.accent).name()));
     nameRow->addWidget(chip, 0, Qt::AlignVCenter);
@@ -78,7 +78,7 @@ static QFrame *assetCard(const SendConfirmData &data, QWidget *parent)
     head->addLayout(names, 1);
     layout->addLayout(head);
 
-    AmountLabel *amount = new AmountLabel(30, QFont::Bold, card);
+    AmountLabel *amount = new AmountLabel(30, QFont::Medium, card);
     amount->setAmount(GUIUtil::withThousands(data.total), data.asset);
     amount->setAlignment(Qt::AlignLeft | Qt::AlignVCenter);
     layout->addWidget(amount);
@@ -101,7 +101,7 @@ static QWidget *recipientRow(const SendConfirmData &data, const SendConfirmData:
     if (data.recipients.size() > 1)
         who = QString("%1. %2").arg(number).arg(who);
     QLabel *label = new QLabel(who, row);
-    label->setFont(GUIUtil::appFont(13, QFont::DemiBold));
+    label->setFont(GUIUtil::appFont(13, QFont::Medium));
     label->setStyleSheet(QString("color: %1;").arg((recipient.label.isEmpty() ? t.textSecondary : t.text).name()));
     head->addWidget(label);
     if (!recipient.known) {
@@ -135,7 +135,7 @@ static void summaryLine(QGridLayout *grid, const QString &name, const QString &a
     grid->addWidget(label, row, 0);
     if (!note.isEmpty())
         grid->addWidget(plain(note, "caption", parent), row, 1);
-    AmountLabel *value = new AmountLabel(strong ? 15 : 14, strong ? QFont::DemiBold : QFont::Medium, parent);
+    AmountLabel *value = new AmountLabel(strong ? 15 : 14, strong ? QFont::Medium : QFont::Medium, parent);
     value->setAmount(GUIUtil::withThousands(amount), unit);
     value->setAlignment(Qt::AlignRight | Qt::AlignVCenter);
     grid->addWidget(value, row, 2);

@@ -536,7 +536,7 @@ ExplorerPage::ExplorerPage(const PlatformStyle *platformStyle, QWidget *parent) 
     searchButton = new QPushButton(tr("Look up"));
     searchButton->setProperty("primary", true);
     searchButton->setProperty("look", "large");
-    searchButton->setFont(GUIUtil::appFont(15, QFont::DemiBold));
+    searchButton->setFont(GUIUtil::appFont(15, QFont::Medium));
     searchButton->setFixedHeight(48);
     searchButton->setCursor(Qt::PointingHandCursor);
     searchRow->addWidget(searchEdit, 1);
@@ -565,7 +565,7 @@ ExplorerPage::ExplorerPage(const PlatformStyle *platformStyle, QWidget *parent) 
     QHBoxLayout *resultHeader = new QHBoxLayout();
     resultTitle = new QLabel(tr("Result"));
     resultTitle->setProperty("role", "title");
-    resultTitle->setFont(GUIUtil::appFont(16, QFont::DemiBold));
+    resultTitle->setFont(GUIUtil::appFont(15, QFont::Medium));
     resultBadge = new QLabel();
     resultBadge->setFont(GUIUtil::appFont(12, QFont::Medium));
     resultBadge->hide();
@@ -615,7 +615,7 @@ ExplorerPage::ExplorerPage(const PlatformStyle *platformStyle, QWidget *parent) 
     QHBoxLayout *poolHeader = new QHBoxLayout();
     QLabel *poolTitle = new QLabel(tr("Memory pool"));
     poolTitle->setProperty("role", "title");
-    poolTitle->setFont(GUIUtil::appFont(16, QFont::DemiBold));
+    poolTitle->setFont(GUIUtil::appFont(15, QFont::Medium));
     poolHeader->addWidget(poolTitle);
     poolHeader->addStretch();
     poolHeader->addWidget(caption(tr("Transactions waiting to be confirmed")));
@@ -629,7 +629,7 @@ ExplorerPage::ExplorerPage(const PlatformStyle *platformStyle, QWidget *parent) 
         layout->setContentsMargins(12, 12, 12, 12);
         layout->setSpacing(2);
         layout->addWidget(caption(name));
-        value = new AmountLabel(18, QFont::DemiBold);
+        value = new AmountLabel(18, QFont::Medium);
         value->setAmount(QString::fromUtf8("–"));
         layout->addWidget(value);
         tiles->addWidget(tile, 1);
@@ -789,7 +789,7 @@ void ExplorerPage::setBadge(const QString& text, bool ok)
 {
     const GUIUtil::Theme& t = GUIUtil::theme();
     resultBadge->setText(text);
-    resultBadge->setStyleSheet(QString("QLabel { color: %1; background-color: %2; border-radius: 4px; padding: 4px 10px; }")
+    resultBadge->setStyleSheet(QString("QLabel { color: %1; background-color: %2; border-radius: 8px; padding: 4px 10px; }")
         .arg((ok ? t.ok : t.negative).name(), (ok ? t.okSoft : t.negativeSoft).name()));
     resultBadge->setVisible(!text.isEmpty());
 }
@@ -888,7 +888,7 @@ QWidget *ExplorerPage::transferRow(const UniValue& entry)
     if (mine) {
         QLabel *chip = new QLabel(tr("Mine"));
         chip->setFont(GUIUtil::appFont(11, QFont::Medium));
-        chip->setStyleSheet(QString("QLabel { color: %1; background-color: %2; border-radius: 3px; padding: 1px 7px; }")
+        chip->setStyleSheet(QString("QLabel { color: %1; background-color: %2; border-radius: 6px; padding: 1px 7px; }")
             .arg(GUIUtil::theme().chipText.name(), GUIUtil::theme().chip.name()));
         layout->addWidget(chip);
     }
@@ -1196,7 +1196,7 @@ void ExplorerPage::refreshDone(const QString& json)
         layout->setSpacing(12);
         QLabel *dot = new QLabel();
         dot->setFixedSize(8, 8);
-        dot->setStyleSheet(QString("QLabel { background-color: %1; border-radius: 4px; }").arg(t.negative.name()));
+        dot->setStyleSheet(QString("QLabel { background-color: %1; border-radius: 8px; }").arg(t.negative.name()));
         layout->addWidget(dot);
         QVBoxLayout *left = new QVBoxLayout();
         left->setSpacing(1);

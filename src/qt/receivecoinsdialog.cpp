@@ -109,7 +109,7 @@ void ReceiveCoinsDialog::buildLayout()
     formHeader->setSpacing(8);
     QLabel *formTitle = new QLabel(tr("New payment request"), ui->frame2);
     formTitle->setProperty("role", "title");
-    formTitle->setFont(GUIUtil::appFont(16, QFont::DemiBold));
+    formTitle->setFont(GUIUtil::appFont(15, QFont::Medium));
     QLabel *optional = new QLabel(tr("optional"), ui->frame2);
     optional->setProperty("role", "tag");
     optional->setToolTip(tr("All fields are optional. Without them you get a plain receiving address."));
@@ -189,13 +189,13 @@ void ReceiveCoinsDialog::buildLayout()
     qr->setSpacing(10);
     QLabel *qrTitle = new QLabel(tr("Receiving address"), qrCard);
     qrTitle->setProperty("role", "title");
-    qrTitle->setFont(GUIUtil::appFont(16, QFont::DemiBold));
+    qrTitle->setFont(GUIUtil::appFont(15, QFont::Medium));
     qr->addWidget(qrTitle);
     qr->addStretch(1);
     qrImage = new QLabel(qrCard);
     qrImage->setFixedSize(188, 188);
     qrImage->setAlignment(Qt::AlignCenter);
-    qrImage->setStyleSheet(QString("QLabel { background-color: #FFFFFF; border: 1px solid %1; border-radius: 4px; }").arg(theme.border.name()));
+    qrImage->setStyleSheet(QString("QLabel { background-color: #FFFFFF; border: 1px solid %1; border-radius: 8px; }").arg(theme.border.name()));
     qr->addWidget(qrImage, 0, Qt::AlignHCenter);
     qrPlaceholder = new QLabel(tr("Press \"Request payment\" to get an address. It is shown here with its QR code."), qrCard);
     qrPlaceholder->setProperty("role", "secondary");
@@ -242,7 +242,7 @@ void ReceiveCoinsDialog::buildLayout()
     ui->label_6->setText(tr("Request history"));
     ui->label_6->setProperty("role", "title");
     ui->label_6->setStyleSheet(QString());
-    ui->label_6->setFont(GUIUtil::appFont(16, QFont::DemiBold));
+    ui->label_6->setFont(GUIUtil::appFont(15, QFont::Medium));
     if (ui->frame->layout())
         ui->frame->layout()->setContentsMargins(24, 18, 24, 16);
     ui->recentRequestsView->setFrameShape(QFrame::NoFrame);

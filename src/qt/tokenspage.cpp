@@ -71,7 +71,7 @@ TokensPage::TokensPage(const PlatformStyle *platformStyle, QWidget *parent) :
     heldHeader->setSpacing(8);
     QLabel *heldTitle = new QLabel(tr("Tokens of this wallet"), body);
     heldTitle->setProperty("role", "title");
-    heldTitle->setFont(GUIUtil::appFont(16, QFont::DemiBold));
+    heldTitle->setFont(GUIUtil::appFont(15, QFont::Medium));
     heldCount = new QLabel(body);
     heldCount->setProperty("role", "secondary");
     heldHeader->addWidget(heldTitle);

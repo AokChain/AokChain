@@ -65,7 +65,7 @@ SplashScreen::SplashScreen(Qt::WindowFlags f, const NetworkStyle *networkStyle) 
     pixPaint.drawPixmap(QPointF((width - logoSize) / 2.0, 56), WizardHeader::logo(logoSize, devicePixelRatio));
 
     pixPaint.setPen(t.text);
-    pixPaint.setFont(GUIUtil::appFont(24, QFont::Bold));
+    pixPaint.setFont(GUIUtil::appFont(24, QFont::Medium));
     pixPaint.drawText(QRect(0, 146, width, 36), Qt::AlignHCenter | Qt::AlignVCenter, titleText);
 
     pixPaint.setPen(t.textSecondary);
@@ -78,12 +78,12 @@ SplashScreen::SplashScreen(Qt::WindowFlags f, const NetworkStyle *networkStyle) 
 
     // a chip for a network other than the main one
     if(!titleAddText.isEmpty()) {
-        pixPaint.setFont(GUIUtil::appFont(11, QFont::DemiBold));
+        pixPaint.setFont(GUIUtil::appFont(11, QFont::Medium));
         const int chipWidth = pixPaint.fontMetrics().boundingRect(titleAddText).width() + 20;
         const QRectF chip(width - chipWidth - 14, 18, chipWidth, 22);
         pixPaint.setPen(Qt::NoPen);
         pixPaint.setBrush(t.warnBg);
-        pixPaint.drawRoundedRect(chip, 3, 3);
+        pixPaint.drawRoundedRect(chip, 6, 6);
         pixPaint.setPen(t.warnText);
         pixPaint.drawText(chip, Qt::AlignCenter, titleAddText);
     }

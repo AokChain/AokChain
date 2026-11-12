@@ -243,7 +243,7 @@ QWidget *WalletView::addPage(QWidget *page, const QString &title, QWidget *conte
     header->setSpacing(12);
     QLabel *titleLabel = new QLabel(title, shell);
     titleLabel->setProperty("role", "pageTitle");
-    titleLabel->setFont(GUIUtil::appFont(24, QFont::Bold));
+    titleLabel->setFont(GUIUtil::appFont(28, QFont::Medium));
     titleLabel->setMinimumHeight(40);
     header->addWidget(titleLabel);
     header->addStretch();

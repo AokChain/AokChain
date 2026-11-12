@@ -408,13 +408,13 @@ OverviewPage::OverviewPage(const PlatformStyle *platformStyle, QWidget *parent) 
     searchEdit->setProperty("look", "search");
     searchEdit->setFont(GUIUtil::monoFont(13));
     searchEdit->setPlaceholderText(tr("Search a transaction ID, an address or a block height"));
-    searchEdit->setFixedHeight(44);
+    searchEdit->setFixedHeight(40);
     searchEdit->addAction(QIcon(GUIUtil::lineIcon("search", 16, theme.textSecondary, 2.2)), QLineEdit::LeadingPosition);
     searchEdit->setClearButtonEnabled(true);
     QPushButton *searchButton = new QPushButton(tr("Look up"));
     searchButton->setProperty("primary", true);
     searchButton->setProperty("look", "large");
-    searchButton->setFixedHeight(44);
+    searchButton->setFixedHeight(40);
     searchButton->setCursor(Qt::PointingHandCursor);
     searchRow->addWidget(searchEdit, 1);
     searchRow->addWidget(searchButton);
@@ -457,7 +457,7 @@ OverviewPage::OverviewPage(const PlatformStyle *platformStyle, QWidget *parent) 
     totalCaption->setFont(GUIUtil::appFont(13, QFont::Medium));
     totalCaption->setProperty("role", "secondary");
     balanceLeft->addWidget(totalCaption);
-    labelTotal = new AmountLabel(40, QFont::Bold);
+    labelTotal = new AmountLabel(32, QFont::Medium);
     labelTotal->setUnitColor(theme.accent);
     balanceLeft->addWidget(labelTotal);
     balanceLeft->addSpacing(2);
@@ -510,9 +510,9 @@ OverviewPage::OverviewPage(const PlatformStyle *platformStyle, QWidget *parent) 
     receiveButton->setIcon(QIcon(GUIUtil::lineIcon("receive", 16, theme.text, 2.4)));
     receiveButton->setCursor(Qt::PointingHandCursor);
     for (QPushButton *button : {sendButton, receiveButton}) {
-        button->setFont(GUIUtil::appFont(15, QFont::DemiBold));
+        button->setFont(GUIUtil::appFont(14, QFont::Medium));
         button->setIconSize(QSize(16, 16));
-        button->setFixedHeight(46);
+        button->setFixedHeight(40);
         button->setMinimumWidth(116);
     }
     QHBoxLayout *buttons = new QHBoxLayout();
@@ -540,7 +540,7 @@ OverviewPage::OverviewPage(const PlatformStyle *platformStyle, QWidget *parent) 
     tokenHeader->setSpacing(8);
     QLabel *tokenTitle = new QLabel(tr("Tokens"));
     tokenTitle->setProperty("role", "title");
-    tokenTitle->setFont(GUIUtil::appFont(16, QFont::DemiBold));
+    tokenTitle->setFont(GUIUtil::appFont(15, QFont::Medium));
     tokenCount = new QLabel();
     tokenCount->setProperty("role", "secondary");
     tokenCount->setFont(GUIUtil::appFont(13, QFont::Medium));
@@ -579,7 +579,7 @@ OverviewPage::OverviewPage(const PlatformStyle *platformStyle, QWidget *parent) 
     QHBoxLayout *txHeader = new QHBoxLayout();
     QLabel *txTitle = new QLabel(tr("Recent transactions"));
     txTitle->setProperty("role", "title");
-    txTitle->setFont(GUIUtil::appFont(16, QFont::DemiBold));
+    txTitle->setFont(GUIUtil::appFont(15, QFont::Medium));
     QPushButton *allTransactions = new QPushButton(tr("Show all"));
     allTransactions->setProperty("look", "link");
     allTransactions->setCursor(Qt::PointingHandCursor);
