@@ -16,6 +16,8 @@ staked again.
  - a node that lost the times (-restorecointime=0, the old behaviour) still
    stakes such a coin: the staking code reads the time from the transaction
  - repaircoins finds the damaged coins and repairs them
+ - a node without the transaction index (node0) reads the time from the block
+   of the coin
 """
 
 import os
@@ -34,13 +36,14 @@ SLOT = 16
 BASE = ["-lastpowblock=%d" % LAST_POW]
 STAKING = ["-staking=1", "-emergencystaking=1"]
 OLD = ["-restorecointime=0"]
+NOINDEX = ["-txindex=0"]
 
 
 class StakeCoinTimeTest(AokChainTestFramework):
     def set_test_params(self):
         self.num_nodes = 3
         self.setup_clean_chain = True
-        self.extra_args = [BASE + STAKING, BASE + STAKING, BASE + STAKING + OLD]
+        self.extra_args = [BASE + STAKING + NOINDEX, BASE + STAKING, BASE + STAKING + OLD]
 
     def connect_all(self):
         for a, b in ((0, 1), (0, 2), (1, 2)):
@@ -74,7 +77,7 @@ class StakeCoinTimeTest(AokChainTestFramework):
 
     def restart(self, i, args, t):
         self.stop_node(i)
-        self.start_node(i, BASE + args + ["-mocktime=%d" % t])
+        self.start_node(i, BASE + args + (NOINDEX if i == 0 else []) + ["-mocktime=%d" % t])
 
     def run_test(self):
         n0, n1, n2 = self.nodes

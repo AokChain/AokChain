@@ -46,8 +46,9 @@ Nothing here changes which blocks are valid.
    (`ReadCoinTxInfo()`), as `ConnectBlock()` does. A damaged coin stakes valid blocks again.
    If the transaction cannot be read the coin is not staked; no block is built with time 0.
 2. **Disconnecting a block** (`ApplyTxInUndo()`): a restored coin gets time and coinstake
-   mark back from its transaction (transaction index; on a snapshot node from the record
-   kept for coins from before the snapshot, see 15-snapshot.md). A node that reorganized
+   mark back from its transaction (transaction index, or without it the block at the
+   height of the coin; on a snapshot node from the record kept for coins from before the
+   snapshot, see 15-snapshot.md). A node that reorganized
    now has the same chain state, field by field, as one that did not. The two
    `tx_verify.cpp` checks that use these fields (coinstake maturity, input time not after
    the spending transaction) were weaker on a damaged node; they are now as strict as on
@@ -62,13 +63,29 @@ Test: `feature_stake_cointime.py`.
 ## For nodes that still run 3.0.x
 
 `-reindex-chainstate` rebuilds the chain state with all times and repairs the coins until
-the next orphaned stake. Upgrading to 4.0 and running `repaircoins` once is the lasting fix.
+the next orphaned stake. A damaged coin is also replaced by a sound one when it is spent:
+sending the staking balance to an address of the same wallet makes new coins that stake
+normally (after the usual maturity), again until the next orphaned stake. Upgrading to
+4.0 is the lasting fix; `repaircoins` then cleans the chain state but is not required,
+because 4.0 stakes a coin without a time correctly.
 
 ## Limits
 
-- Needs the transaction index (on by default). Without it, or on a snapshot node for a
-  coin from before the snapshot that has no kept record, the coin stays without a time and
-  is not staked; `repaircoins` reports it as `unreadable`.
+- The time is read through the transaction index (on by default) or, without it, from the
+  block at the height of the coin. On a snapshot node, a coin from before the snapshot that
+  has no kept record and whose block is not on disk stays without a time and is not staked;
+  `repaircoins` reports it as `unreadable`. Before the block fallback (builds up to
+  5d97341) a node with `-txindex=0` could not read the time at all, and the check of the
+  last blocks at the next start then failed with "ConnectBlock: read txPrev failed".
+
+## Checked on the main network (2026-11-12)
+
+- Verification node, upgraded from a 4.0 build without the disconnect fix: `repaircoins
+  true` read 7,279,262 unspent outputs in 4 seconds and found 45 without a time, all
+  repairable; `repaircoins` repaired them and a second check found none. The count is that
+  of one node: each node damages the coins of the blocks that it disconnected itself.
+- A new node started from the published snapshot (height 3,031,432): 7,274,962 unspent
+  outputs, none without a time. The snapshot does not pass damaged coins on.
 - On regtest every kernel meets the target, so the functional test shows that the
   transaction time is used and that the block is accepted, not that a main network kernel
   is found. The kernel computation is the one `ConnectBlock()` uses.

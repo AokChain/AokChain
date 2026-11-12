@@ -1734,7 +1734,22 @@ bool ReadCoinTxInfo(const COutPoint& out, int nCoinHeight, unsigned int& nTime, 
     // The transaction id covers the time and the form of the transaction, so any copy will do.
     CTransactionRef tx;
     uint256 hashBlock;
-    if (!GetTransaction(out.hash, tx, Params().GetConsensus(), hashBlock, false) || !tx || tx->nTime == 0)
+    if (!GetTransaction(out.hash, tx, Params().GetConsensus(), hashBlock, false) || !tx) {
+        // Without the transaction index: the coin knows the height of its block, and that block
+        // is in the active chain (a coin is given back by a block above it).
+        tx = nullptr;
+        const CBlockIndex* pindex = nCoinHeight >= 0 ? chainActive[nCoinHeight] : nullptr;
+        CBlock block;
+        if (pindex && (pindex->nStatus & BLOCK_HAVE_DATA) && ReadBlockFromDisk(block, pindex, Params().GetConsensus())) {
+            for (const CTransactionRef& candidate : block.vtx) {
+                if (candidate->GetHash() == out.hash) {
+                    tx = candidate;
+                    break;
+                }
+            }
+        }
+    }
+    if (!tx || tx->nTime == 0)
         return false;
     nTime = tx->nTime;
     fCoinStake = tx->IsCoinStake();
