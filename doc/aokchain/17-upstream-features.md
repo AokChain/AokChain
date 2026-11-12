@@ -12,7 +12,7 @@ exceptions that are named.
 | Phase | Content | Release |
 |---|---|---|
 | 1 | Commands and options for operators and exchanges (below) — **done** | 4.0.0 |
-| 2 | Wallet structure and tools: offline wallet tool, one database environment per wallet and wallet lifetime handling (unloading the first wallet, wallets in the GUI), Branch-and-Bound coin selection and `-avoidpartialspends`, the transaction index as a background index, `restorewallet`, PSBT for the AokChain transaction format | 4.1 |
+| 2 | Wallet structure and tools: offline wallet tool (**done**, below), one database environment per wallet and wallet lifetime handling (unloading the first wallet, wallets in the GUI), Branch-and-Bound coin selection and `-avoidpartialspends`, the transaction index as a background index, `restorewallet`, PSBT for the AokChain transaction format | 4.1 |
 | 3 | Network: Tor v3 and addrv2, block-relay-only connections and anchors, limits on the peer time adjustment, removal of UPnP (see 07, C-02 to C-06, U-09) | 4.2 |
 | 4 | Base: reproducible builds, LevelDB and libsecp256k1 updates, SHA-NI, fuzzing, `std::thread`, CMake (see 07, T-01 to T-06) | 4.2 |
 
@@ -73,3 +73,88 @@ rpcwhitelistdefault=0                  # the other users stay as they are
 
 Not tested: `scantxoutset` and `getblockstats` on the main network data, `-daemonwait` under
 systemd, the whitelist with cookie authentication only.
+
+## Phase 2
+
+### aokchain-wallet (Bitcoin Core 0.18: bitcoin-wallet)
+
+A program that works on a wallet file without a node. It is built with the daemon when the
+wallet is enabled, and is in the tools packages.
+
+```
+aokchain-wallet -wallet=<wallet> [options] <command>
+```
+
+| Command | What it does |
+|---|---|
+| `info` | Format, wallet version, encryption, HD seed id, number of keys, key pool size, transactions, address book entries, watch-only, time of the oldest key |
+| `addresses` | The addresses of the address book with purpose and label, tab separated; `-allkeys` adds every key of the wallet with its HD path (key pool and change keys included). Balances are not in a wallet file: give the addresses to `scantxoutset` of a node |
+| `create` | A new wallet with an HD seed and a key pool, not encrypted. `<wallet>` becomes a folder with `wallet.dat` in it; a node loads it with `-wallet=<folder>` or `loadwallet` |
+| `salvage` | Recovers the private keys that can be read from a damaged file (what `-salvagewallet` does at the start of a node). The file as it was is kept as `<name>.<time>.bak` |
+
+`-wallet` is a path to a wallet file or folder, or a name in the wallet directory of
+`-datadir` / `-walletdir`. `-testnet` and `-regtest` select the form of the addresses.
+
+- **`info` and `addresses` change nothing.** A node that finds a damaged wallet file renames
+  it and tries a repair; the tool only reports the damage and names `salvage`, which is to
+  be run on a copy.
+- **A wallet that a node uses is refused**: the tool takes the lock (`.walletlock`) that the
+  node holds on the wallet directory. Stop the node, work on a copy, or unload the wallet.
+- It leaves an empty `db.log` and `.walletlock` next to the file.
+- A wallet file is opened with the Berkeley DB version of the tool. The release packages
+  use 4.8, as the 3.0.x releases did; a build with a newer version (`--with-incompatible-bdb`)
+  upgrades a file that it opens, and 4.8 cannot read it afterwards. Work on a copy when the
+  versions differ.
+
+`unloadwallet` now also closes the database environment of the wallet and gives up the lock
+on its folder when no other loaded wallet uses that folder, so that the tool (or a copy
+program) can take the wallet while the node runs.
+
+Test: `tool_wallet.py`.
+
+### restorewallet (Bitcoin Core 23)
+
+`restorewallet "wallet_name" "backup_file"` copies a backup (of `backupwallet`, or a copy of a
+`wallet.dat`) to the folder `<wallet_name>` in the wallet directory and loads it. The backup
+file is not changed, and nothing is left behind when loading fails. Test: `wallet_unload.py`.
+
+`backupwallet` copied the wrong file for a wallet in a folder of its own (made by
+`createwallet`, `restorewallet` or `aokchain-wallet create`): it took `wallet.dat` of the wallet
+directory, the file of the first wallet, and without making it self contained. It now takes
+the file of the wallet that was asked for. The first wallet of a node, which is the one that
+existing installations have, was always backed up correctly.
+
+## Staking coin size (not from Bitcoin Core)
+
+`-stakecombinethreshold=<amount>` (default 1000 AOK, was fixed at 100). A stake gathers the
+coins of its address that are smaller than the threshold until it has twice the threshold,
+and is paid out in two halves when it has. The staking coins of a wallet therefore end up
+between one and two times the threshold.
+
+- Before, a stake could gather up to 100 small coins whatever their sum was; now it stops
+  when it has enough for two outputs. Otherwise a higher threshold would tie up a large
+  amount while the stake matures (60 blocks).
+- Why larger coins: with 100 AOK the two large stakers of the main network held about
+  15,000 coins each (wallet files up to 198 MB, slow wallet calls, and each coin one more
+  that a pre-4.0 reorganization could damage). With 1000 AOK the same balance is about 1,500
+  coins. The wallets get there by staking, a dozen small coins per stake; no command is
+  needed.
+- The price: a stake ties up one to two times the threshold for 60 blocks. For a wallet
+  that wins about every second block that is about 2% of its balance at 1000 AOK and 1%
+  at 500 AOK; for a small staker it is negligible.
+- This is wallet policy. The coinstake transactions are valid under the same rules as
+  before, and stakers with different settings work together.
+
+Test: `feature_stake_combine.py`.
+
+### What staking brought
+
+`getstakinginfo` has three more fields for the wallet: `stakes_24h` (stakes of the last 24
+hours that are in the chain), `orphaned_24h` (stakes that lost against another block; they
+earn nothing) and `reward_24h`. The side bar of the GUI shows them under the staking switch
+("24 h: 7 rewards · 0.875 AOK · 2 lost"), with the explanation in the tool tip. A block of
+the wallet that never became the tip of its own node is not a wallet transaction and is not
+counted.
+
+The staking switch of the GUI showed "off" after a start with `-staking=1` although the
+wallet was staking: the state was read before a wallet was shown. Fixed.
