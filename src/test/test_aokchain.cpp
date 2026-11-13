@@ -12,6 +12,7 @@
 #include "fs.h"
 #include "key.h"
 #include "validation.h"
+#include "governance/governance.h"
 #include "miner.h"
 #include "net_processing.h"
 #include "pubkey.h"
@@ -74,6 +75,10 @@ TestingSetup::TestingSetup(const std::string &chainName) : BasicTestingSetup(cha
     pblocktree.reset(new CBlockTreeDB(1 << 20, true));
     pcoinsdbview = new CCoinsViewDB(1 << 23, true);
     pcoinsTip.reset(new CCoinsViewCache(pcoinsdbview));
+    // (the node always has the governance state; without it every check of a transaction's inputs
+    // crashed here once governance is active, which is height 10 on regtest)
+    governance = new CGovernance(1 << 20, true, false);
+    governance->Init(false, chainparams);
     if (!LoadGenesisBlock(chainparams))
     {
         throw std::runtime_error("LoadGenesisBlock failed.");
@@ -108,6 +113,8 @@ TestingSetup::~TestingSetup()
     delete pcoinsdbview;
     pblocktree.reset();
     delete ptokens;
+    delete governance;
+    governance = nullptr;
     fs::remove_all(pathTemp);
 }
 

@@ -404,7 +404,8 @@ BOOST_FIXTURE_TEST_SUITE(wallet_tests, WalletTestingSetup)
             CWallet wallet("dummy", CWalletDBWrapper::CreateDummy());
             AddKey(wallet, coinbaseKey);
             BOOST_CHECK_EQUAL(nullBlock, wallet.ScanForWalletTransactions(oldTip, nullptr));
-            BOOST_CHECK_EQUAL(wallet.GetImmatureBalance(), 10000 * COIN);
+            // (the two newest blocks of the chain, 4 coins each)
+            BOOST_CHECK_EQUAL(wallet.GetImmatureBalance(), 2 * 4 * COIN);
         }
 
         // Prune the older block file.
@@ -417,7 +418,7 @@ BOOST_FIXTURE_TEST_SUITE(wallet_tests, WalletTestingSetup)
             CWallet wallet("dummy", CWalletDBWrapper::CreateDummy());
             AddKey(wallet, coinbaseKey);
             BOOST_CHECK_EQUAL(oldTip, wallet.ScanForWalletTransactions(oldTip, nullptr));
-            BOOST_CHECK_EQUAL(wallet.GetImmatureBalance(), 5000 * COIN);
+            BOOST_CHECK_EQUAL(wallet.GetImmatureBalance(), 4 * COIN);
         }
 
         // Verify importmulti RPC returns failure for a key whose creation time is
@@ -547,7 +548,7 @@ BOOST_FIXTURE_TEST_SUITE(wallet_tests, WalletTestingSetup)
         // credit amount is calculated.
         wtx.MarkDirty();
         wallet.AddKeyPubKey(coinbaseKey, coinbaseKey.GetPubKey());
-        BOOST_CHECK_EQUAL(wtx.GetImmatureCredit(), 5000 * COIN);
+        BOOST_CHECK_EQUAL(wtx.GetImmatureCredit(), 4 * COIN);
     }
 
     static int64_t AddTx(CWallet &wallet, uint32_t lockTime, int64_t mockTime, int64_t blockTime)
@@ -670,15 +671,16 @@ BOOST_FIXTURE_TEST_SUITE(wallet_tests, WalletTestingSetup)
         std::string coinbaseAddress = coinbaseKey.GetPubKey().GetID().ToString();
         LOCK2(cs_main, wallet->cs_wallet);
 
-        // Confirm ListCoins initially returns 1 coin grouped under coinbaseKey
-        // address.
+        // The coinbases of the 103 block chain that are mature (10 confirmations on AokChain, with
+        // the premine of block 1 among them), all grouped under the coinbaseKey address.
         auto list = wallet->ListCoins();
         BOOST_CHECK_EQUAL(list.size(), 1L);
         BOOST_CHECK_EQUAL(boost::get<CKeyID>(list.begin()->first).ToString(), coinbaseAddress);
-        BOOST_CHECK_EQUAL(list.begin()->second.size(), 1L);
+        const size_t nInitial = list.begin()->second.size();
+        BOOST_CHECK(nInitial > 1);
 
-        // Check initial balance from one mature coinbase transaction.
-        BOOST_CHECK_EQUAL(5000 * COIN, wallet->GetAvailableBalance());
+        // The initial balance: those coinbases, 4 coins each, and the premine instead of 4 for block 1.
+        BOOST_CHECK_EQUAL((CAmount)(nInitial - 1) * 4 * COIN + 2100000000 * COIN, wallet->GetAvailableBalance());
 
         // Add a transaction creating a change address, and confirm ListCoins still
         // returns the coin associated with the change address underneath the
@@ -688,14 +690,15 @@ BOOST_FIXTURE_TEST_SUITE(wallet_tests, WalletTestingSetup)
         list = wallet->ListCoins();
         BOOST_CHECK_EQUAL(list.size(), 1L);
         BOOST_CHECK_EQUAL(boost::get<CKeyID>(list.begin()->first).ToString(), coinbaseAddress);
-        auto output = list.begin()->second[0].ToString();
-        //std::cout << "OUTPUT:" << output << std::endl;
-        BOOST_CHECK_EQUAL(list.begin()->second.size(), 2L);
+        // (the block of AddTx made one more coinbase mature; the transaction spent some coins and
+        // made one change coin)
+        const size_t nAfter = list.begin()->second.size();
+        BOOST_CHECK(nAfter >= 2);
 
-        // Lock both coins. Confirm number of available coins drops to 0.
+        // Lock all coins. Confirm number of available coins drops to 0.
         std::vector<COutput> available;
         wallet->AvailableCoins(available);
-        BOOST_CHECK_EQUAL(available.size(), 2L);
+        BOOST_CHECK_EQUAL(available.size(), nAfter);
         for (const auto &group : list)
         {
             for (const auto &coin : group.second)
@@ -711,7 +714,7 @@ BOOST_FIXTURE_TEST_SUITE(wallet_tests, WalletTestingSetup)
         list = wallet->ListCoins();
         BOOST_CHECK_EQUAL(list.size(), 1L);
         BOOST_CHECK_EQUAL(boost::get<CKeyID>(list.begin()->first).ToString(), coinbaseAddress);
-        BOOST_CHECK_EQUAL(list.begin()->second.size(), 2L);
+        BOOST_CHECK_EQUAL(list.begin()->second.size(), nAfter);
     }
 
 BOOST_AUTO_TEST_SUITE_END()

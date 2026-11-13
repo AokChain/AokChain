@@ -135,7 +135,9 @@ BOOST_FIXTURE_TEST_SUITE(hash_tests, BasicTestingSetup)
         // and the test would be affected by default tx version bumps if not fixed.
         tx.nVersion = 1;
         ss << tx;
-        BOOST_CHECK_EQUAL(SipHashUint256(1, 2, ss.GetHash()), 0x79751e980c2a0a35ULL);
+        // (the hash of an empty AokChain transaction, which has a time field: not the value of the
+        // Bitcoin test)
+        BOOST_CHECK_EQUAL(SipHashUint256(1, 2, ss.GetHash()), 0x01708baa2a6b3c73ULL);
 
         // Check consistency between CSipHasher and SipHashUint256[Extra].
         FastRandomContext ctx;

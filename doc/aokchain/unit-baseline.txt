@@ -13,11 +13,14 @@ bswap_tests
 cache_tests
 checkqueue_tests
 compress_tests
+crypto_tests
 cuckoocache_tests
 dbwrapper_tests
 DoS_tests
 getarg_tests
+hash_tests
 limitedmap_tests
+main_tests
 mempool_tests
 merkle_tests
 multisig_tests
@@ -51,3 +54,4 @@ uint256_tests
 univalue_tests
 util_tests
 wallet_crypto
+wallet_tests
