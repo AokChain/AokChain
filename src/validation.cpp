@@ -4926,9 +4926,15 @@ static bool CheckBlockStakeBeforeStorage(const CBlock& block, const CBlockIndex*
  * holder from signing any number of different blocks with it. Each of them passes
  * every check that can be made before a block is stored, so a staker could have a
  * node store them without end. Honest stakers sign one block per stake, so beyond a
- * few blocks with the same stake further ones are not stored. Such a block is still
- * fetched and stored once a header builds on it: the chain that the network extends
- * is always followed, whichever of the blocks it started with.
+ * few blocks with the same stake further ones are not stored, unless the block is on
+ * the best chain of headers: the chain that the network extends is always followed,
+ * whichever of the blocks it started with.
+ *
+ * (Before 4.0.1 any header that built on the block was enough, and finding one meant a
+ * walk over the whole block index under cs_main for every such block: a staker could
+ * keep a node busy with a stream of them. A header costs nothing to make on proof of
+ * stake, so that exception did not hold back the storing either. Now a block beyond the
+ * limit needs a chain of headers with more work than any other the node knows.)
  *
  * All protected by cs_main. Kept in memory only.
  */
@@ -4955,17 +4961,10 @@ static void NoteStakeBlockStored(const std::pair<COutPoint, unsigned int>& stake
     }
 }
 
-/** Whether a header that builds on the block is known. */
-static bool HasChildHeader(const CBlockIndex* pindex)
+bool IsOnBestHeaderChain(const CBlockIndex* pindex)
 {
-    if (pindexBestHeader && pindexBestHeader != pindex && pindexBestHeader->GetAncestor(pindex->nHeight) == pindex)
-        return true;
-    // (reached only for a block beyond the limit; the stores before it took far longer than this)
-    for (const std::pair<const uint256, CBlockIndex*>& item : mapBlockIndex) {
-        if (item.second->pprev == pindex)
-            return true;
-    }
-    return false;
+    AssertLockHeld(cs_main);
+    return pindex && pindexBestHeader && pindexBestHeader->GetAncestor(pindex->nHeight) == pindex;
 }
 
 static bool AcceptBlock(const std::shared_ptr<const CBlock>& pblock, CValidationState& state, const CChainParams& chainparams, CBlockIndex** ppindex, bool fRequested, const CDiskBlockPos* dbp, bool* fNewBlock, const uint256& hash)
@@ -5043,7 +5042,7 @@ static bool AcceptBlock(const std::shared_ptr<const CBlock>& pblock, CValidation
     if (fCountStake) {
         stake = std::make_pair(block.vtx[1]->vin[0].prevout, block.nTime);
         std::map<std::pair<COutPoint, unsigned int>, unsigned int>::const_iterator it = mapBlocksPerStake.find(stake);
-        if (it != mapBlocksPerStake.end() && it->second >= nMaxBlocksPerStake && !fHasMoreWork && !HasChildHeader(pindex)) {
+        if (it != mapBlocksPerStake.end() && it->second >= nMaxBlocksPerStake && !fHasMoreWork && !IsOnBestHeaderChain(pindex)) {
             LogPrintf("%s: block %s (height %d) is not stored: %u blocks with its stake %s at time %u are stored already\n",
                       __func__, hash.ToString(), pindex->nHeight, it->second, stake.first.ToString(), stake.second);
             if (setSkippedStakeVariants.size() >= MAX_STAKES_REMEMBERED)

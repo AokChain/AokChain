@@ -306,8 +306,11 @@ bool IsInitialBlockDownload();
 /** Blocks with the same stake (coin and time) that are stored before further ones are left out (-maxblocksperstake). */
 static const unsigned int DEFAULT_MAX_BLOCKS_PER_STAKE = 4;
 extern unsigned int nMaxBlocksPerStake;
-/** Whether the block was received and not stored because of that limit. It is fetched again when a header builds on it. */
+/** Whether the block was received and not stored because of that limit. It is fetched again
+ *  when it is on the best chain of headers (IsOnBestHeaderChain). */
 bool IsSkippedStakeVariant(const CBlockIndex* pindex);
+/** Whether the block is pindexBestHeader or one of its ancestors. */
+bool IsOnBestHeaderChain(const CBlockIndex* pindex);
 bool IsInitialSyncSpeedUp();
 /**
  * Time and coinstake mark of the transaction that created a coin. For a coin that lost them: the

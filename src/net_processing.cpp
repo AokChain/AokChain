@@ -539,9 +539,10 @@ void FindNextBlocksToDownload(NodeId nodeid, unsigned int count, std::vector<con
                     state->pindexLastCommonBlock = pindex;
             } else if (mapBlocksInFlight.count(pindex->GetBlockHash()) == 0) {
                 // The block is not already downloaded, and not yet in flight.
-                if (pindex == state->pindexBestKnownBlock && IsSkippedStakeVariant(pindex)) {
+                if (IsSkippedStakeVariant(pindex) && !IsOnBestHeaderChain(pindex)) {
                     // Received before and not stored (too many blocks with its stake). It
-                    // would not be stored now either: wait for a block that builds on it.
+                    // would not be stored now either: wait until the best chain of headers
+                    // goes through it.
                     return;
                 }
                 if (pindex->nHeight > nWindowEnd) {
@@ -1457,7 +1458,7 @@ bool static ProcessHeadersMessage(CNode *pfrom, CConnman *connman, const std::ve
             while (pindexWalk && !chainActive.Contains(pindexWalk) && vToFetch.size() <= MAX_BLOCKS_IN_TRANSIT_PER_PEER) {
                 if (!(pindexWalk->nStatus & BLOCK_HAVE_DATA) &&
                         !mapBlocksInFlight.count(pindexWalk->GetBlockHash()) &&
-                        !(pindexWalk == pindexLast && IsSkippedStakeVariant(pindexWalk)) &&
+                        !(IsSkippedStakeVariant(pindexWalk) && !IsOnBestHeaderChain(pindexWalk)) &&
                         (!IsWitnessEnabled(pindexWalk->pprev, chainparams.GetConsensus()) || State(pfrom->GetId())->fHaveWitness)) {
                     // We don't have this block, and it's not yet in flight.
                     vToFetch.push_back(pindexWalk);
