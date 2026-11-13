@@ -16,6 +16,7 @@
 #include "aokchaingui.h"
 #include "clientmodel.h"
 #include "guiutil.h"
+#include "util.h"
 #include "pastblocks.h"
 #include "optionsdialog.h"
 #include "optionsmodel.h"
@@ -321,11 +322,17 @@ void WalletView::setAokChainGUI(AokChainGUI *gui)
         // Settings page: what the menus of the window offered
         QVBoxLayout *body = nullptr;
         QFrame *walletCard = OptionsDialog::makeCard(tr("Wallet security"), settingsPage, &body);
-        const std::pair<QString, QString> securityNotes[] = {
+        // Restoring from the recovery words of another wallet is hidden until it is decided how the
+        // keys of such a wallet and the keys of this one fit together: a payment from those keys
+        // keeps its change in this wallet's own keys, which the other wallet (a mobile wallet) does
+        // not see, so its coins look lost there. -mnemonicrestore shows it (support and tests).
+        const bool fShowRestore = gArgs.GetBoolArg("-mnemonicrestore", false);
+        std::vector<std::pair<QString, QString>> securityNotes = {
             {tr("Encryption"), tr("A passphrase locks the keys in the wallet file. Someone who copies the file or uses this computer cannot send your coins without it. The passphrase cannot be recovered: if it is lost, the coins are lost.")},
             {tr("Backup"), tr("A copy of the wallet file. If this computer breaks or is lost, the backup brings the coins back. Keep it on a USB drive or another computer, and make a new one after adding keys.")},
-            {tr("Recovery words"), tr("The 12 or 24 words of another wallet, such as a mobile wallet. Restoring adds the keys of that wallet to this one, so its coins can be used here.")},
         };
+        if (fShowRestore)
+            securityNotes.push_back({tr("Recovery words"), tr("The 12 or 24 words of another wallet, such as a mobile wallet. Restoring adds the keys of that wallet to this one, so its coins can be used here.")});
         for (const std::pair<QString, QString> &note : securityNotes) {
             QLabel *label = new QLabel(QString("<b>%1</b> &nbsp;%2").arg(note.first, note.second), walletCard);
             label->setProperty("role", "secondary");
@@ -339,12 +346,14 @@ void WalletView::setAokChainGUI(AokChainGUI *gui)
             walletButtons->addWidget(actionButton(action, walletCard), n / 2, n % 2);
             ++n;
         }
-        QPushButton *restoreButton = new QPushButton(tr("Restore from recovery words"), walletCard);
-        restoreButton->setFixedHeight(38);
-        restoreButton->setCursor(Qt::PointingHandCursor);
-        restoreButton->setToolTip(tr("Add the keys of another wallet to this wallet, from its 12 or 24 recovery words"));
-        connect(restoreButton, SIGNAL(clicked()), this, SLOT(restoreFromMnemonic()));
-        walletButtons->addWidget(restoreButton, n / 2, n % 2);
+        if (fShowRestore) {
+            QPushButton *restoreButton = new QPushButton(tr("Restore from recovery words"), walletCard);
+            restoreButton->setFixedHeight(38);
+            restoreButton->setCursor(Qt::PointingHandCursor);
+            restoreButton->setToolTip(tr("Add the keys of another wallet to this wallet, from its 12 or 24 recovery words"));
+            connect(restoreButton, SIGNAL(clicked()), this, SLOT(restoreFromMnemonic()));
+            walletButtons->addWidget(restoreButton, n / 2, n % 2);
+        }
         body->addLayout(walletButtons);
         settingsPage->addCard(walletCard);
 
