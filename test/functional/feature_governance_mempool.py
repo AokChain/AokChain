@@ -113,12 +113,15 @@ class GovernanceMempoolTest(AokChainTestFramework):
         self.start_nodes([self.extra_args[0] + ["-staking=1", "-emergencystaking=1"], self.extra_args[1]])
         connect_nodes_bi(self.nodes, 0, 1)
         n0, n1 = self.nodes
-        t = n0.getblock(n0.getbestblockhash())["time"] + 2 * SLOT
-        t -= t % SLOT
+        # the clock at the time of the tip: no slot for a new block yet, so that both
+        # transactions are in the mempool before the staker can make a block
+        t = n0.getblock(n0.getbestblockhash())["time"]
         for node in self.nodes:
             node.setmocktime(t)
         spend = self.payment(victims[2], Decimal("0.0001"))
         freeze = self.command(master, script_command(FREEZE, self.script_of(victims[2])), Decimal("0.01"))
+        assert_equal(n0.getblockcount(), LAST_POW)
+        t -= t % SLOT
         for _ in range(3):
             height = n0.getblockcount()
             t += SLOT
