@@ -989,6 +989,10 @@ public:
      *  per wallet (it was one for all wallets, so unlocking a second wallet for staking only
      *  also closed the first one for payments, and locking it opened the first one again). */
     std::atomic<bool> fUnlockStakingOnly{false};
+    /** The wallet was open for staking only when walletpassphrase opened it for a time: when
+     *  that time is over it goes back to staking only instead of being locked. Guarded by
+     *  cs_wallet. Per wallet: with one flag for all, the timer of another wallet used it up. */
+    bool fRestoreStakingOnlyUnlock = false;
 
     uint64_t GetStakeWeight() const;
 

@@ -60,7 +60,15 @@ class WalletEncryptionTest(AokChainTestFramework):
 
         # Open for staking only, without a time limit: the keys sign stakes and nothing else
         self.nodes[0].walletlock()
+        # A call that fails leaves the wallet locked, also with the right passphrase:
+        # the arguments are checked before the wallet is opened.
+        self.nodes[0].walletlock()
         assert_raises_rpc_error(-8, "Timeout cannot be negative", self.nodes[0].walletpassphrase, passphrase2, -1)
+        assert_raises_rpc_error(-13, "Please enter the wallet passphrase with walletpassphrase first", self.nodes[0].dumpprivkey, address)
+        assert_raises_rpc_error(None, None, self.nodes[0].walletpassphrase, passphrase2, "soon")
+        assert_raises_rpc_error(None, None, self.nodes[0].walletpassphrase, passphrase2, 10, "yes")
+        assert_raises_rpc_error(-13, "Please enter the wallet passphrase with walletpassphrase first", self.nodes[0].dumpprivkey, address)
+        assert_equal(self.nodes[0].getwalletinfo()["unlocked_until"], 0)
         self.nodes[0].walletpassphrase(passphrase2, 0, True)
         time.sleep(2)
         assert_equal(self.nodes[0].getwalletinfo()["unlocked_until"], 0)

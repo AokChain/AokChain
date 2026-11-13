@@ -156,3 +156,11 @@ Reviewed and not taken over:
 - The functional test baseline has 51 tests.
 
 Note: some boolean fields of RPC results are printed as `1`/`0`, not `true`/`false`, since 3.0.x (`networkactive`, `complete`, `staking` and others). This is kept for compatibility with programs that read them.
+
+## 4.0.1 (in preparation)
+
+Fixes after the 4.0.0 release, including the results of the external source review of 2026-11-13.
+
+- **`walletpassphrase` (SEC-29).** A call that failed because of its arguments left the wallet open for payments; the arguments are checked first now. The mark that takes a wallet back to staking only after a timed unlock is per wallet.
+- **Diagnostics.** The duration of the first stake search after a start is logged. `-debug=coinstake` works.
+- **`upgrade.sh`.** Waits for the process ids of a node that does not run under systemd. A new installation can start from the snapshot with `AOK_SNAPSHOT`. The newest three backups are kept.

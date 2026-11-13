@@ -2551,22 +2551,19 @@ UniValue keypoolrefill(const JSONRPCRequest& request)
 }
 
 
-/** The wallet was open for staking only (the staking switch of the GUI) when walletpassphrase opened it for a time. */
-static bool fRestoreStakingOnlyUnlock = false;
-
 static void LockWallet(CWallet* pWallet)
 {
     LOCK(pWallet->cs_wallet);
     pWallet->nRelockTime = 0;
-    if (fRestoreStakingOnlyUnlock && !pWallet->IsLocked()) {
+    if (pWallet->fRestoreStakingOnlyUnlock && !pWallet->IsLocked()) {
         // The time of walletpassphrase is over: back to what was before it, open for staking only.
         // Locking here would stop the staking that the user switched on.
-        fRestoreStakingOnlyUnlock = false;
+        pWallet->fRestoreStakingOnlyUnlock = false;
         pWallet->fUnlockStakingOnly = true;
         pWallet->NotifyStatusChanged(pWallet);
         return;
     }
-    fRestoreStakingOnlyUnlock = false;
+    pWallet->fRestoreStakingOnlyUnlock = false;
     pWallet->Lock();
 }
 
@@ -2615,6 +2612,13 @@ UniValue walletpassphrase(const JSONRPCRequest& request)
     // Alternately, find a way to make request.params[0] mlock()'d to begin with.
     strWalletPass = request.params[0].get_str().c_str();
 
+    // Every argument is checked before the wallet is opened: a call that fails must leave
+    // the wallet as it was (it used to stay open, for payments and without a time limit).
+    const int64_t nSleepTime = request.params[1].get_int64();
+    const bool fStakingOnly = request.params.size() > 2 && request.params[2].get_bool();
+    if (nSleepTime < 0)
+        throw JSONRPCError(RPC_INVALID_PARAMETER, "Timeout cannot be negative.");
+
     // open for staking only before this call, and not by an earlier call with a time
     const bool fWasStakingOnly = !pwallet->IsLocked() && pwallet->fUnlockStakingOnly && pwallet->nRelockTime == 0;
 
@@ -2632,17 +2636,13 @@ UniValue walletpassphrase(const JSONRPCRequest& request)
     pwallet->TopUpKeyPool();
 
     if (fWasStakingOnly)
-        fRestoreStakingOnlyUnlock = true;
+        pwallet->fRestoreStakingOnlyUnlock = true;
 
-    int64_t nSleepTime = request.params[1].get_int64();
-    const bool fStakingOnly = request.params.size() > 2 && request.params[2].get_bool();
-    if (nSleepTime < 0)
-        throw JSONRPCError(RPC_INVALID_PARAMETER, "Timeout cannot be negative.");
     if (nSleepTime == 0 && fStakingOnly) {
         // A staking node: open for staking only until it is locked or stopped. (Without
         // stakingonly a timeout of 0 locks at once, as before.)
         pwallet->nRelockTime = 0;
-        fRestoreStakingOnlyUnlock = false;
+        pwallet->fRestoreStakingOnlyUnlock = false;
         RPCCancelLater(strprintf("lockwallet(%s)", pwallet->GetName()));
     } else {
         pwallet->nRelockTime = GetTime() + nSleepTime;
@@ -2741,7 +2741,7 @@ UniValue walletlock(const JSONRPCRequest& request)
     }
 
     pwallet->Lock();
-    fRestoreStakingOnlyUnlock = false;
+    pwallet->fRestoreStakingOnlyUnlock = false;
     pwallet->nRelockTime = 0;
 
     return NullUniValue;
