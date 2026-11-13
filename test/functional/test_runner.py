@@ -128,6 +128,7 @@ BASE_SCRIPTS= [
     'tool_wallet.py',
     'feature_stake_combine.py',
     'feature_offline_staking.py',
+    'feature_future_drift.py',
     'rpc_mnemonic.py',
     'wallet_importmnemonic.py',
     'wallet_multisig_flow.py',
