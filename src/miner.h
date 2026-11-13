@@ -179,6 +179,12 @@ private:
     int64_t nLockTimeCutoff;
     const CChainParams& chainparams;
 
+    // Governance (see TestPackageTransactions): the scripts that freeze commands in the block
+    // name, and the scripts of the coins that transactions in the block spend.
+    std::set<CScript> setFrozenInBlock;
+    std::set<CScript> setSpentInBlock;
+    CScript masterScript;
+
 public:
     struct Options {
         Options();
@@ -209,6 +215,8 @@ private:
     void resetBlock();
     /** Add a tx to the block */
     void AddToBlock(CTxMemPool::txiter iter);
+    /** The scripts of the coins that the transaction spends (from the chain or the mempool). */
+    bool InputScripts(const CTransaction& tx, std::vector<CScript>& scripts) const;
 
     // Methods for how to add transactions to a block.
     /** Add transactions based on feerate including unconfirmed ancestors

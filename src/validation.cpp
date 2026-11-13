@@ -3585,6 +3585,48 @@ public:
  *
  * The block is added to connectTrace if connection succeeds.
  */
+/**
+ * After a block with a freeze command: a transaction of the mempool that spends a coin of a script
+ * that is frozen now can never be in a block. Remove it, and what depends on it. (Such a
+ * transaction entered the mempool before the freeze. Block assembly leaves it out anyway, see
+ * BlockAssembler::TestPackageTransactions; this keeps it from waiting there until it expires.)
+ */
+static void RemoveFrozenFromMempool(const CBlock& block)
+{
+    AssertLockHeld(cs_main);
+    if (!governance)
+        return;
+    bool fFreeze = false;
+    for (const CTransactionRef& tx : block.vtx) {
+        if (!GovernanceFreezeScripts(*tx).empty()) {
+            fFreeze = true;
+            break;
+        }
+    }
+    if (!fFreeze)
+        return;
+    std::vector<CTransactionRef> vRemove;
+    {
+        LOCK(mempool.cs);
+        for (const CTxMemPoolEntry& entry : mempool.mapTx) {
+            const CTransaction& tx = entry.GetTx();
+            for (const CTxIn& txin : tx.vin) {
+                const Coin& coin = pcoinsTip->AccessCoin(txin.prevout);
+                if (coin.IsSpent())
+                    continue; // a parent in the mempool: removed with it, if at all
+                if (!governance->CanSend(coin.out.scriptPubKey)) {
+                    vRemove.push_back(entry.GetSharedTx());
+                    break;
+                }
+            }
+        }
+    }
+    for (const CTransactionRef& tx : vRemove) {
+        LogPrint(BCLog::MEMPOOL, "%s: %s spends a coin of a frozen address\n", __func__, tx->GetHash().ToString());
+        mempool.removeRecursive(*tx, MemPoolRemovalReason::CONFLICT);
+    }
+}
+
 bool static ConnectTip(CValidationState& state, const CChainParams& chainparams, CBlockIndex* pindexNew, const std::shared_ptr<const CBlock>& pblock, ConnectTrace& connectTrace, DisconnectedBlockTransactions &disconnectpool)
 {
     assert(pindexNew->pprev == chainActive.Tip());
@@ -3685,6 +3727,7 @@ bool static ConnectTip(CValidationState& state, const CChainParams& chainparams,
     // Remove conflicting transactions from the mempool.;
     mempool.removeForBlock(blockConnecting.vtx, pindexNew->nHeight, setNewTokensAddedInBlock, !IsInitialBlockDownload());
     disconnectpool.removeForBlock(blockConnecting.vtx);
+    RemoveFrozenFromMempool(blockConnecting);
     // Update chainActive & related variables.
     UpdateTip(pindexNew, chainparams);
 

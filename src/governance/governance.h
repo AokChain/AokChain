@@ -108,6 +108,13 @@ private:
 };
 
 /**
+ * The scripts that the freeze commands of a transaction name: data outputs OP_RETURN <len> 'G' 'A'
+ * 'F' <length> <script>, read as ConnectBlock() reads them. They take effect only when the
+ * transaction spends a coin of the governance master address (see ConnectBlock()).
+ */
+std::vector<CScript> GovernanceFreezeScripts(const CTransaction& tx);
+
+/**
  * Opens a level of governance changes (CGovernance::BeginChanges) and discards it when it
  * goes out of scope, unless Commit() was called: every early return of a failed check
  * leaves the governance state as it was.

@@ -9,6 +9,7 @@
 #include <miner.h>
 
 #include <amount.h>
+#include <base58.h>
 #include <chain.h>
 #include <chainparams.h>
 #include <coins.h>
@@ -188,6 +189,9 @@ BlockAssembler::BlockAssembler(const CChainParams& params) : BlockAssembler(para
 void BlockAssembler::resetBlock()
 {
     inBlock.clear();
+    setFrozenInBlock.clear();
+    setSpentInBlock.clear();
+    masterScript = GetScriptForDestination(DecodeDestination(chainparams.GovernanceMasterAddress()));
 
     // Reserve space for coinbase tx
     nBlockWeight = 4000;
@@ -225,10 +229,61 @@ bool BlockAssembler::TestPackage(uint64_t packageSize, int64_t packageSigOpsCost
 // - transaction finality (locktime)
 // - premature witness (in case segwit transactions are added to mempool before
 //   segwit activation)
+bool BlockAssembler::InputScripts(const CTransaction& tx, std::vector<CScript>& scripts) const
+{
+    scripts.clear();
+    for (const CTxIn& txin : tx.vin) {
+        const Coin& coin = pcoinsTip->AccessCoin(txin.prevout);
+        if (!coin.IsSpent()) {
+            scripts.push_back(coin.out.scriptPubKey);
+            continue;
+        }
+        CTransactionRef parent = mempool.get(txin.prevout.hash);
+        if (!parent || txin.prevout.n >= parent->vout.size())
+            return false;
+        scripts.push_back(parent->vout[txin.prevout.n].scriptPubKey);
+    }
+    return true;
+}
+
 bool BlockAssembler::TestPackageTransactions(const CTxMemPool::setEntries& package)
 {
     for (const CTxMemPool::txiter it : package) {
         if (!IsFinalTx(it->GetTx(), nHeight, nLockTimeCutoff))
+            return false;
+    }
+
+    // Governance. A transaction that spends a coin of a frozen script is invalid, and so is one
+    // that spends such a coin after a freeze command of the same block (the command counts for
+    // the transactions after it). The mempool can hold both a freeze command and a payment
+    // from the address it freezes, which arrived before it: the block takes whichever comes
+    // first and leaves the other one out. Before, the block took both, the command first when
+    // its fee rate was higher, and was invalid; a staker then made invalid blocks for as long
+    // as both were in its mempool (the owner of the address only had to send a payment with a
+    // smaller fee than the freeze command).
+    std::set<CScript> frozenByPackage, spentByPackage;
+    std::vector<CScript> scripts;
+    for (const CTxMemPool::txiter it : package) {
+        const CTransaction& tx = it->GetTx();
+        if (!InputScripts(tx, scripts))
+            return false;
+        bool fMaster = false;
+        for (const CScript& script : scripts) {
+            if (script == masterScript)
+                fMaster = true;
+            if (setFrozenInBlock.count(script) || (governance && !governance->CanSend(script)))
+                return false;
+            spentByPackage.insert(script);
+        }
+        if (fMaster) {
+            for (const CScript& script : GovernanceFreezeScripts(tx)) {
+                if (script != masterScript) // (a command to freeze the master address does nothing)
+                    frozenByPackage.insert(script);
+            }
+        }
+    }
+    for (const CScript& script : frozenByPackage) {
+        if (setSpentInBlock.count(script) || spentByPackage.count(script))
             return false;
     }
     return true;
@@ -236,6 +291,23 @@ bool BlockAssembler::TestPackageTransactions(const CTxMemPool::setEntries& packa
 
 void BlockAssembler::AddToBlock(CTxMemPool::txiter iter)
 {
+    {
+        std::vector<CScript> scripts;
+        bool fMaster = false;
+        if (InputScripts(iter->GetTx(), scripts)) {
+            for (const CScript& script : scripts) {
+                if (script == masterScript)
+                    fMaster = true;
+                setSpentInBlock.insert(script);
+            }
+        }
+        if (fMaster) {
+            for (const CScript& script : GovernanceFreezeScripts(iter->GetTx())) {
+                if (script != masterScript)
+                    setFrozenInBlock.insert(script);
+            }
+        }
+    }
     pblock->vtx.emplace_back(iter->GetSharedTx());
     pblocktemplate->vTxFees.push_back(iter->GetFee());
     pblocktemplate->vTxSigOpsCost.push_back(iter->GetSigOpCost());
@@ -766,7 +838,23 @@ void ThreadStakeMiner(CWallet *pwallet)
                         FutureDrift(pblockfilled->GetBlockTime()) < pindexPrev->GetBlockTime()) {
                         LogPrintf("ThreadStakeMiner(): Valid PoS block took too long to create and has expired\n");
                     } else {
-                        CheckStake(pblockfilled, *pwallet);
+                        // Check the block with its transactions before it is sent, as block
+                        // templates of proof of work are checked in CreateNewBlock(): an
+                        // invalid block loses the slot, and the next one would be invalid for
+                        // the same reason. The block without them (pblock, signed above) is
+                        // valid whenever its stake is.
+                        bool fValid = false;
+                        {
+                            LOCK(cs_main);
+                            if (pindexPrev == chainActive.Tip()) {
+                                CValidationState state;
+                                fValid = TestBlockValidity(state, Params(), *pblockfilled, pindexPrev, false, true, true);
+                                if (!fValid)
+                                    LogPrintf("ThreadStakeMiner(): the block with %u transaction(s) is not valid (%s); the block without them is sent\n",
+                                              (unsigned int)(pblockfilled->vtx.size() - 2), FormatStateMessage(state));
+                            }
+                        }
+                        CheckStake(fValid ? pblockfilled : pblock, *pwallet);
                     }
                 }
 

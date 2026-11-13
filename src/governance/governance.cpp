@@ -5,6 +5,7 @@
 #include <unordered_map>
 
 #include <governance/governance.h>
+#include <primitives/transaction.h>
 #include <utilstrencodings.h>
 #include <script/script.h>
 #include <chainparams.h>
@@ -370,6 +371,19 @@ bool CGovernance::Finish(CDBBatch& batch)
     if (!vChanges.empty())
         return true;
     return WriteBatch(batch);
+}
+
+std::vector<CScript> GovernanceFreezeScripts(const CTransaction& tx)
+{
+    std::vector<CScript> scripts;
+    for (const CTxOut& out : tx.vout) {
+        const CScript& script = out.scriptPubKey;
+        if (script.size() >= 6 && script[0] == OP_RETURN && script[2] == GOVERNANCE_MARKER && script[3] == GOVERNANCE_ACTION
+            && script[4] == GOVERNANCE_FREEZE && script.size() == 6 + (size_t)script[5]) {
+            scripts.emplace_back(script.begin() + 6, script.end());
+        }
+    }
+    return scripts;
 }
 
 // ---- Freeze list
