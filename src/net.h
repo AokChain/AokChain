@@ -695,6 +695,9 @@ public:
     std::vector<uint256> vInventoryBlockToSend;
     CCriticalSection cs_inventory;
     std::set<uint256> setAskFor;
+    /** Orphan transactions whose parents this peer has delivered and that are still to be tried
+     *  (guarded by cs_main) */
+    std::set<uint256> orphan_work_set;
     std::multimap<int64_t, CInv> mapAskFor;
     int64_t nNextInvSend;
     // Used for headers announcements - unfiltered blocks to relay

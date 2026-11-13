@@ -1264,7 +1264,11 @@ void CConnman::ThreadSocketHandler()
                 if (pnode->hSocket == INVALID_SOCKET)
                     continue;
 
-                FD_SET(pnode->hSocket, &fdsetError);
+                // (not for a peer whose receiving is paused and that has nothing to be sent: urgent
+                // TCP data raises this condition, and reading on it would take in data past the
+                // limit that the pause is there for, CVE-2026-117350)
+                if (select_recv || select_send)
+                    FD_SET(pnode->hSocket, &fdsetError);
                 hSocketMax = std::max(hSocketMax, pnode->hSocket);
                 have_fds = true;
 
@@ -1338,7 +1342,7 @@ void CConnman::ThreadSocketHandler()
                 sendSet = FD_ISSET(pnode->hSocket, &fdsetSend);
                 errorSet = FD_ISSET(pnode->hSocket, &fdsetError);
             }
-            if (recvSet || errorSet)
+            if (recvSet || (errorSet && !pnode->fPauseRecv))
             {
                 // typical socket buffer is 8K-64K
                 char pchBuf[0x10000];
