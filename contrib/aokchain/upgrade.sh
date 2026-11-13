@@ -107,8 +107,10 @@ main() {
     if command -v systemctl >/dev/null && systemctl cat aokchaind.service >/dev/null 2>&1; then
         unit="aokchaind.service"
     fi
-    local was_running=0
-    if pgrep -x aokchaind >/dev/null; then
+    # (the process ids, not the name: while shutting down the program renames itself)
+    local was_running=0 pids=""
+    pids="$(pgrep -x aokchaind || true)"
+    if [ -n "$pids" ]; then
         was_running=1
     fi
 
@@ -120,8 +122,13 @@ main() {
         else
             "${cli[@]}" stop || fail "the node does not answer 'aokchain-cli stop'; stop it and run this again"
         fi
-        local waited=0
-        while pgrep -x aokchaind >/dev/null; do
+        local waited=0 pid alive=1
+        while [ "$alive" = 1 ]; do
+            alive=0
+            for pid in $pids; do
+                if kill -0 "$pid" 2>/dev/null; then alive=1; fi
+            done
+            [ "$alive" = 0 ] && break
             [ "$waited" -lt 600 ] || fail "the node is still running after 10 minutes"
             sleep 2; waited=$((waited + 2))
         done
@@ -192,8 +199,9 @@ UNIT
         "$bindir/aokchaind" -daemon "-datadir=$datadir" >/dev/null
     fi
     local waited=0 blocks=""
+    sleep 3
     until blocks="$("${cli[@]}" getblockcount 2>/dev/null)"; do
-        pgrep -x aokchaind >/dev/null || fail "the node stopped while starting; see $datadir/debug.log${keep:+. The old programs are in $keep}"
+        pgrep -f "^$bindir/aokchaind" >/dev/null || fail "the node stopped while starting; see $datadir/debug.log${keep:+. The old programs are in $keep}"
         [ "$waited" -lt 1800 ] || fail "the node does not answer after 30 minutes; see $datadir/debug.log"
         sleep 5; waited=$((waited + 5))
     done
