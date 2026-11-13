@@ -10,6 +10,7 @@
 #include "chainparamsbase.h"
 #include "fs.h"
 #include "key.h"
+#include "primitives/block.h"
 #include "pubkey.h"
 #include "random.h"
 #include "scheduler.h"
@@ -159,6 +160,17 @@ struct TestMemPoolEntryHelper
     }
 };
 
-CBlock getBlock13b8a();
+// Test data that is built in the AokChain formats (a transaction has nTime, the block
+// hash is blake2b), in place of the serialized Bitcoin blocks and transactions of the
+// original tests. The same in every run.
+
+/** A key whose secret is 32 times the byte n (1..255). */
+CKey TestKey(unsigned char n);
+/** A transaction with one input and one output of 1 coin. */
+CMutableTransaction TestTx(const COutPoint& prevout, const CScript& scriptSig, const CScript& scriptPubKey);
+/** A block of a coinbase and the given transactions, with its merkle root (no valid proof of work). */
+CBlock TestBlock(const std::vector<CMutableTransaction>& txs);
+/** A block of 9 transactions: the coinbase, and for n = 2..9 a payment to the address of TestKey(n). */
+CBlock TestBlock9();
 
 #endif

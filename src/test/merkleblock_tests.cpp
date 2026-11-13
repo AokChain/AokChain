@@ -21,15 +21,15 @@ BOOST_FIXTURE_TEST_SUITE(merkleblock_tests, BasicTestingSetup)
     {
         BOOST_TEST_MESSAGE("Running MerkleBlock Construct From TxIDs Found Test");
 
-        CBlock block = getBlock13b8a();
+        CBlock block = TestBlock9();
 
         std::set<uint256> txids;
 
         // Last txn in block.
-        uint256 txhash1 = uint256S("0x74d681e0e03bafa802c8aa084379aa98d9fcd632ddc2ed9782b586ec87451f20");
+        uint256 txhash1 = block.vtx[8]->GetHash();
 
         // Second txn in block.
-        uint256 txhash2 = uint256S("0xf9fc751cb7dc372406a9f8d738d5e6f8f63bab71986a39cf36ee70ee17036d07");
+        uint256 txhash2 = block.vtx[1]->GetHash();
 
         txids.insert(txhash1);
         txids.insert(txhash2);
@@ -64,7 +64,7 @@ BOOST_FIXTURE_TEST_SUITE(merkleblock_tests, BasicTestingSetup)
     {
         BOOST_TEST_MESSAGE("Running MerkleBlock Construct From TxIDs Not Found Test");
 
-        CBlock block = getBlock13b8a();
+        CBlock block = TestBlock9();
 
         std::set<uint256> txids2;
         txids2.insert(uint256S("0xc0ffee00003bafa802c8aa084379aa98d9fcd632ddc2ed9782b586ec87451f20"));

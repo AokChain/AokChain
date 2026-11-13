@@ -241,10 +241,23 @@ BOOST_AUTO_TEST_SUITE(tx_validationcache_tests)
             // successes.
             ValidateCheckInputsForAllFlags(spend_tx, SCRIPT_VERIFY_DERSIG | SCRIPT_VERIFY_LOW_S | SCRIPT_VERIFY_STRICTENC, false, false);
 
-            // And if we produce a block with this tx, it should be valid (DERSIG not
-            // enabled yet), even though there's no cache entry.
+            // AokChain blocks enforce DERSIG from the first block: a block with
+            // this transaction is not accepted (in Bitcoin's version of this test
+            // DERSIG is not active yet and the block is valid).
             CBlock block;
 
+            block = CreateAndProcessBlock({spend_tx}, p2pk_scriptPubKey);
+            BOOST_CHECK(chainActive.Tip()->GetBlockHash() != block.GetBlockHash());
+
+            // With a DER signature the block is valid, though there is no cache
+            // entry for the transaction. The tests below spend its outputs.
+            {
+                std::vector<unsigned char> vchSig;
+                uint256 hash = SignatureHash(p2pk_scriptPubKey, spend_tx, 0, SIGHASH_ALL, 0, SIGVERSION_BASE);
+                BOOST_CHECK(coinbaseKey.Sign(hash, vchSig));
+                vchSig.push_back((unsigned char) SIGHASH_ALL);
+                spend_tx.vin[0].scriptSig = CScript() << vchSig;
+            }
             block = CreateAndProcessBlock({spend_tx}, p2pk_scriptPubKey);
             BOOST_CHECK(chainActive.Tip()->GetBlockHash() == block.GetBlockHash());
             BOOST_CHECK(pcoinsTip->GetBestBlock() == block.GetBlockHash());
