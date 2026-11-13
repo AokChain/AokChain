@@ -553,7 +553,8 @@ public:
     void removeRecursive(const CTransaction &tx, MemPoolRemovalReason reason = MemPoolRemovalReason::UNKNOWN);
     void removeForReorg(const CCoinsViewCache *pcoins, unsigned int nMemPoolHeight, int flags);
     void removeConflicts(const CTransaction &tx);
-    void removeForBlock(const std::vector<CTransactionRef>& vtx, unsigned int nBlockHeight, std::set<CTokenCacheNewToken>& setNewTokens );
+    /** fUpdateEstimates: false leaves the fee estimator alone (the first synchronization). */
+    void removeForBlock(const std::vector<CTransactionRef>& vtx, unsigned int nBlockHeight, std::set<CTokenCacheNewToken>& setNewTokens, bool fUpdateEstimates = true);
     void removeForBlock(const std::vector<CTransactionRef>& vtx, unsigned int nBlockHeight);
 
     void clear();
