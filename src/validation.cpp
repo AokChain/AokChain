@@ -8,6 +8,8 @@
 
 #include "validation.h"
 
+#include <deque>
+
 #include "snapshot.h"
 
 #include "arith_uint256.h"
@@ -4854,6 +4856,55 @@ static bool CheckBlockStakeBeforeStorage(const CBlock& block, const CBlockIndex*
     return true;
 }
 
+/**
+ * Blocks stored per stake.
+ *
+ * A stake (a coin and a time) is the right to sign one block, but nothing stops its
+ * holder from signing any number of different blocks with it. Each of them passes
+ * every check that can be made before a block is stored, so a staker could have a
+ * node store them without end. Honest stakers sign one block per stake, so beyond a
+ * few blocks with the same stake further ones are not stored. Such a block is still
+ * fetched and stored once a header builds on it: the chain that the network extends
+ * is always followed, whichever of the blocks it started with.
+ *
+ * All protected by cs_main. Kept in memory only.
+ */
+unsigned int nMaxBlocksPerStake = DEFAULT_MAX_BLOCKS_PER_STAKE;
+static const size_t MAX_STAKES_REMEMBERED = 50000;
+static std::map<std::pair<COutPoint, unsigned int>, unsigned int> mapBlocksPerStake;
+static std::deque<std::pair<COutPoint, unsigned int> > queueBlocksPerStake;
+static std::set<const CBlockIndex*> setSkippedStakeVariants;
+
+bool IsSkippedStakeVariant(const CBlockIndex* pindex)
+{
+    AssertLockHeld(cs_main);
+    return setSkippedStakeVariants.count(pindex) != 0;
+}
+
+static void NoteStakeBlockStored(const std::pair<COutPoint, unsigned int>& stake)
+{
+    if (mapBlocksPerStake[stake]++ == 0) {
+        queueBlocksPerStake.push_back(stake);
+        if (queueBlocksPerStake.size() > MAX_STAKES_REMEMBERED) {
+            mapBlocksPerStake.erase(queueBlocksPerStake.front());
+            queueBlocksPerStake.pop_front();
+        }
+    }
+}
+
+/** Whether a header that builds on the block is known. */
+static bool HasChildHeader(const CBlockIndex* pindex)
+{
+    if (pindexBestHeader && pindexBestHeader != pindex && pindexBestHeader->GetAncestor(pindex->nHeight) == pindex)
+        return true;
+    // (reached only for a block beyond the limit; the stores before it took far longer than this)
+    for (const std::pair<const uint256, CBlockIndex*>& item : mapBlockIndex) {
+        if (item.second->pprev == pindex)
+            return true;
+    }
+    return false;
+}
+
 static bool AcceptBlock(const std::shared_ptr<const CBlock>& pblock, CValidationState& state, const CChainParams& chainparams, CBlockIndex** ppindex, bool fRequested, const CDiskBlockPos* dbp, bool* fNewBlock, const uint256& hash)
 {
     const CBlock& block = *pblock;
@@ -4923,6 +4974,23 @@ static bool AcceptBlock(const std::shared_ptr<const CBlock>& pblock, CValidation
         }
     }
 
+    // Blocks stored per stake (see nMaxBlocksPerStake)
+    const bool fCountStake = dbp == nullptr && !fReindex && !fImporting && block.IsProofOfStake();
+    std::pair<COutPoint, unsigned int> stake;
+    if (fCountStake) {
+        stake = std::make_pair(block.vtx[1]->vin[0].prevout, block.nTime);
+        std::map<std::pair<COutPoint, unsigned int>, unsigned int>::const_iterator it = mapBlocksPerStake.find(stake);
+        if (it != mapBlocksPerStake.end() && it->second >= nMaxBlocksPerStake && !fHasMoreWork && !HasChildHeader(pindex)) {
+            LogPrintf("%s: block %s (height %d) is not stored: %u blocks with its stake %s at time %u are stored already\n",
+                      __func__, hash.ToString(), pindex->nHeight, it->second, stake.first.ToString(), stake.second);
+            if (setSkippedStakeVariants.size() >= MAX_STAKES_REMEMBERED)
+                setSkippedStakeVariants.clear();
+            setSkippedStakeVariants.insert(pindex);
+            if (fNewBlock) *fNewBlock = false;
+            return true;
+        }
+    }
+
     // Header is valid/has work, merkle tree and segwit merkle tree are good...RELAY NOW
     // (but if it does not build on our best tip, let the SendMessages loop relay it)
     if (!IsInitialBlockDownload() && chainActive.Tip() == pindex->pprev)
@@ -4945,6 +5013,11 @@ static bool AcceptBlock(const std::shared_ptr<const CBlock>& pblock, CValidation
             return error("AcceptBlock(): ReceivedBlockTransactions failed");
     } catch (const std::runtime_error& e) {
         return AbortNode(state, std::string("System error: ") + e.what());
+    }
+
+    if (fCountStake) {
+        NoteStakeBlockStored(stake);
+        setSkippedStakeVariants.erase(pindex);
     }
 
     if (fCheckForPruning)

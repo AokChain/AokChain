@@ -503,6 +503,7 @@ std::string HelpMessage(HelpMessageMode mode)
         strUsage += HelpMessageOpt("-limitdescendantcount=<n>", strprintf("Do not accept transactions if any ancestor would have <n> or more in-mempool descendants (default: %u)", DEFAULT_DESCENDANT_LIMIT));
         strUsage += HelpMessageOpt("-limitdescendantsize=<n>", strprintf("Do not accept transactions if any ancestor would have more than <n> kilobytes of in-mempool descendants (default: %u).", DEFAULT_DESCENDANT_SIZE_LIMIT));
         strUsage += HelpMessageOpt("-lastpowblock=<height>", "Height of the last proof-of-work block; later blocks must be proof-of-stake (regtest-only)");
+        strUsage += HelpMessageOpt("-maxblocksperstake=<n>", strprintf("Blocks with the same stake (coin and time) that are stored; further ones are stored only when a block builds on them (default: %u)", DEFAULT_MAX_BLOCKS_PER_STAKE));
         strUsage += HelpMessageOpt("-masteraddress=<address>", "Governance master address, to test governance commands with a key of the test (regtest-only)");
         strUsage += HelpMessageOpt("-futuredriftheight=<height>", "Height from which a proof-of-stake block may be at most 60 seconds ahead of the clock (regtest-only)");
         strUsage += HelpMessageOpt("-restorecointime", "Give the coins of a disconnected block their transaction time back; 0 loses it as versions before 4.0 did (regtest-only, default: 1)");
@@ -1184,6 +1185,8 @@ bool AppInitParameterInteraction()
         }
         SetRestoreCoinTime(false);
     }
+
+    nMaxBlocksPerStake = (unsigned int)std::max<int64_t>(1, gArgs.GetArg("-maxblocksperstake", DEFAULT_MAX_BLOCKS_PER_STAKE));
 
     if (gArgs.IsArgSet("-masteraddress")) {
         if (!chainparams.MineBlocksOnDemand())

@@ -132,6 +132,7 @@ BASE_SCRIPTS= [
     'p2p_orphan_processing.py',
     'feature_tokens.py',
     'feature_governance.py',
+    'feature_stake_variants.py',
     'rpc_mnemonic.py',
     'wallet_importmnemonic.py',
     'wallet_multisig_flow.py',
