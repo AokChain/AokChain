@@ -102,9 +102,11 @@ staking node stakes them. To end it, the owner sends the coins anywhere else.
   majority of the stake.
 - **The staking key is a hot key.** Whoever has it can stake the coins and nothing else,
   under the 4.0 rule. He can also refuse to stake them; the owner then moves the coins.
-- **The owner's wallet treats the coins as its own money.** A payment from the owner's
-  wallet may pick them as inputs like any other coin, which ends the delegation of those
-  coins. Keep them in a wallet that is not used for payments, or spend with coin control.
+- **The owner's wallet counts the coins as its own money, and a payment leaves them alone.**
+  They are in the balance, but a payment does not take them as inputs on its own (it did
+  before 4.0rc9, which ended the delegation of those coins unasked); with only delegated
+  coins a payment fails with "Insufficient funds". To spend them, select them: coin control
+  in the GUI, or a raw transaction. `-spendofflinestaking=1` gives the old behaviour back.
 - **No reward for the operator.** A staking service would need an agreement outside the
   chain.
 - A stake gathers small coins of the same offline staking address like any stake

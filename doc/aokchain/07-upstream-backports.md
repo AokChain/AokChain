@@ -49,7 +49,7 @@
 |---|---|---|---|---|---|
 | P-01 | **Fake stake defence**: check the kernel, stake prevout and signature **before** a block is stored on disk | [V] Blocks whose parent is on the active chain are checked before they are stored (`e5c3203`, `d4e3bb2`). See the "Lesson" in document 04 | **P0** | M | partly ✅ |
 | P-02 | Budget limit for fake stakes that use an already spent kernel (fork blocks) | [V] The kernel is checked only against the UTXO tip | P1 | M | ⏳ |
-| P-03 | Blocking duplicate stakes (`setStakeSeen`) | [V] absent | P1 | S | ⏳ |
+| P-03 | No unlimited storing of different blocks signed with one stake | [V] **Fixed**: limit on stored blocks per stake, `-maxblocksperstake` (default 4); a further block is fetched when a header builds on it. Unlike BlackCoin's `setStakeSeen` the block is not refused (a node that refuses it cannot follow when the chain continues on that block). SEC-28 | P1 | S | ✅ |
 
 ### A-3. Policy / defaults / feature removal
 

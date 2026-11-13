@@ -9,21 +9,29 @@ The suites are run one by one now:
 ```bash
 contrib/aokchain/unit-tests.sh        # each suite on its own, compared with doc/aokchain/unit-baseline.txt
 ```
-Current state: **59 of 70 suites pass, 11 fail.** The 59 are the baseline (`unit-baseline.txt`); if one of them fails, that is a regression. (53 passed when this was first looked at; `crypto_tests`, `hash_tests`, `main_tests`, `wallet_tests`, `key_tests` and `pow_tests` were adapted to AokChain, and the test fixture got a governance state, without which every check of a transaction's inputs crashed on a null pointer.)
+Current state: **all 70 suites that have test cases pass** (`miner_tests` is empty: its cases were removed in the code this fork started from). The 70 are the baseline (`unit-baseline.txt`); if one of them fails, that is a regression. (53 passed when this was first looked at, then 59 and 63.)
 
-| Failing suites | Reason (all inherited test data or assumptions) |
+How the last suites were recovered:
+
+| Suite | Cause and what was done |
 |---|---|
-| `bloom_tests`, `merkleblock_tests`, `transaction_tests`, `coins_tests`, `sighash_tests`, `script_tests` | Transactions, blocks and coins serialized in the Bitcoin format. AokChain transactions have `nTime`/`nMessage` and coins have a time field, so deserialization goes wrong |
-| `rpc_tests` | Addresses with the Ravencoin prefix, raw transactions in the Bitcoin format, `getnetworkinfo` and `setban` in a fixture without a network object |
-| `versionbits_tests`, `policyestimator_tests` | Expect Bitcoin's difficulty, deployment and fee parameters |
-| `tx_validationcache_tests` | `checkinputs_test` assumes Bitcoin's staged activation of script rules (blocks before DERSIG). AokChain enforces them from the start. The double-spend test passes |
-| `miner_tests` | Its test cases are disabled |
+| `coins_tests`, `sighash_tests`, `script_tests` | Coins have a time field and the signature hash covers `nTime`. The tests were adapted and the vectors regenerated (`sighash.json` with `PRINT_SIGHASH_JSON`, the script vectors with `UPDATE_JSON_TESTS`) |
+| `bloom_tests`, `merkleblock_tests` | They parsed blocks and transactions serialized in the Bitcoin format. They now build blocks in the AokChain format inside the test (`TestKey`, `TestTx`, `TestBlock`, `TestBlock9` in `test_aokchain.h`) and check the same properties: filter matches, the output update flags, partial merkle tree proofs, serialization |
+| `transaction_tests` | `basic_transaction_test`: `nTime` added to the vector. `tx_valid_test` and `tx_invalid_test` are **not run** (`unit-not-run.txt`): their vectors carry Bitcoin signatures; in the AokChain format the signature hash is another one, and without the private keys they cannot be signed again. Signature hashing and script evaluation are covered by `sighash_tests` and `script_tests` |
+| `rpc_tests` | Ravencoin addresses, the Bitcoin private key prefix and a raw transaction in the Bitcoin format were replaced; a ban end time that had passed was moved to the future; `has_ipfs` was missing in `issue`. For the boolean fields see "RPC booleans" below |
+| `versionbits_tests` | AokChain decides the start and the timeout of a deployment by the time of the block itself (Bitcoin: the median of the past blocks). The two scenarios where that shows were adapted |
+| `policyestimator_tests` | The optimization that skips fee estimates during the first synchronization asked `IsInitialBlockDownload()` inside the mempool, so in a test without a chain the estimator received nothing. The decision moved to the caller (`ConnectTip`) |
+| `tx_validationcache_tests` | `checkinputs_test` assumed blocks before DERSIG. AokChain enforces it from the start: the test now checks that a block with a non-DER signature is **refused**, signs again with a DER signature and goes on |
 
-These 11 do not point to defects in the code; the tests were never ported to AokChain. But **those areas (script vectors, sighash, transaction parsing) are not protected by unit tests**, and regenerating the vectors in the AokChain format is what remains (in this order: `tx_validationcache_tests`, `script_tests`, `sighash_tests`, `transaction_tests`).
+**RPC booleans.** The JSON library of this code base has no `pushKV(key, bool)`, so a boolean passed to `pushKV` is printed as the number `1` or `0` (`networkactive` of `getnetworkinfo`, `complete` of `signrawtransaction`, `staking` of `getstakinginfo` and others). It has been that way since 3.0.x, and exchanges and explorers may read this output, so it is **not changed**. Printing `true`/`false` is a compatibility decision that needs a look at the programs that read it.
 
-| Status | Suite | Cause | Direction of the fix |
-|---|---|---|---|
-| ✖ 5 fail | `bloom_tests` (bloom_match, merkle_block_1/2/2_with_update_none/3_and_serialize) | They use serialized transaction and block hex and secret key strings in the Bitcoin format. AokChain transactions have `nTime`/`nMessage`, so deserialization fails | Create real transactions and blocks on regtest, extract the hex and replace the vectors. The test logic (filter matching) can stay as it is |
+### 1.1 Sanitizers (2026-11-13)
+
+Every unit suite was run in a build with `-fsanitize=address,undefined` (configured with `--with-asm=no --disable-asm`: the hand-written SHA256 assembly crashes in a sanitizer build). Found:
+
+- `Solver()` did not set its second type (`scriptTypeRet`) unless the script is a token script, and callers (`AreInputsStandard`, `ProduceSignature`) compared the uninitialized value. Not a consensus path. Fixed.
+- `CFeeRate(fee, size)` overflowed 64 bits for amounts above 92 million AOK. Fixed.
+- Two memory errors in the tests themselves (`script_P2PKH_tests` read past an array, `checkqueue_tests` let a thread read variables that had left their scope). Fixed.
 
 Main test bugs fixed this time (for reference; do not repeat the same mistakes):
 - `vchBlockSig` was missing from `TestHeaderAndShortIDs`, so the compact block serialization was misaligned.

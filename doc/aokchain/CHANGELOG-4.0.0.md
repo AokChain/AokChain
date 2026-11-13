@@ -142,3 +142,16 @@ Reviewed and not taken over:
 - **Ravencoin 4.8, mining bypass**: proof-of-work (KAWPOW) only, does not apply.
 - **Announcement queue of paused pre-BIP31 peers (CVE-2026-117349)**: does not apply, the lowest accepted protocol version is past BIP31.
 - **Undo file position overflow (CVE-2026-117346)**: applies and is not fixed. The undo data of one block file has to exceed 4 GiB, which needs a staker who builds a series of blocks that spend very many outputs with large scripts. The fix (64 bit positions) is outstanding.
+
+## Update of 2026-11-13 (3): rc9
+
+- **Limit on stored blocks per stake (SEC-28).** A node stored any number of different blocks signed with one stake; it now stores four (`-maxblocksperstake`). A further block is fetched and stored when a block builds on it. The consensus rules are unchanged.
+- **Uninitialized script type.** `Solver()` set its second type for token scripts only, so the standard input check and wallet signing compared an uninitialized value (found with the sanitizers). Not a consensus path.
+- **Fee rate overflow.** `CFeeRate` overflowed 64 bits for amounts above 92 million AOK.
+- **Fee estimates.** The decision to skip estimates during the first synchronization moved from the mempool to the block connection code (same behaviour).
+- **Governance test.** With the regtest-only `-masteraddress` a test holds the master key; freeze, unfreeze, issuing cost, fee address and block disconnection are tested (`feature_governance.py`). A test of issuing, transferring and reissuing tokens was added (`feature_tokens.py`).
+- **Unit tests.** All 70 suites that have test cases pass (`05-stability-testing.md`). Two cases on Bitcoin signature vectors are not run.
+- **Sanitizers.** Every unit suite was run under the address and undefined behaviour sanitizers.
+- The functional test baseline has 51 tests.
+
+Note: some boolean fields of RPC results are printed as `1`/`0`, not `true`/`false`, since 3.0.x (`networkactive`, `complete`, `staking` and others). This is kept for compatibility with programs that read them.
