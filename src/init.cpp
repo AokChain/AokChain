@@ -1517,7 +1517,9 @@ bool AppInitMain(boost::thread_group& threadGroup, CScheduler& scheduler)
     int64_t nCoinDBCache = std::min(nTotalCache / 2, (nTotalCache / 4) + (1 << 23)); // use 25%-50% of the remainder for disk cache
     nCoinDBCache = std::min(nCoinDBCache, nMaxCoinsDBCache << 20); // cap total coins db cache
     nTotalCache -= nCoinDBCache;
-    int64_t nGovernanceDBCache = nTotalCache / 2;
+    // The governance state is a few entries: 8 MiB are plenty. (It used to get half of what was
+    // left, which took that half away from the cache of unspent outputs.)
+    int64_t nGovernanceDBCache = std::min<int64_t>(nTotalCache / 2, 8 << 20);
     nTotalCache -= nGovernanceDBCache;
     nCoinCacheUsage = nTotalCache; // the rest goes to in-memory cache
     int64_t nMempoolSizeMax = gArgs.GetArg("-maxmempool", DEFAULT_MAX_MEMPOOL_SIZE) * 1000000;
