@@ -19,6 +19,7 @@ dbwrapper_tests
 DoS_tests
 getarg_tests
 hash_tests
+key_tests
 limitedmap_tests
 main_tests
 mempool_tests
@@ -29,6 +30,7 @@ net_tests
 offlinestake_tests
 pmt_tests
 pos_tests
+pow_tests
 PrevectorTests
 raii_event_tests
 random_tests
