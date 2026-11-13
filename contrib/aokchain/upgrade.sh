@@ -17,8 +17,10 @@
 #
 # Settings (environment variables, all optional):
 #   AOK_BASE      where the archive is downloaded from (default: where this script is published)
-#   AOK_DATADIR   data directory (default: ~/.aokchain)
-#   AOK_BINDIR    where to install (default: the directory of the installed aokchaind, else /usr/local/bin)
+#   AOK_DATADIR   data directory (default: the -datadir of the running node or of the systemd unit,
+#                 else ~/.aokchain). Needed when several nodes run on the machine.
+#   AOK_BINDIR    where to install (default: the directory of the running or configured aokchaind,
+#                 else of the aokchaind in PATH, else /usr/local/bin)
 #   AOK_START=0   do not start the node after installing
 #   AOK_REPAIR=0  do not run "repaircoins" after an upgrade from 3.0.x
 #   AOK_SYSTEMD=1 on a machine without an aokchaind unit, install one (starts the node at boot)
@@ -36,12 +38,69 @@ DEFAULT_BASE="@BASE@"
 
 main() {
     local base="${AOK_BASE:-$DEFAULT_BASE}"
-    local datadir="${AOK_DATADIR:-$HOME/.aokchain}"
-    local conf="$datadir/aokchain.conf"
     local start="${AOK_START:-1}"
 
     say()  { printf '\n== %s\n' "$*"; }
     fail() { printf '\nERROR: %s\n' "$*" >&2; exit 1; }
+
+    # ---- the node as it runs now: its program and its options (a running process first,
+    # then the systemd unit), so that a node with its own -datadir or program directory is
+    # upgraded where it is
+    local unit=""
+    if command -v systemctl >/dev/null && systemctl cat aokchaind.service >/dev/null 2>&1; then
+        unit="aokchaind.service"
+    fi
+    # the data directory of a running process (its -datadir, else the default)
+    process_datadir() {
+        local dir
+        dir="$(tr '\0' '\n' < "/proc/$1/cmdline" 2>/dev/null | sed -n 's/^--\{0,1\}datadir=//p' | tail -n 1)"
+        printf '%s\n' "${dir:-$HOME/.aokchain}"
+    }
+    local running_pid="" running_exe="" running_args="" pid
+    local all_pids
+    all_pids="$(pgrep -x aokchaind || true)"
+    if [ -n "${AOK_DATADIR:-}" ]; then
+        # the node of that data directory
+        for pid in $all_pids; do
+            if [ "$(readlink -f "$(process_datadir "$pid")")" = "$(readlink -f "$AOK_DATADIR")" ]; then
+                running_pid="$pid"
+            fi
+        done
+    elif [ "$(printf '%s\n' "$all_pids" | grep -c .)" -gt 1 ]; then
+        fail "several nodes run on this machine; set AOK_DATADIR to the data directory of the one to upgrade"
+    else
+        running_pid="$all_pids"
+    fi
+    if [ -n "$running_pid" ]; then
+        if [ "$(stat -c %u "/proc/$running_pid" 2>/dev/null)" != "$(id -u)" ]; then
+            fail "the node runs as the user $(stat -c %U "/proc/$running_pid" 2>/dev/null); run this script as that user"
+        fi
+        running_exe="$(readlink "/proc/$running_pid/exe" 2>/dev/null | sed 's/ (deleted)$//' || true)"
+        running_args="$(tr '\0' '\n' < "/proc/$running_pid/cmdline" 2>/dev/null || true)"
+    elif [ -n "$unit" ]; then
+        local unit_user
+        unit_user="$(systemctl show -p User --value "$unit" 2>/dev/null || true)"
+        if [ -n "$unit_user" ] && [ "$unit_user" != "$(id -un)" ]; then
+            fail "the unit $unit runs the node as the user $unit_user; run this script as that user"
+        fi
+        local exec_start
+        exec_start="$(systemctl show -p ExecStart --value "$unit" 2>/dev/null || true)"
+        running_exe="$(printf '%s\n' "$exec_start" | sed -n 's/.*path=\([^ ;]*\).*/\1/p' | head -n 1)"
+        running_args="$(printf '%s\n' "$exec_start" | sed -n 's/.*argv\[\]=\([^;]*\).*/\1/p' | head -n 1 | tr ' ' '\n')"
+    fi
+    local option_datadir
+    option_datadir="$(printf '%s\n' "$running_args" | sed -n 's/^--\{0,1\}datadir=//p' | tail -n 1)"
+
+    local datadir="${AOK_DATADIR:-${option_datadir:-$HOME/.aokchain}}"
+    local conf="$datadir/aokchain.conf"
+    # the systemd unit counts only when it runs this node (the data directory of its command)
+    if [ -n "$unit" ]; then
+        local unit_datadir
+        unit_datadir="$(systemctl show -p ExecStart --value "$unit" 2>/dev/null | sed -n 's/.*argv\[\]=\([^;]*\).*/\1/p' | tr ' ' '\n' | sed -n 's/^--\{0,1\}datadir=//p' | tail -n 1)"
+        if [ "$(readlink -f "${unit_datadir:-$HOME/.aokchain}")" != "$(readlink -f "$datadir")" ]; then
+            unit=""
+        fi
+    fi
 
     # ---- requirements
     [ "$(uname -s)" = "Linux" ] && [ "$(uname -m)" = "x86_64" ] || fail "this archive is for Linux x86_64"
@@ -56,8 +115,11 @@ main() {
         fail "glibc $glibc is too old; 2.34 or later is needed (Ubuntu 22.04, Debian 12 or newer)"
     fi
 
-    # ---- where the programs go
+    # ---- where the programs go: where the running (or configured) program is
     local bindir="${AOK_BINDIR:-}"
+    if [ -z "$bindir" ] && [ -n "$running_exe" ] && [ -x "$running_exe" ]; then
+        bindir="$(dirname "$running_exe")"
+    fi
     if [ -z "$bindir" ]; then
         if command -v aokchaind >/dev/null; then
             bindir="$(dirname "$(readlink -f "$(command -v aokchaind)")")"
@@ -110,13 +172,8 @@ main() {
     fi
 
     # ---- how the node runs
-    local unit=""
-    if command -v systemctl >/dev/null && systemctl cat aokchaind.service >/dev/null 2>&1; then
-        unit="aokchaind.service"
-    fi
     # (the process ids, not the name: while shutting down the program renames itself)
-    local was_running=0 pids=""
-    pids="$(pgrep -x aokchaind || true)"
+    local was_running=0 pids="$running_pid"
     if [ -n "$pids" ]; then
         was_running=1
     fi
@@ -127,7 +184,10 @@ main() {
         if [ -n "$unit" ] && systemctl is-active --quiet "$unit"; then
             sudo systemctl stop "$unit"
         else
-            "${cli[@]}" stop || fail "the node does not answer 'aokchain-cli stop'; stop it and run this again"
+            # (a node that is still starting answers no RPC call: SIGTERM stops it the same way)
+            if ! "${cli[@]}" stop 2>/dev/null; then
+                kill -TERM $pids 2>/dev/null || fail "the node does not answer 'aokchain-cli stop'; stop it and run this again"
+            fi
         fi
         local waited=0 pid alive=1
         while [ "$alive" = 1 ]; do
@@ -212,16 +272,45 @@ UNIT
     if [ -n "$unit" ]; then
         sudo systemctl start "$unit"
     else
-        "$bindir/aokchaind" -daemon "-datadir=$datadir" >/dev/null
+        # with the options of its command line as before (they may not be in aokchain.conf),
+        # as a daemon
+        local -a options=()
+        local option
+        if [ -n "$running_args" ]; then
+            while IFS= read -r option; do
+                [ -n "$option" ] && options+=("$option")
+            done < <(printf '%s\n' "$running_args" | tail -n +2)
+        fi
+        if [ "${#options[@]}" -eq 0 ]; then
+            options=("-datadir=$datadir")
+        fi
+        case " ${options[*]} " in
+            *" -daemon "*|*" -daemon=1 "*|*" --daemon "*) ;;
+            *) options+=("-daemon") ;;
+        esac
+        "$bindir/aokchaind" "${options[@]}" >/dev/null
     fi
     local waited=0 blocks=""
     sleep 3
     until blocks="$("${cli[@]}" getblockcount 2>/dev/null)"; do
-        pgrep -f "^$bindir/aokchaind" >/dev/null || fail "the node stopped while starting; see $datadir/debug.log${keep:+. The old programs are in $keep}"
+        pgrep -f "^$bindir/aokchaind" >/dev/null || pgrep -x aokchaind >/dev/null || fail "the node stopped while starting; see $datadir/debug.log${keep:+. The old programs are in $keep}"
         [ "$waited" -lt 1800 ] || fail "the node does not answer after 30 minutes; see $datadir/debug.log"
         sleep 5; waited=$((waited + 5))
     done
     echo "running:         $("${cli[@]}" getnetworkinfo | grep '"subversion"' | tr -d ' ,')"
+    # the process that answers must run the program that was installed
+    local pid_now="" exe_now=""
+    for pid in $(pgrep -x aokchaind || true); do
+        if [ "$(readlink -f "$(process_datadir "$pid")")" = "$(readlink -f "$datadir")" ]; then
+            pid_now="$pid"
+        fi
+    done
+    if [ -n "$pid_now" ]; then
+        exe_now="$(readlink "/proc/$pid_now/exe" 2>/dev/null | sed 's/ (deleted)$//' || true)"
+    fi
+    if [ -n "$exe_now" ] && [ "$exe_now" != "$bindir/aokchaind" ]; then
+        echo "WARNING: the node that runs is $exe_now, not $bindir/aokchaind: check how it is started"
+    fi
     echo "blocks:          $blocks"
 
     # ---- coins that 3.0.x left without a time (doc/aokchain/16-stake-coin-time.md)

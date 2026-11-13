@@ -62,7 +62,10 @@ encrypted or changed (its copy in the backup is as unencrypted as the wallet; th
 three backups are kept). A new installation can start from the chain state snapshot
 (`AOK_SNAPSHOT=http://…`). After an upgrade from 3.0.x it runs `repaircoins`
 (`doc/aokchain/16-stake-coin-time.md`). Settings are environment variables, listed at
-the top of the script.
+the top of the script. The script finds the program and the data directory of the node from
+the running process (or the systemd unit), keeps the options of its command line when it starts
+it again, and refuses to guess when several nodes run on the machine (set `AOK_DATADIR`). It is
+run as the user that runs the node.
 
 The file in the source tree has three placeholders. To publish it for a release:
 
