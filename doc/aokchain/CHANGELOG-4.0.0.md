@@ -118,7 +118,7 @@ A wallet that had been used for a long time became very slow as transactions acc
 - The staking switch showed "off" after a start with `-staking=1` while the wallet staked; fixed.
 
 ### Tests
-- The unit test suites run one by one. "73 of 78 pass" was the count of a run that stopped half way; in fact **53 of 70 suites pass**, and the 17 that fail use Bitcoin or Ravencoin test data (`05-stability-testing.md`).
+- The unit test suites run one by one. "73 of 78 pass" was the count of a run that stopped half way; in fact **57 of 70 suites pass** (four were repaired now), and the 13 that fail use Bitcoin or Ravencoin test data (`05-stability-testing.md`).
 - The functional baseline has 47 tests.
 
 ### The reward schedule
