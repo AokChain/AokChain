@@ -21,16 +21,16 @@
 | SEC-05 | **Critical** | Governance commands can be applied without a master key signature (in combination with SEC-01); governance state changes are applied even when block validation fails | No fork needed | **core path fixed** (`10a3fd7`) — the signature failure path is closed. The other failure paths (reward too high etc.) and `fJustCheck` remain |
 | SEC-06 | High | PoS "fake stake" disk/memory exhaustion | No (policy) | **partly fixed** (`e5c3203`, `d4e3bb2`) — only blocks whose parent is on the active chain are checked in advance. Deep forks and header spam remain |
 | SEC-07 | High | OpenSSL 1.0.1k (EOL) — used for the RNG | No | **partly fixed** (`1a11bda`) — depends raised to 3.0.15. Removing the OpenSSL dependency of the RNG remains |
-| SEC-08 | Medium | `nBits` check skipped while syncing the first 1440 blocks | Yes | open |
+| SEC-08 | Medium | `nBits` check skipped while syncing the first 1440 blocks | Yes | **Fixed** (rc7) — the difficulty field is checked for every proof-of-stake header. Blocks 1,443 to 3,031,432 all have the value of the formula (1441 and 1442 of the main network do not and are left out) |
 | SEC-09 | Medium | Index access before the size check when parsing governance scripts | Same result | **fixed** (`10a3fd7`) |
 | SEC-10 | Medium | A single master key can freeze arbitrary addresses | Policy | needs documentation |
 | SEC-11 | Medium | No rate limit for addr messages, no defence against low-work header spam | No | **partly fixed** (`a641851`) — addr rate limit added. The header spam defence remains |
 | SEC-12 | Medium | zeromq 4.2.2 (CVE-2019-6250 etc.) | No | **fixed** (`1a11bda`, 4.3.5) |
-| SEC-13 | Medium | `fWalletUnlockStakingOnly` is a global flag (multi-wallet) | No | open |
+| SEC-13 | Medium | `fWalletUnlockStakingOnly` is a global flag (multi-wallet) | No | **Fixed** (rc7) — `fUnlockStakingOnly` is a member of each wallet |
 | SEC-14 | Medium | `CheckAmountWithUnits` uses floating-point `pow()` | Same result | **fixed** (`a016189`) |
-| SEC-15 | Medium | `MAX_MONEY = INT64_MAX` — the range check is effectively meaningless | Yes | open |
+| SEC-15 | Medium | `MAX_MONEY = INT64_MAX` — the range check is effectively meaningless | Yes | **Fixed** (rc7) — `MAX_MONEY` is 25 billion AOK. With 2.1 billion coins in existence no block can be affected |
 | SEC-16 | Low | `addressType` uninitialized (address index) | No | **fixed** (`b844eb7`) |
-| SEC-17 | Low | Checkpoints/assumevalid/minimumChainWork need updating, one DNS seed | No | **partly fixed** (`13222ef`) — assumevalid, minimumChainWork and chainTxData updated to block 3,030,000. Checkpoints and seeds remain |
+| SEC-17 | Low | Checkpoints/assumevalid/minimumChainWork need updating, one DNS seed | No | **Partly fixed** (rc7) — checkpoints up to 3,030,000, fixed seeds rebuilt from seven nodes that answer. The DNS seed `dns.aok.network` does not resolve |
 | SEC-18 | Low | GUI dependencies (Qt 5.7.1, zlib 1.2.11, freetype 2.7.1, expat 2.2.1) | No | **partly fixed** (`f8cdd48`) — Qt 5.15.10 for the Windows build. The Qt depends for Linux remains |
 | SEC-19 | High | `-reindex-chainstate` does not wipe the token and governance databases and marks a valid block (179,185) invalid | No | **fixed** (`25c7554`) |
 | SEC-20 | High | `-reindex` cannot index blocks stored before their parent and stops midway (at 3,440 with mainnet data) | No | **fixed** (`1d870fb`) |
@@ -39,6 +39,7 @@
 | SEC-23 | Medium | `ActivateBestChain` terminates with a null dereference when it receives a block without a hash pointer. Happens when a peer's block request (getdata, GETBLOCKTXN) arrives right after another thread (staking, `submitblock`) accepted a block. Present in the original 3.0.x code | No | **fixed** (`1d028b4`) |
 | SEC-24 | Medium | Staking thread: (1) when there are no coins to stake it scans the wallet repeatedly without `sleep` while holding `cs_main` and `cs_wallet`, uses 100% of one core and starves validation, P2P and RPC. (2) The kernel search reads the tip and the UTXO cache (`pcoinsTip`) without locks and races with the validation thread (found by code review; a crash was not reproduced). Present in the original 3.0.x code. (1) was reproduced on the mainnet verification node (core 100% → 0%) | No | **fixed** (`1d706e9`, `04103d4`) |
 | SEC-25 | Low | `ZapSelectTx` (`removeprunedfunds`) leaves behind the `wtxOrdered` pointer of the deleted wallet transaction (later access to freed memory in `listtransactions`) and its `mapTxSpends` entries (if another transaction spends the same output, termination by the assert in `MarkConflicted` — reproduced while testing the new RPC). Reachable only through local RPC. Bitcoin Core fixed it with #13437, #18850 and #34358, and the code was brought into the same form | No | **fixed** (`ed715ce`, `643fa84`) |
+| SEC-26 | **High** | Offline staking: the holder of a staking key could put delegated coins behind a kernel of his own in a coinstake and pay them to himself, or pay back less than the stake took in. Validation looked only at the script of the kernel input, not at the other inputs or the amounts | Tightening of the rules. No activation height needed: the main network never had an offline staking output (all blocks and the chain state were searched) | **Fixed** (rc7) — `CheckOfflineStakeScripts()`, 18-offline-staking.md |
 
 ---
 

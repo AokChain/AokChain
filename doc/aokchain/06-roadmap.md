@@ -25,7 +25,7 @@ A consensus change is any change that alters the **criteria by which a node acce
 ### Phase 1 — Build modernization and test recovery ✅ (2026-11-09, mostly done)
 - [x] Build with C++17, gcc 13, Boost 1.83, OpenSSL 3
 - [x] Fix building and linking of `aokchain-tx`
-- [x] Restore compilation of the unit tests (73/78 pass)
+- [x] Restore compilation of the unit tests (57 of 70 suites pass; "73/78" was the count of a run that stopped half way, see document 05)
 - [x] Restore the functional test framework (baseline of 38 passes, including regtest PoS staking)
 - [x] Fix the undefined symbols of `libaokchainconsensus.so`
 - [x] Fix SEC-03 (remote crash)

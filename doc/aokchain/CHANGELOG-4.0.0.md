@@ -1,6 +1,8 @@
+# AokChain Core 4.0.0 (candidate) changelog — compared with 3.0.5
+
 - **Covers:** 4.0.0 release candidate (`modernize` branch, Windows test build `v4.0.0.0-0698aa2`)
 - **Baseline:** 3.0.5 (`5d1fd3d`, 2022-09-24)
-- **Size:** 96 commits, 277 files changed (as of `08bd166`)
+- **Size:** 136 commits (as of 2026-11-13)
 - **Status:** pre-release. Not yet observed on testnet and not code-signed.
 
 ## Compatibility
@@ -52,8 +54,9 @@ A wallet that had been used for a long time became very slow as transactions acc
 - **`purgeorphanstakes`.** Deletes orphaned stakes that pile up in the wallet file (run manually).
 - **`-checkwalletlive`.** Test option that verifies the wallet index against a full scan.
 - **`-lastpowblock`.** Lets regtest reach the proof-of-stake phase (regtest only).
+
 - **Chain state snapshot (fast start).** A new installation starts from the chain state at block 3,031,432 instead of validating every block. The program accepts a snapshot only when the hashes of its unspent outputs, tokens, governance state and block index equal the values compiled into it; otherwise it removes the snapshot and validates the blocks. The blocks before the snapshot are downloaded only when something needs them (`fetchblocks`, `-fetchblocks=1`, or the question the wallet asks). `-snapshot=0` turns it off. RPCs `getstatehashes`, `getsnapshotinfo`, `fetchblocks`; tool `contrib/aokchain/make_snapshot.py`. See `15-snapshot.md`.
-- **Faster block validation** for nodes that validate the chain: the staked transaction is no longer read from disk for every block, and three per-block costs that were not validation are gone. See `15-snapshot.md` §6.# AokChain Core 4.0.0 (candidate) changelog — compared with 3.0.5
+- **Faster block validation** for nodes that validate the chain: the staked transaction is no longer read from disk for every block, and three per-block costs that were not validation are gone. See `15-snapshot.md` §6.
 
 ## Bug fixes
 
@@ -69,7 +72,7 @@ A wallet that had been used for a long time became very slow as transactions acc
 
 - **Compiler:** C++17. Builds on current systems (Ubuntu 24.04, GCC 13). 3.0.5 did not build there.
 - **Dependencies:** Boost 1.64 → 1.83, OpenSSL 1.0.1k → 3.0.15, libevent 2.1.8 → 2.1.12, ZeroMQ 4.2.2 → 4.3.5, miniupnpc 2.0 → 2.2.7. BDB stays at 4.8.30.
-- **Windows build:** Qt 5.7.1 → 5.15.10 (static, cross-compiled). Merged into `modernize`.
+- **Windows build:** Qt 5.7.1 → 5.15.10. This part lives in a separate work tree and is not merged into `modernize` yet.
 
 ## Tests
 
@@ -84,3 +87,40 @@ A wallet that had been used for a long time became very slow as transactions acc
 - **Windows:** tested under wine only. Long-term operation on real Windows is not confirmed.
 - **Mnemonics:** only English and Korean are validated. The derivation scheme of the AOK mobile wallet is not published.
 - **Not code-signed.** Windows SmartScreen shows a warning.
+
+## Update of 2026-11-13: added in rc3 to rc7
+
+### Staking
+- **Coins that lost their time in a reorganization.** 3.0.x lost the transaction time of a coin when a block was disconnected, and such a coin then produced only invalid stake blocks (invalid blocks at 21.5% of the main network heights; 4,659 and 3,748 damaged coins on the two large staking nodes). 4.0 keeps the time, stakes damaged coins correctly and repairs the chain state with `repaircoins`. With both nodes on 4.0 there are no invalid blocks (`16-stake-coin-time.md`).
+- **Size of the staking coins**: `-stakecombinethreshold` (default 1,000 AOK, was fixed at 100). A staking wallet has about a tenth of the coins.
+- **`getstakinginfo` and the side bar show the last 24 hours**: stakes, lost stakes, reward.
+- **Offline staking validation (SEC-26).** The holder of a staking key could take or destroy delegated coins; closed. No activation height, because the main network never used the feature (`18-offline-staking.md`).
+
+### Wallet and tools
+- `aokchain-wallet`: look into a wallet file, create one or salvage one, without a node.
+- `unloadwallet`, `restorewallet`. `backupwallet` copied the file of another wallet for a wallet in a folder of its own; fixed.
+- `importprivkey` on a snapshot node imports the key and waits for the past blocks.
+- The staking-only unlock is a state of each wallet (SEC-13).
+
+### Commands and options from Bitcoin Core 0.17 to 30 (`17-upstream-features.md`)
+- `scantxoutset`, `testmempoolaccept`, `getblockstats`, `getindexinfo`, `getnodeaddresses`, `getrpcinfo`, `getaddressinfo`, `getbalances`, `signrawtransactionwithwallet`, `signrawtransactionwithkey`
+- a fee rate limit for `sendrawtransaction`
+- `-rpcwhitelist`, `-daemonwait`, `-startupnotify`, `-shutdownnotify`, `-logratelimit`
+
+### Security (this update)
+- **SEC-08:** the difficulty field of a proof-of-stake block is checked for every header (it was skipped during the initial synchronization). Blocks 1,443 to 3,031,432 all have the value of the formula.
+- **SEC-15:** the upper bound of an amount is 25 billion AOK instead of the largest 64 bit number, so the range checks mean something.
+- **SEC-17:** checkpoints up to 3,030,000; the fixed seeds are rebuilt from nodes that answer.
+- **A smaller allowance for the time of a block** (10 minutes to 60 seconds) as a rule with an activation height; not scheduled on the main network.
+
+### GUI
+- Plainer design (grey ramp, weights 500/600); the past block download in the side bar.
+- The staking switch showed "off" after a start with `-staking=1` while the wallet staked; fixed.
+
+### Tests
+- The unit test suites run one by one. "73 of 78 pass" was the count of a run that stopped half way; in fact **53 of 70 suites pass**, and the 17 that fail use Bitcoin or Ravencoin test data (`05-stability-testing.md`).
+- The functional baseline has 47 tests.
+
+### The reward schedule
+- The next halving is at height 3,155,760 (mid February 2027); the subsidy ends at height 5,259,600 (mid 2031).
+- **Postponing the halving is a hard fork.** The block reward would be larger than the old rule allows, and nodes of older versions reject such a block. It loosens a rule instead of tightening one, so it needs an activation height and the upgrade of every node and exchange. It is not in this update.

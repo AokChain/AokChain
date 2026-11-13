@@ -97,8 +97,8 @@ Items 1 and 2 are rule tightenings that take effect immediately, without an acti
 - **S-05:** the rule that the time of a PoS block must be a multiple of 16 seconds. Stakers already produce blocks according to this rule, and all 3.03 million historical PoS blocks satisfy it. The code is included, but the activation height on mainnet and testnet is undecided (INT_MAX). It will be activated in a separate release after the height has been agreed with exchanges and operators.
 
 ## Tests
-- **Unit tests:** 73 of 78 pass. The original did not compile. The remaining 5 are a bloom test data problem.
-- **Functional tests:** a baseline of 38 passes (`doc/aokchain/functional-baseline.txt`). In the original all of them failed at the import stage.
+- **Unit tests:** 57 of 70 suites pass (`contrib/aokchain/unit-tests.sh`). "73 of 78", written here before, was the count of a run that stopped half way. The 13 suites that fail use Bitcoin or Ravencoin test data.
+- **Functional tests:** a baseline of 47 passes (`doc/aokchain/functional-baseline.txt`). In the original all of them failed at the import stage.
 - **New regression tests:**
   - `wallet_multisig_flow.py`: the multisig flow used by the GUI (2-of-3 address from sorted public keys, partial signing, combining, broadcasting) and the cases that are rejected
   - `feature_bootstrap.py`: synchronization from block archives, falling over to a mirror, importing a folder, damaged files, rejected blocks, restart midway, skipping
@@ -116,3 +116,7 @@ Items 1 and 2 are rule tightenings that take effect immediately, without an acti
   - Full sync (`-par=1 -assumevalid=0`)
   - Full reindex (`-par=8`, 4.0.0 binary)
   - History scan (`contrib/aokchain/history_scan.py`)
+
+## Added in rc3 to rc7
+
+See "Update of 2026-11-13" in `CHANGELOG-4.0.0.md`: coins that lost their time in a reorganization, the size of staking coins, the offline staking rule (SEC-26), `aokchain-wallet`, new commands and options, SEC-08, 13, 15 and 17, and why postponing the halving would be a hard fork.
