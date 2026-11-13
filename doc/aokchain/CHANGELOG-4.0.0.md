@@ -119,8 +119,26 @@ A wallet that had been used for a long time became very slow as transactions acc
 
 ### Tests
 - The unit test suites run one by one. "73 of 78 pass" was the count of a run that stopped half way; in fact **57 of 70 suites pass** (four were repaired now), and the 13 that fail use Bitcoin or Ravencoin test data (`05-stability-testing.md`).
-- The functional baseline has 47 tests.
+- The functional baseline has 47 tests (48 with rc8).
 
 ### The reward schedule
 - The next halving is at height 3,155,760 (mid February 2027); the subsidy ends at height 5,259,600 (mid 2031).
 - **Postponing the halving is a hard fork.** The block reward would be larger than the old rule allows, and nodes of older versions reject such a block. It loosens a rule instead of tightening one, so it needs an activation height and the upgrade of every node and exchange. It is not in this update.
+
+## Update of 2026-11-13 (2): rc8
+
+The releases and security advisories of Bitcoin Core 30.0 to 32.1 and of Ravencoin 4.7 and 4.8 were reviewed, and what applies was taken over.
+
+- **Orphan transactions (CVE-2024-52914).** When a parent arrived, every orphan that waited for it was validated on the spot. They are now processed one at a time, between the messages of that peer, so a peer cannot prepare orphans that keep the node busy. The outcome (what ends up in the mempool) is the same (`p2p_orphan_processing.py`).
+- **Urgent TCP data (CVE-2026-117350).** The exceptional condition of a socket was watched, and read on, also for a peer whose receiving was paused, which let data in past the receive limit. A paused peer is neither watched nor read.
+- **Announcement backlog.** The more transaction announcements wait for a peer, the more are sent at once (the whole set is sorted anew in every round).
+- **Wallet names.** `createwallet` and `loadwallet` refuse `.` and `..` in a name.
+- **`-dbcache` default.** 1024 MiB instead of 450 on a computer with 4 GiB of memory or more.
+- **Cache split.** The governance database took half of the remaining cache; it gets 8 MiB now, which about doubles the cache of unspent outputs for the same `-dbcache`.
+- **Unit tests.** `key_tests` and `pow_tests` were adapted to AokChain: 59 of 70 suites pass.
+
+Reviewed and not taken over:
+- **Ravencoin 4.7/4.8, asset transfer quantity overflow** (the holder of one unit of a token could make 2^64 of them; published in August 2026): 4.0 has the same checks already (SEC-02). **3.0.x nodes are vulnerable.**
+- **Ravencoin 4.8, mining bypass**: proof-of-work (KAWPOW) only, does not apply.
+- **Announcement queue of paused pre-BIP31 peers (CVE-2026-117349)**: does not apply, the lowest accepted protocol version is past BIP31.
+- **Undo file position overflow (CVE-2026-117346)**: applies and is not fixed. The undo data of one block file has to exceed 4 GiB, which needs a staker who builds a series of blocks that spend very many outputs with large scripts. The fix (64 bit positions) is outstanding.

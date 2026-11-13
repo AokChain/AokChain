@@ -9,17 +9,17 @@ The suites are run one by one now:
 ```bash
 contrib/aokchain/unit-tests.sh        # each suite on its own, compared with doc/aokchain/unit-baseline.txt
 ```
-Current state: **57 of 70 suites pass, 13 fail.** The 57 are the baseline (`unit-baseline.txt`); if one of them fails, that is a regression. (53 passed when this was first looked at; `crypto_tests`, `hash_tests`, `main_tests` and `wallet_tests` were adapted to AokChain, and the test fixture got a governance state, without which every check of a transaction's inputs crashed on a null pointer.)
+Current state: **59 of 70 suites pass, 11 fail.** The 59 are the baseline (`unit-baseline.txt`); if one of them fails, that is a regression. (53 passed when this was first looked at; `crypto_tests`, `hash_tests`, `main_tests`, `wallet_tests`, `key_tests` and `pow_tests` were adapted to AokChain, and the test fixture got a governance state, without which every check of a transaction's inputs crashed on a null pointer.)
 
 | Failing suites | Reason (all inherited test data or assumptions) |
 |---|---|
 | `bloom_tests`, `merkleblock_tests`, `transaction_tests`, `coins_tests`, `sighash_tests`, `script_tests` | Transactions, blocks and coins serialized in the Bitcoin format. AokChain transactions have `nTime`/`nMessage` and coins have a time field, so deserialization goes wrong |
-| `key_tests`, `rpc_tests` | Addresses and secret keys with Bitcoin/Ravencoin prefixes, assumptions of the Raven token RPCs |
-| `pow_tests`, `versionbits_tests`, `policyestimator_tests` | Expect Bitcoin's difficulty, deployment and fee parameters |
+| `rpc_tests` | Addresses with the Ravencoin prefix, raw transactions in the Bitcoin format, `getnetworkinfo` and `setban` in a fixture without a network object |
+| `versionbits_tests`, `policyestimator_tests` | Expect Bitcoin's difficulty, deployment and fee parameters |
 | `tx_validationcache_tests` | `checkinputs_test` assumes Bitcoin's staged activation of script rules (blocks before DERSIG). AokChain enforces them from the start. The double-spend test passes |
 | `miner_tests` | Its test cases are disabled |
 
-These 13 do not point to defects in the code; the tests were never ported to AokChain. But **those areas (script vectors, sighash, transaction parsing) are not protected by unit tests**, and regenerating the vectors in the AokChain format is what remains (in this order: `tx_validationcache_tests`, `script_tests`, `sighash_tests`, `transaction_tests`).
+These 11 do not point to defects in the code; the tests were never ported to AokChain. But **those areas (script vectors, sighash, transaction parsing) are not protected by unit tests**, and regenerating the vectors in the AokChain format is what remains (in this order: `tx_validationcache_tests`, `script_tests`, `sighash_tests`, `transaction_tests`).
 
 | Status | Suite | Cause | Direction of the fix |
 |---|---|---|---|

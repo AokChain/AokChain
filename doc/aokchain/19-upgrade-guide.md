@@ -85,6 +85,12 @@ Going back: stop the node, put the two old programs back, start it.
   it), a fee rate limit for `sendrawtransaction`, `-rpcwhitelist` (an RPC user that may only
   call a list of methods), `scantxoutset` (the balance of a deposit address without the
   wallet).
+- **Token deposits on 3.0.x.** 3.0.x does not check the sums of token amounts: the holder of
+  one unit of a token can build a transaction that creates 2^64 of them. The same defect was
+  published for Ravencoin in August 2026 (fixed there in 4.8.0). 4.0 refuses such a
+  transaction, and with the stake majority on 4.0 it does not stay in the chain; but a 3.0.x
+  node accepts it into its mempool and, for the time of a block that a 3.0.x staker makes,
+  into its chain. An exchange that credits token deposits should run 4.0.
 - An exchange node on 3.0.x keeps working beside 4.0 nodes. It should still be upgraded:
   3.0.x accepts blocks that break rules which 4.0 enforces (signatures, token amounts), and
   it can be stopped by a peer (SEC-03). As long as the stake majority runs 4.0, a block

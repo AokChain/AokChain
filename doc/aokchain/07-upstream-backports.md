@@ -25,20 +25,23 @@
 |---|---|---|---|---|---|---|
 | U-01 | Crash on a resent BLOCKTXN | CVE-2024-35202, 25.0 | [V] affected → **fixed** (SEC-03, `b809e5a`) | P0 | S | ✅ |
 | U-02 | Script check queue and lifetime of `txdata` (UAF) | CVE-2024-52911 [source], PR #31112 | [V] affected → **fixed** (`0b23d4e`) | P0 | S | ✅ |
-| U-03 | Double loop in orphan transaction handling | CVE-2024-52914, 0.18, PR #15644 | [V] `vWorkQueue` is processed to the end inside the TX handler | P1 | M | ⏳ |
+| U-03 | Double loop in orphan transaction handling | CVE-2024-52914, 0.18, PR #15644 | [V] `vWorkQueue` is processed to the end inside the TX handler → **fixed** (rc8): orphans are processed one at a time between the messages of the peer (`p2p_orphan_processing.py`) | P1 | M | ✅ |
 | U-04 | A huge INV triggers one GETHEADERS per entry | CVE-2024-52915, 0.20, PR #18962 | [V] affected → **fixed** (`1c25384`) | P1 | S | ✅ |
 | U-05 | A mutated block resets the download state of another peer | CVE-2024-52921, 25.0, PR #27608 | [V] A BLOCK from any peer calls `MarkBlockAsReceived`. More dangerous because a mutation that changes only `vchBlockSig` is free → **fixed** (`a641851`) | P1 | M | ✅ |
 | U-06 | Header memory DoS (presync) | CVE-2019-25220, 24.0.1 | [V] affected. Under PoS a defence based on "work" is weak, so it is addressed with SEC-06 (kernel check before storing) and a per-peer header budget | P1 | L | ⏳ |
 | U-07 | addrman `nIdCount` overflow, addr spam | CVE-2024-52919 [source], 22.0, PR #22387 | [V] addr token bucket **added** (`a641851`). Widening the type of `nIdCount` remains | P1 | M | partly ✅ |
 | U-08 | Unbounded banlist | CVE-2020-14198, 0.20.1, PR #19219 | [V] Automatic ban of misbehaving peers → switch to "discourage" | P1 | M | ⏳ |
-| U-09 | Peer time offset overflow | CVE-2024-52912, 0.21 | [V] `nTime - GetTime()` has no range limit. More important under PoS because the adjusted time is used in the kernel search → **fixed** (`1c25384`) | P1 | S | ✅ |
+| U-09 | Peer time offset overflow | CVE-2024-52912, 0.21 | [V] `nTime - GetTime()` has no range limit. More important under PoS because the adjusted time is used in the kernel search → **fixed** (`1c25384`) → **fixed**: the time difference of a version message is kept within a range (done earlier) | P1 | S | ✅ |
 | U-10 | Compact block stalling | CVE-2024-52922 [source], 25.1/26.0, PR #27626 | [V] No limit on the number of concurrent compact block requests per block | P2 | M | ⏳ |
-| U-11 | DoS through sorting of the inv-to-send set | 25.0, PR #27610 | [V] `setInventoryTxToSend` | P2 | S | ⏳ |
+| U-11 | DoS through sorting of the inv-to-send set | 25.0, PR #27610 | [V] `setInventoryTxToSend` → **fixed** (rc8): the larger the backlog of announcements, the more are sent at once | P2 | S | ✅ |
 | U-12 | Censorship of transaction re-requests | CVE-2024-52913, 0.21 (`TxRequestTracker`) | [V] uses `mapAlreadyAskedFor` | P2 | L | ⏳ |
 | U-13 | Cap on GETDATA processing | CVE-2024-52920, 0.20 | [V/U] Not an infinite loop. Serves an unlimited number of blocks per request | P3 | S | ⏳ |
 | U-14 | Filling the disk with logs | CVE-2025-54604/54605 [source], PR #32604 | [U] Applies → **fixed**: 1 MiB per hour and source location, `-logratelimit` (17-upstream-features.md) | P2 | S | ✅ |
 | U-15 | Legacy sighash CPU DoS | CVE-2025-46598 [source] | [U] | P2 | M | investigate |
 | U-16 | Undo file 4GiB position overflow | advisory id unverified [source] | [V] 32-bit `nUndoPos` | P3 | S | ⏳ |
+| U-17 | Urgent TCP data lets a peer push data past the receive limit while its receiving is paused | CVE-2026-117350, 32.1/31.2/30.4/29.5 | [V] applies (select() is used on every OS) → **fixed** (rc8) | P1 | S | ✅ |
+| U-18 | Unbounded announcement queue of paused pre-BIP31 peers | CVE-2026-117349 | [V] does not apply: the lowest accepted protocol version is past BIP31, so the ping timeout holds for every peer | — | — | n/a |
+| U-19 | Ravencoin 4.7/4.8 asset transfer quantity overflow (2^64 units from one) | Ravencoin PR #1287, 2026-08 | [V] 4.0 has the same checks already (SEC-02, `87eae21`). **3.0.x nodes are vulnerable** | P0 | — | ✅ |
 
 ### A-2. PoS-specific defences (BlackCoin / PIVX / Qtum / Particl)
 
