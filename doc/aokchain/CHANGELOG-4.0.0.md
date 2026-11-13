@@ -157,7 +157,7 @@ Reviewed and not taken over:
 
 Note: some boolean fields of RPC results are printed as `1`/`0`, not `true`/`false`, since 3.0.x (`networkactive`, `complete`, `staking` and others). This is kept for compatibility with programs that read them.
 
-## 4.0.1 (in preparation)
+## 4.0.1 (2026-11-14)
 
 Fixes after the 4.0.0 release, including the results of the external source review of 2026-11-13.
 
@@ -170,3 +170,4 @@ Fixes after the 4.0.0 release, including the results of the external source revi
 - **Relock timer (SEC-33).** The relock timer of `walletpassphrase` is handled after the locks are released, which removes a deadlock that could stop the node when the timer ran at that moment. The timer table has a lock, and an outdated timer does not lock a wallet that was opened again.
 - **Diagnostics.** The duration of the first stake search after a start is logged. `-debug=coinstake` works.
 - **`upgrade.sh`.** Waits for the process ids of a node that does not run under systemd. A new installation can start from the snapshot with `AOK_SNAPSHOT`. The newest three backups are kept.
+- **Recovery words of the AOK mobile wallet.** That wallet makes its 12 words without the BIP39 checksum (the seed is made from the words as BIP39 says), so the restore page refused them: "the words do not fit together". When every word is in the word list and only the checksum is wrong, the page now says so and offers to search without it; `importmnemonic` takes `validate=false` for the same. Unknown words and a wrong number of words are still refused.
