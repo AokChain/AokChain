@@ -58,7 +58,9 @@ script, stops the node (the systemd unit `aokchaind` if there is one, else
 `<datadir>/upgrade-backup/<time>/`, installs the new programs where the old ones are and
 starts the node the way it was running. An existing `aokchain.conf` is never changed; one
 with a random RPC password is written only when there is none. The wallet is not
-encrypted or changed. After an upgrade from 3.0.x it runs `repaircoins`
+encrypted or changed (its copy in the backup is as unencrypted as the wallet; the newest
+three backups are kept). A new installation can start from the chain state snapshot
+(`AOK_SNAPSHOT=http://…`). After an upgrade from 3.0.x it runs `repaircoins`
 (`doc/aokchain/16-stake-coin-time.md`). Settings are environment variables, listed at
 the top of the script.
 

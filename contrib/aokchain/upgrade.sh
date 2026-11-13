@@ -22,6 +22,10 @@
 #   AOK_START=0   do not start the node after installing
 #   AOK_REPAIR=0  do not run "repaircoins" after an upgrade from 3.0.x
 #   AOK_SYSTEMD=1 on a machine without an aokchaind unit, install one (starts the node at boot)
+#   AOK_SNAPSHOT  for a new installation: address (http://...) of the chain state snapshot and
+#                 block archives. It is written into the new aokchain.conf as bootstrapurl, and
+#                 the node starts from the snapshot instead of validating every block.
+#   AOK_KEEP      number of backups kept under <datadir>/upgrade-backup (default 3)
 
 set -euo pipefail
 
@@ -99,6 +103,9 @@ main() {
         ( umask 077
           printf 'server=1\nrpcuser=aokrpc\nrpcpassword=%s\nrpcbind=127.0.0.1\nrpcallowip=127.0.0.1\n' \
               "$(head -c 24 /dev/urandom | od -An -tx1 | tr -d ' \n')" > "$conf" )
+        if [ -n "${AOK_SNAPSHOT:-}" ]; then
+            printf 'bootstrapurl=%s\n' "$AOK_SNAPSHOT" >> "$conf"
+        fi
         echo "configuration:   $conf (written, there was none)"
     fi
 
@@ -148,6 +155,15 @@ main() {
     if [ -d "$datadir/wallets" ]; then cp -a "$datadir/wallets" "$keep/"; fi
     if [ -n "$(ls -A "$keep")" ]; then
         echo "backup:          $keep (old programs and wallet)"
+        echo "                 The wallet copy is as (un)encrypted as the wallet. Move it somewhere safe"
+        echo "                 or delete it when the new version runs well."
+        # older backups: keep the newest few (names are times, so they sort by age)
+        local old
+        ls -1 "$datadir/upgrade-backup" | sort | head -n "-${AOK_KEEP:-3}" | while read -r old; do
+            case "$old" in
+                [0-9]*-[0-9]*) rm -rf -- "$datadir/upgrade-backup/$old" ;;
+            esac
+        done
     else
         rmdir "$keep"; keep=""
         echo "backup:          nothing to keep (new installation)"
