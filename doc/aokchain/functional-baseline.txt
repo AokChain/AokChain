@@ -50,3 +50,4 @@ feature_tokens.py
 feature_governance.py
 feature_stake_variants.py
 feature_governance_mempool.py
+wallet_staking_unlock.py
