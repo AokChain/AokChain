@@ -146,6 +146,7 @@ Reviewed and not taken over:
 ## Update of 2026-11-13 (3): rc9
 
 - **Limit on stored blocks per stake (SEC-28).** A node stored any number of different blocks signed with one stake; it now stores four (`-maxblocksperstake`). A further block is fetched and stored when a block builds on it. The consensus rules are unchanged.
+- **Misbehaving peers (CVE-2020-14198).** A peer that broke the rules was put on the ban list for 24 hours; it is now recorded in a filter of fixed size in memory. The ban list is written to disk and has no limit, so an attacker with many addresses could grow it without end. A recorded address is refused only while the inbound slots are almost full, and the record is gone after a restart. `setban` and `listbanned` deal with the bans the operator made.
 - **Uninitialized script type.** `Solver()` set its second type for token scripts only, so the standard input check and wallet signing compared an uninitialized value (found with the sanitizers). Not a consensus path.
 - **Fee rate overflow.** `CFeeRate` overflowed 64 bits for amounts above 92 million AOK.
 - **Fee estimates.** The decision to skip estimates during the first synchronization moved from the mempool to the block connection code (same behaviour).

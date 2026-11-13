@@ -3078,7 +3078,8 @@ static bool SendRejectsAndCheckIfBanned(CNode* pnode, CConnman* connman)
                 LogPrintf("Warning: not banning local peer %s!\n", pnode->addr.ToString());
             else
             {
-                connman->Ban(pnode->addr, BanReasonNodeMisbehaving);
+                LogPrintf("Disconnecting and discouraging peer %d (%s)\n", pnode->GetId(), pnode->addr.ToString());
+                connman->Discourage(pnode->addr);
             }
         }
         return true;

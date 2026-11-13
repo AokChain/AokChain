@@ -495,11 +495,30 @@ void CConnman::ClearBanned()
     {
         LOCK(cs_setBanned);
         setBanned.clear();
+        m_discouraged.reset();
         setBannedIsDirty = true;
     }
     DumpBanlist(); //store banlist to disk
     if(clientInterface)
         clientInterface->BannedListChanged();
+}
+
+static std::vector<unsigned char> DiscourageKey(const CNetAddr& netAddr)
+{
+    const std::string ip = netAddr.ToStringIP();
+    return std::vector<unsigned char>(ip.begin(), ip.end());
+}
+
+void CConnman::Discourage(const CNetAddr& netAddr)
+{
+    LOCK(cs_setBanned);
+    m_discouraged.insert(DiscourageKey(netAddr));
+}
+
+bool CConnman::IsDiscouraged(const CNetAddr& netAddr)
+{
+    LOCK(cs_setBanned);
+    return m_discouraged.contains(DiscourageKey(netAddr));
 }
 
 bool CConnman::IsBanned(CNetAddr ip)
@@ -1119,6 +1138,15 @@ void CConnman::AcceptConnection(const ListenSocket& hListenSocket) {
     if (IsBanned(addr) && !whitelisted)
     {
         LogPrintf("connection from %s dropped (banned)\n", addr.ToString());
+        CloseSocket(hSocket);
+        return;
+    }
+
+    // A peer at this address misbehaved before: take the connection only
+    // while there is room (it may be someone else behind the same address).
+    if (!whitelisted && nInbound + 1 >= nMaxInbound && IsDiscouraged(addr))
+    {
+        LogPrint(BCLog::NET, "connection from %s dropped (discouraged)\n", addr.ToString());
         CloseSocket(hSocket);
         return;
     }
@@ -2000,7 +2028,7 @@ bool CConnman::OpenNetworkConnection(const CAddress& addrConnect, bool fCountFai
     }
     if (!pszDest) {
         if (IsLocal(addrConnect) ||
-            FindNode(static_cast<CNetAddr>(addrConnect)) || IsBanned(addrConnect) ||
+            FindNode(static_cast<CNetAddr>(addrConnect)) || IsBanned(addrConnect) || IsDiscouraged(addrConnect) ||
             FindNode(addrConnect.ToStringIPPort()))
             return false;
     } else if (FindNode(std::string(pszDest)))
