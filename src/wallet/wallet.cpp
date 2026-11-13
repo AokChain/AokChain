@@ -126,7 +126,6 @@ const uint256 CMerkleTx::ABANDON_HASH(uint256S("00000000000000000000000000000000
 // optional setting to unlock wallet for staking only
 // serves to disable the trivial sendmoney when OS account compromised
 // provides no real security
-bool fWalletUnlockStakingOnly = false;
 
 /** @defgroup mapWallet
  *

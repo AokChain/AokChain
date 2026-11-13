@@ -126,6 +126,8 @@ void RPCUnsetTimerInterface(RPCTimerInterface *iface);
  * Overrides previous timer <name> (if any).
  */
 void RPCRunLater(const std::string& name, std::function<void(void)> func, int64_t nSeconds);
+/** Forget a call that RPCRunLater() has queued under this name. */
+void RPCCancelLater(const std::string& name);
 
 typedef UniValue(*rpcfn_type)(const JSONRPCRequest& jsonRequest);
 

@@ -62,11 +62,9 @@ extern CFeeRate payTxFee;
 extern unsigned int nTxConfirmTarget;
 extern bool bSpendZeroConfChange;
 extern bool fWalletRbf;
-extern bool fWalletUnlockStakingOnly;
 
 extern CAmount nReserveBalance;
 extern CAmount nMinimumInputValue;
-extern bool fWalletUnlockStakingOnly;
 
 static const unsigned int DEFAULT_KEYPOOL_SIZE = 1000;
 //! -paytxfee default
@@ -983,6 +981,11 @@ public:
                         const CAmount& nMinimumAmount = 1, const CAmount& nMaximumAmount = MAX_MONEY,
                         const CAmount& nMinimumSumAmount = MAX_MONEY, const uint64_t& nMaximumCount = 0,
                         const int& nMinDepth = 0, const int& nMaxDepth = 9999999) const EXCLUSIVE_LOCKS_REQUIRED(cs_main, cs_wallet);
+
+    /** The wallet is unlocked for staking only: its keys sign stakes and nothing else. One flag
+     *  per wallet (it was one for all wallets, so unlocking a second wallet for staking only
+     *  also closed the first one for payments, and locking it opened the first one again). */
+    std::atomic<bool> fUnlockStakingOnly{false};
 
     uint64_t GetStakeWeight() const;
 

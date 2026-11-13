@@ -92,7 +92,7 @@ void EnsureWalletIsUnlocked(CWallet * const pwallet)
     if (pwallet->IsLocked()) {
         throw JSONRPCError(RPC_WALLET_UNLOCK_NEEDED, "Error: Please enter the wallet passphrase with walletpassphrase first.");
     }
-    if (fWalletUnlockStakingOnly)
+    if (pwallet->fUnlockStakingOnly)
         throw JSONRPCError(RPC_WALLET_UNLOCK_NEEDED, "Error: Wallet is unlocked for staking only.");
 }
 
@@ -448,7 +448,7 @@ static void SendMoney(CWallet * const pwallet, const CTxDestination &address, CA
         throw JSONRPCError(RPC_CLIENT_P2P_DISABLED, "Error: Peer-to-peer functionality missing or disabled");
     }
 
-    if (fWalletUnlockStakingOnly) {
+    if (pwallet->fUnlockStakingOnly) {
         std::string strError = _("Error: Wallet unlocked for staking only, unable to create transaction.");
         throw JSONRPCError(RPC_WALLET_ERROR, strError);
     }
@@ -2562,7 +2562,7 @@ static void LockWallet(CWallet* pWallet)
         // The time of walletpassphrase is over: back to what was before it, open for staking only.
         // Locking here would stop the staking that the user switched on.
         fRestoreStakingOnlyUnlock = false;
-        fWalletUnlockStakingOnly = true;
+        pWallet->fUnlockStakingOnly = true;
         pWallet->NotifyStatusChanged(pWallet);
         return;
     }
@@ -2585,7 +2585,8 @@ UniValue walletpassphrase(const JSONRPCRequest& request)
             "\nArguments:\n"
             "1. \"passphrase\"     (string, required) The wallet passphrase\n"
             "2. timeout            (numeric, required) The time to keep the decryption key in seconds.\n"
-            "3. stakingonly        (bool, optional, default=false) Unlock wallet for staking only.\n"
+            "3. stakingonly        (bool, optional, default=false) Unlock wallet for staking only. With a timeout of 0\n"
+            "                      the wallet then stays open for staking until it is locked or the node stops.\n"
             "\nNote:\n"
             "Issuing the walletpassphrase command while the wallet is already unlocked will set a new unlock\n"
             "time that overrides the old one.\n"
@@ -2615,7 +2616,7 @@ UniValue walletpassphrase(const JSONRPCRequest& request)
     strWalletPass = request.params[0].get_str().c_str();
 
     // open for staking only before this call, and not by an earlier call with a time
-    const bool fWasStakingOnly = !pwallet->IsLocked() && fWalletUnlockStakingOnly && pwallet->nRelockTime == 0;
+    const bool fWasStakingOnly = !pwallet->IsLocked() && pwallet->fUnlockStakingOnly && pwallet->nRelockTime == 0;
 
     if (strWalletPass.length() > 0)
     {
@@ -2634,14 +2635,22 @@ UniValue walletpassphrase(const JSONRPCRequest& request)
         fRestoreStakingOnlyUnlock = true;
 
     int64_t nSleepTime = request.params[1].get_int64();
-    pwallet->nRelockTime = GetTime() + nSleepTime;
-    RPCRunLater(strprintf("lockwallet(%s)", pwallet->GetName()), boost::bind(LockWallet, pwallet), nSleepTime);
+    const bool fStakingOnly = request.params.size() > 2 && request.params[2].get_bool();
+    if (nSleepTime < 0)
+        throw JSONRPCError(RPC_INVALID_PARAMETER, "Timeout cannot be negative.");
+    if (nSleepTime == 0 && fStakingOnly) {
+        // A staking node: open for staking only until it is locked or stopped. (Without
+        // stakingonly a timeout of 0 locks at once, as before.)
+        pwallet->nRelockTime = 0;
+        fRestoreStakingOnlyUnlock = false;
+        RPCCancelLater(strprintf("lockwallet(%s)", pwallet->GetName()));
+    } else {
+        pwallet->nRelockTime = GetTime() + nSleepTime;
+        RPCRunLater(strprintf("lockwallet(%s)", pwallet->GetName()), boost::bind(LockWallet, pwallet), nSleepTime);
+    }
 
     // ppcoin: if user OS account compromised prevent trivial sendmoney commands
-    if (request.params.size() > 2)
-        fWalletUnlockStakingOnly = request.params[2].get_bool();
-    else
-        fWalletUnlockStakingOnly = false;
+    pwallet->fUnlockStakingOnly = fStakingOnly;
 
     return NullUniValue;
 }

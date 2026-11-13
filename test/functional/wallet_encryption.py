@@ -58,5 +58,26 @@ class WalletEncryptionTest(AokChainTestFramework):
         self.nodes[0].walletpassphrase(passphrase2, 10)
         assert_equal(privkey, self.nodes[0].dumpprivkey(address))
 
+        # Open for staking only, without a time limit: the keys sign stakes and nothing else
+        self.nodes[0].walletlock()
+        assert_raises_rpc_error(-8, "Timeout cannot be negative", self.nodes[0].walletpassphrase, passphrase2, -1)
+        self.nodes[0].walletpassphrase(passphrase2, 0, True)
+        time.sleep(2)
+        assert_equal(self.nodes[0].getwalletinfo()["unlocked_until"], 0)
+        assert_raises_rpc_error(-13, "unlocked for staking only", self.nodes[0].dumpprivkey, address)
+        assert_raises_rpc_error(-13, "unlocked for staking only", self.nodes[0].sendtoaddress, address, 1)
+        # a timed unlock for a payment; when its time is over the wallet is open for staking only
+        # again, not locked: staking goes on
+        self.nodes[0].walletpassphrase(passphrase2, 2)
+        assert_equal(privkey, self.nodes[0].dumpprivkey(address))
+        time.sleep(3)
+        assert_raises_rpc_error(-13, "unlocked for staking only", self.nodes[0].dumpprivkey, address)
+        self.nodes[0].walletlock()
+        assert_raises_rpc_error(-13, "Please enter the wallet passphrase", self.nodes[0].dumpprivkey, address)
+        # without stakingonly a timeout of 0 still locks at once
+        self.nodes[0].walletpassphrase(passphrase2, 0)
+        time.sleep(1)
+        assert_raises_rpc_error(-13, "Please enter the wallet passphrase", self.nodes[0].dumpprivkey, address)
+
 if __name__ == '__main__':
     WalletEncryptionTest().main()

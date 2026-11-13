@@ -514,7 +514,7 @@ WalletModel::EncryptionStatus WalletModel::getEncryptionStatus() const
     {
         return Locked;
     }
-    else if (fWalletUnlockStakingOnly)
+    else if (wallet->fUnlockStakingOnly)
     {
         return UnlockedForStaking;
     }
@@ -586,12 +586,17 @@ bool WalletModel::setWalletEncrypted(bool encrypted, const SecureString &passphr
     }
 }
 
+void WalletModel::setUnlockStakingOnly(bool stakingOnly)
+{
+    wallet->fUnlockStakingOnly = stakingOnly;
+}
+
 bool WalletModel::setWalletLocked(bool locked, const SecureString &passPhrase, bool stakingOnly)
 {
     if(locked)
     {
         // Lock
-        fWalletUnlockStakingOnly = false;
+        wallet->fUnlockStakingOnly = false;
         return wallet->Lock();
     }
     else
@@ -599,7 +604,7 @@ bool WalletModel::setWalletLocked(bool locked, const SecureString &passPhrase, b
         // Unlock
         if (!wallet->Unlock(passPhrase))
             return false;
-        fWalletUnlockStakingOnly = stakingOnly;
+        wallet->fUnlockStakingOnly = stakingOnly;
         updateStatus();
         return true;
     }
@@ -722,7 +727,7 @@ WalletModel::UnlockContext::~UnlockContext()
     {
         if (stakingOnly && wallet->getEncryptionStatus() == Unlocked) {
             // staking goes on: back to "for staking only" without locking the keys away
-            fWalletUnlockStakingOnly = true;
+            wallet->setUnlockStakingOnly(true);
             wallet->updateStatus();
         } else {
             wallet->setWalletLocked(true);

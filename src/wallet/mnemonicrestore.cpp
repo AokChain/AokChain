@@ -325,7 +325,7 @@ int ImportKeys(CWallet* pwallet, const Plan& plan, const std::string& label, std
         error = "The wallet is locked";
         return -1;
     }
-    if (fWalletUnlockStakingOnly) {
+    if (pwallet->fUnlockStakingOnly) {
         error = "The wallet is unlocked for staking only";
         return -1;
     }

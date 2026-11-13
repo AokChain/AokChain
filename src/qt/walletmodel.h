@@ -257,6 +257,7 @@ public:
     // Passphrase only needed when unlocking
     // (stakingOnly: the keys are available to the staking thread only; sending asks for the passphrase again)
     bool setWalletLocked(bool locked, const SecureString &passPhrase=SecureString(), bool stakingOnly=false);
+    void setUnlockStakingOnly(bool stakingOnly);
     /** Whether a new, never used wallet without encryption is loaded: the first start asks for a passphrase */
     bool isFreshUnencrypted() const;
     /**

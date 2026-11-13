@@ -133,7 +133,7 @@ UniValue importprivkey(const JSONRPCRequest& request)
     bool fGood = vchSecret.SetString(strSecret);
 
     if (!fGood) throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Invalid private key encoding");
-    if (fWalletUnlockStakingOnly)
+    if (pwallet->fUnlockStakingOnly)
         throw JSONRPCError(RPC_WALLET_UNLOCK_NEEDED, "Wallet is unlocked for staking only.");
 
     CKey key = vchSecret.GetKey();
@@ -763,7 +763,7 @@ UniValue dumpprivkey(const JSONRPCRequest& request)
         throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Invalid AokChain address");
     }
 
-    if (fWalletUnlockStakingOnly)
+    if (pwallet->fUnlockStakingOnly)
         throw JSONRPCError(RPC_WALLET_UNLOCK_NEEDED, "Wallet is unlocked for staking only.");
 
     const CKeyID *keyID = boost::get<CKeyID>(&dest);
