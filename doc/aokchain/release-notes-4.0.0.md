@@ -1,6 +1,6 @@
-# AokChain Core 4.0.0 release notes (candidate)
+# AokChain Core 4.0.0 release notes
 
-> Status: **release candidate**. After deployment and observation on testnet are finished, `_CLIENT_VERSION_IS_RELEASE` in `configure.ac` is set to true and the tag is created.
+> Status: **release**. The candidates rc1 to rc9 ran on a mainnet verification node and on staking nodes; then `_CLIENT_VERSION_IS_RELEASE` was set to true. The programs report the version as `v4.0.0.0` and no longer warn that they are a test build. That is the only difference from rc9.
 
 ## Summary
 - This is a security upgrade. There is **no hard fork and no activation height**, and it was confirmed that the whole existing mainnet chain (up to height 3,030,487) is accepted as it is.
