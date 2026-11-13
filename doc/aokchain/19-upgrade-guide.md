@@ -16,6 +16,11 @@ upgraded on its own, at any time.
 
 ## Steps
 
+The script `contrib/aokchain/upgrade.sh` does the steps below in one command
+(`curl -fsSL <base url>/upgrade.sh | bash`): it checks the download, stops the node, keeps
+the old programs and the wallet, installs, starts and runs `repaircoins`. It leaves an
+existing `aokchain.conf` and the wallet as they are. By hand:
+
 ```bash
 sha256sum aokchain-4.0.0…-linux-x86_64.tar.gz          # compare with SHA256SUMS.txt
 tar xzf aokchain-4.0.0…-linux-x86_64.tar.gz

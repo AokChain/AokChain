@@ -45,3 +45,26 @@ contrib/aokchain/make_snapshot.py --datadir ~/snapshot-node --hashes hashes.json
 ## publish_bootstrap_github.md
 
 How to publish the folder as GitHub release assets (Korean).
+
+## upgrade.sh — install or upgrade a Linux node with one command
+
+```bash
+curl -fsSL <base url>/upgrade.sh | bash
+```
+
+Downloads the release archive, checks its SHA256 against the value written into the
+script, stops the node (the systemd unit `aokchaind` if there is one, else
+`aokchain-cli stop`), keeps the old programs and the wallet file under
+`<datadir>/upgrade-backup/<time>/`, installs the new programs where the old ones are and
+starts the node the way it was running. An existing `aokchain.conf` is never changed; one
+with a random RPC password is written only when there is none. The wallet is not
+encrypted or changed. After an upgrade from 3.0.x it runs `repaircoins`
+(`doc/aokchain/16-stake-coin-time.md`). Settings are environment variables, listed at
+the top of the script.
+
+The file in the source tree has three placeholders. To publish it for a release:
+
+```bash
+sed -e 's|@VERSION@|4.0.0|' -e "s|@SHA256@|$(sha256sum aokchain-4.0.0-linux-x86_64.tar.gz | cut -d' ' -f1)|" \
+    -e 's|@BASE@|https://example.org/download|' contrib/aokchain/upgrade.sh > upgrade.sh
+```
