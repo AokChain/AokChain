@@ -22,11 +22,28 @@
 #include <QApplication>
 #include <QCheckBox>
 #include <QHBoxLayout>
+#include <QInputMethodEvent>
 #include <QLabel>
+#include <QRegularExpression>
+#include <QRegularExpressionValidator>
 #include <QStyle>
 #include <QVBoxLayout>
 #include <QMessageBox>
 #include <QPushButton>
+
+/**
+ * A wallet passphrase is typed in English letters, digits and symbols (printable ASCII,
+ * the space included). With the Korean input mode on, the same keys type Hangul, and the
+ * passphrase that is set or tried is not the one the user has in mind.
+ */
+static bool HasNonAsciiCharacter(const QString &text)
+{
+    for (const QChar c : text) {
+        if (c.unicode() > 0x7E && c.isPrint())
+            return true;
+    }
+    return false;
+}
 
 AskPassphraseDialog::AskPassphraseDialog(Mode _mode, QWidget *parent) :
     QDialog(parent),
@@ -53,6 +70,10 @@ AskPassphraseDialog::AskPassphraseDialog(Mode _mode, QWidget *parent) :
         edit->setMinimumHeight(40);
         edit->setMinimumWidth(260);
         edit->setMaxLength(MAX_PASSPHRASE_SIZE);
+        // English letters, digits and symbols only: no input method (the Korean input mode
+        // types ASCII here), and nothing else is accepted, pasted text included
+        edit->setAttribute(Qt::WA_InputMethodEnabled, false);
+        edit->setValidator(new QRegularExpressionValidator(QRegularExpression("[\\x20-\\x7E]*"), edit));
         // Setup Caps Lock detection.
         edit->installEventFilter(this);
     }
@@ -74,7 +95,7 @@ AskPassphraseDialog::AskPassphraseDialog(Mode _mode, QWidget *parent) :
     switch(mode)
     {
         case Encrypt: { // Ask passphrase x2
-            ui->warningLabel->setText(tr("Choose a passphrase for the wallet. It is asked for when you send coins. A thief who copies the wallet file cannot spend the coins without it."));
+            ui->warningLabel->setText(tr("Choose a passphrase for the wallet. It is asked for when you send coins. A thief who copies the wallet file cannot spend the coins without it.") + " " + tr("Use English letters, digits and symbols."));
             ui->passLabel1->hide();
             ui->passEdit1->hide();
             setWindowTitle(tr("Encrypt wallet"));
@@ -118,7 +139,7 @@ AskPassphraseDialog::AskPassphraseDialog(Mode _mode, QWidget *parent) :
             break;
         case ChangePass: // Ask old passphrase + new passphrase x2
             setWindowTitle(tr("Change passphrase"));
-            ui->warningLabel->setText(tr("Enter the old passphrase and new passphrase to the wallet."));
+            ui->warningLabel->setText(tr("Enter the old passphrase and new passphrase to the wallet.") + " " + tr("Use English letters, digits and symbols."));
             ok->setText(tr("Change passphrase"));
             break;
     }
@@ -162,7 +183,7 @@ void AskPassphraseDialog::setOnboarding()
         title->hide();
     ui->warningLabel->hide();
     ui->verticalLayout->insertWidget(0, new WizardHeader(WizardHeader::Passphrase, tr("Protect the wallet"),
-        tr("Choose a passphrase for the new wallet. It is asked for when you send coins. A thief who copies the wallet file cannot spend the coins without it."), this));
+        tr("Choose a passphrase for the new wallet. It is asked for when you send coins. A thief who copies the wallet file cannot spend the coins without it.") + " " + tr("Use English letters, digits and symbols."), this));
     ui->buttonBox->button(QDialogButtonBox::Cancel)->setText(tr("Quit"));
     ui->verticalLayout->setContentsMargins(28, 26, 28, 22);
     setMinimumWidth(580);
@@ -368,6 +389,21 @@ bool AskPassphraseDialog::eventFilter(QObject *object, QEvent *event)
      * Shift key is down and the result is a lower case character, or
      * Shift key is not down and the result is an upper case character.
      */
+    // Hangul (or any other character outside ASCII) is not typed into a passphrase field.
+    // The fields have no input method; this covers platforms that send such text anyway.
+    if (event->type() == QEvent::InputMethod) {
+        QInputMethodEvent *ime = static_cast<QInputMethodEvent *>(event);
+        if (HasNonAsciiCharacter(ime->commitString()) || HasNonAsciiCharacter(ime->preeditString())) {
+            ui->capsLabel->setText(tr("Only English letters, digits and symbols can be used in the passphrase. Check the Korean/English key."));
+            ui->capsLabel->show();
+            return true;
+        }
+    }
+    if (event->type() == QEvent::KeyPress && HasNonAsciiCharacter(static_cast<QKeyEvent *>(event)->text())) {
+        ui->capsLabel->setText(tr("Only English letters, digits and symbols can be used in the passphrase. Check the Korean/English key."));
+        ui->capsLabel->show();
+        return true;
+    }
     if (event->type() == QEvent::KeyPress) {
         QKeyEvent *ke = static_cast<QKeyEvent *>(event);
         QString str = ke->text();

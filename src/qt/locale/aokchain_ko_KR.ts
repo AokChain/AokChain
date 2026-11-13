@@ -276,6 +276,14 @@
         <translation>경고: Caps Lock키가 켜져있습니다!</translation>
     </message>
     <message>
+        <source>Use English letters, digits and symbols.</source>
+        <translation>암호는 영문, 숫자, 특수문자로 입력합니다.</translation>
+    </message>
+    <message>
+        <source>Only English letters, digits and symbols can be used in the passphrase. Check the Korean/English key.</source>
+        <translation>암호에는 영문, 숫자, 특수문자만 쓸 수 있습니다. 한/영 키를 확인하세요.</translation>
+    </message>
+    <message>
         <source>Cancel</source>
         <translation>취소</translation>
     </message>
