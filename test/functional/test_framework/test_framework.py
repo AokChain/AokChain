@@ -16,6 +16,8 @@ import tempfile
 import time
 import traceback
 
+import test_framework.mininode
+
 from .authproxy import JSONRPCException
 from . import coverage
 from .test_node import TestNode
@@ -82,10 +84,10 @@ class AokChainTestFramework():
         parser.add_option("--noshutdown", dest="noshutdown", default=False, action="store_true",
                           help="Don't stop aokchainds after the test execution")
         parser.add_option("--srcdir", dest="srcdir",
-                          default=os.path.normpath(os.path.dirname(os.path.reaokath(__file__)) + "/../../../src"),
+                          default=os.path.normpath(os.path.dirname(os.path.realpath(__file__)) + "/../../../src"),
                           help="Source directory containing aokchaind/aokchain-cli (default: %default)")
         parser.add_option("--cachedir", dest="cachedir",
-                          default=os.path.normpath(os.path.dirname(os.path.reaokath(__file__)) + "/../../cache"),
+                          default=os.path.normpath(os.path.dirname(os.path.realpath(__file__)) + "/../../cache"),
                           help="Directory for caching pregenerated datadirs")
         parser.add_option("--tmpdir", dest="tmpdir", help="Root directory for datadirs")
         parser.add_option("-l", "--loglevel", dest="loglevel", default="INFO",
@@ -340,9 +342,11 @@ class AokChainTestFramework():
         NOTE: the timestamp should match time of genesis block.
         NOTE: the timestamp could be retrieved via "getblockhash 0" + "getblock <hash>"."""
         self.mocktime = 1524179366 + (201 * 1 * 60)
+        test_framework.mininode.MOCKTIME = self.mocktime
 
     def disable_mocktime(self):
         self.mocktime = 0
+        test_framework.mininode.MOCKTIME = 0
 
     # Private helper methods. These should not be accessed by the subclass test scripts.
 
@@ -435,10 +439,11 @@ class AokChainTestFramework():
             self.nodes = []
             self.disable_mocktime()
             for i in range(MAX_NODES):
-                os.remove(log_filename(self.options.cachedir, i, "debug.log"))
-                os.remove(log_filename(self.options.cachedir, i, "db.log"))
-                os.remove(log_filename(self.options.cachedir, i, "peers.dat"))
-                os.remove(log_filename(self.options.cachedir, i, "fee_estimates.dat"))
+                for entry in ["debug.log", "db.log", "peers.dat", "fee_estimates.dat"]:
+                    try:
+                        os.remove(log_filename(self.options.cachedir, i, entry))
+                    except FileNotFoundError:
+                        pass  # e.g. db.log now lives under wallets/
 
         for i in range(self.num_nodes):
             from_dir = os.path.join(self.options.cachedir, "node" + str(i))

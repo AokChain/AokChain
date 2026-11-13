@@ -12,8 +12,11 @@
 #include <init.h>
 
 #include <addrman.h>
+#include <bootstrap.h>
+#include <snapshot.h>
 #include <amount.h>
 #include <chain.h>
+#include <base58.h>
 #include <chainparams.h>
 #include <checkpoints.h>
 #include <compat/sanity.h>
@@ -199,6 +202,12 @@ void Shutdown()
     if (!lockShutdown)
         return;
 
+    {
+        const std::string strCmd = gArgs.GetArg("-shutdownnotify", "");
+        if (!strCmd.empty())
+            runCommand(strCmd); // waits: the command may need the node to be up still
+    }
+
     /// Note: Shutdown() must be able to handle cases in which initialization failed part of the way,
     /// for example if the data directory was found to be locked.
     /// Be sure that anything that writes files or flushes caches only does this if the respective
@@ -366,6 +375,8 @@ std::string HelpMessage(HelpMessageMode mode)
     strUsage += HelpMessageOpt("-version", _("Print version and exit"));
     strUsage += HelpMessageOpt("-alertnotify=<cmd>", _("Execute command when a relevant alert is received or we see a really long fork (%s in cmd is replaced by message)"));
     strUsage += HelpMessageOpt("-blocknotify=<cmd>", _("Execute command when the best block changes (%s in cmd is replaced by block hash)"));
+    strUsage += HelpMessageOpt("-startupnotify=<cmd>", _("Execute command when the node has started and answers RPC requests"));
+    strUsage += HelpMessageOpt("-shutdownnotify=<cmd>", _("Execute command immediately before beginning shutdown; the node waits for it to finish"));
     if (showDebug)
         strUsage += HelpMessageOpt("-blocksonly", strprintf(_("Whether to operate in a blocks only mode (default: %u)"), DEFAULT_BLOCKSONLY));
     strUsage +=HelpMessageOpt("-assumevalid=<hex>", strprintf(_("If this block is in the chain assume that it and its ancestors are valid and potentially skip their script verification (0 to verify all, default: %s, testnet: %s)"), defaultChainParams->GetConsensus().defaultAssumeValid.GetHex(), testnetChainParams->GetConsensus().defaultAssumeValid.GetHex()));
@@ -374,16 +385,23 @@ std::string HelpMessage(HelpMessageMode mode)
     {
 #if HAVE_DECL_DAEMON
         strUsage += HelpMessageOpt("-daemon", _("Run in the background as a daemon and accept commands"));
+        strUsage += HelpMessageOpt("-daemonwait", _("Run in the background as a daemon like -daemon, and return when the node has started and accepts commands"));
 #endif
     }
     strUsage += HelpMessageOpt("-datadir=<dir>", _("Specify data directory"));
     if (showDebug) {
         strUsage += HelpMessageOpt("-dbbatchsize", strprintf("Maximum database write batch size in bytes (default: %u)", nDefaultDbBatchSize));
     }
-    strUsage += HelpMessageOpt("-dbcache=<n>", strprintf(_("Set database cache size in megabytes (%d to %d, default: %d)"), nMinDbCache, nMaxDbCache, nDefaultDbCache));
+    strUsage += HelpMessageOpt("-dbcache=<n>", strprintf(_("Set database cache size in megabytes (%d to %d, default: %d)"), nMinDbCache, nMaxDbCache, GetDefaultDbCache()));
     if (showDebug)
         strUsage += HelpMessageOpt("-feefilter", strprintf("Tell other nodes to filter invs to us by our mempool min fee (default: %u)", DEFAULT_FEEFILTER));
     strUsage += HelpMessageOpt("-loadblock=<file>", _("Imports blocks from external blk000??.dat file on startup"));
+    strUsage += HelpMessageOpt("-bootstrapurl=<url>", strprintf(_("Fetch the blocks as archives from this address when the node is far behind, instead of from peers. Every block is validated as usual. Can be given several times: mirrors, tried in this order. (default: none; on the main network the GUI wallet uses %s)"), DEFAULT_BOOTSTRAP_URL_MAIN));
+    strUsage += HelpMessageOpt("-bootstrapdir=<dir>", _("Import the block archives (manifest.json and the files it lists) from this folder, which is only read. Every block is validated as usual."));
+    strUsage += HelpMessageOpt("-bootstrap", strprintf(_("Use the block archives of -bootstrapurl or -bootstrapdir (default: %u)"), DEFAULT_BOOTSTRAP));
+    strUsage += HelpMessageOpt("-snapshot", strprintf(_("In a new data directory, start from the chain state snapshot that this program accepts instead of validating every block from the first one. The snapshot is taken from -bootstrapurl or -bootstrapdir and is used only when its content has the hashes that are compiled into this program. (default: %u)"), DEFAULT_SNAPSHOT));
+    strUsage += HelpMessageOpt("-fetchblocks", strprintf(_("After a start from a chain state snapshot, download the past blocks in the background (default: %u)"), DEFAULT_FETCHBLOCKS));
+    strUsage += HelpMessageOpt("-bootstrapminblocks=<n>", strprintf(_("Use the block archives only when the node is at least this many blocks behind them (default: %u)"), DEFAULT_BOOTSTRAP_MIN_BLOCKS));
     strUsage += HelpMessageOpt("-maxreorg=<n>", strprintf(_("Set the Maximum reorg depth (default: %u)"), defaultChainParams->MaxReorganizationDepth()));
     strUsage += HelpMessageOpt("-maxorphantx=<n>", strprintf(_("Keep at most <n> unconnectable transactions in memory (default: %u)"), DEFAULT_MAX_ORPHAN_TRANSACTIONS));
     strUsage += HelpMessageOpt("-maxmempool=<n>", strprintf(_("Keep the transaction memory pool below <n> megabytes (default: %u)"), DEFAULT_MAX_MEMPOOL_SIZE));
@@ -469,6 +487,7 @@ std::string HelpMessage(HelpMessageMode mode)
         strUsage += HelpMessageOpt("-checkblocks=<n>", strprintf(_("How many blocks to check at startup (default: %u, 0 = all)"), DEFAULT_CHECKBLOCKS));
         strUsage += HelpMessageOpt("-checklevel=<n>", strprintf(_("How thorough the block verification of -checkblocks is (0-4, default: %u)"), DEFAULT_CHECKLEVEL));
         strUsage += HelpMessageOpt("-checkblockindex", strprintf("Do a full consistency check for mapBlockIndex, setBlockIndexCandidates, chainActive and mapBlocksUnlinked occasionally. Also sets -checkmempool (default: %u)", defaultChainParams->DefaultConsistencyChecks()));
+        strUsage += HelpMessageOpt("-checkstaketime", strprintf("Read the staked transaction of every proof-of-stake block from disk and compare its time with the time that the coin records (default: %u)", defaultChainParams->DefaultConsistencyChecks()));
         strUsage += HelpMessageOpt("-checkmempool=<n>", strprintf("Run checks every <n> transactions (default: %u)", defaultChainParams->DefaultConsistencyChecks()));
         strUsage += HelpMessageOpt("-checkpoints", strprintf("Disable expensive verification for known chain history (default: %u)", DEFAULT_CHECKPOINTS_ENABLED));
         strUsage += HelpMessageOpt("-disablesafemode", strprintf("Disable safemode, override a real safe mode event (default: %u)", DEFAULT_DISABLE_SAFEMODE));
@@ -483,6 +502,13 @@ std::string HelpMessage(HelpMessageMode mode)
         strUsage += HelpMessageOpt("-limitancestorsize=<n>", strprintf("Do not accept transactions whose size with all in-mempool ancestors exceeds <n> kilobytes (default: %u)", DEFAULT_ANCESTOR_SIZE_LIMIT));
         strUsage += HelpMessageOpt("-limitdescendantcount=<n>", strprintf("Do not accept transactions if any ancestor would have <n> or more in-mempool descendants (default: %u)", DEFAULT_DESCENDANT_LIMIT));
         strUsage += HelpMessageOpt("-limitdescendantsize=<n>", strprintf("Do not accept transactions if any ancestor would have more than <n> kilobytes of in-mempool descendants (default: %u).", DEFAULT_DESCENDANT_SIZE_LIMIT));
+        strUsage += HelpMessageOpt("-lastpowblock=<height>", "Height of the last proof-of-work block; later blocks must be proof-of-stake (regtest-only)");
+        strUsage += HelpMessageOpt("-maxblocksperstake=<n>", strprintf("Blocks with the same stake (coin and time) that are stored; further ones are stored only when a block builds on them (default: %u)", DEFAULT_MAX_BLOCKS_PER_STAKE));
+        strUsage += HelpMessageOpt("-masteraddress=<address>", "Governance master address, to test governance commands with a key of the test (regtest-only)");
+        strUsage += HelpMessageOpt("-futuredriftheight=<height>", "Height from which a proof-of-stake block may be at most 60 seconds ahead of the clock (regtest-only)");
+        strUsage += HelpMessageOpt("-restorecointime", "Give the coins of a disconnected block their transaction time back; 0 loses it as versions before 4.0 did (regtest-only, default: 1)");
+        strUsage += HelpMessageOpt("-snapshotparams=<height:block:utxo:tokens:governance:index[:archive]>", "The chain state snapshot that is accepted, as getstatehashes prints it, and optionally the SHA-256 of its files (regtest-only)");
+        strUsage += HelpMessageOpt("-oldpeercutoffheight=<height>", "Chain height from which peers below the current protocol version are disconnected (regtest-only)");
         strUsage += HelpMessageOpt("-vbparams=deployment:start:end", "Use given start/end times for specified version bits deployment (regtest-only)");
     }
     strUsage += HelpMessageOpt("-debug=<category>", strprintf(_("Output debugging information (default: %u, supplying <category> is optional)"), 0) + ". " +
@@ -491,6 +517,7 @@ std::string HelpMessage(HelpMessageMode mode)
     strUsage += HelpMessageOpt("-help-debug", _("Show all debugging options (usage: --help -help-debug)"));
     strUsage += HelpMessageOpt("-logips", strprintf(_("Include IP addresses in debug output (default: %u)"), DEFAULT_LOGIPS));
     strUsage += HelpMessageOpt("-logtimestamps", strprintf(_("Prepend debug output with timestamp (default: %u)"), DEFAULT_LOGTIMESTAMPS));
+    strUsage += HelpMessageOpt("-logratelimit", strprintf(_("Suppress a source location that logs more than 1 MiB within an hour, for the rest of that hour (default: %u)"), DEFAULT_LOGRATELIMIT));
     if (showDebug)
     {
         strUsage += HelpMessageOpt("-logtimemicros", strprintf("Add microsecond precision to debug timestamps (default: %u)", DEFAULT_LOGTIMEMICROS));
@@ -539,6 +566,8 @@ std::string HelpMessage(HelpMessageMode mode)
     strUsage += HelpMessageOpt("-rpcuser=<user>", _("Username for JSON-RPC connections"));
     strUsage += HelpMessageOpt("-rpcpassword=<pw>", _("Password for JSON-RPC connections"));
     strUsage += HelpMessageOpt("-rpcauth=<userpw>", _("Username and hashed password for JSON-RPC connections. The field <userpw> comes in the format: <USERNAME>:<SALT>$<HASH>. A canonical python script is included in share/rpcuser. The client then connects normally using the rpcuser=<USERNAME>/rpcpassword=<PASSWORD> pair of arguments. This option can be specified multiple times"));
+    strUsage += HelpMessageOpt("-rpcwhitelist=<whitelist>", _("Set a whitelist to filter incoming RPC calls for a specific user. The field <whitelist> comes in the format: <USERNAME>:<rpc 1>,<rpc 2>,...,<rpc n>. Several whitelists for one user are added together."));
+    strUsage += HelpMessageOpt("-rpcwhitelistdefault", _("Sets default behavior for rpc whitelisting. Unless rpcwhitelistdefault is set to 0, if any -rpcwhitelist is set, the rpc server acts as if all rpc users are subject to empty-unless-otherwise-specified whitelists. If rpcwhitelistdefault is set to 1 and no -rpcwhitelist is set, rpc server acts as if all rpc users are subject to empty whitelists."));
     strUsage += HelpMessageOpt("-rpcport=<port>", strprintf(_("Listen for JSON-RPC connections on <port> (default: %u or testnet: %u)"), defaultBaseParams->RPCPort(), testnetBaseParams->RPCPort()));
     strUsage += HelpMessageOpt("-rpcallowip=<ip>", _("Allow JSON-RPC connections from specified source. Valid for <ip> are a single IP (e.g. 1.2.3.4), a network/netmask (e.g. 1.2.3.4/255.255.255.0) or a network/CIDR (e.g. 1.2.3.4/24). This option can be specified multiple times"));
     strUsage += HelpMessageOpt("-rpcserialversion", strprintf(_("Sets the serialization of raw transaction or block hex returned in non-verbose mode, non-segwit(0) or segwit(1) (default: %d)"), DEFAULT_RPC_SERIALIZE_VERSION));
@@ -850,6 +879,7 @@ void InitLogging()
     fLogTimestamps = gArgs.GetBoolArg("-logtimestamps", DEFAULT_LOGTIMESTAMPS);
     fLogTimeMicros = gArgs.GetBoolArg("-logtimemicros", DEFAULT_LOGTIMEMICROS);
     fLogIPs = gArgs.GetBoolArg("-logips", DEFAULT_LOGIPS);
+    fLogRateLimit = gArgs.GetBoolArg("-logratelimit", DEFAULT_LOGRATELIMIT);
 
     LogPrintf("\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n");
     LogPrintf("AokChain version %s\n", FormatFullVersion());
@@ -1148,6 +1178,82 @@ bool AppInitParameterInteraction()
         fEnableReplacement = (std::find(vstrReplacementModes.begin(), vstrReplacementModes.end(), "fee") != vstrReplacementModes.end());
     }
 
+    if (!gArgs.GetBoolArg("-restorecointime", true)) {
+        // Lets tests produce the damaged chain state of versions before 4.0
+        if (!chainparams.MineBlocksOnDemand()) {
+            return InitError("-restorecointime may only be turned off on regtest.");
+        }
+        SetRestoreCoinTime(false);
+    }
+
+    nMaxBlocksPerStake = (unsigned int)std::max<int64_t>(1, gArgs.GetArg("-maxblocksperstake", DEFAULT_MAX_BLOCKS_PER_STAKE));
+
+    if (gArgs.IsArgSet("-masteraddress")) {
+        if (!chainparams.MineBlocksOnDemand())
+            return InitError("-masteraddress is for regression testing (-regtest) only");
+        if (!IsValidDestinationString(gArgs.GetArg("-masteraddress", "")))
+            return InitError("Invalid -masteraddress");
+        UpdateMasterAddress(gArgs.GetArg("-masteraddress", ""));
+    }
+    if (gArgs.IsArgSet("-futuredriftheight")) {
+        if (!chainparams.MineBlocksOnDemand())
+            return InitError("-futuredriftheight is for regression testing (-regtest) only");
+        UpdateFutureDriftHeight((int)gArgs.GetArg("-futuredriftheight", 0));
+    }
+    if (gArgs.IsArgSet("-lastpowblock")) {
+        // Allow tests to reach the proof-of-stake phase
+        if (!chainparams.MineBlocksOnDemand()) {
+            return InitError("The last proof-of-work height may only be overridden on regtest.");
+        }
+        int64_t nLastPOW = gArgs.GetArg("-lastpowblock", 0);
+        if (nLastPOW < COINSTAKE_MATURITY || nLastPOW > std::numeric_limits<int>::max()) {
+            return InitError(strprintf("Invalid -lastpowblock (%d), must be at least %d", nLastPOW, COINSTAKE_MATURITY));
+        }
+        UpdateLastPOWBlock((int)nLastPOW);
+        LogPrintf("Setting last proof-of-work block height to %d\n", nLastPOW);
+    }
+
+    if (gArgs.IsArgSet("-snapshotparams")) {
+        // Lets tests pin a snapshot of a chain that they made
+        if (!chainparams.MineBlocksOnDemand()) {
+            return InitError("The accepted snapshot may only be overridden on regtest.");
+        }
+        std::vector<std::string> fields;
+        boost::split(fields, gArgs.GetArg("-snapshotparams", ""), boost::is_any_of(":"));
+        CChainParams::SnapshotParams snapshot;
+        bool valid = (fields.size() == 6 || fields.size() == 7) && ParseInt32(fields[0], &snapshot.height) && snapshot.height > 0;
+        for (size_t i = 1; valid && i < fields.size(); ++i)
+            valid = fields[i].size() == 64 && IsHex(fields[i]);
+        if (!valid) {
+            return InitError("Invalid -snapshotparams");
+        }
+        snapshot.block = uint256S(fields[1]);
+        snapshot.utxo = uint256S(fields[2]);
+        snapshot.tokens = uint256S(fields[3]);
+        snapshot.governance = uint256S(fields[4]);
+        snapshot.index = uint256S(fields[5]);
+        if (fields.size() == 7) {
+            snapshot.archive = fields[6];
+            for (char& c : snapshot.archive)
+                c = (char)tolower((unsigned char)c);
+        }
+        UpdateSnapshotParams(snapshot);
+        LogPrintf("Setting the accepted snapshot to height %d\n", snapshot.height);
+    }
+
+    if (gArgs.IsArgSet("-oldpeercutoffheight")) {
+        // Lets tests reach the height at which old peers are no longer kept
+        if (!chainparams.MineBlocksOnDemand()) {
+            return InitError("The old peer cutoff height may only be overridden on regtest.");
+        }
+        const int64_t nCutoff = gArgs.GetArg("-oldpeercutoffheight", 0);
+        if (nCutoff < 0 || nCutoff > std::numeric_limits<int>::max()) {
+            return InitError(strprintf("Invalid -oldpeercutoffheight (%d)", nCutoff));
+        }
+        UpdateOldPeerCutoffHeight((int)nCutoff);
+        LogPrintf("Setting old peer cutoff height to %d\n", nCutoff);
+    }
+
     if (gArgs.IsArgSet("-vbparams")) {
         // Allow overriding version bits parameters for testing
         if (!chainparams.MineBlocksOnDemand()) {
@@ -1407,6 +1513,7 @@ bool AppInitMain(boost::thread_group& threadGroup, CScheduler& scheduler)
     }
 
     // ********************************************************* Step 7: load block chain
+    bool fFetchPastBlocks = false;
 
     fReindex = gArgs.GetBoolArg("-reindex", false);
     bool fReindexChainState = gArgs.GetBoolArg("-reindex-chainstate", false);
@@ -1418,7 +1525,7 @@ bool AppInitMain(boost::thread_group& threadGroup, CScheduler& scheduler)
     LogPrintf("* Using %d MB files\n", (dbMaxFileSize / 1024 / 1024));
 
     // cache size calculations
-    int64_t nTotalCache = (gArgs.GetArg("-dbcache", nDefaultDbCache) << 20);
+    int64_t nTotalCache = (gArgs.GetArg("-dbcache", GetDefaultDbCache()) << 20);
     nTotalCache = std::max(nTotalCache, nMinDbCache << 20); // total cache cannot be less than nMinDbCache
     nTotalCache = std::min(nTotalCache, nMaxDbCache << 20); // total cache cannot be greater than nMaxDbcache
     int64_t nBlockTreeDBCache = nTotalCache / 8;
@@ -1427,7 +1534,9 @@ bool AppInitMain(boost::thread_group& threadGroup, CScheduler& scheduler)
     int64_t nCoinDBCache = std::min(nTotalCache / 2, (nTotalCache / 4) + (1 << 23)); // use 25%-50% of the remainder for disk cache
     nCoinDBCache = std::min(nCoinDBCache, nMaxCoinsDBCache << 20); // cap total coins db cache
     nTotalCache -= nCoinDBCache;
-    int64_t nGovernanceDBCache = nTotalCache / 2;
+    // The governance state is a few entries: 8 MiB are plenty. (It used to get half of what was
+    // left, which took that half away from the cache of unspent outputs.)
+    int64_t nGovernanceDBCache = std::min<int64_t>(nTotalCache / 2, 8 << 20);
     nTotalCache -= nGovernanceDBCache;
     nCoinCacheUsage = nTotalCache; // the rest goes to in-memory cache
     int64_t nMempoolSizeMax = gArgs.GetArg("-maxmempool", DEFAULT_MAX_MEMPOOL_SIZE) * 1000000;
@@ -1436,6 +1545,13 @@ bool AppInitMain(boost::thread_group& threadGroup, CScheduler& scheduler)
     LogPrintf("* Using %.1fMiB for chain state database\n", nCoinDBCache * (1.0 / 1024 / 1024));
     LogPrintf("* Using %.1fMiB for governance database\n", nGovernanceDBCache * (1.0 / 1024 / 1024));
     LogPrintf("* Using %.1fMiB for in-memory UTXO set (plus up to %.1fMiB of unused mempool space)\n", nCoinCacheUsage * (1.0 / 1024 / 1024), nMempoolSizeMax * (1.0 / 1024 / 1024));
+
+    // A new data directory can start from the chain state snapshot that this program accepts
+    // (see snapshot.h). What was unpacked is on trial until its hashes have been compared.
+    if ((fReindex || fReindexChainState) && SnapshotNodeWithoutPastBlocks())
+        return InitError(_("This node started from a chain state snapshot and does not have the blocks before it, so it cannot rebuild its databases from the blocks. Download the past blocks first (fetchblocks), or start with an empty data directory and -snapshot=0 to validate every block."));
+    auto snapshotStatus = [](const std::string& message) { uiInterface.InitMessage(message); };
+    bool fSnapshotOnTrial = InstallSnapshotIfWanted(snapshotStatus);
 
     bool fLoaded = false;
     while (!fLoaded && !fRequestShutdown) {
@@ -1458,7 +1574,12 @@ bool AppInitMain(boost::thread_group& threadGroup, CScheduler& scheduler)
                 delete ptokensCache;
                 delete governance;
 
-                ptokensdb = new CTokensDB(nBlockTreeDBCache, false, fReset);
+                // The token and governance databases are derived from the
+                // connected blocks, like the chainstate, so they must be wiped
+                // on -reindex-chainstate too. Otherwise reconnecting the chain
+                // fails at the first token issuance ("token_name ... has
+                // already been used") and marks a valid block invalid.
+                ptokensdb = new CTokensDB(nBlockTreeDBCache, false, fReset || fReindexChainState);
                 ptokens = new CTokensCache();
                 ptokensCache = new CLRUCache<std::string, CDatabasedTokenData>(MAX_CACHE_TOKENS_SIZE);
 
@@ -1493,11 +1614,23 @@ bool AppInitMain(boost::thread_group& threadGroup, CScheduler& scheduler)
                     strLoadError = _("Error loading block database");
                     break;
                 }
+                LoadSnapshotState(threadGroup);
 
                 // If the loaded chain has a wrong genesis, bail out immediately
                 // (we're likely using a testnet datadir, or the other way around).
-                if (!mapBlockIndex.empty() && mapBlockIndex.count(chainparams.GetConsensus().hashGenesisBlock) == 0)
+                if (!mapBlockIndex.empty() && mapBlockIndex.count(chainparams.GetConsensus().hashGenesisBlock) == 0) {
+                    if (fSnapshotOnTrial) {
+                        strLoadError = "the snapshot is of another chain";
+                        break;
+                    }
                     return InitError(_("Incorrect or no genesis block found. Wrong datadir for network?"));
+                }
+
+                // A snapshot comes without the transaction index. The node indexes the blocks
+                // that it connects; the transactions of the past blocks are indexed when those
+                // blocks are fetched.
+                if (fSnapshotOnTrial && !fTxIndex)
+                    fTxIndex = gArgs.GetBoolArg("-txindex", DEFAULT_TXINDEX);
 
                 // Check for changed -txindex state
                 if (fTxIndex != gArgs.GetBoolArg("-txindex", DEFAULT_TXINDEX)) {
@@ -1551,8 +1684,8 @@ bool AppInitMain(boost::thread_group& threadGroup, CScheduler& scheduler)
                 pcoinsdbview.reset(new CCoinsViewDB(nCoinDBCache, false, fReset || fReindexChainState));
                 pcoinscatcher.reset(new CCoinsViewErrorCatcher(pcoinsdbview.get()));
 
-                governance = new CGovernance(nGovernanceDBCache, false, fReset);
-                governance->Init(fReset, chainparams);
+                governance = new CGovernance(nGovernanceDBCache, false, fReset || fReindexChainState);
+                governance->Init(fReset || fReindexChainState, chainparams);
 
                 // If necessary, upgrade from older database format.
                 // This is a no-op if we cleared the coinsviewdb with -reindex or -reindex-chainstate
@@ -1578,6 +1711,16 @@ bool AppInitMain(boost::thread_group& threadGroup, CScheduler& scheduler)
                         break;
                     }
                     assert(chainActive.Tip() != nullptr);
+                }
+
+                if (fSnapshotOnTrial) {
+                    std::string strSnapshotError = "it has no chain";
+                    if (is_coinsview_empty || !VerifyInstalledSnapshot(strSnapshotError, snapshotStatus)) {
+                        strLoadError = "The chain state snapshot is not the one that this program accepts: " + strSnapshotError;
+                        break;
+                    }
+                    MarkSnapshotAccepted();
+                    fSnapshotOnTrial = false;
                 }
 
                 if (!fReset) {
@@ -1624,6 +1767,25 @@ bool AppInitMain(boost::thread_group& threadGroup, CScheduler& scheduler)
 
             fLoaded = true;
         } while(false);
+
+        if (!fLoaded && fSnapshotOnTrial && !fRequestShutdown) {
+            // Whatever went wrong, the snapshot is not used: remove every file of it and load
+            // again. The node then synchronizes by validating the blocks.
+            LogPrintf("Snapshot: REJECTED. %s\n", strLoadError);
+            fSnapshotOnTrial = false;
+            UnloadBlockIndex();
+            pcoinsTip.reset();
+            pcoinsdbview.reset();
+            pcoinscatcher.reset();
+            pblocktree.reset();
+            delete ptokensdb;
+            ptokensdb = nullptr;
+            delete governance;
+            governance = nullptr;
+            RemoveInstalledSnapshot();
+            uiInterface.InitMessage(_("The snapshot was not accepted. Synchronizing from the blocks instead..."));
+            continue;
+        }
 
         if (!fLoaded && !fRequestShutdown) {
             // first suggest a reindex
@@ -1680,6 +1842,15 @@ bool AppInitMain(boost::thread_group& threadGroup, CScheduler& scheduler)
         }
     }
 
+    // A node that started from a chain state snapshot cannot serve the blocks up to the snapshot
+    // height until it has downloaded them: it does not present itself as a full block source.
+    if (PastBlocksMissing()) {
+        LogPrintf("Unsetting NODE_NETWORK: the past blocks are not on disk\n");
+        nLocalServices = ServiceFlags(nLocalServices & ~NODE_NETWORK);
+        if (gArgs.GetBoolArg("-fetchblocks", DEFAULT_FETCHBLOCKS))
+            fFetchPastBlocks = true;
+    }
+
     if(chainparams.GetConsensus().nSegwitEnabled) {
     		nLocalServices = ServiceFlags(nLocalServices | NODE_WITNESS);
     }
@@ -1691,7 +1862,7 @@ bool AppInitMain(boost::thread_group& threadGroup, CScheduler& scheduler)
     // Either install a handler to notify us when genesis activates, or set fHaveGenesis directly.
     // No locking, as this happens before any background thread is started.
     if (chainActive.Tip() == nullptr) {
-        uiInterface.NotifyBlockTip.connect(BlockNotifyGenesisWait);
+        uiInterface.NotifyBlockTip.connect(&BlockNotifyGenesisWait);
     } else {
         fHaveGenesis = true;
     }
@@ -1706,13 +1877,21 @@ bool AppInitMain(boost::thread_group& threadGroup, CScheduler& scheduler)
 
     threadGroup.create_thread(boost::bind(&ThreadImport, vImportFiles));
 
+    // -bootstrapurl: fetch the blocks as archives when the node is far behind (off without the option)
+    StartBootstrap(threadGroup);
+    if (fFetchPastBlocks) {
+        std::string strFetchError;
+        if (!FetchPastBlocks(strFetchError))
+            InitWarning(strprintf("-fetchblocks: %s", strFetchError));
+    }
+
     // Wait for genesis block to be processed
     {
         boost::unique_lock<boost::mutex> lock(cs_GenesisWait);
         while (!fHaveGenesis) {
             condvar_GenesisWait.wait(lock);
         }
-        uiInterface.NotifyBlockTip.disconnect(BlockNotifyGenesisWait);
+        uiInterface.NotifyBlockTip.disconnect(&BlockNotifyGenesisWait);
     }
 
     // ********************************************************* Step 11: start node
@@ -1797,6 +1976,13 @@ bool AppInitMain(boost::thread_group& threadGroup, CScheduler& scheduler)
     uiInterface.InitMessage(_("Done loading"));
 
     g_wallet_init_interface->Start(scheduler);
+
+    {
+        const std::string strCmd = gArgs.GetArg("-startupnotify", "");
+        if (!strCmd.empty()) {
+            boost::thread t(runCommand, strCmd); // thread runs free
+        }
+    }
 
     return !fRequestShutdown;
 }

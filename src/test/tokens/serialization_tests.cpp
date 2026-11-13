@@ -12,6 +12,8 @@
 #include <amount.h>
 #include <base58.h>
 #include <chainparams.h>
+#include <uint256.h>
+#include <utilstrencodings.h>
 
 BOOST_FIXTURE_TEST_SUITE(serialization_tests, BasicTestingSetup)
     BOOST_AUTO_TEST_CASE(owner_token_serialization_test)
@@ -25,7 +27,8 @@ BOOST_FIXTURE_TEST_SUITE(serialization_tests, BasicTestingSetup)
         CNewToken token(name, 100000000);
 
         // Create destination
-        CTxDestination dest = DecodeDestination("mfe7MqgYZgBuXzrT2QTFqZwBXwRDqagHTp"); // Testnet Address
+        CTxDestination dest = CKeyID(uint160(ParseHex("0102030405060708090a0b0c0d0e0f1011121314")));
+        std::string expected_address = EncodeDestination(dest); // Testnet Address
 
         BOOST_CHECK(IsValidDestination(dest));
 
@@ -38,7 +41,7 @@ BOOST_FIXTURE_TEST_SUITE(serialization_tests, BasicTestingSetup)
         std::stringstream ownerName;
         ownerName << name << OWNER_TAG;
         BOOST_CHECK_MESSAGE(OwnerTokenFromScript(scriptPubKey, strOwnerName, address), "Failed to get token from script");
-        BOOST_CHECK_MESSAGE(address == "mfe7MqgYZgBuXzrT2QTFqZwBXwRDqagHTp", "Addresses weren't equal");
+        BOOST_CHECK_MESSAGE(address == expected_address, "Addresses weren't equal");
         BOOST_CHECK_MESSAGE(strOwnerName == ownerName.str(), "Token names weren't equal");
     }
 

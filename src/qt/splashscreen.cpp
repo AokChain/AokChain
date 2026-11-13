@@ -5,6 +5,8 @@
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 #if defined(HAVE_CONFIG_H)
+#include "firstrun.h"
+#include "guiutil.h"
 #include "config/aokchain-config.h"
 #endif
 
@@ -31,13 +33,7 @@
 SplashScreen::SplashScreen(Qt::WindowFlags f, const NetworkStyle *networkStyle) :
     QWidget(0, f), curAlignment(0)
 {
-    // set reference point, paddings
-    int paddingRight            = 50;
-    int paddingTop              = 50;
-    int titleVersionVSpace      = 17;
-    int titleCopyrightVSpace    = 40;
-
-    float fontFactor            = 1.0;
+    const GUIUtil::Theme &t = GUIUtil::theme();
     float devicePixelRatio      = 1.0;
 #if QT_VERSION > 0x050100
     devicePixelRatio = static_cast<QGuiApplication*>(QCoreApplication::instance())->devicePixelRatio();
@@ -45,14 +41,13 @@ SplashScreen::SplashScreen(Qt::WindowFlags f, const NetworkStyle *networkStyle) 
 
     // define text to place
     QString titleText       = tr(PACKAGE_NAME);
-    QString versionText     = QString("Version %1").arg(QString::fromStdString(FormatFullVersion()));
+    QString versionText     = QString::fromStdString(FormatFullVersion());
     QString copyrightText   = QString::fromUtf8(CopyrightHolders(strprintf("\xc2\xA9 %u ", COPYRIGHT_YEAR)).c_str());
     QString titleAddText    = networkStyle->getTitleAddText();
 
-    QString font            = QApplication::font().toString();
-
     // create a bitmap according to device pixelratio
-    QSize splashSize(480*devicePixelRatio,320*devicePixelRatio);
+    const int width = 480, height = 320;
+    QSize splashSize(width*devicePixelRatio,height*devicePixelRatio);
     pixmap = QPixmap(splashSize);
 
 #if QT_VERSION > 0x050100
@@ -60,65 +55,37 @@ SplashScreen::SplashScreen(Qt::WindowFlags f, const NetworkStyle *networkStyle) 
     pixmap.setDevicePixelRatio(devicePixelRatio);
 #endif
 
+    // The look of the first-run screens: the surface of a card, the logo, the name, the version.
     QPainter pixPaint(&pixmap);
-    pixPaint.setPen(QColor(100,100,100));
+    pixPaint.setRenderHints(QPainter::Antialiasing | QPainter::TextAntialiasing | QPainter::SmoothPixmapTransform, true);
+    pixPaint.fillRect(QRect(0, 0, width, height), t.surface);
+    pixPaint.fillRect(QRect(0, 0, width, 6), t.fill);
 
-    // draw a slightly radial gradient
-    QRadialGradient gradient(QPoint(0,0), splashSize.width()/devicePixelRatio);
-    gradient.setColorAt(0, Qt::white);
-    gradient.setColorAt(1, QColor(247,247,247));
-    QRect rGradient(QPoint(0,0), splashSize);
-    pixPaint.fillRect(rGradient, gradient);
+    const int logoSize = 76;
+    pixPaint.drawPixmap(QPointF((width - logoSize) / 2.0, 56), WizardHeader::logo(logoSize, devicePixelRatio));
 
-    // draw the aokchain icon, expected size of PNG: 1024x1024
-    QRect rectIcon(QPoint(-40,0), QSize(310,310));
+    pixPaint.setPen(t.text);
+    pixPaint.setFont(GUIUtil::appFont(24, QFont::DemiBold));
+    pixPaint.drawText(QRect(0, 146, width, 36), Qt::AlignHCenter | Qt::AlignVCenter, titleText);
 
-    const QSize requiredSize(1024,1024);
-    QPixmap icon(networkStyle->getSplashIcon().pixmap(requiredSize));
+    pixPaint.setPen(t.textSecondary);
+    pixPaint.setFont(GUIUtil::monoFont(12));
+    pixPaint.drawText(QRect(0, 184, width, 20), Qt::AlignHCenter | Qt::AlignVCenter, versionText);
 
-    pixPaint.drawPixmap(rectIcon, icon);
+    pixPaint.setPen(t.textDisabled);
+    pixPaint.setFont(GUIUtil::appFont(10));
+    pixPaint.drawText(QRect(40, 208, width - 80, 30), Qt::AlignHCenter | Qt::AlignTop | Qt::TextWordWrap, copyrightText);
 
-    // check font size and drawing with
-    pixPaint.setFont(QFont(font, 33*fontFactor));
-    QFontMetrics fm = pixPaint.fontMetrics();
-    int titleTextWidth = fm.width(titleText);
-    if (titleTextWidth > 176) {
-        fontFactor = fontFactor * 176 / titleTextWidth;
-    }
-
-    pixPaint.setFont(QFont(font, 33*fontFactor));
-    fm = pixPaint.fontMetrics();
-    titleTextWidth  = fm.width(titleText);
-    pixPaint.drawText(pixmap.width()/devicePixelRatio-titleTextWidth-paddingRight,paddingTop,titleText);
-
-    pixPaint.setFont(QFont(font, 15*fontFactor));
-
-    // if the version string is to long, reduce size
-    fm = pixPaint.fontMetrics();
-    int versionTextWidth  = fm.width(versionText);
-    if(versionTextWidth > titleTextWidth+paddingRight-10) {
-        pixPaint.setFont(QFont(font, 10*fontFactor));
-        titleVersionVSpace -= 5;
-    }
-    pixPaint.drawText(pixmap.width()/devicePixelRatio-titleTextWidth-paddingRight+2,paddingTop+titleVersionVSpace,versionText);
-
-    // draw copyright stuff
-    {
-        pixPaint.setFont(QFont(font, 10*fontFactor));
-        const int x = pixmap.width()/devicePixelRatio-titleTextWidth-paddingRight;
-        const int y = paddingTop+titleCopyrightVSpace;
-        QRect copyrightRect(x, y, pixmap.width() - x - paddingRight, pixmap.height() - y);
-        pixPaint.drawText(copyrightRect, Qt::AlignLeft | Qt::AlignTop | Qt::TextWordWrap, copyrightText);
-    }
-
-    // draw additional text if special network
+    // a chip for a network other than the main one
     if(!titleAddText.isEmpty()) {
-        QFont boldFont = QFont(font, 10*fontFactor);
-        boldFont.setWeight(QFont::Bold);
-        pixPaint.setFont(boldFont);
-        fm = pixPaint.fontMetrics();
-        int titleAddTextWidth  = fm.width(titleAddText);
-        pixPaint.drawText(pixmap.width()/devicePixelRatio-titleAddTextWidth-10,15,titleAddText);
+        pixPaint.setFont(GUIUtil::appFont(11, QFont::DemiBold));
+        const int chipWidth = pixPaint.fontMetrics().boundingRect(titleAddText).width() + 20;
+        const QRectF chip(width - chipWidth - 14, 18, chipWidth, 22);
+        pixPaint.setPen(Qt::NoPen);
+        pixPaint.setBrush(t.warnBg);
+        pixPaint.drawRoundedRect(chip, 6, 6);
+        pixPaint.setPen(t.warnText);
+        pixPaint.drawText(chip, Qt::AlignCenter, titleAddText);
     }
 
     pixPaint.end();
@@ -222,9 +189,12 @@ void SplashScreen::paintEvent(QPaintEvent *event)
 {
     QPainter painter(this);
     painter.drawPixmap(0, 0, pixmap);
-    QRect r = rect().adjusted(5, 5, -5, -5);
-    painter.setPen(curColor);
-    painter.drawText(r, curAlignment, curMessage);
+    // what the node is doing, below a thin line
+    const GUIUtil::Theme &t = GUIUtil::theme();
+    painter.fillRect(QRect(40, height() - 70, width() - 80, 1), t.line);
+    painter.setPen(t.textSecondary);
+    painter.setFont(GUIUtil::appFont(12));
+    painter.drawText(QRect(24, height() - 62, width() - 48, 52), Qt::AlignHCenter | Qt::AlignVCenter | Qt::TextWordWrap, curMessage);
 }
 
 void SplashScreen::closeEvent(QCloseEvent *event)

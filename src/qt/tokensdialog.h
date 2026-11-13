@@ -17,6 +17,10 @@
 class ClientModel;
 class PlatformStyle;
 class SendTokensEntry;
+class AmountLabel;
+class HeldTokenIndex;
+class SummaryCard;
+class TokenPicker;
 class SendCoinsRecipient;
 
 namespace Ui {
@@ -24,6 +28,8 @@ namespace Ui {
 }
 
 QT_BEGIN_NAMESPACE
+class QLabel;
+class QPushButton;
 class QUrl;
 QT_END_NAMESPACE
 
@@ -64,6 +70,10 @@ public Q_SLOTS:
     void setBalance(const CAmount& balance, const CAmount& unconfirmedBalance, const CAmount& immatureBalance,
                     const CAmount& watchOnlyBalance, const CAmount& watchUnconfBalance, const CAmount& watchImmatureBalance);
     void focusTokenListBox();
+    /** Choose the token to send by its name */
+    void selectToken(const QString &name);
+    /** Read the tokens of the wallet again */
+    void refreshTokens();
 
 private:
     Ui::TokensDialog *ui;
@@ -72,6 +82,17 @@ private:
     bool fNewRecipientAllowed;
     bool fFeeMinimized;
     const PlatformStyle *platformStyle;
+
+    /** Two columns as on the send page: the form on the left, the summary on the right */
+    void buildLayout();
+    void renumberEntries();
+    TokenPicker *picker;
+    HeldTokenIndex *heldTokens;
+    QLabel *pickedLogo;
+    QLabel *pickedName;
+    QPushButton *belowButton;
+    AmountLabel *pickedAvailable;
+    SummaryCard *summary;
 
     // Process WalletModel::SendCoinsReturn and generate a pair consisting
     // of a message and message flags for use in Q_EMIT message().
@@ -112,6 +133,9 @@ private Q_SLOTS:
     /** TOKENS START */
     void tokenControlUpdateSendCoinsDialog();
     void focusToken(const QModelIndex& index);
+    void tokenPicked(const QString &name);
+    void chooseBelow();
+    void updateSummary();
     /** TOKENS END */
 
     Q_SIGNALS:

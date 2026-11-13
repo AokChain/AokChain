@@ -250,6 +250,16 @@ public:
     void Ban(const CNetAddr& netAddr, const BanReason& reason, int64_t bantimeoffset = 0, bool sinceUnixEpoch = false);
     void Ban(const CSubNet& subNet, const BanReason& reason, int64_t bantimeoffset = 0, bool sinceUnixEpoch = false);
     void ClearBanned(); // needed for unit testing
+    /**
+     * Discourage an address whose peer misbehaved. Connections from it are
+     * refused while the inbound slots are (almost) full, and no connection is
+     * made to it. Kept in memory in a filter of fixed size and gone after a
+     * restart. (Such peers were put on the ban list, which is written to
+     * disk and has no limit: an attacker with many addresses could grow it
+     * without end. The ban list is for the operator, see setban.)
+     */
+    void Discourage(const CNetAddr& netAddr);
+    bool IsDiscouraged(const CNetAddr& netAddr);
     bool IsBanned(CNetAddr ip);
     bool IsBanned(CSubNet subnet);
     bool Unban(const CNetAddr &ip);
@@ -391,6 +401,7 @@ private:
     std::vector<ListenSocket> vhListenSocket;
     std::atomic<bool> fNetworkActive;
     banmap_t setBanned;
+    CRollingBloomFilter m_discouraged{50000, 0.000001}; //!< guarded by cs_setBanned
     CCriticalSection cs_setBanned;
     bool setBannedIsDirty;
     bool fAddressesInitialized;
@@ -673,6 +684,10 @@ public:
     std::vector<CAddress> vAddrToSend;
     CRollingBloomFilter addrKnown;
     bool fGetAddr;
+    /** Addr rate limiting (upstream PR #22387): number of addresses that can
+     *  still be processed from this peer, and when it was last updated. */
+    double m_addr_token_bucket{1.0};
+    int64_t m_addr_token_timestamp{GetTimeMicros()};
     std::set<uint256> setKnown;
     int64_t nNextAddrSend;
     int64_t nNextLocalAddrSend;
@@ -691,6 +706,9 @@ public:
     std::vector<uint256> vInventoryBlockToSend;
     CCriticalSection cs_inventory;
     std::set<uint256> setAskFor;
+    /** Orphan transactions whose parents this peer has delivered and that are still to be tried
+     *  (guarded by cs_main) */
+    std::set<uint256> orphan_work_set;
     std::multimap<int64_t, CInv> mapAskFor;
     int64_t nNextInvSend;
     // Used for headers announcements - unfiltered blocks to relay

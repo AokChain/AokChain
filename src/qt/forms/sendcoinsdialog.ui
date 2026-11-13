@@ -96,12 +96,12 @@
               </property>
               <property name="font">
                <font>
-                <weight>75</weight>
-                <bold>true</bold>
+                <weight>57</weight>
+                <bold>false</bold>
                </font>
               </property>
               <property name="styleSheet">
-               <string notr="true">font-weight:bold;</string>
+               <string notr="true">font-weight:500;</string>
               </property>
               <property name="text">
                <string>Coin Control Features</string>
@@ -145,12 +145,12 @@
              <widget class="QLabel" name="labelCoinControlInsuffFunds">
               <property name="font">
                <font>
-                <weight>75</weight>
-                <bold>true</bold>
+                <weight>57</weight>
+                <bold>false</bold>
                </font>
               </property>
               <property name="styleSheet">
-               <string notr="true">color:red;font-weight:bold;</string>
+               <string notr="true">color:red;font-weight:500;</string>
               </property>
               <property name="text">
                <string>Insufficient funds!</string>
@@ -237,8 +237,8 @@
                   <widget class="QLabel" name="labelCoinControlQuantityText">
                    <property name="font">
                     <font>
-                     <weight>75</weight>
-                     <bold>true</bold>
+                     <weight>57</weight>
+                     <bold>false</bold>
                     </font>
                    </property>
                    <property name="text">
@@ -272,8 +272,8 @@
                   <widget class="QLabel" name="labelCoinControlBytesText">
                    <property name="font">
                     <font>
-                     <weight>75</weight>
-                     <bold>true</bold>
+                     <weight>57</weight>
+                     <bold>false</bold>
                     </font>
                    </property>
                    <property name="text">
@@ -320,8 +320,8 @@
                   <widget class="QLabel" name="labelCoinControlAmountText">
                    <property name="font">
                     <font>
-                     <weight>75</weight>
-                     <bold>true</bold>
+                     <weight>57</weight>
+                     <bold>false</bold>
                     </font>
                    </property>
                    <property name="text">
@@ -352,8 +352,8 @@
                   <widget class="QLabel" name="labelCoinControlLowOutputText">
                    <property name="font">
                     <font>
-                     <weight>75</weight>
-                     <bold>true</bold>
+                     <weight>57</weight>
+                     <bold>false</bold>
                     </font>
                    </property>
                    <property name="text">
@@ -400,8 +400,8 @@
                   <widget class="QLabel" name="labelCoinControlFeeText">
                    <property name="font">
                     <font>
-                     <weight>75</weight>
-                     <bold>true</bold>
+                     <weight>57</weight>
+                     <bold>false</bold>
                     </font>
                    </property>
                    <property name="text">
@@ -451,8 +451,8 @@
                   <widget class="QLabel" name="labelCoinControlAfterFeeText">
                    <property name="font">
                     <font>
-                     <weight>75</weight>
-                     <bold>true</bold>
+                     <weight>57</weight>
+                     <bold>false</bold>
                     </font>
                    </property>
                    <property name="text">
@@ -483,8 +483,8 @@
                   <widget class="QLabel" name="labelCoinControlChangeText">
                    <property name="font">
                     <font>
-                     <weight>75</weight>
-                     <bold>true</bold>
+                     <weight>57</weight>
+                     <bold>false</bold>
                     </font>
                    </property>
                    <property name="text">
@@ -733,12 +733,12 @@
                   </property>
                   <property name="font">
                    <font>
-                    <weight>75</weight>
-                    <bold>true</bold>
+                    <weight>57</weight>
+                    <bold>false</bold>
                    </font>
                   </property>
                   <property name="styleSheet">
-                   <string notr="true">font-weight:bold;</string>
+                   <string notr="true">font-weight:500;</string>
                   </property>
                   <property name="text">
                    <string>Transaction Fee:</string>
@@ -780,8 +780,8 @@
              <widget class="QLabel" name="fallbackFeeWarningLabel">
               <property name="font">
                <font>
-                <weight>75</weight>
-                <bold>true</bold>
+                <weight>57</weight>
+                <bold>false</bold>
                </font>
               </property>
               <property name="toolTip">

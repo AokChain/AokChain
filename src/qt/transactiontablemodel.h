@@ -77,6 +77,16 @@ public:
         RawDecorationRole,
         /** AOK or name of an token */
         TokenNameRole,
+        /** Short title: direction and asset ("Received · AOK") */
+        TitleRole,
+        /** Name of the asset for display: an owner token without its "!" */
+        AssetNameRole,
+        /** Is this the owner token of a token? */
+        OwnerTokenRole,
+        /** Amount with sign and thousands separators, for display */
+        DisplayAmountRole,
+        /** Short status for a badge ("Confirmed", "Unconfirmed 2/6") */
+        StatusTextRole,
     };
 
     int rowCount(const QModelIndex &parent) const;
@@ -102,6 +112,8 @@ private:
     QString formatTxStatus(const TransactionRecord *wtx) const;
     QString formatTxDate(const TransactionRecord *wtx) const;
     QString formatTxType(const TransactionRecord *wtx) const;
+    QString formatTxTitle(const TransactionRecord *wtx) const;
+    QString formatTxShortStatus(const TransactionRecord *wtx) const;
     QString formatTxToAddress(const TransactionRecord *wtx, bool tooltip) const;
     QString formatTxAmount(const TransactionRecord *wtx, bool showUnconfirmed=true, AokChainUnits::SeparatorStyle separators=AokChainUnits::separatorStandard) const;
     QString formatTooltip(const TransactionRecord *rec) const;

@@ -826,7 +826,7 @@ void CTxMemPool::removeForBlock(const std::vector<CTransactionRef>& vtx, unsigne
 /**
  * Called when a block is connected. Removes from mempool and updates the miner fee estimator.
  */
-void CTxMemPool::removeForBlock(const std::vector<CTransactionRef>& vtx, unsigned int nBlockHeight, std::set<CTokenCacheNewToken>& setNewTokens)
+void CTxMemPool::removeForBlock(const std::vector<CTransactionRef>& vtx, unsigned int nBlockHeight, std::set<CTokenCacheNewToken>& setNewTokens, bool fUpdateEstimates)
 {
     LOCK(cs);
     std::vector<const CTxMemPoolEntry*> entries;
@@ -854,7 +854,10 @@ void CTxMemPool::removeForBlock(const std::vector<CTransactionRef>& vtx, unsigne
     /** TOKENS END */
 
     // Before the txs in the new block have been removed from the mempool, update policy estimates
-    if (minerPolicyEstimator) {minerPolicyEstimator->processBlock(nBlockHeight, entries);}
+    // (the caller turns this off during the first synchronization: there is nothing to
+    // estimate from, and aging the statistics for every block took a noticeable part of
+    // the time of each block)
+    if (minerPolicyEstimator && fUpdateEstimates) {minerPolicyEstimator->processBlock(nBlockHeight, entries);}
     for (const auto& tx : vtx)
     {
         txiter it = mapTx.find(tx->GetHash());

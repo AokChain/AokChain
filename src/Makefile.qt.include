@@ -106,7 +106,6 @@ QT_FORMS_UI = \
   qt/forms/modaloverlay.ui \
   qt/forms/openuridialog.ui \
   qt/forms/optionsdialog.ui \
-  qt/forms/overviewpage.ui \
   qt/forms/receivecoinsdialog.ui \
   qt/forms/receiverequestdialog.ui \
   qt/forms/debugwindow.ui \
@@ -123,6 +122,9 @@ QT_MOC_CPP = \
   qt/moc_addressbookpage.cpp \
   qt/moc_addresstablemodel.cpp \
   qt/moc_askpassphrasedialog.cpp \
+  qt/moc_firstrun.cpp \
+  qt/moc_mnemonicdialog.cpp \
+  qt/moc_sendconfirmdialog.cpp \
   qt/moc_tokencontroldialog.cpp \
   qt/moc_tokencontroltreewidget.cpp \
   qt/moc_tokenfilterproxy.cpp \
@@ -136,7 +138,6 @@ QT_MOC_CPP = \
   qt/moc_coincontroldialog.cpp \
   qt/moc_coincontroltreewidget.cpp \
   qt/moc_csvmodelwriter.cpp \
-  qt/moc_darkstyle.cpp \
   qt/moc_editaddressdialog.cpp \
   qt/moc_guiutil.cpp \
   qt/moc_intro.cpp \
@@ -171,6 +172,13 @@ QT_MOC_CPP = \
   qt/moc_walletframe.cpp \
   qt/moc_walletmodel.cpp \
   qt/moc_walletview.cpp \
+  qt/moc_sidebar.cpp \
+  qt/moc_pagewidgets.cpp \
+  qt/moc_tokenspage.cpp \
+  qt/moc_tokenlists.cpp \
+  qt/moc_explorerpage.cpp \
+  qt/moc_multisigmodel.cpp \
+  qt/moc_signhubpage.cpp \
   qt/moc_tokensdialog.cpp \
   qt/moc_createtokendialog.cpp \
   qt/moc_reissuetokendialog.cpp \
@@ -201,6 +209,9 @@ AOKCHAIN_QT_H = \
   qt/addressbookpage.h \
   qt/addresstablemodel.h \
   qt/askpassphrasedialog.h \
+  qt/firstrun.h \
+  qt/mnemonicdialog.h \
+  qt/sendconfirmdialog.h \
   qt/tokencontroldialog.h \
   qt/tokencontroltreewidget.h \
   qt/tokenfilterproxy.h \
@@ -217,7 +228,6 @@ AOKCHAIN_QT_H = \
   qt/coincontroldialog.h \
   qt/coincontroltreewidget.h \
   qt/csvmodelwriter.h \
-  qt/darkstyle.h \
   qt/editaddressdialog.h \
   qt/guiconstants.h \
   qt/guiutil.h \
@@ -260,9 +270,22 @@ AOKCHAIN_QT_H = \
   qt/walletmodel.h \
   qt/walletmodeltransaction.h \
   qt/walletview.h \
+  qt/sidebar.h \
+  qt/pagewidgets.h \
+  qt/tokenspage.h \
+  qt/tokenlists.h \
+  qt/explorerpage.h \
+  qt/bootstrapfetch.h \
+  qt/pastblocks.h \
+  qt/multisigmodel.h \
+  qt/signhubpage.h \
   qt/winshutdownmonitor.h
 
 RES_ICONS = \
+  qt/res/icons/check_white.png \
+  qt/res/icons/aok_logo.png \
+  qt/res/icons/chevron_down.png \
+  qt/res/icons/radio_white.png \
   qt/res/icons/add.png \
   qt/res/icons/address-book.png \
   qt/res/icons/about_aok.png \
@@ -325,33 +348,32 @@ RES_ICONS = \
   qt/res/icons/tx_token_output.png \
   qt/res/icons/warning.png \
   qt/res/icons/verify.png \
-  qt/res/darkstyle/icon_close.png \
-  qt/res/darkstyle/icon_restore.png \
-  qt/res/darkstyle/icon_undock.png \
-  qt/res/darkstyle/icon_branch_closed.png \
-  qt/res/darkstyle/icon_branch_end.png \
-  qt/res/darkstyle/icon_branch_more.png \
-  qt/res/darkstyle/icon_branch_open.png \
-  qt/res/darkstyle/icon_vline.png \
-  qt/res/darkstyle/icon_checkbox_checked.png \
-  qt/res/darkstyle/icon_checkbox_indeterminate.png \
-  qt/res/darkstyle/icon_checkbox_unchecked.png \
-  qt/res/darkstyle/icon_checkbox_checked_pressed.png \
-  qt/res/darkstyle/icon_checkbox_indeterminate_pressed.png \
-  qt/res/darkstyle/icon_checkbox_unchecked_pressed.png \
-  qt/res/darkstyle/icon_checkbox_checked_disabled.png \
-  qt/res/darkstyle/icon_checkbox_indeterminate_disabled.png \
-  qt/res/darkstyle/icon_checkbox_unchecked_disabled.png \
-  qt/res/darkstyle/icon_radiobutton_checked.png \
-  qt/res/darkstyle/icon_radiobutton_unchecked.png \
-  qt/res/darkstyle/icon_radiobutton_checked_pressed.png \
-  qt/res/darkstyle/icon_radiobutton_unchecked_pressed.png \
-  qt/res/darkstyle/icon_radiobutton_checked_disabled.png \
-  qt/res/darkstyle/icon_radiobutton_unchecked_disabled.png \
-  qt/res/fonts/Montserrat-Bold.otf \
-  qt/res/fonts/Montserrat-Light.otf \
-  qt/res/fonts/Montserrat-Regular.otf \
-  qt/res/fonts/Montserrat-SemiBold.otf
+  qt/res/fonts/NotoSans-Regular.ttf \
+  qt/res/fonts/NotoSans-Medium.ttf \
+  qt/res/fonts/NotoSans-SemiBold.ttf \
+  qt/res/fonts/NotoSans-Bold.ttf \
+  qt/res/fonts/NotoSansKR-Regular.ttf \
+  qt/res/fonts/NotoSansKR-Medium.ttf \
+  qt/res/fonts/NotoSansKR-SemiBold.ttf \
+  qt/res/fonts/NotoSansKR-Bold.ttf \
+  qt/res/fonts/NotoSansMono-Regular.ttf \
+  qt/res/fonts/NotoSansMono-Medium.ttf \
+  qt/res/fonts/NotoSansMono-SemiBold.ttf \
+  qt/res/fonts/NotoSansMono-Bold.ttf \
+  qt/res/tokens/artl.png \
+  qt/res/tokens/cca.png \
+  qt/res/tokens/ccl.png \
+  qt/res/tokens/dhtb.png \
+  qt/res/tokens/dztb.png \
+  qt/res/tokens/gnd.png \
+  qt/res/tokens/mec.png \
+  qt/res/tokens/nmo.png \
+  qt/res/tokens/nol.png \
+  qt/res/tokens/papt.png \
+  qt/res/tokens/plb.png \
+  qt/res/tokens/serg.png \
+  qt/res/tokens/tong.png \
+  qt/res/css/theme.qss
 
 
 AOKCHAIN_QT_BASE_CPP = \
@@ -362,7 +384,6 @@ AOKCHAIN_QT_BASE_CPP = \
   qt/aokchainunits.cpp \
   qt/clientmodel.cpp \
   qt/csvmodelwriter.cpp \
-  qt/darkstyle.cpp \
   qt/guiutil.cpp \
   qt/intro.cpp \
   qt/modaloverlay.cpp \
@@ -376,9 +397,11 @@ AOKCHAIN_QT_BASE_CPP = \
   qt/qvalidatedlineedit.cpp \
   qt/qvaluecombobox.cpp \
   qt/rpcconsole.cpp \
+  qt/firstrun.cpp \
   qt/splashscreen.cpp \
   qt/trafficgraphwidget.cpp \
-  qt/utilitydialog.cpp
+  qt/utilitydialog.cpp \
+  qt/sidebar.cpp
 
 AOKCHAIN_QT_WINDOWS_CPP = qt/winshutdownmonitor.cpp
 
@@ -386,6 +409,8 @@ AOKCHAIN_QT_WALLET_CPP = \
   qt/addressbookpage.cpp \
   qt/addresstablemodel.cpp \
   qt/askpassphrasedialog.cpp \
+  qt/mnemonicdialog.cpp \
+  qt/sendconfirmdialog.cpp \
   qt/tokencontroldialog.cpp \
   qt/tokencontroltreewidget.cpp \
   qt/tokenfilterproxy.cpp \
@@ -415,7 +440,15 @@ AOKCHAIN_QT_WALLET_CPP = \
   qt/walletframe.cpp \
   qt/walletmodel.cpp \
   qt/walletmodeltransaction.cpp \
-  qt/walletview.cpp
+  qt/walletview.cpp \
+  qt/explorerpage.cpp \
+  qt/bootstrapfetch.cpp \
+  qt/pastblocks.cpp \
+  qt/multisigmodel.cpp \
+  qt/signhubpage.cpp \
+  qt/tokenspage.cpp \
+  qt/tokenlists.cpp \
+  qt/pagewidgets.cpp
 
 AOKCHAIN_QT_CPP = $(AOKCHAIN_QT_BASE_CPP)
 if TARGET_WINDOWS

@@ -18,14 +18,15 @@
 
 #include <boost/test/unit_test.hpp>
 
-static const std::string strSecret1 = "5HxWvvfubhXpYYpS3tJkw6fq9jE9j18THftkZjHHfmFiWtmAbrj";
-static const std::string strSecret2 = "5KC4ejrDjv152FGwP386VD1i2NYc5KkfSMyv1nGy1VGDxGHqVY3";
-static const std::string strSecret1C = "Kwr371tjA9u2rFSMZjTNun2PXXP3WPZu2afRHTcta6KxEUdm1vEw";
-static const std::string strSecret2C = "L3Hq7a8FEQwJkW1M2GNKDW28546Vp5miewcCzSqUD9kCAXrJdS3g";
-static const std::string addr1 = "RYY2usMVfuN47PfRmjshQjCcXzo3oPicoh"; //1QFqqMUD55ZV3PJEJZtaKCsQmjLT6JkjvJ";
-static const std::string addr2 = "RPNA9jxXxRt84dg5eKgTfzyFoXgYsXYrGu"; //1F5y5E5FMc5YzdJtB9hLaUe43GDxEKXENJ";
-static const std::string addr1C = "RX5VwKmAZCytjCf6mhSBP6xWcnspqFiSfK"; //1NoJrossxPBKfCHuJXT4HadJrXRE9Fxiqs";
-static const std::string addr2C = "RLhv6ordc2L64HXioasqMsJtSdukCn2Tcg"; //"1CRj2HyM1CXWzHAXLQtiGLyggNT9WQqsDs";
+// The keys of the Bitcoin test, in the AokChain encoding (secret prefix 255, address prefix 46)
+static const std::string strSecret1 = "9Yq4LNfxpjRafjd1BW8f4ppBTDSMHS9fDqtRYke8uz6yBoveJUY";
+static const std::string strSecret2 = "9a4c4BrGxwtq9S5WWewzcwA4KrkodkmsNXyazodpFi7UdALGQ1s";
+static const std::string strSecret1C = "ejV7iWeyPgFVby7uoMao1t3F8httXY1DhgmyM9cuvs3LzWwPqkpT";
+static const std::string strSecret2C = "epvuj4tVTwHmWDguFtVjKc2ygEcLqED3L3im48qVZvTava9UfTre";
+static const std::string addr1 = "Kuob8MBTjNsnfKiDRsDEcyPbiwBqp3tyon"; //1QFqqMUD55ZV3PJEJZtaKCsQmjLT6JkjvJ";
+static const std::string addr2 = "KkdiNDnW1uPrcZisJT1ztFAEzU5LtxncAG"; //1F5y5E5FMc5YzdJtB9hLaUe43GDxEKXENJ";
+static const std::string addr1C = "KtM49ob8cgVdH8htRpmibM9VojGcsWC5E4"; //1NoJrossxPBKfCHuJXT4HadJrXRE9Fxiqs";
+static const std::string addr2C = "KhyUKHgbfVqpcDaWTiDNa7VsdaJYA5Gmz6"; //"1CRj2HyM1CXWzHAXLQtiGLyggNT9WQqsDs";
 
 static const std::string strAddressBad = "1HV9Lc3sNHZxwj4Zk6fB38tEmBryq2cBiF";
 

@@ -4,6 +4,7 @@
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 #include <pos.h>
+#include <utilmoneystr.h>
 
 #include <txdb.h>
 #include <validation.h>
@@ -77,10 +78,57 @@ bool CheckCoinStakeTimestamp(int64_t nTimeBlock, int64_t nTimeTx)
     return (nTimeBlock == nTimeTx);
 }
 
-// Simplified version of CheckCoinStakeTimestamp() to check header-only timestamp
-bool CheckStakeBlockTimestamp(int64_t nTimeBlock)
+// Header-only check of a proof-of-stake block timestamp. Stakers already
+// round the time down to STAKE_TIMESTAMP_MASK (miner.cpp); from
+// nStakeTimestampMaskHeight on this is also enforced, as in BlackCoin.
+// Before that height this was a no-op (it compared the time with itself).
+bool CheckStakeBlockTimestamp(int64_t nTimeBlock, int nHeight, const Consensus::Params& params)
 {
-   return CheckCoinStakeTimestamp(nTimeBlock, nTimeBlock);
+    if (nHeight < params.nStakeTimestampMaskHeight)
+        return true;
+    return (nTimeBlock & params.nStakeTimestampMask) == 0;
+}
+
+/**
+ * The time that the kernel hash takes for a staked coin: the time of its transaction. The coin
+ * has it, except a coin that a disconnected block gave back before 4.0 (the undo data does not
+ * keep the time, such a coin has time 0). ConnectBlock() reads the transaction for those; the
+ * staking code hashed with 0, found kernels that no node accepts (bad-cs-proofhash) and missed
+ * the real ones. Read the transaction here as well. The time of a transaction never changes, so
+ * it is remembered.
+ */
+static bool GetStakeCoinTime(const COutPoint& prevout, const Coin& coin, unsigned int& nTimeOut)
+{
+    if (coin.nTime != 0) {
+        nTimeOut = coin.nTime;
+        return true;
+    }
+    static CCriticalSection cs_times;
+    static std::map<uint256, unsigned int> mapTimes;
+    {
+        LOCK(cs_times);
+        auto it = mapTimes.find(prevout.hash);
+        if (it != mapTimes.end()) {
+            nTimeOut = it->second;
+            return nTimeOut != 0;
+        }
+    }
+    unsigned int nTimeTx = 0;
+    bool fCoinStake = false;
+    if (!ReadCoinTxInfo(prevout, coin.nHeight, nTimeTx, fCoinStake))
+        nTimeTx = 0;
+    if (nTimeTx != 0)
+        LogPrintf("Stake: coin %s:%u has no time in the chain state, %u read from its transaction (repaircoins fixes the chain state)\n", prevout.hash.GetHex(), prevout.n, nTimeTx);
+    else
+        LogPrintf("Stake: coin %s:%u has no time in the chain state and its transaction cannot be read; it is not staked\n", prevout.hash.GetHex(), prevout.n);
+    {
+        LOCK(cs_times);
+        if (mapTimes.size() > 100000)
+            mapTimes.clear();
+        mapTimes[prevout.hash] = nTimeTx;
+    }
+    nTimeOut = nTimeTx;
+    return nTimeTx != 0;
 }
 
 bool CheckKernel(CBlockIndex* pindexPrev, unsigned int nBits, uint32_t nTimeBlock, const COutPoint& prevout, CCoinsViewCache& view)
@@ -116,18 +164,26 @@ bool CheckKernel(CBlockIndex* pindexPrev, unsigned int nBits, uint32_t nTimeBloc
             return false;
         }
 
+        unsigned int nTimeCoin = 0;
+        if (!GetStakeCoinTime(prevout, coinPrev, nTimeCoin))
+            return false;
+
         return CheckStakeKernelHash(pindexPrev, nBits, coinPrev.out.nValue, prevout,
-                                    nTimeBlock, coinPrev.nTime);
+                                    nTimeBlock, nTimeCoin);
     } else {
         Coin coinPrev;
         if(!view.GetCoin(prevout, coinPrev)){
             return false;
         }
 
+        unsigned int nTimeCoin = 0;
+        if (!GetStakeCoinTime(prevout, coinPrev, nTimeCoin))
+            return false;
+
         // found in cache
         const CStakeCache& stake = it->second;
         if (CheckStakeKernelHash(pindexPrev, nBits, stake.amount, prevout,
-                                    nTimeBlock, coinPrev.nTime)) {
+                                    nTimeBlock, nTimeCoin)) {
             // Cache could potentially cause false positive stakes in the event of deep reorgs, so check without cache also
             return CheckKernel(pindexPrev, nBits, nTimeBlock, prevout, view);
         }
@@ -168,19 +224,58 @@ bool CheckProofOfStake(CBlockIndex* pindexPrev, CValidationState& state, const C
         return state.DoS(100, error("CheckProofOfStake() : VerifySignature failed on coinstake %s", tx.GetHash().ToString()));
     }
 
-    if (!CheckStakeKernelHash(pindexPrev, nBits, coinPrev.out.nValue, txin.prevout, nTimeBlock, coinPrev.nTime)) {
+    unsigned int nTimeCoin = 0;
+    if (!GetStakeCoinTime(txin.prevout, coinPrev, nTimeCoin)) {
+        return state.DoS(1, error("CheckProofOfStake() : the time of the staked transaction %s is unknown", txin.prevout.hash.ToString()));
+    }
+
+    if (!CheckStakeKernelHash(pindexPrev, nBits, coinPrev.out.nValue, txin.prevout, nTimeBlock, nTimeCoin)) {
         return state.DoS(1, error("CheckProofOfStake() : INFO: check kernel failed on coinstake %s, hashProof=%s", tx.GetHash().ToString(), hashProofOfStake.ToString())); // may occur during initial download or if behind on block chain sync
     }
 
     // Check offline stake script
-    if (coinPrev.out.scriptPubKey.IsOfflineStaking()) {
-        for (unsigned int i = 1; i < tx.vout.size(); i++) {
-            if (tx.vout[i].scriptPubKey != coinPrev.out.scriptPubKey) {
-                return state.DoS(100, error("CheckProofOfStake(): Coinstake output %d tried to move offline staking coins to a non authorised script", i));
-            }
-        }
-    }
+    if (!CheckOfflineStakeScripts(tx, view, state))
+        return false;
 
+    return true;
+}
+
+bool CheckOfflineStakeScripts(const CTransaction& tx, const CCoinsViewCache& view, CValidationState& state)
+{
+    // the script of an offline staking input, if there is one
+    const CScript* script = nullptr;
+    std::vector<const Coin*> coins;
+    coins.reserve(tx.vin.size());
+    for (const CTxIn& txin : tx.vin) {
+        const Coin& coin = view.AccessCoin(txin.prevout);
+        if (coin.IsSpent())
+            return state.DoS(100, error("%s: input %s of the coinstake is missing or spent", __func__, txin.prevout.ToString()),
+                             REJECT_INVALID, "bad-cs-inputs-missingorspent");
+        coins.push_back(&coin);
+        if (!script && coin.out.scriptPubKey.IsOfflineStaking())
+            script = &coin.out.scriptPubKey;
+    }
+    if (!script)
+        return true;
+
+    CAmount nValueIn = 0;
+    for (size_t i = 0; i < coins.size(); i++) {
+        // (also a kernel that is no offline staking output, with offline staking coins behind it)
+        if (coins[i]->out.scriptPubKey != *script)
+            return state.DoS(100, error("%s: input %u of the coinstake mixes offline staking coins with coins of another script", __func__, (unsigned int)i),
+                             REJECT_INVALID, "bad-offline-stake");
+        nValueIn += coins[i]->out.nValue;
+    }
+    CAmount nValueOut = 0;
+    for (unsigned int i = 1; i < tx.vout.size(); i++) {
+        if (tx.vout[i].scriptPubKey != *script)
+            return state.DoS(100, error("%s: Coinstake output %d tried to move offline staking coins to a non authorised script", __func__, i),
+                             REJECT_INVALID, "bad-offline-stake");
+        nValueOut += tx.vout[i].nValue;
+    }
+    if (nValueOut < nValueIn)
+        return state.DoS(100, error("%s: the coinstake pays back less offline staking coins (%s) than it takes (%s)", __func__, FormatMoney(nValueOut), FormatMoney(nValueIn)),
+                         REJECT_INVALID, "bad-offline-stake");
     return true;
 }
 

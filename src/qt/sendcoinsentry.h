@@ -9,9 +9,17 @@
 
 #include "walletmodel.h"
 
+#include "amount.h"
+
+#include <QDateTime>
 #include <QStackedWidget>
 
+class ChipButton;
 class WalletModel;
+
+QT_BEGIN_NAMESPACE
+class QLabel;
+QT_END_NAMESPACE
 class PlatformStyle;
 
 namespace Ui {
@@ -48,6 +56,21 @@ public:
 
     void setFocus();
 
+    /** What the summary of the send page shows */
+    QString addressText() const;
+    QString labelText() const;
+    CAmount amount() const;
+    bool subtractsFee() const;
+    /** Used by "use the whole balance" */
+    void setAmount(const CAmount &amount);
+    void checkSubtractFeeFromAmount();
+    /** Number in the title of the card ("Recipient 2") */
+    void setIndex(int index);
+    /** Time until which the coins stay locked for the recipient; invalid when there is no lock */
+    QDateTime lockTime() const;
+    /** Address and amount are complete */
+    bool isComplete() const;
+
 public Q_SLOTS:
     void clear();
 
@@ -55,6 +78,8 @@ Q_SIGNALS:
     void removeEntry(SendCoinsEntry *entry);
     void payAmountChanged();
     void subtractFeeFromAmountChanged();
+    void recipientChanged();
+    void useAvailableBalance(SendCoinsEntry *entry);
 
 private Q_SLOTS:
     void deleteClicked();
@@ -63,6 +88,12 @@ private Q_SLOTS:
     void on_pasteButton_clicked();
     void updateDisplayUnit();
     void toggleTimeLock(bool checked);
+    void useAvailableBalanceClicked();
+    void editLabel();
+    void clearLabel();
+    void editLockTime();
+    void clearLockTime();
+    void updateChips();
 
 private:
     SendCoinsRecipient recipient;
@@ -70,7 +101,14 @@ private:
     WalletModel *model;
     const PlatformStyle *platformStyle;
 
+    QLabel *addressHint;
+    QLabel *cardTitle;
+    ChipButton *labelChip;
+    ChipButton *lockChip;
+
     bool updateLabel(const QString &address);
+    void buildLayout();
+    void updateAddressHint(const QString &address);
 };
 
 #endif // AOKCHAIN_QT_SENDCOINSENTRY_H

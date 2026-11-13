@@ -110,8 +110,8 @@ BOOST_FIXTURE_TEST_SUITE(DoS_tests, TestingSetup)
         dummyNode1.fSuccessfullyConnected = true;
         Misbehaving(dummyNode1.GetId(), 100); // Should get banned
         peerLogic->SendMessages(&dummyNode1, interruptDummy);
-        BOOST_CHECK(connman->IsBanned(addr1));
-        BOOST_CHECK(!connman->IsBanned(ip(0xa0b0c001 | 0x0000ff00))); // Different IP, not banned
+        BOOST_CHECK(connman->IsDiscouraged(addr1));
+        BOOST_CHECK(!connman->IsDiscouraged(ip(0xa0b0c001 | 0x0000ff00))); // Different IP, not banned
 
         CAddress addr2(ip(0xa0b0c002), NODE_NONE);
         CNode dummyNode2(id++, NODE_NETWORK, 0, INVALID_SOCKET, addr2, 1, 1, CAddress(), "", true);
@@ -121,11 +121,11 @@ BOOST_FIXTURE_TEST_SUITE(DoS_tests, TestingSetup)
         dummyNode2.fSuccessfullyConnected = true;
         Misbehaving(dummyNode2.GetId(), 50);
         peerLogic->SendMessages(&dummyNode2, interruptDummy);
-        BOOST_CHECK(!connman->IsBanned(addr2)); // 2 not banned yet...
-        BOOST_CHECK(connman->IsBanned(addr1));  // ... but 1 still should be
+        BOOST_CHECK(!connman->IsDiscouraged(addr2)); // 2 not banned yet...
+        BOOST_CHECK(connman->IsDiscouraged(addr1));  // ... but 1 still should be
         Misbehaving(dummyNode2.GetId(), 50);
         peerLogic->SendMessages(&dummyNode2, interruptDummy);
-        BOOST_CHECK(connman->IsBanned(addr2));
+        BOOST_CHECK(connman->IsDiscouraged(addr2));
 
         bool dummy;
         peerLogic->FinalizeNode(dummyNode1.GetId(), dummy);
@@ -148,19 +148,21 @@ BOOST_FIXTURE_TEST_SUITE(DoS_tests, TestingSetup)
         dummyNode1.fSuccessfullyConnected = true;
         Misbehaving(dummyNode1.GetId(), 100);
         peerLogic->SendMessages(&dummyNode1, interruptDummy);
-        BOOST_CHECK(!connman->IsBanned(addr1));
+        BOOST_CHECK(!connman->IsDiscouraged(addr1));
         Misbehaving(dummyNode1.GetId(), 10);
         peerLogic->SendMessages(&dummyNode1, interruptDummy);
-        BOOST_CHECK(!connman->IsBanned(addr1));
+        BOOST_CHECK(!connman->IsDiscouraged(addr1));
         Misbehaving(dummyNode1.GetId(), 1);
         peerLogic->SendMessages(&dummyNode1, interruptDummy);
-        BOOST_CHECK(connman->IsBanned(addr1));
+        BOOST_CHECK(connman->IsDiscouraged(addr1));
         gArgs.ForceSetArg("-banscore", std::to_string(DEFAULT_BANSCORE_THRESHOLD));
 
         bool dummy;
         peerLogic->FinalizeNode(dummyNode1.GetId(), dummy);
     }
 
+    // A misbehaving peer is discouraged, not banned: its address stays out of the ban
+    // list (which is the operator's), and the discouragement does not end with -bantime.
     BOOST_AUTO_TEST_CASE(DoS_bantime_test)
     {
         BOOST_TEST_MESSAGE("Running DoS Bantime Test");
@@ -180,16 +182,21 @@ BOOST_FIXTURE_TEST_SUITE(DoS_tests, TestingSetup)
 
         Misbehaving(dummyNode.GetId(), 100);
         peerLogic->SendMessages(&dummyNode, interruptDummy);
-        BOOST_CHECK(connman->IsBanned(addr));
-
-        SetMockTime(nStartTime + 60 * 60);
-        BOOST_CHECK(connman->IsBanned(addr));
+        BOOST_CHECK(connman->IsDiscouraged(addr));
+        BOOST_CHECK(!connman->IsBanned(addr));
+        banmap_t banned;
+        connman->GetBanned(banned);
+        BOOST_CHECK(banned.empty());
 
         SetMockTime(nStartTime + 60 * 60 * 24 + 1);
-        BOOST_CHECK(!connman->IsBanned(addr));
+        BOOST_CHECK(connman->IsDiscouraged(addr));
+
+        connman->ClearBanned();
+        BOOST_CHECK(!connman->IsDiscouraged(addr));
 
         bool dummy;
         peerLogic->FinalizeNode(dummyNode.GetId(), dummy);
+        SetMockTime(0);
     }
 
     CTransactionRef RandomOrphan()

@@ -15,6 +15,10 @@
 #include <QMessageBox>
 #include <QObject>
 #include <QProgressBar>
+#include <QColor>
+#include <QFont>
+#include <QList>
+#include <QStyledItemDelegate>
 #include <QString>
 #include <QTableView>
 #include <QLabel>
@@ -23,11 +27,15 @@ class QValidatedLineEdit;
 class SendCoinsRecipient;
 
 QT_BEGIN_NAMESPACE
+class QApplication;
 class QAbstractItemView;
 class QDateTime;
 class QFont;
+class QPainter;
+class QPixmap;
 class QLineEdit;
 class QUrl;
+class QComboBox;
 class QWidget;
 QT_END_NAMESPACE
 
@@ -35,6 +43,115 @@ QT_END_NAMESPACE
  */
 namespace GUIUtil
 {
+    /** Colors of the application theme. There is one (light) theme. */
+    struct Theme {
+        QColor bg;            //!< window background
+        QColor surface;       //!< cards, inputs, tables
+        QColor surfaceAlt;    //!< secondary buttons, hover, read-only fields
+        QColor border;        //!< card borders
+        QColor borderStrong;  //!< input and button borders
+        QColor line;          //!< separators between rows
+        QColor text;
+        QColor textSecondary;
+        QColor label;         //!< field labels, secondary button text
+        QColor textDisabled;
+        QColor fill;          //!< primary buttons
+        QColor fillHover;
+        QColor fillPressed;
+        QColor onFill;        //!< text on the primary fill
+        QColor accent;        //!< accent text, focus borders
+        QColor accentHover;
+        QColor accentPressed;
+        QColor accentSoft;    //!< selection and hover tint
+        QColor onAccent;      //!< text on the accent color
+        QColor positive;      //!< received amounts
+        QColor positiveSoft;
+        QColor negative;      //!< sent amounts
+        QColor negativeSoft;
+        QColor ok;            //!< confirmed, valid
+        QColor okSoft;
+        QColor error;         //!< invalid input, failed transactions
+        QColor errorSoft;
+        QColor warnBg;
+        QColor warnText;
+        QColor warnBorder;
+        QColor chip;
+        QColor chipText;
+        // side bar
+        QColor sideBg;
+        QColor sideText;
+        QColor sideStrong;
+        QColor sideOnBg;      //!< active navigation item
+        QColor sideCard;
+        QColor sideTrack;
+        QColor sideBar;
+        QColor sideOff;       //!< switch that is off
+    };
+    /** The theme. */
+    const Theme& theme();
+    /** Register the bundled fonts (Noto Sans, Noto Sans KR, Noto Sans Mono). Call once, before any widget is created. */
+    void loadAppFonts();
+    /** The application font at a pixel size and weight. */
+    QFont appFont(int pixelSize = 13, int weight = QFont::Medium);
+    /** The fixed-width font for amounts, addresses, transaction ids, dates in tables and block heights. */
+    QFont monoFont(int pixelSize = 13, int weight = QFont::Medium);
+    /** Apply style, palette, font and style sheet of the theme to the application. */
+    void applyTheme(QApplication& app);
+    /** Style sheet snippets that follow the theme. */
+    QString labelColorStyle();
+    QString invalidFieldStyle();
+    QString validFieldStyle();
+    /** Style sheet of a card: a panel on the surface color with a border and rounded corners. */
+    QString cardFrameStyle(const QString& selector = ".QFrame");
+
+    /** First and last four characters of an address ("Kj6i…qVgR"). Text that is not a valid address is returned as it is. */
+    QString shortAddress(const QString& address);
+    /** Shortened transaction id or block hash. */
+    QString shortHash(const QString& hash, int head = 12, int tail = 8);
+    /** Put thousands separators (commas) into the integer part of a formatted number. For display only. */
+    QString withThousands(const QString& number);
+    /** A line icon drawn in the given color. Names: overview, send, receive, history, tokens, explorer,
+        create, manage, addressbook, paste, download, search, chevron, plus, remove, copy, lock. */
+    /** Fill a combo box with the languages of the bundled translations, each in its own
+        language, after "System default". The item data is the locale name ("" for the default). */
+    void fillLanguageCombo(QComboBox* combo);
+    /** Ask for the program to be started again after it has shut down (see main()). */
+    /** Make a window high enough for its texts that wrap (layouts ask for too little by themselves) */
+    void fitDialogHeight(QWidget* dialog);
+
+    /** Start the program again when it has ended; extraArguments are added to those of this start */
+    void requestRestart(const QStringList& extraArguments = QStringList());
+    QStringList restartArguments();
+    bool restartRequested();
+    QPixmap lineIcon(const QString& name, int size, const QColor& color, qreal strokeWidth = 2.0);
+    /** The bundled logo of a token as a round pixmap; a letter avatar when there is none.
+        The logo is looked up by the root name (before '/', '#' and '!'). */
+    QPixmap tokenLogo(const QString& tokenName, int size);
+    /** Paint the tile that shows the direction of a transaction: received (incoming arrow), sent
+        (outgoing arrow) or a staking reward. */
+    void paintDirectionTile(QPainter* painter, const QRect& tile, bool outgoing, bool reward = false);
+    /** HTML that shows already escaped text in the fixed-width font. */
+    QString monoHtml(const QString& escapedText);
+    /** Tool tip text with the value in the fixed-width font, optionally with a caption line above. */
+    QString monoToolTip(const QString& value, const QString& caption = QString());
+    /** Date and time in the form used in tables: 2024-04-13 16:06 */
+    QString isoDateTime(const QDateTime& dateTime, bool seconds = false);
+    /** Is there a bundled logo for the token (looked up by its root name)? */
+    bool hasTokenLogo(const QString& tokenName);
+    /**
+     * Paint an amount: the fraction (the point and the digits after it) at 60 % of the size of
+     * the integer part, on the same base line. Every amount on the pages is painted this way.
+     * Returns the width used.
+     */
+    int paintAmount(QPainter* painter, const QRect& rect, const QString& amount, const QFont& font, const QColor& color,
+                    Qt::Alignment align = Qt::AlignRight | Qt::AlignVCenter);
+    /** Width of an amount painted by paintAmount(). */
+    int amountWidth(const QString& amount, const QFont& font);
+    /** Paint a chip (small rounded label) at the position; returns its width. */
+    int paintChip(QPainter* painter, int x, int centerY, const QString& text);
+    /** Paint a rounded badge with its own colors, right- or left-aligned in the rectangle. */
+    void paintBadge(QPainter* painter, const QRect& rect, const QString& text, const QColor& fg, const QColor& bg, Qt::Alignment align = Qt::AlignLeft);
+
     // Get the font for the sub labels
     QFont getSubLabelFont();
     QFont getSubLabelFontBolded();
@@ -215,6 +332,37 @@ namespace GUIUtil
     QString formatNiceTimeOffset(qint64 secs);
 
     QString formatBytes(uint64_t bytes);
+
+    /** Item delegate that shows some columns (amounts, addresses, dates) in the fixed-width font. */
+    class MonoColumnDelegate : public QStyledItemDelegate
+    {
+    public:
+        MonoColumnDelegate(const QList<int>& columns, QObject *parent, const QList<int>& amounts = QList<int>()) :
+            QStyledItemDelegate(parent), monoColumns(columns), amountColumns(amounts) {}
+        /** Amount columns are painted with the smaller fraction, see paintAmount() */
+        void paint(QPainter *painter, const QStyleOptionViewItem &option, const QModelIndex &index) const override;
+
+    protected:
+        void initStyleOption(QStyleOptionViewItem *option, const QModelIndex &index) const override;
+
+    private:
+        QList<int> monoColumns;
+        QList<int> amountColumns;
+    };
+
+    /** Logs how long a piece of GUI work took, in the "qt" debug category (-debug=qt). */
+    class LogTimer
+    {
+    public:
+        explicit LogTimer(const QString& what);
+        ~LogTimer();
+        void setDetail(const QString& detail) { m_detail = detail; }
+
+    private:
+        QString m_what;
+        QString m_detail;
+        qint64 m_start;
+    };
 
     class ClickableLabel : public QLabel
     {

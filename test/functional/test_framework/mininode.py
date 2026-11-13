@@ -82,7 +82,7 @@ def ripemd160(s):
 def hash256(s):
     return sha256(sha256(s))
 
-x16r_hash_cmd = os.path.dirname(os.path.reaokath(__file__)) + "/../../../src/test/test_aokchain_hash"
+x16r_hash_cmd = os.path.dirname(os.path.realpath(__file__)) + "/../../../src/test/test_aokchain_hash"
 def hash_x16r(s):
     cmd = [x16r_hash_cmd, s]
     hash = subprocess.run(cmd, stdout=subprocess.PIPE, check=True).stdout.decode('ascii')
@@ -509,10 +509,25 @@ class CTxWitness():
         return True
 
 
+# AokChain transactions carry an nTime field. The mempool rejects one too far
+# in the future, and below consensus.nDisableTimestampCheck (mainnet 695000;
+# 0 on testnet/regtest) consensus also rejects a transaction older than its
+# inputs, so default it to the node clock.
+# test_framework.enable_mocktime()/disable_mocktime() keep this in sync.
+MOCKTIME = 0
+
+def get_tx_time():
+    return MOCKTIME if MOCKTIME else int(time.time())
+
+# Transactions with nVersion >= MESSAGE_VERSION serialize an nMessage string.
+MESSAGE_VERSION = 2
+
 class CTransaction():
     def __init__(self, tx=None):
         if tx is None:
             self.nVersion = 1
+            self.nTime = get_tx_time()
+            self.nMessage = b""
             self.vin = []
             self.vout = []
             self.wit = CTxWitness()
@@ -521,6 +536,8 @@ class CTransaction():
             self.hash = None
         else:
             self.nVersion = tx.nVersion
+            self.nTime = tx.nTime
+            self.nMessage = tx.nMessage
             self.vin = copy.deepcopy(tx.vin)
             self.vout = copy.deepcopy(tx.vout)
             self.nLockTime = tx.nLockTime
@@ -530,6 +547,7 @@ class CTransaction():
 
     def deserialize(self, f):
         self.nVersion = struct.unpack("<i", f.read(4))[0]
+        self.nTime = struct.unpack("<I", f.read(4))[0]
         self.vin = deser_vector(f, CTxIn)
         flags = 0
         if len(self.vin) == 0:
@@ -545,15 +563,21 @@ class CTransaction():
             self.wit.vtxinwit = [CTxInWitness() for i in range(len(self.vin))]
             self.wit.deserialize(f)
         self.nLockTime = struct.unpack("<I", f.read(4))[0]
+        self.nMessage = deser_string(f) if self.nVersion >= MESSAGE_VERSION else b""
         self.sha256 = None
         self.hash = None
+
+    def serialize_message(self):
+        return ser_string(self.nMessage) if self.nVersion >= MESSAGE_VERSION else b""
 
     def serialize_without_witness(self):
         r = b""
         r += struct.pack("<i", self.nVersion)
+        r += struct.pack("<I", self.nTime)
         r += ser_vector(self.vin)
         r += ser_vector(self.vout)
         r += struct.pack("<I", self.nLockTime)
+        r += self.serialize_message()
         return r
 
     # Only serialize with witness when explicitly called for
@@ -563,6 +587,7 @@ class CTransaction():
             flags |= 1
         r = b""
         r += struct.pack("<i", self.nVersion)
+        r += struct.pack("<I", self.nTime)
         if flags:
             dummy = []
             r += ser_vector(dummy)
@@ -577,6 +602,7 @@ class CTransaction():
                     self.wit.vtxinwit.append(CTxInWitness())
             r += self.wit.serialize()
         r += struct.pack("<I", self.nLockTime)
+        r += self.serialize_message()
         return r
 
     # Regular serialization is without witness -- must explicitly
@@ -685,10 +711,13 @@ class CBlock(CBlockHeader):
     def __init__(self, header=None):
         super(CBlock, self).__init__(header)
         self.vtx = []
+        # PoS block signature, serialized after vtx (empty for PoW blocks)
+        self.vchBlockSig = b""
 
     def deserialize(self, f):
         super(CBlock, self).deserialize(f)
         self.vtx = deser_vector(f, CTransaction)
+        self.vchBlockSig = deser_string(f)
 
     def serialize(self, with_witness=False):
         r = b""
@@ -697,6 +726,7 @@ class CBlock(CBlockHeader):
             r += ser_vector(self.vtx, "serialize_with_witness")
         else:
             r += ser_vector(self.vtx)
+        r += ser_string(self.vchBlockSig)
         return r
 
     # Calculate the merkle root given a vector of transaction hashes
@@ -862,6 +892,7 @@ class P2PHeaderAndShortIDs():
         self.shortids = []
         self.prefilled_txn_length = 0
         self.prefilled_txn = []
+        self.vchBlockSig = b""
 
     def deserialize(self, f):
         self.header.deserialize(f)
@@ -873,6 +904,7 @@ class P2PHeaderAndShortIDs():
             self.shortids.append(struct.unpack("<Q", f.read(6) + b'\x00\x00')[0])
         self.prefilled_txn = deser_vector(f, PrefilledTransaction)
         self.prefilled_txn_length = len(self.prefilled_txn)
+        self.vchBlockSig = deser_string(f)
 
     # When using version 2 compact blocks, we must serialize with_witness.
     def serialize(self, with_witness=False):
@@ -887,6 +919,7 @@ class P2PHeaderAndShortIDs():
             r += ser_vector(self.prefilled_txn, "serialize_with_witness")
         else:
             r += ser_vector(self.prefilled_txn)
+        r += ser_string(self.vchBlockSig)
         return r
 
     def __repr__(self):
@@ -913,10 +946,12 @@ class HeaderAndShortIDs():
         self.shortids = []
         self.prefilled_txn = []
         self.use_witness = False
+        self.vchBlockSig = b""
 
         if p2pheaders_and_shortids != None:
             self.header = p2pheaders_and_shortids.header
             self.nonce = p2pheaders_and_shortids.nonce
+            self.vchBlockSig = p2pheaders_and_shortids.vchBlockSig
             self.shortids = p2pheaders_and_shortids.shortids
             last_index = -1
             for x in p2pheaders_and_shortids.prefilled_txn:
@@ -930,6 +965,7 @@ class HeaderAndShortIDs():
             ret = P2PHeaderAndShortIDs()
         ret.header = self.header
         ret.nonce = self.nonce
+        ret.vchBlockSig = self.vchBlockSig
         ret.shortids_length = len(self.shortids)
         ret.shortids = self.shortids
         ret.prefilled_txn_length = len(self.prefilled_txn)
@@ -952,6 +988,7 @@ class HeaderAndShortIDs():
     def initialize_from_block(self, block, nonce=0, prefill_list = [0], use_witness = False):
         self.header = CBlockHeader(block)
         self.nonce = nonce
+        self.vchBlockSig = getattr(block, "vchBlockSig", b"")
         self.prefilled_txn = [ PrefilledTransaction(i, block.vtx[i]) for i in prefill_list ]
         self.shortids = []
         self.use_witness = use_witness

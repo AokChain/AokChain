@@ -8,6 +8,10 @@
 
 #include "validation.h"
 
+#include <deque>
+
+#include "snapshot.h"
+
 #include "arith_uint256.h"
 #include "chain.h"
 #include "chainparams.h"
@@ -68,6 +72,9 @@
 #if defined(NDEBUG)
 # error "AokChain cannot be compiled without assertions."
 #endif
+
+/** Block tree database: time and coinstake mark of a spent coin from before the snapshot (see ConnectBlock) */
+static const char DB_SNAPSHOT_SPENT_COIN = 'k';
 
 #define MICRO 0.000001
 #define MILLI 0.001
@@ -493,7 +500,7 @@ static bool CheckInputsFromMempoolAndCache(const CTransaction& tx, CValidationSt
 
 static bool AcceptToMemoryPoolWorker(const CChainParams& chainparams, CTxMemPool& pool, CValidationState& state, const CTransactionRef& ptx,
                               bool* pfMissingInputs, int64_t nAcceptTime, std::list<CTransactionRef>* plTxnReplaced,
-                              bool bypass_limits, const CAmount& nAbsurdFee, std::vector<COutPoint>& coins_to_uncache)
+                              bool bypass_limits, const CAmount& nAbsurdFee, std::vector<COutPoint>& coins_to_uncache, bool test_accept)
 {
     const CTransaction& tx = *ptx;
     const uint256 hash = tx.GetHash();
@@ -931,6 +938,11 @@ static bool AcceptToMemoryPoolWorker(const CChainParams& chainparams, CTxMemPool
             }
         }
 
+        if (test_accept) {
+            // testmempoolaccept: every check has passed, and the pool is left as it is
+            return true;
+        }
+
         // Remove conflicting transactions from the mempool
         for (const CTxMemPool::txiter it : allConflicting)
         {
@@ -999,11 +1011,11 @@ static bool AcceptToMemoryPoolWorker(const CChainParams& chainparams, CTxMemPool
 /** (try to) add transaction to memory pool with a specified acceptance time **/
 static bool AcceptToMemoryPoolWithTime(const CChainParams& chainparams, CTxMemPool& pool, CValidationState &state, const CTransactionRef &tx,
                         bool* pfMissingInputs, int64_t nAcceptTime, std::list<CTransactionRef>* plTxnReplaced,
-                        bool bypass_limits, const CAmount nAbsurdFee)
+                        bool bypass_limits, const CAmount nAbsurdFee, bool test_accept = false)
 {
     std::vector<COutPoint> coins_to_uncache;
-    bool res = AcceptToMemoryPoolWorker(chainparams, pool, state, tx, pfMissingInputs, nAcceptTime, plTxnReplaced, bypass_limits, nAbsurdFee, coins_to_uncache);
-    if (!res) {
+    bool res = AcceptToMemoryPoolWorker(chainparams, pool, state, tx, pfMissingInputs, nAcceptTime, plTxnReplaced, bypass_limits, nAbsurdFee, coins_to_uncache, test_accept);
+    if (!res || test_accept) {
         for (const COutPoint& hashTx : coins_to_uncache)
             pcoinsTip->Uncache(hashTx);
     }
@@ -1028,10 +1040,10 @@ static bool AcceptToMemoryPoolWithTime(const CChainParams& chainparams, CTxMemPo
 
 bool AcceptToMemoryPool(CTxMemPool& pool, CValidationState &state, const CTransactionRef &tx,
                         bool* pfMissingInputs, std::list<CTransactionRef>* plTxnReplaced,
-                        bool bypass_limits, const CAmount nAbsurdFee)
+                        bool bypass_limits, const CAmount nAbsurdFee, bool test_accept)
 {
     const CChainParams& chainparams = Params();
-    return AcceptToMemoryPoolWithTime(chainparams, pool, state, tx, pfMissingInputs, GetTime(), plTxnReplaced, bypass_limits, nAbsurdFee);
+    return AcceptToMemoryPoolWithTime(chainparams, pool, state, tx, pfMissingInputs, GetTime(), plTxnReplaced, bypass_limits, nAbsurdFee, test_accept);
 }
 
 bool GetTimestampIndex(const unsigned int &high, const unsigned int &low, const bool fActiveOnly, std::vector<std::pair<uint256, unsigned int> > &hashes)
@@ -1703,6 +1715,108 @@ bool AbortNode(CValidationState& state, const std::string& strMessage, const std
 
 } // namespace
 
+/** Regtest only (-restorecointime=0): give coins back without their time, as versions before 4.0 did. */
+static bool fRestoreCoinTime = true;
+
+void SetRestoreCoinTime(bool fRestore)
+{
+    fRestoreCoinTime = fRestore;
+}
+
+bool ReadCoinTxInfo(const COutPoint& out, int nCoinHeight, unsigned int& nTime, bool& fCoinStake)
+{
+    LOCK(cs_main);
+    if (!pblocktree)
+        return false;
+    // A node that started from a chain state snapshot kept both for the coins from before the
+    // snapshot that it spent (see ConnectBlock): it cannot read the past blocks.
+    if (nCoinHeight <= SnapshotHeight()) {
+        std::pair<unsigned int, unsigned char> kept;
+        if (pblocktree->Read(std::make_pair(DB_SNAPSHOT_SPENT_COIN, out), kept) && kept.first != 0) {
+            nTime = kept.first;
+            fCoinStake = kept.second != 0;
+            return true;
+        }
+    }
+    // The transaction id covers the time and the form of the transaction, so any copy will do.
+    CTransactionRef tx;
+    uint256 hashBlock;
+    if (!GetTransaction(out.hash, tx, Params().GetConsensus(), hashBlock, false) || !tx) {
+        // Without the transaction index: the coin knows the height of its block, and that block
+        // is in the active chain (a coin is given back by a block above it).
+        tx = nullptr;
+        const CBlockIndex* pindex = nCoinHeight >= 0 ? chainActive[nCoinHeight] : nullptr;
+        CBlock block;
+        if (pindex && (pindex->nStatus & BLOCK_HAVE_DATA) && ReadBlockFromDisk(block, pindex, Params().GetConsensus())) {
+            for (const CTransactionRef& candidate : block.vtx) {
+                if (candidate->GetHash() == out.hash) {
+                    tx = candidate;
+                    break;
+                }
+            }
+        }
+    }
+    if (!tx || tx->nTime == 0)
+        return false;
+    nTime = tx->nTime;
+    fCoinStake = tx->IsCoinStake();
+    return true;
+}
+
+bool RepairCoins(bool fWrite, uint64_t& nScanned, uint64_t& nDamaged, uint64_t& nRepaired, uint64_t& nUnreadable)
+{
+    LOCK(cs_main);
+    nScanned = nDamaged = nRepaired = nUnreadable = 0;
+    CValidationState state;
+    if (!FlushStateToDisk(Params(), state, FLUSH_STATE_ALWAYS))
+        return false;
+
+    std::vector<std::pair<COutPoint, Coin>> damaged;
+    {
+        std::unique_ptr<CCoinsViewCursor> pcursor(pcoinsdbview->Cursor());
+        while (pcursor->Valid()) {
+            boost::this_thread::interruption_point();
+            COutPoint key;
+            Coin coin;
+            if (!pcursor->GetKey(key) || !pcursor->GetValue(coin))
+                return error("%s: unable to read a coin", __func__);
+            nScanned++;
+            if (coin.nTime == 0 && !coin.IsSpent() && !coin.out.scriptPubKey.IsUnspendable())
+                damaged.emplace_back(key, std::move(coin));
+            pcursor->Next();
+        }
+    }
+    nDamaged = damaged.size();
+
+    for (std::pair<COutPoint, Coin>& entry : damaged) {
+        unsigned int nTimeTx = 0;
+        bool fCoinStakeTx = false;
+        if (!ReadCoinTxInfo(entry.first, entry.second.nHeight, nTimeTx, fCoinStakeTx)) {
+            nUnreadable++;
+            continue;
+        }
+        if (fWrite) {
+            entry.second.nTime = nTimeTx;
+            entry.second.fCoinStake = fCoinStakeTx;
+            pcoinsTip->AddCoin(entry.first, std::move(entry.second), true);
+        }
+        nRepaired++;
+    }
+    if (fWrite && nRepaired > 0) {
+        if (!FlushStateToDisk(Params(), state, FLUSH_STATE_ALWAYS))
+            return false;
+        LogPrintf("%s: %u of %u coins without a time repaired (%u could not be read)\n", __func__, nRepaired, nDamaged, nUnreadable);
+    }
+    return true;
+}
+
+bool ReadBlockUndo(CBlockUndo& blockundo, const CBlockIndex* pindex)
+{
+    if (!pindex || !pindex->pprev || pindex->GetUndoPos().IsNull())
+        return false;
+    return UndoReadFromDisk(blockundo, pindex->GetUndoPos(), pindex->pprev->GetBlockHash());
+}
+
 enum DisconnectResult
 {
     DISCONNECT_OK,      // All good.
@@ -1747,6 +1861,25 @@ int ApplyTxInUndo(Coin&& undo, CCoinsViewCache& view, const COutPoint& out, CTok
             return DISCONNECT_FAILED; // adding output for transaction without known metadata
         }
     }
+    // The undo data has neither the time of the transaction nor its coinstake mark. A node that
+    // started from a chain state snapshot kept them for the coins from before the snapshot when
+    // it spent them (see ConnectBlock): it cannot read them from the past blocks.
+    //
+    // Every other coin gets them back from its transaction, read from disk. Without this the
+    // coin came back with time 0 and no coinstake mark, and stayed that way: the staking code,
+    // which hashed the kernel with the time of the coin, then produced blocks that every node
+    // rejected (bad-cs-proofhash), and the coin never staked again.
+    if (undo.nTime == 0 && fRestoreCoinTime) {
+        unsigned int nTimeTx = 0;
+        bool fCoinStakeTx = false;
+        if (ReadCoinTxInfo(out, undo.nHeight, nTimeTx, fCoinStakeTx)) {
+            undo.nTime = nTimeTx;
+            undo.fCoinStake = fCoinStakeTx;
+        } else {
+            LogPrintf("%s: the transaction of coin %s:%u could not be read; the coin is restored without its time\n", __func__, out.hash.GetHex(), out.n);
+        }
+    }
+
     // The potential_overwrite parameter to AddCoin is only allowed to be false if we know for
     // sure that the coin did not already exist in the cache. As we have queried for that above
     // using HaveCoin, we don't need to guess. When fClean is false, a coin already existed and
@@ -1767,9 +1900,16 @@ int ApplyTxInUndo(Coin&& undo, CCoinsViewCache& view, const COutPoint& out, CTok
 
 /** Undo the effects of this block (with given index) on the UTXO set represented by coins.
  *  When FAILED is returned, view is left in an indeterminate state. */
-static DisconnectResult DisconnectBlock(const CBlock& block, const CBlockIndex* pindex, CCoinsViewCache& view, CTokensCache* tokensCache = nullptr, bool ignoreAddressIndex = false)
+/** Undo the effects of this block (with given index) on the UTXO set represented by coins.
+ *  fApplyGovernance: false leaves the governance state as it is (ReplayBlocks: it was
+ *  changed when the block was disconnected before the interrupted flush). */
+static DisconnectResult DisconnectBlock(const CBlock& block, const CBlockIndex* pindex, CCoinsViewCache& view, CTokensCache* tokensCache = nullptr, bool ignoreAddressIndex = false, bool fApplyGovernance = true)
 {
     bool fClean = true;
+
+    // The governance commands of the block are undone in a level of changes, written only
+    // when the whole block is disconnected (see CGovernance::BeginChanges).
+    CGovernanceChanges governanceChanges(governance);
 
     CBlockUndo blockUndo;
     CDiskBlockPos pos = pindex->GetUndoPos();
@@ -2105,7 +2245,7 @@ static DisconnectResult DisconnectBlock(const CBlock& block, const CBlockIndex* 
             if (fCheckGovernance) {
                 for (auto out : tx.vout) {
                     // Check if output is OP_RETURN
-                    if (out.scriptPubKey[0] == OP_RETURN and out.scriptPubKey.size() >= 5) {
+                    if (out.scriptPubKey.size() >= 5 && out.scriptPubKey[0] == OP_RETURN) {
                         if (out.scriptPubKey[2] == GOVERNANCE_MARKER && out.scriptPubKey[3] == GOVERNANCE_ACTION)
                         {
                             // Revert freeze
@@ -2193,6 +2333,11 @@ static DisconnectResult DisconnectBlock(const CBlock& block, const CBlockIndex* 
             error("Failed to write address unspent index");
             return DISCONNECT_FAILED;
         }
+    }
+
+    if (fApplyGovernance && !governanceChanges.Commit()) {
+        error("DisconnectBlock(): failed to write the governance database");
+        return DISCONNECT_FAILED;
     }
 
     return fClean ? DISCONNECT_OK : DISCONNECT_UNCLEAN;
@@ -2391,26 +2536,38 @@ static bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockInd
                 error("%s: tried to stake at depth %d", __func__, pindex->nHeight - coin.nHeight),
                         REJECT_INVALID, "bad-cs-premature");
 
-        CTransactionRef txPrev;
-        uint256 hashPrevBlock = block.GetBlockHash();
-        if (!GetTransaction(prevout.hash, txPrev, Params().GetConsensus(), hashPrevBlock, false)) {
-            return state.DoS(100, error("%s: read txPrev failed", __func__),
-                        REJECT_INVALID, "read-txprev-failed");
+        // The time of the transaction that is staked. The coin has it: AddCoins() stores tx.nTime
+        // in every coin. Only a coin that a disconnected block gave back has no time (0, the undo
+        // data does not keep it); for such a coin the transaction is read from disk, through the
+        // transaction index, as it used to be for every stake. Reading it for every block cost a
+        // large part of the time of the first synchronization, and a node that started from a
+        // chain state snapshot cannot read the transactions of the past blocks at all.
+        // -checkstaketime (default on regtest) reads the transaction as well and compares.
+        unsigned int nTimeTxPrev = coin.nTime;
+        static const bool fCheckStakeTime = gArgs.GetBoolArg("-checkstaketime", chainparams.DefaultConsistencyChecks());
+        if (nTimeTxPrev == 0 || fCheckStakeTime) {
+            CTransactionRef txPrev;
+            uint256 hashPrevBlock = block.GetBlockHash();
+            if (GetTransaction(prevout.hash, txPrev, Params().GetConsensus(), hashPrevBlock, false)) {
+                if (txPrev->nTime != coin.nTime && coin.nTime != 0) {
+                    LogPrintf("%s: WARNING: time of the staked transaction %s is %u on disk and %u in the coin\n", __func__,
+                              prevout.hash.GetHex(), txPrev->nTime, coin.nTime);
+                    assert(!fCheckStakeTime);
+                }
+                nTimeTxPrev = txPrev->nTime;
+            } else if (nTimeTxPrev == 0) {
+                return state.DoS(100, error("%s: read txPrev failed", __func__),
+                            REJECT_INVALID, "read-txprev-failed");
+            }
         }
 
-        if (!CheckStakeKernelHash(pindex->pprev, block.nBits, coin.out.nValue, prevout, block.vtx[1]->nTime, txPrev->nTime))
+        if (!CheckStakeKernelHash(pindex->pprev, block.nBits, coin.out.nValue, prevout, block.vtx[1]->nTime, nTimeTxPrev))
             return state.DoS(100, error("%s: proof-of-stake hash doesn't match nBits", __func__),
                         REJECT_INVALID, "bad-cs-proofhash");
 
-        // Check offline stake script
-        if (coin.out.scriptPubKey.IsOfflineStaking()) {
-            for (unsigned int i = 1; i < block.vtx[1]->vout.size(); i++) {
-                if (block.vtx[1]->vout[i].scriptPubKey != coin.out.scriptPubKey) {
-                    return state.DoS(100, error("%s: Coinstake output %d tried to move offline staking coins to a non authorised script",
-                                 __func__, i), REJECT_INVALID, "bad-offline-stake");;
-                }
-            }
-        }
+        // Check offline stake script: every input and output, not the kernel alone
+        if (!CheckOfflineStakeScripts(*block.vtx[1], view, state))
+            return false;
     }
 
     nBlocksTotal++;
@@ -2453,6 +2610,11 @@ static bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockInd
     CBlockUndo blockundo;
     std::vector<std::pair<std::string, CBlockTokenUndo> > vUndoTokenData;
 
+    // txdata must outlive control: queued script checks hold pointers into it
+    // and may still run in ~CCheckQueueControl (CVE-2024-52911, upstream PR #31112).
+    std::vector<PrecomputedTransactionData> txdata;
+    txdata.reserve(block.vtx.size()); // Required so that pointers to individual PrecomputedTransactionData don't get invalidated
+
     CCheckQueueControl<CScriptCheck> control(fScriptChecks && nScriptCheckThreads ? &scriptcheckqueue : nullptr);
 
     std::vector<int> prevheights;
@@ -2464,8 +2626,6 @@ static bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockInd
     std::vector<std::pair<uint256, CDiskTxPos> > vPos;
     vPos.reserve(block.vtx.size());
     blockundo.vtxundo.reserve(block.vtx.size() - 1);
-    std::vector<PrecomputedTransactionData> txdata;
-    txdata.reserve(block.vtx.size()); // Required so that pointers to individual PrecomputedTransactionData don't get invalidated
 
     std::vector<std::pair<CAddressIndexKey, CAmount> > addressIndex;
     std::vector<std::pair<CAddressUnspentKey, CAddressUnspentValue> > addressUnspentIndex;
@@ -2473,6 +2633,11 @@ static bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockInd
 
     CTxDestination destination = DecodeDestination(Params().GovernanceMasterAddress());
     CScript masterKey = GetScriptForDestination(destination);
+
+    // The governance commands of the block go into a level of changes: later transactions of
+    // the block see them, the database gets them only when the whole block is valid and is
+    // connected (not for fJustCheck). Every early return below discards them.
+    CGovernanceChanges governanceChanges(governance);
 
     for (unsigned int i = 0; i < block.vtx.size(); i++)
     {
@@ -2536,7 +2701,7 @@ static bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockInd
                     const CTxIn input = tx.vin[j];
                     const CTxOut &prevout = view.AccessCoin(tx.vin[j].prevout).out;
                     uint160 hashBytes;
-                    int addressType;
+                    int addressType = 0;
                     bool isToken = false;
                     std::string tokenName;
                     CAmount tokenAmount;
@@ -2791,11 +2956,22 @@ static bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockInd
                 }
             }
 
+            // The governance actions below are written to the governance
+            // database right away, but with -par > 1 the scripts of this
+            // transaction have only been queued so far. Verify them now, so a
+            // forged spend of a master-address output cannot change governance
+            // state in a block that is then rejected by control.Wait().
+            if (fCheckGovernance && fScriptChecks && nScriptCheckThreads) {
+                if (!CheckInputs(tx, state, view, true, flags, false, false, txdata[i], nullptr))
+                    return error("ConnectBlock(): governance transaction %s failed script checks: %s",
+                        tx.GetHash().ToString(), FormatStateMessage(state));
+            }
+
             // Master key signature found
             if (fCheckGovernance) {
                 for (auto out : tx.vout) {
                     // Check if output is OP_RETURN
-                    if (out.scriptPubKey[0] == OP_RETURN and out.scriptPubKey.size() >= 5) {
+                    if (out.scriptPubKey.size() >= 5 && out.scriptPubKey[0] == OP_RETURN) {
                         if (out.scriptPubKey[2] == GOVERNANCE_MARKER && out.scriptPubKey[3] == GOVERNANCE_ACTION)
                         {
                             // Freeze
@@ -2914,14 +3090,42 @@ static bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockInd
                            REJECT_INVALID, "bad-cs-amount");
     }
 
-    // if (!control.Wait())
-        // return state.DoS(100, error("%s: CheckQueue failed", __func__), REJECT_INVALID, "block-validation-failed");
-    
+    // Script checks queued to the worker threads (-par > 1, the default on
+    // multi-core machines) are only verified here. This check was commented
+    // out in 290f3c1 ("Tokens hardfork"), so such nodes accepted blocks with
+    // invalid scripts. A full mainnet validation with -par=1 -assumevalid=0
+    // (which verifies scripts inline) found no such block in the main chain,
+    // so restoring it does not change the valid chain.
+    // See doc/aokchain/04-security-audit.md SEC-01.
+    if (!control.Wait())
+        return state.DoS(100, error("%s: CheckQueue failed", __func__), REJECT_INVALID, "block-validation-failed");
+
     int64_t nTime4 = GetTimeMicros(); nTimeVerify += nTime4 - nTime2;
     LogPrint(BCLog::BENCH, "    - Verify %u txins: %.2fms (%.3fms/txin) [%.2fs (%.2fms/blk)]\n", nInputs - 1, MILLI * (nTime4 - nTime2), nInputs <= 1 ? 0 : MILLI * (nTime4 - nTime2) / (nInputs-1), nTimeVerify * MICRO, nTimeVerify * MILLI / nBlocksTotal);
 
     if (fJustCheck)
         return true;
+
+    // A node that started from a chain state snapshot cannot read the transactions of the past
+    // blocks, and the undo data keeps neither the time nor the coinstake mark of a spent coin.
+    // Keep both for the coins from before the snapshot, so that a block that is disconnected
+    // gives them back as they were (see ApplyTxInUndo).
+    if (PastBlocksMissing()) {
+        CDBBatch batch(*pblocktree);
+        bool any = false;
+        for (size_t i = 0; i < blockundo.vtxundo.size() && i + 1 < block.vtx.size(); i++) {
+            const std::vector<Coin>& spent = blockundo.vtxundo[i].vprevout;
+            const CTransaction& tx = *block.vtx[i + 1];
+            for (size_t j = 0; j < spent.size() && j < tx.vin.size(); j++) {
+                if ((int)spent[j].nHeight <= SnapshotHeight() && spent[j].nTime != 0) {
+                    batch.Write(std::make_pair(DB_SNAPSHOT_SPENT_COIN, tx.vin[j].prevout), std::make_pair(spent[j].nTime, (unsigned char)spent[j].fCoinStake));
+                    any = true;
+                }
+            }
+        }
+        if (any && !pblocktree->WriteBatch(batch))
+            return AbortNode(state, "Failed to write to block index database");
+    }
 
     // Write undo information to disk
     if (pindex->GetUndoPos().IsNull() || !pindex->IsValid(BLOCK_VALID_SCRIPTS))
@@ -2938,13 +3142,16 @@ static bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockInd
             pindex->nStatus |= BLOCK_HAVE_UNDO;
         }
 
-        if (vUndoTokenData.size()) {
-            if (!ptokensdb->WriteBlockUndoTokenData(block.GetBlockHash(), vUndoTokenData))
-                return AbortNode(state, "Failed to write token undo data");
-        }
-
         pindex->RaiseValidity(BLOCK_VALID_SCRIPTS);
         setDirtyBlockIndex.insert(pindex);
+    }
+
+    // The token undo data lives in the token database, which is wiped on
+    // -reindex-chainstate while the block index (and its undo position) is
+    // kept. Write it whenever a block is connected; it is keyed by block hash.
+    if (vUndoTokenData.size()) {
+        if (!ptokensdb->WriteBlockUndoTokenData(block.GetBlockHash(), vUndoTokenData))
+            return AbortNode(state, "Failed to write token undo data");
     }
 
     if (fTxIndex)
@@ -2992,6 +3199,9 @@ static bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockInd
 
     int64_t nTime5 = GetTimeMicros(); nTimeIndex += nTime5 - nTime4;
     LogPrint(BCLog::BENCH, "    - Index writing: %.2fms [%.2fs (%.2fms/blk)]\n", MILLI * (nTime5 - nTime4), nTimeIndex * MICRO, nTimeIndex * MILLI / nBlocksTotal);
+
+    if (!governanceChanges.Commit())
+        return AbortNode(state, "Failed to write to the governance database");
 
     int64_t nTime6 = GetTimeMicros(); nTimeCallbacks += nTime6 - nTime5;
     LogPrint(BCLog::BENCH, "    - Callbacks: %.2fms [%.2fs (%.2fms/blk)]\n", MILLI * (nTime6 - nTime5), nTimeCallbacks * MICRO, nTimeCallbacks * MILLI / nBlocksTotal);
@@ -3223,7 +3433,7 @@ void static UpdateTip(CBlockIndex *pindexNew, const CChainParams& chainParams) {
             DoWarning(strWarning);
         }
     }
-    LogPrintf("%s: new best=%s height=%d version=0x%08x log2_work=%.8g tx=%lu date='%s' progress=%f cache=%.1fMiB(%utxo)", __func__,
+    LogPrintfUnlimited("%s: new best=%s height=%d version=0x%08x log2_work=%.8g tx=%lu date='%s' progress=%f cache=%.1fMiB(%utxo)", __func__,
       chainActive.Tip()->GetBlockHash().ToString(), chainActive.Height(), chainActive.Tip()->nVersion,
       log(chainActive.Tip()->nChainWork.getdouble())/log(2.0), (unsigned long)chainActive.Tip()->nChainTx,
       DateTimeStrFormat("%Y-%m-%d %H:%M:%S", chainActive.Tip()->GetBlockTime()),
@@ -3375,6 +3585,48 @@ public:
  *
  * The block is added to connectTrace if connection succeeds.
  */
+/**
+ * After a block with a freeze command: a transaction of the mempool that spends a coin of a script
+ * that is frozen now can never be in a block. Remove it, and what depends on it. (Such a
+ * transaction entered the mempool before the freeze. Block assembly leaves it out anyway, see
+ * BlockAssembler::TestPackageTransactions; this keeps it from waiting there until it expires.)
+ */
+static void RemoveFrozenFromMempool(const CBlock& block)
+{
+    AssertLockHeld(cs_main);
+    if (!governance)
+        return;
+    bool fFreeze = false;
+    for (const CTransactionRef& tx : block.vtx) {
+        if (!GovernanceFreezeScripts(*tx).empty()) {
+            fFreeze = true;
+            break;
+        }
+    }
+    if (!fFreeze)
+        return;
+    std::vector<CTransactionRef> vRemove;
+    {
+        LOCK(mempool.cs);
+        for (const CTxMemPoolEntry& entry : mempool.mapTx) {
+            const CTransaction& tx = entry.GetTx();
+            for (const CTxIn& txin : tx.vin) {
+                const Coin& coin = pcoinsTip->AccessCoin(txin.prevout);
+                if (coin.IsSpent())
+                    continue; // a parent in the mempool: removed with it, if at all
+                if (!governance->CanSend(coin.out.scriptPubKey)) {
+                    vRemove.push_back(entry.GetSharedTx());
+                    break;
+                }
+            }
+        }
+    }
+    for (const CTransactionRef& tx : vRemove) {
+        LogPrint(BCLog::MEMPOOL, "%s: %s spends a coin of a frozen address\n", __func__, tx->GetHash().ToString());
+        mempool.removeRecursive(*tx, MemPoolRemovalReason::CONFLICT);
+    }
+}
+
 bool static ConnectTip(CValidationState& state, const CChainParams& chainparams, CBlockIndex* pindexNew, const std::shared_ptr<const CBlock>& pblock, ConnectTrace& connectTrace, DisconnectedBlockTransactions &disconnectpool)
 {
     assert(pindexNew->pprev == chainActive.Tip());
@@ -3427,10 +3679,15 @@ bool static ConnectTip(CValidationState& state, const CChainParams& chainparams,
         int64_t nTimeTokensStart = GetTimeMicros();
         /** TOKENS START */
         // Get the newly created tokens, from the connectblock tokenCache so we can remove the correct tokens from the mempool
+        // (walk the tokens of this block, which are few, and not the tokens that wait to be
+        // written, which are all the tokens issued since the last flush: copying each of them
+        // for every block took a sixth of the time of the first synchronization)
         setNewTokensAddedInBlock = tokenCache.setNewTokensToAdd;
-        for (auto it : ptokens->setNewTokensToAdd) {
-            if (setNewTokensAddedInBlock.count(it))
-                setNewTokensAddedInBlock.erase(it);
+        for (auto it = setNewTokensAddedInBlock.begin(); it != setNewTokensAddedInBlock.end();) {
+            if (ptokens->setNewTokensToAdd.count(*it))
+                it = setNewTokensAddedInBlock.erase(it);
+            else
+                ++it;
         }
 
         // Remove all tx hashes, that were marked as reissued script from the mapReissuedTx.
@@ -3468,8 +3725,9 @@ bool static ConnectTip(CValidationState& state, const CChainParams& chainparams,
     int64_t nTime5 = GetTimeMicros(); nTimeChainState += nTime5 - nTime4;
     LogPrint(BCLog::BENCH, "  - Writing chainstate: %.2fms [%.2fs (%.2fms/blk)]\n", (nTime5 - nTime4) * MILLI, nTimeChainState * MICRO, nTimeChainState * MILLI / nBlocksTotal);
     // Remove conflicting transactions from the mempool.;
-    mempool.removeForBlock(blockConnecting.vtx, pindexNew->nHeight, setNewTokensAddedInBlock);
+    mempool.removeForBlock(blockConnecting.vtx, pindexNew->nHeight, setNewTokensAddedInBlock, !IsInitialBlockDownload());
     disconnectpool.removeForBlock(blockConnecting.vtx);
+    RemoveFrozenFromMempool(blockConnecting);
     // Update chainActive & related variables.
     UpdateTip(pindexNew, chainparams);
 
@@ -3699,7 +3957,7 @@ bool ActivateBestChain(CValidationState &state, const CChainParams& chainparams,
 
             bool fInvalidFound = false;
             std::shared_ptr<const CBlock> nullBlockPtr;
-            if (!ActivateBestChainStep(state, chainparams, pindexMostWork, pblock && (*phash) == pindexMostWork->GetBlockHash() ? pblock : nullBlockPtr, fInvalidFound, connectTrace))
+            if (!ActivateBestChainStep(state, chainparams, pindexMostWork, pblock && (phash ? *phash : pblock->GetBlockHash()) == pindexMostWork->GetBlockHash() ? pblock : nullBlockPtr, fInvalidFound, connectTrace))
                 return false;
 
             if (fInvalidFound) {
@@ -4310,12 +4568,28 @@ static bool ContextualCheckBlockHeader(const CBlock& block, CValidationState& st
         );
     }
 
+    // A node that started from a chain state snapshot has no undo data for the blocks up to the
+    // snapshot height: it cannot follow a fork that begins there. (Once the chain is more than the
+    // maximum reorganization depth past the snapshot, the rule above covers this.)
+    if (nHeight <= SnapshotHeight() && (!chainActive[nHeight] || chainActive[nHeight]->GetBlockHash() != hash)) {
+        return state.DoS(25,
+            error("%s: forked chain begins at height %d, at or below the snapshot height %d", __func__, nHeight, SnapshotHeight()),
+            REJECT_MAXREORGDEPTH, "bad-fork-prior-to-snapshot"
+        );
+    }
+
     if (hash == params.GetConsensus().hashGenesisBlock)
         return true;
 
     // Check proof of work
     const Consensus::Params& consensusParams = params.GetConsensus();
-    if (chainActive.Height() > consensusParams.nLastPOWBlock && nHeight > consensusParams.nLastPOWBlock && block.nBits != GetNextTargetRequired(pindexPrev, &block, true, consensusParams))
+    // The difficulty of a proof-of-stake block follows from the two blocks before it. This was
+    // checked only once the active chain had passed the last proof-of-work block, so not while a
+    // new node received its headers: a peer could then announce headers with any difficulty.
+    // It is checked for every header now. The first two proof-of-stake blocks are left out:
+    // on the main network (1441, 1442) they do not have the value of the formula. Every later
+    // block does (all blocks up to 3,031,432 were compared).
+    if (nHeight > consensusParams.nLastPOWBlock + 2 && block.nBits != GetNextTargetRequired(pindexPrev, &block, true, consensusParams))
         return state.DoS(100, false, REJECT_INVALID, "bad-diffbits", false, "incorrect proof of work");
 
     // Check against checkpoints
@@ -4340,9 +4614,14 @@ static bool ContextualCheckBlockHeader(const CBlock& block, CValidationState& st
     if (block.GetBlockTime() > FutureDrift(nAdjustedTime))
         return state.Invalid(false, REJECT_INVALID, "time-too-new", "block timestamp too far in the future");
     
-    if (nHeight > consensusParams.nLastPOWBlock && !CheckStakeBlockTimestamp(block.GetBlockTime()))
+    if (nHeight > consensusParams.nLastPOWBlock && !CheckStakeBlockTimestamp(block.GetBlockTime(), nHeight, consensusParams))
         return state.DoS(100, error("%s: incorrect pos block timestamp", __func__),
                          REJECT_INVALID, "bad-pos-time");
+
+    // The smaller allowance for the time of a block, once it is scheduled
+    // (proof-of-stake blocks: their time is the slot in which the stake was found)
+    if (nHeight >= consensusParams.nFutureDriftHeight && nHeight > consensusParams.nLastPOWBlock && block.GetBlockTime() > nAdjustedTime + consensusParams.nFutureDriftSeconds)
+        return state.Invalid(false, REJECT_INVALID, "time-too-new", "block timestamp too far in the future");
 
     // Reject outdated veresion blocks onces tokens are active.
     if (AreTokensDeployed() && block.nVersion < VERSIONBITS_TOP_BITS_TOKENS) {
@@ -4540,6 +4819,154 @@ bool ProcessNewBlockHeaders(const std::vector<CBlockHeader>& headers, CValidatio
 }
 
 /** Store block on disk. If dbp is non-nullptr, the file is known to already reside on disk */
+/**
+ * Fake-stake mitigation: check the coinstake kernel of a proof-of-stake block
+ * before the block is written to disk or relayed. Without this, kernel and
+ * stake input are only checked in ConnectBlock(), so blocks with a made-up
+ * stake on any fork within the reorg limit cost nothing to produce but are
+ * stored (see doc/aokchain/04-security-audit.md SEC-06).
+ *
+ * It only rejects (and marks invalid) a block when it can evaluate exactly
+ * what ConnectBlock() will evaluate, and the block fails. In every other case
+ * it returns true and the block is stored as before.
+ *
+ * In particular the kernel hash depends on pprev->nStakeModifier, which is
+ * only computed when pprev is connected (ConnectBlock()). So the check is
+ * limited to blocks whose parent is on the active chain. (An earlier version
+ * also checked fork blocks whose parent was not connected yet, used a null
+ * stake modifier and rejected a valid mainnet block, 3030580 cfce995c.)
+ */
+static bool CheckBlockStakeBeforeStorage(const CBlock& block, const CBlockIndex* pindex, CValidationState& state, const Consensus::Params& consensusParams)
+{
+    AssertLockHeld(cs_main);
+
+    if (!block.IsProofOfStake() || pindex->pprev == nullptr)
+        return true;
+
+    const CBlockIndex* pindexPrev = pindex->pprev;
+    // Parent not connected (side branch, or ahead of the tip during initial
+    // block download): its stake modifier and UTXO set are unknown here.
+    if (!chainActive.Contains(pindexPrev) || pindexPrev->nStakeModifier.IsNull())
+        return true;
+
+    const COutPoint& prevout = block.vtx[1]->vin[0].prevout;
+
+    // The block extends the tip and its kernel is an unspent coin that has the time of its
+    // transaction (see ConnectBlock()): everything that is checked here is in the coin, and the
+    // transaction is not read from disk. This is the case for nearly every block.
+    if (pindexPrev == chainActive.Tip()) {
+        const Coin& coin = pcoinsTip->AccessCoin(prevout);
+        if (!coin.IsSpent() && coin.nTime != 0) {
+            if (pindex->nHeight - (int)coin.nHeight < COINSTAKE_MATURITY)
+                return state.DoS(100, error("%s: tried to stake at depth %d", __func__, pindex->nHeight - coin.nHeight),
+                                 REJECT_INVALID, "bad-cs-premature");
+            if (!CheckStakeKernelHash(pindexPrev, block.nBits, coin.out.nValue, prevout, block.vtx[1]->nTime, coin.nTime))
+                return state.DoS(100, error("%s: proof-of-stake hash doesn't match nBits", __func__),
+                                 REJECT_INVALID, "bad-cs-proofhash");
+            return true;
+        }
+    }
+
+    // Same lookup ConnectBlock() uses for the kernel transaction when the coin has no time.
+    CTransactionRef txPrev;
+    uint256 hashBlock;
+    if (!GetTransaction(prevout.hash, txPrev, consensusParams, hashBlock, false) || prevout.n >= txPrev->vout.size()) {
+        // A node that started from a chain state snapshot cannot read a transaction of the past
+        // blocks. For a block on a fork of the active chain the coin of the tip still tells what
+        // is needed, as long as it is unspent there.
+        const Coin& coin = pcoinsTip->AccessCoin(prevout);
+        if (!PastBlocksMissing() || coin.IsSpent() || coin.nTime == 0 || (int)coin.nHeight > SnapshotHeight() || (int)coin.nHeight > pindexPrev->nHeight)
+            return true;
+        if (pindex->nHeight - (int)coin.nHeight < COINSTAKE_MATURITY)
+            return state.DoS(100, error("%s: tried to stake at depth %d", __func__, pindex->nHeight - coin.nHeight),
+                             REJECT_INVALID, "bad-cs-premature");
+        if (!CheckStakeKernelHash(pindexPrev, block.nBits, coin.out.nValue, prevout, block.vtx[1]->nTime, coin.nTime))
+            return state.DoS(100, error("%s: proof-of-stake hash doesn't match nBits", __func__),
+                             REJECT_INVALID, "bad-cs-proofhash");
+        return true;
+    }
+
+    int nCoinHeight;
+    CAmount nValueIn;
+    if (pindexPrev == chainActive.Tip()) {
+        // Same UTXO view ConnectBlock() will use.
+        const Coin& coin = pcoinsTip->AccessCoin(prevout);
+        if (coin.IsSpent())
+            return state.DoS(100, error("%s: kernel input unavailable", __func__),
+                             REJECT_INVALID, "bad-cs-kernel");
+        nCoinHeight = coin.nHeight;
+        nValueIn = coin.out.nValue;
+    } else {
+        // Parent is an older block of the active chain (a fork of it). We
+        // cannot cheaply tell whether the kernel is unspent at pprev, so only
+        // the maturity and kernel hash are checked, and only if the kernel
+        // transaction is confirmed in an ancestor of pprev.
+        BlockMap::const_iterator mi = mapBlockIndex.find(hashBlock);
+        if (hashBlock.IsNull() || mi == mapBlockIndex.end() || pindexPrev->GetAncestor(mi->second->nHeight) != mi->second)
+            return true;
+        nCoinHeight = mi->second->nHeight;
+        nValueIn = txPrev->vout[prevout.n].nValue;
+    }
+
+    if (pindex->nHeight - nCoinHeight < COINSTAKE_MATURITY)
+        return state.DoS(100, error("%s: tried to stake at depth %d", __func__, pindex->nHeight - nCoinHeight),
+                         REJECT_INVALID, "bad-cs-premature");
+
+    if (!CheckStakeKernelHash(pindexPrev, block.nBits, nValueIn, prevout, block.vtx[1]->nTime, txPrev->nTime))
+        return state.DoS(100, error("%s: proof-of-stake hash doesn't match nBits", __func__),
+                         REJECT_INVALID, "bad-cs-proofhash");
+
+    return true;
+}
+
+/**
+ * Blocks stored per stake.
+ *
+ * A stake (a coin and a time) is the right to sign one block, but nothing stops its
+ * holder from signing any number of different blocks with it. Each of them passes
+ * every check that can be made before a block is stored, so a staker could have a
+ * node store them without end. Honest stakers sign one block per stake, so beyond a
+ * few blocks with the same stake further ones are not stored, unless the block is on
+ * the best chain of headers: the chain that the network extends is always followed,
+ * whichever of the blocks it started with.
+ *
+ * (Before 4.0.1 any header that built on the block was enough, and finding one meant a
+ * walk over the whole block index under cs_main for every such block: a staker could
+ * keep a node busy with a stream of them. A header costs nothing to make on proof of
+ * stake, so that exception did not hold back the storing either. Now a block beyond the
+ * limit needs a chain of headers with more work than any other the node knows.)
+ *
+ * All protected by cs_main. Kept in memory only.
+ */
+unsigned int nMaxBlocksPerStake = DEFAULT_MAX_BLOCKS_PER_STAKE;
+static const size_t MAX_STAKES_REMEMBERED = 50000;
+static std::map<std::pair<COutPoint, unsigned int>, unsigned int> mapBlocksPerStake;
+static std::deque<std::pair<COutPoint, unsigned int> > queueBlocksPerStake;
+static std::set<const CBlockIndex*> setSkippedStakeVariants;
+
+bool IsSkippedStakeVariant(const CBlockIndex* pindex)
+{
+    AssertLockHeld(cs_main);
+    return setSkippedStakeVariants.count(pindex) != 0;
+}
+
+static void NoteStakeBlockStored(const std::pair<COutPoint, unsigned int>& stake)
+{
+    if (mapBlocksPerStake[stake]++ == 0) {
+        queueBlocksPerStake.push_back(stake);
+        if (queueBlocksPerStake.size() > MAX_STAKES_REMEMBERED) {
+            mapBlocksPerStake.erase(queueBlocksPerStake.front());
+            queueBlocksPerStake.pop_front();
+        }
+    }
+}
+
+bool IsOnBestHeaderChain(const CBlockIndex* pindex)
+{
+    AssertLockHeld(cs_main);
+    return pindex && pindexBestHeader && pindexBestHeader->GetAncestor(pindex->nHeight) == pindex;
+}
+
 static bool AcceptBlock(const std::shared_ptr<const CBlock>& pblock, CValidationState& state, const CChainParams& chainparams, CBlockIndex** ppindex, bool fRequested, const CDiskBlockPos* dbp, bool* fNewBlock, const uint256& hash)
 {
     const CBlock& block = *pblock;
@@ -4597,6 +5024,35 @@ static bool AcceptBlock(const std::shared_ptr<const CBlock>& pblock, CValidation
         return error("%s: %s", __func__, FormatStateMessage(state));
     }
 
+    // Blocks read back from our own disk (reindex, -loadblock) were either
+    // checked when first received or will be fully checked by ConnectBlock().
+    if (dbp == nullptr && !fReindex && !fImporting) {
+        if (!CheckBlockStakeBeforeStorage(block, pindex, state, chainparams.GetConsensus())) {
+            if (state.IsInvalid() && !state.CorruptionPossible()) {
+                pindex->nStatus |= BLOCK_FAILED_VALID;
+                setDirtyBlockIndex.insert(pindex);
+            }
+            return error("%s: %s", __func__, FormatStateMessage(state));
+        }
+    }
+
+    // Blocks stored per stake (see nMaxBlocksPerStake)
+    const bool fCountStake = dbp == nullptr && !fReindex && !fImporting && block.IsProofOfStake();
+    std::pair<COutPoint, unsigned int> stake;
+    if (fCountStake) {
+        stake = std::make_pair(block.vtx[1]->vin[0].prevout, block.nTime);
+        std::map<std::pair<COutPoint, unsigned int>, unsigned int>::const_iterator it = mapBlocksPerStake.find(stake);
+        if (it != mapBlocksPerStake.end() && it->second >= nMaxBlocksPerStake && !fHasMoreWork && !IsOnBestHeaderChain(pindex)) {
+            LogPrintf("%s: block %s (height %d) is not stored: %u blocks with its stake %s at time %u are stored already\n",
+                      __func__, hash.ToString(), pindex->nHeight, it->second, stake.first.ToString(), stake.second);
+            if (setSkippedStakeVariants.size() >= MAX_STAKES_REMEMBERED)
+                setSkippedStakeVariants.clear();
+            setSkippedStakeVariants.insert(pindex);
+            if (fNewBlock) *fNewBlock = false;
+            return true;
+        }
+    }
+
     // Header is valid/has work, merkle tree and segwit merkle tree are good...RELAY NOW
     // (but if it does not build on our best tip, let the SendMessages loop relay it)
     if (!IsInitialBlockDownload() && chainActive.Tip() == pindex->pprev)
@@ -4619,6 +5075,11 @@ static bool AcceptBlock(const std::shared_ptr<const CBlock>& pblock, CValidation
             return error("AcceptBlock(): ReceivedBlockTransactions failed");
     } catch (const std::runtime_error& e) {
         return AbortNode(state, std::string("System error: ") + e.what());
+    }
+
+    if (fCountStake) {
+        NoteStakeBlockStored(stake);
+        setSkippedStakeVariants.erase(pindex);
     }
 
     if (fCheckForPruning)
@@ -5013,6 +5474,9 @@ bool static LoadBlockIndexDB(const CChainParams& chainparams)
     {
         CDiskBlockPos pos(*it, 0);
         if (CAutoFile(OpenBlockFile(pos, true), SER_DISK, CLIENT_VERSION).IsNull()) {
+            // a node that started from a chain state snapshot has the block files from there on
+            if (SnapshotBlockFilesMayBeMissing())
+                continue;
             return false;
         }
     }
@@ -5090,6 +5554,11 @@ CVerifyDB::~CVerifyDB()
 bool CVerifyDB::VerifyDB(const CChainParams& chainparams, CCoinsView *coinsview, int nCheckLevel, int nCheckDepth)
 {
     LOCK(cs_main);
+    // The blocks are disconnected and connected again on a copy of the coins only. Their
+    // governance commands go into a level of changes that is discarded at the end, so the
+    // check leaves the governance state as it is (it reverted the commands of the checked
+    // blocks before, and only a check at level 4 applied them again).
+    CGovernanceChanges governanceChanges(governance);
     if (chainActive.Tip() == nullptr || chainActive.Tip()->pprev == nullptr)
         return true;
 
@@ -5119,6 +5588,9 @@ bool CVerifyDB::VerifyDB(const CChainParams& chainparams, CCoinsView *coinsview,
         }
         uiInterface.ShowProgress(_("Verifying blocks..."), percentageDone, false);
         if (pindex->nHeight < chainActive.Height()-nCheckDepth)
+            break;
+        // a node that started from a chain state snapshot has neither blocks nor undo data up to its height
+        if (pindex->nHeight <= SnapshotHeight())
             break;
         if (fPruneMode && !(pindex->nStatus & BLOCK_HAVE_DATA)) {
             // If pruning, only go back as far as we have data.
@@ -5248,7 +5720,9 @@ bool ReplayBlocks(const CChainParams& params, CCoinsView* view)
                 return error("RollbackBlock(): ReadBlockFromDisk() failed at %d, hash=%s", pindexOld->nHeight, pindexOld->GetBlockHash().ToString());
             }
             LogPrintf("Rolling back %s (%i)\n", pindexOld->GetBlockHash().ToString(), pindexOld->nHeight);
-            DisconnectResult res = DisconnectBlock(block, pindexOld, cache, &tokensCache);
+            // (the governance state already is that of the new tip: it is written when a block is
+            // connected or disconnected, before the coins are flushed)
+            DisconnectResult res = DisconnectBlock(block, pindexOld, cache, &tokensCache, false, false);
             if (res == DISCONNECT_FAILED) {
                 return error("RollbackBlock(): DisconnectBlock failed at %d, hash=%s", pindexOld->nHeight, pindexOld->GetBlockHash().ToString());
             }
@@ -5575,10 +6049,15 @@ bool LoadExternalBlockFile(const CChainParams& chainparams, FILE* fileIn, CDiskB
                                     head.ToString());
                             LOCK(cs_main);
                             CValidationState dummy;
-                            if (AcceptBlock(pblockrecursive, dummy, chainparams, nullptr, true, &it->second, nullptr, hash))
+                            // Pass the child's own hash. This used to pass the parent's
+                            // hash, so AcceptBlock() found the parent ("already have")
+                            // and the out-of-order child was never indexed: -reindex
+                            // stopped at the first block stored before its parent.
+                            const uint256 hashRecursive = pblockrecursive->GetBlockHash();
+                            if (AcceptBlock(pblockrecursive, dummy, chainparams, nullptr, true, &it->second, nullptr, hashRecursive))
                             {
                                 nLoaded++;
-                                queue.push_back(pblockrecursive->GetBlockHash());
+                                queue.push_back(hashRecursive);
                             }
                         }
                         range.first++;

@@ -11,7 +11,7 @@
  * network protocol versioning
  */
 
-static const int PROTOCOL_VERSION = 70020;
+static const int PROTOCOL_VERSION = 70021;
 // static const int PROTOCOL_VERSION = 60019;
 
 //! initial proto version, to be increased after version/verack negotiation
@@ -53,5 +53,10 @@ static const int TOKENDATA_VERSION = 70017;
 
 //! gettokendata reutrn asstnotfound, and tokendata doesn't have blockhash in the data
 static const int TOKENDATA_VERSION_UPDATED = 70020;
+
+//! Peers below this version are not kept once the chain has reached the old peer cutoff height
+//! of the network (see CChainParams::OldPeerCutoffHeight). 70021 is the first version of the
+//! 4.0 series; 3.0.x announces 70020.
+static const int OLD_PEER_CUTOFF_VERSION = 70021;
 
 #endif // AOKCHAIN_VERSION_H

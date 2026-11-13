@@ -136,6 +136,12 @@ AC_DEFUN([AOKCHAIN_QT_CONFIGURE],[
       if test x$TARGET_OS = xwindows; then
         _AOKCHAIN_QT_CHECK_STATIC_PLUGINS([Q_IMPORT_PLUGIN(QWindowsIntegrationPlugin)],[-lqwindows])
         AC_DEFINE(QT_QPA_PLATFORM_WINDOWS, 1, [Define this symbol if the qt platform is windows])
+        dnl Since Qt 5.10 the native Windows style is a separate static plugin.
+        if test -f "$qt_plugin_path/styles/libqwindowsvistastyle.a"; then
+          QT_LIBS="-L$qt_plugin_path/styles $QT_LIBS"
+          _AOKCHAIN_QT_CHECK_STATIC_PLUGINS([Q_IMPORT_PLUGIN(QWindowsVistaStylePlugin)],[-lqwindowsvistastyle])
+          AC_DEFINE(QT_WINDOWS_VISTA_STYLE, 1, [Define this symbol if the qt windows vista style plugin exists])
+        fi
       elif test x$TARGET_OS = xlinux; then
         _AOKCHAIN_QT_CHECK_STATIC_PLUGINS([Q_IMPORT_PLUGIN(QXcbIntegrationPlugin)],[-lqxcb -lxcb-static])
         AC_DEFINE(QT_QPA_PLATFORM_XCB, 1, [Define this symbol if the qt platform is xcb])
@@ -363,7 +369,37 @@ AC_DEFUN([_AOKCHAIN_QT_FIND_STATIC_PLUGINS],[
            [aokchain_cv_need_platformsupport=no])
          ])
          if test x$aokchain_cv_need_platformsupport = xyes; then
-           AOKCHAIN_QT_CHECK(AC_CHECK_LIB([${QT_LIB_PREFIX}PlatformSupport],[main],,AOKCHAIN_QT_FAIL(lib$QT_LIB_PREFIXPlatformSupport not found)))
+           AC_CACHE_CHECK(for Qt >= 5.8, aokchain_cv_qt58,[AC_COMPILE_IFELSE([AC_LANG_PROGRAM(
+               [[#include <QtCore>]],[[
+               #if QT_VERSION < 0x050800
+               choke;
+               #endif
+               ]])],
+             [aokchain_cv_qt58=yes],
+             [aokchain_cv_qt58=no])
+           ])
+           if test x$aokchain_cv_qt58 = xno; then
+             AOKCHAIN_QT_CHECK(AC_CHECK_LIB([${QT_LIB_PREFIX}PlatformSupport],[main],,AOKCHAIN_QT_FAIL(lib$QT_LIB_PREFIXPlatformSupport not found)))
+           else
+             dnl Qt 5.8 split PlatformSupport into several static libraries. They
+             dnl must come after the platform plugin and before QtGui/QtCore.
+             qt_support_libs=
+             for qt_support_lib in WindowsUIAutomationSupport AccessibilitySupport ThemeSupport EventDispatcherSupport FontDatabaseSupport; do
+               if test -f "$qt_lib_path/lib${QT_LIB_PREFIX}${qt_support_lib}.a"; then
+                 qt_support_libs="-l${QT_LIB_PREFIX}${qt_support_lib} $qt_support_libs"
+               fi
+             done
+             if test "x$qt_support_libs" = x; then
+               AOKCHAIN_QT_FAIL(Qt platform support libraries not found)
+             fi
+             dnl Qt's bundled libpng needs the zlib that is built into QtCore, so
+             dnl it cannot be found by AC_SEARCH_LIBS on its own. Link it between
+             dnl QtGui and QtCore.
+             if test -f "$qt_lib_path/libqtlibpng.a"; then
+               QT_LIBS=`echo "$QT_LIBS" | sed "s/-l${QT_LIB_PREFIX}Core/-lqtlibpng -l${QT_LIB_PREFIX}Core/"`
+             fi
+             QT_LIBS="$qt_support_libs $QT_LIBS -lwtsapi32 -lversion -ldwmapi -luxtheme -lnetapi32 -luserenv -ldnsapi -lws2_32 -lcrypt32"
+           fi
          fi
        fi
      fi
@@ -476,10 +512,10 @@ AC_DEFUN([_AOKCHAIN_QT_FIND_LIBS_WITHOUT_PKGCONFIG],[
   ])
 
   AOKCHAIN_QT_CHECK(AC_CHECK_LIB([z] ,[main],,AC_MSG_WARN([zlib not found. Assuming qt has it built-in])))
-  AOKCHAIN_QT_CHECK(AC_SEARCH_LIBS([png_error] ,[qtpng png],,AC_MSG_WARN([libpng not found. Assuming qt has it built-in])))
+  AOKCHAIN_QT_CHECK(AC_SEARCH_LIBS([png_error] ,[qtlibpng qtpng png],,AC_MSG_WARN([libpng not found. Assuming qt has it built-in])))
   AOKCHAIN_QT_CHECK(AC_SEARCH_LIBS([jpeg_create_decompress] ,[qtjpeg jpeg],,AC_MSG_WARN([libjpeg not found. Assuming qt has it built-in])))
-  AOKCHAIN_QT_CHECK(AC_SEARCH_LIBS([pcre16_exec], [qtpcre pcre16],,AC_MSG_WARN([libpcre16 not found. Assuming qt has it built-in])))
-  AOKCHAIN_QT_CHECK(AC_SEARCH_LIBS([hb_ot_tags_from_script] ,[qtharfbuzzng harfbuzz],,AC_MSG_WARN([libharfbuzz not found. Assuming qt has it built-in or support is disabled])))
+  AOKCHAIN_QT_CHECK(AC_SEARCH_LIBS([pcre2_match_16], [qtpcre2],,[AC_SEARCH_LIBS([pcre16_exec], [qtpcre pcre16],,AC_MSG_WARN([libpcre not found. Assuming qt has it built-in]))]))
+  AOKCHAIN_QT_CHECK(AC_SEARCH_LIBS([hb_ot_tags_from_script] ,[qtharfbuzz qtharfbuzzng harfbuzz],,AC_MSG_WARN([libharfbuzz not found. Assuming qt has it built-in or support is disabled])))
   AOKCHAIN_QT_CHECK(AC_CHECK_LIB([${QT_LIB_PREFIX}Core]   ,[main],,AOKCHAIN_QT_FAIL(lib$QT_LIB_PREFIXCore not found)))
   AOKCHAIN_QT_CHECK(AC_CHECK_LIB([${QT_LIB_PREFIX}Gui]    ,[main],,AOKCHAIN_QT_FAIL(lib$QT_LIB_PREFIXGui not found)))
   AOKCHAIN_QT_CHECK(AC_CHECK_LIB([${QT_LIB_PREFIX}Network],[main],,AOKCHAIN_QT_FAIL(lib$QT_LIB_PREFIXNetwork not found)))

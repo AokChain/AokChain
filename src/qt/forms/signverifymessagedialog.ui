@@ -200,8 +200,8 @@
           <widget class="QLabel" name="statusLabel_SM">
            <property name="font">
             <font>
-             <weight>75</weight>
-             <bold>true</bold>
+             <weight>57</weight>
+             <bold>false</bold>
             </font>
            </property>
            <property name="text">
@@ -343,8 +343,8 @@
           <widget class="QLabel" name="statusLabel_VM">
            <property name="font">
             <font>
-             <weight>75</weight>
-             <bold>true</bold>
+             <weight>57</weight>
+             <bold>false</bold>
             </font>
            </property>
            <property name="text">

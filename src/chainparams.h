@@ -14,6 +14,7 @@
 #include "protocol.h"
 
 #include <memory>
+#include <limits>
 #include <vector>
 
 struct CDNSSeedData {
@@ -71,6 +72,27 @@ public:
     /** Policy: Filter transactions that do not match well-defined patterns */
     bool RequireStandard() const { return fRequireStandard; }
     uint64_t PruneAfterHeight() const { return nPruneAfterHeight; }
+    /** From this height of the active chain on, peers that announce a protocol version below
+        OLD_PEER_CUTOFF_VERSION are disconnected. INT_MAX: never. Not a consensus rule. */
+    /** The chain state snapshot that this program accepts: a height and the hashes of the state
+        at that height (see snapshot.h). Height 0: none. */
+    struct SnapshotParams {
+        int height = 0;
+        uint256 block;
+        uint256 utxo;
+        uint256 tokens;
+        uint256 governance;
+        uint256 index;
+        /** SHA-256 (hex, as sha256sum prints it) of the published snapshot: its parts in order, as
+         *  one stream. Checked before the snapshot is unpacked, so that no other files reach the
+         *  database code, which reads them before the hashes above can be compared. Empty: not
+         *  checked. */
+        std::string archive;
+    };
+    const SnapshotParams& Snapshot() const { return snapshot; }
+    void SetSnapshot(const SnapshotParams& params) { snapshot = params; }
+    int OldPeerCutoffHeight() const { return nOldPeerCutoffHeight; }
+    void SetOldPeerCutoffHeight(int height) { nOldPeerCutoffHeight = height; }
     /** Make miner stop after a block is found. In RPC, don't return until nGenProcLimit blocks are generated */
     bool MineBlocksOnDemand() const { return fMineBlocksOnDemand; }
     /** Return the BIP70 network string (main, test or regtest) */
@@ -81,6 +103,10 @@ public:
     const CCheckpointData& Checkpoints() const { return checkpointData; }
     const ChainTxData& TxData() const { return chainTxData; }
     void UpdateVersionBitsParameters(Consensus::DeploymentPos d, int64_t nStartTime, int64_t nTimeout);
+
+    void UpdateLastPOWBlock(int nHeight);
+    void UpdateFutureDriftHeight(int nHeight);
+    void UpdateMasterAddress(const std::string& address);
     void TurnOffSegwit();
     void TurnOffCSV();
     void TurnOffBIP34();
@@ -111,6 +137,8 @@ protected:
     CMessageHeader::MessageStartChars pchMessageStart;
     int nDefaultPort;
     uint64_t nPruneAfterHeight;
+    int nOldPeerCutoffHeight = std::numeric_limits<int>::max();
+    SnapshotParams snapshot;
     std::vector<CDNSSeedData> vSeeds;
     std::vector<unsigned char> base58Prefixes[MAX_BASE58_TYPES];
     std::string strNetworkID;
@@ -165,6 +193,20 @@ void SelectParams(const std::string& chain);
  * Allows modifying the Version Bits regtest parameters.
  */
 void UpdateVersionBitsParameters(Consensus::DeploymentPos d, int64_t nStartTime, int64_t nTimeout);
+
+/**
+ * Allows overriding the height of the last proof-of-work block (regtest-only),
+ * so that tests can reach the proof-of-stake phase.
+ */
+void UpdateLastPOWBlock(int nHeight);
+/** Regtest only: the height from which the smaller allowance for the time of a block applies. */
+void UpdateFutureDriftHeight(int nHeight);
+/** Regtest only: the governance master address, so that a test can hold its key (-masteraddress). */
+void UpdateMasterAddress(const std::string& address);
+/** Regtest only: the snapshot that is accepted (-snapshotparams). */
+void UpdateSnapshotParams(const CChainParams::SnapshotParams& params);
+/** Regtest only: set the height from which old peers are disconnected (-oldpeercutoffheight). */
+void UpdateOldPeerCutoffHeight(int nHeight);
 
 void TurnOffSegwit();
 

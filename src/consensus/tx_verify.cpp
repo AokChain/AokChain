@@ -211,9 +211,12 @@ bool CheckTransaction(const CTransaction& tx, CValidationState &state, CTokensCa
         if (!AreTokensDeployed() && isToken && !fReindex)
             return state.DoS(100, false, REJECT_INVALID, "bad-txns-is-token-and-token-not-active");
 
-        // Check for transfers that don't meet the tokens units only if the tokenCache is not null
+        // These checks only parse the script and do not need tokenCache. They
+        // used to be skipped when tokenCache was null, which let token outputs
+        // carrying AOK value through on such code paths (the Ravencoin 2020
+        // inflation pattern). No block in the mainnet chain violates them.
         if (AreTokensDeployed() && isToken) {
-            if (tokenCache) {
+            {
                 // Get the transfer transaction data from the scriptPubKey
                 if (nType == TX_TRANSFER_TOKEN) {
                     CTokenTransfer transfer;
@@ -285,7 +288,7 @@ bool CheckTransaction(const CTransaction& tx, CValidationState &state, CTokensCa
     if (tx.IsCoinBase() || tx.IsCoinStake()) {
         for (auto vout : tx.vout) {
             if (vout.scriptPubKey.IsTokenScript()) {
-                return state.DoS(0, error("%s: coinstake contains token transaction", __func__),
+                return state.DoS(100, error("%s: coinstake contains token transaction", __func__),
                                  REJECT_INVALID, "bad-txns-coinstake-contains-token-txes");
             }
         }
@@ -513,11 +516,16 @@ bool Consensus::CheckTxTokens(const CTransaction& tx, CValidationState& state, c
             if (!GetTokenInfoFromCoin(coin, strName, nAmount, nTokenLockTime))
                 return state.DoS(100, false, REJECT_INVALID, "bad-txns-failed-to-get-token-from-script");
 
-            // Add to the total value of tokens in the inputs
-            if (totalInputs.count(strName))
-                totalInputs.at(strName) += nAmount;
-            else
-                totalInputs.insert(make_pair(strName, nAmount));
+            // Add to the total value of tokens in the inputs. The sum must not
+            // overflow (signed overflow is undefined behaviour and allowed
+            // minting tokens; see doc/aokchain/04-security-audit.md SEC-02).
+            // No valid transaction in the chain comes close to these limits.
+            if (nAmount < 0 || nAmount > MAX_MONEY_TOKENS)
+                return state.DoS(100, false, REJECT_INVALID, "bad-txns-token-input-amount-out-of-range");
+            CAmount& nInputTotal = totalInputs[strName];
+            if (nInputTotal > MAX_MONEY_TOKENS - nAmount)
+                return state.DoS(100, false, REJECT_INVALID, "bad-txns-token-inputs-sum-out-of-range");
+            nInputTotal += nAmount;
 
             if ((int64_t)nTokenLockTime > ((int64_t)nTokenLockTime < LOCKTIME_THRESHOLD ? (int64_t)nSpendHeight : nSpendTime)) {
                 std::string errorMsg = strprintf("Tried to spend token before %d", nTokenLockTime);
@@ -542,11 +550,14 @@ bool Consensus::CheckTxTokens(const CTransaction& tx, CValidationState& state, c
                 return state.DoS(100, false, REJECT_INVALID, strError);
             }
 
-            // Add to the total value of tokens in the outputs
-            if (totalOutputs.count(transfer.strName))
-                totalOutputs.at(transfer.strName) += transfer.nAmount;
-            else
-                totalOutputs.insert(make_pair(transfer.strName, transfer.nAmount));
+            // Add to the total value of tokens in the outputs, without
+            // overflowing (SEC-02). IsValid() already requires nAmount > 0.
+            if (transfer.nAmount > MAX_MONEY_TOKENS)
+                return state.DoS(100, false, REJECT_INVALID, "bad-txns-token-transfer-amount-out-of-range");
+            CAmount& nOutputTotal = totalOutputs[transfer.strName];
+            if (nOutputTotal > MAX_MONEY_TOKENS - transfer.nAmount)
+                return state.DoS(100, false, REJECT_INVALID, "bad-txns-token-outputs-sum-out-of-range");
+            nOutputTotal += transfer.nAmount;
 
             if (!fRunningUnitTests) {
                 if (IsTokenNameAnOwner(transfer.strName)) {

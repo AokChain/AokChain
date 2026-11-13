@@ -5,6 +5,7 @@
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
+#include "snapshot.h"
 #include <init.h>
 #include <net.h>
 #include <util.h>
@@ -71,6 +72,9 @@ std::string WalletInit::GetHelpString(bool showDebug)
     strUsage += HelpMessageOpt("-rescan", _("Rescan the block chain for missing wallet transactions on startup"));
     strUsage += HelpMessageOpt("-salvagewallet", _("Attempt to recover private keys from a corrupt wallet on startup"));
     strUsage += HelpMessageOpt("-spendzeroconfchange", strprintf(_("Spend unconfirmed change when sending transactions (default: %u)"), DEFAULT_SPEND_ZEROCONF_CHANGE));
+    strUsage += HelpMessageOpt("-spendofflinestaking", strprintf(_("Let a payment take coins at an offline staking address on its own. Otherwise they are spent only when they are selected, with coin control or in a raw transaction (default: %u)"), DEFAULT_SPEND_OFFLINE_STAKING));
+    strUsage += HelpMessageOpt("-stakecombinethreshold=<amt>", strprintf(_("A stake gathers the coins of its address that are smaller than this amount (in %s) and is split in two when it reaches twice the amount, so the staking coins end up between one and two times this size (default: %s)"),
+                                                            CURRENCY_UNIT, FormatMoney(DEFAULT_STAKE_COMBINE_THRESHOLD)));
     strUsage += HelpMessageOpt("-txconfirmtarget=<n>", strprintf(_("If paytxfee is not set, include enough fee so transactions begin confirmation on average within n blocks (default: %u)"), DEFAULT_TX_CONFIRM_TARGET));
     strUsage += HelpMessageOpt("-walletrbf", strprintf(_("Send transactions with full-RBF opt-in enabled (default: %u)"), DEFAULT_WALLET_RBF));
     strUsage += HelpMessageOpt("-upgradewallet", _("Upgrade wallet to latest format on startup"));
@@ -85,6 +89,7 @@ std::string WalletInit::GetHelpString(bool showDebug)
     {
         strUsage += HelpMessageGroup(_("Wallet debugging/testing options:"));
 
+        strUsage += HelpMessageOpt("-checkwalletlive", "Verify the wallet's index of unspent transactions against a full scan on every use; slow, for tests (default: 0)");
         strUsage += HelpMessageOpt("-dblogsize=<n>", strprintf("Flush wallet database activity from memory to disk log every <n> megabytes (default: %u)", DEFAULT_WALLET_DBLOGSIZE));
         strUsage += HelpMessageOpt("-flushwallet", strprintf("Run a thread to flush wallet periodically (default: %u)", DEFAULT_FLUSHWALLET));
         strUsage += HelpMessageOpt("-privdb", strprintf("Sets the DB_PRIVATE flag in the wallet db environment (default: %u)", DEFAULT_WALLET_PRIVDB));
@@ -184,6 +189,13 @@ bool WalletInit::ParameterInteraction()
                         _("This is the transaction fee you may discard if change is smaller than dust at this level"));
         CWallet::m_discard_rate = CFeeRate(nFeePerK);
     }
+    if (gArgs.IsArgSet("-stakecombinethreshold"))
+    {
+        CAmount nThreshold = 0;
+        if (!ParseMoney(gArgs.GetArg("-stakecombinethreshold", ""), nThreshold) || nThreshold < COIN)
+            return InitError(strprintf(_("Invalid amount for -stakecombinethreshold=<amount>: '%s' (must be at least %s)"), gArgs.GetArg("-stakecombinethreshold", ""), FormatMoney(COIN)));
+        nStakeCombineThreshold = nThreshold;
+    }
     if (gArgs.IsArgSet("-paytxfee"))
     {
         CAmount nFeePerK = 0;
@@ -216,6 +228,7 @@ bool WalletInit::ParameterInteraction()
     }
     nTxConfirmTarget = gArgs.GetArg("-txconfirmtarget", DEFAULT_TX_CONFIRM_TARGET);
     bSpendZeroConfChange = gArgs.GetBoolArg("-spendzeroconfchange", DEFAULT_SPEND_ZEROCONF_CHANGE);
+    fSpendOfflineStaking = gArgs.GetBoolArg("-spendofflinestaking", DEFAULT_SPEND_OFFLINE_STAKING);
     fWalletRbf = gArgs.GetBoolArg("-walletrbf", DEFAULT_WALLET_RBF);
 
     return true;
@@ -308,6 +321,29 @@ bool WalletInit::Open()
         vpwallets.push_back(pwallet);
     }
 
+    // A node that started from a chain state snapshot: wallets that wait for the past blocks.
+    if (WalletRescanPending() && !PastBlocksMissing())
+        SetWalletRescanPending(false); // they were scanned from the beginning just now
+    SetPastBlocksRescanHook([] {
+        // in steps, so that the node is not locked for the whole scan
+        const int step = 2000;
+        for (int height = 0; ; height += step) {
+            boost::this_thread::interruption_point();
+            CBlockIndex *pindexStart, *pindexStop;
+            {
+                LOCK(cs_main);
+                pindexStart = chainActive[height];
+                if (!pindexStart)
+                    break;
+                pindexStop = chainActive[std::min(height + step - 1, chainActive.Height())];
+            }
+            for (CWallet* pwallet : vpwallets)
+                pwallet->ScanForWalletTransactions(pindexStart, pindexStop, true, true);
+        }
+        for (CWallet* pwallet : vpwallets)
+            pwallet->ReacceptWalletTransactions();
+    });
+
     return true;
 }
 
@@ -351,4 +387,8 @@ void WalletInit::Close()
         delete pwallet;
     }
     vpwallets.clear();
+    for (CWallet* pwallet : vpwalletsUnloaded) {
+        delete pwallet;
+    }
+    vpwalletsUnloaded.clear();
 }

@@ -1,6 +1,6 @@
 package=bdb
 $(package)_version=4.8.30
-$(package)_download_path=http://download.oracle.com/berkeley-db
+$(package)_download_path=https://download.oracle.com/berkeley-db
 $(package)_file_name=db-$($(package)_version).NC.tar.gz
 $(package)_sha256_hash=12edc0df75bf9abd7f82f821795bcee50f42cb2e5f76a6a281b85732798364ef
 $(package)_build_subdir=build_unix
@@ -10,6 +10,8 @@ $(package)_config_opts=--disable-shared --enable-cxx --disable-replication
 $(package)_config_opts_mingw32=--enable-mingw
 $(package)_config_opts_linux=--with-pic
 $(package)_cxxflags=-std=c++11
+# BDB 4.8 predates C99 strictness in modern compilers (gcc >= 14 errors).
+$(package)_cflags+=-Wno-error=implicit-function-declaration -Wno-error=format-security -Wno-error=implicit-int -Wno-error=int-conversion
 endef
 
 define $(package)_preprocess_cmds

@@ -45,6 +45,7 @@ CreateTokenDialog::CreateTokenDialog(const PlatformStyle *_platformStyle, QWidge
         platformStyle(_platformStyle)
 {
     ui->setupUi(this);
+    ui->createTokenButton->setProperty("primary", true);
     setWindowTitle("Create Tokens");
     connect(ui->ipfsBox, SIGNAL(clicked()), this, SLOT(ipfsStateChanged()));
     connect(ui->availabilityButton, SIGNAL(clicked()), this, SLOT(checkAvailabilityClicked()));
@@ -151,7 +152,7 @@ void CreateTokenDialog::setModel(WalletModel *_model)
     {
         setBalance(_model->getBalance(), _model->getUnconfirmedBalance(), _model->getImmatureBalance(),
                    _model->getWatchBalance(), _model->getWatchUnconfirmedBalance(), _model->getWatchImmatureBalance());
-        connect(_model, SIGNAL(balanceChanged(CAmount,CAmount,CAmount,CAmount,CAmount,CAmount)), this, SLOT(setBalance(CAmount,CAmount,CAmount,CAmount,CAmount,CAmount)));
+        connect(_model, SIGNAL(balanceChanged(CAmount,CAmount,CAmount,CAmount,CAmount,CAmount,CAmount,CAmount,CAmount)), this, SLOT(setBalance(CAmount,CAmount,CAmount,CAmount,CAmount,CAmount)));
         connect(_model->getOptionsModel(), SIGNAL(displayUnitChanged(int)), this, SLOT(updateDisplayUnit()));
         updateDisplayUnit();
 
@@ -247,7 +248,7 @@ void CreateTokenDialog::setUpValues()
     CheckFormState();
     ui->availabilityButton->setDisabled(true);
 
-    ui->unitExampleLabel->setStyleSheet("font-weight: bold");
+    ui->unitExampleLabel->setStyleSheet("font-weight: 600");
 
     // Setup the token types
     QStringList list;
@@ -263,15 +264,15 @@ void CreateTokenDialog::setUpValues()
     updateTokenList();
 
     ui->tokenFullName->setTextFormat(Qt::RichText);
-    ui->tokenFullName->setStyleSheet("font-weight: bold");
+    ui->tokenFullName->setStyleSheet("font-weight: 600");
 
-    ui->tokenType->setStyleSheet("font-weight: bold");
+    ui->tokenType->setStyleSheet("font-weight: 600");
 }
 
 void CreateTokenDialog::setupCoinControlFrame(const PlatformStyle *platformStyle)
 {
     /** Update the tokencontrol frame */
-    ui->frameCoinControl->setStyleSheet(QString(".QFrame {background-color: %1; padding-top: 10px; padding-right: 5px; border: none;}").arg(platformStyle->WidgetBackGroundColor().name()));
+    ui->frameCoinControl->setStyleSheet(GUIUtil::cardFrameStyle());
     ui->widgetCoinControl->setStyleSheet(".QWidget {background-color: transparent;}");
     /** Create the shadow effects on the frames */
 
@@ -311,7 +312,7 @@ void CreateTokenDialog::setupTokenDataView(const PlatformStyle *platformStyle)
 {
     /** Update the scrollview*/
 
-    ui->frameTokenData->setStyleSheet(QString(".QFrame {background-color: %1; padding-top: 10px; padding-right: 5px; border: none;}").arg(platformStyle->WidgetBackGroundColor().name()));
+    ui->frameTokenData->setStyleSheet(GUIUtil::cardFrameStyle());
 
     ui->tokenTypeLabel->setStyleSheet(STRING_LABEL_COLOR);
     ui->tokenTypeLabel->setFont(GUIUtil::getSubLabelFont());
@@ -335,7 +336,7 @@ void CreateTokenDialog::setupTokenDataView(const PlatformStyle *platformStyle)
 void CreateTokenDialog::setupFeeControl(const PlatformStyle *platformStyle)
 {
     /** Update the coincontrol frame */
-    ui->frameFee->setStyleSheet(QString(".QFrame {background-color: %1; padding-top: 10px; padding-right: 5px; border: none;}").arg(platformStyle->WidgetBackGroundColor().name()));
+    ui->frameFee->setStyleSheet(GUIUtil::cardFrameStyle());
     /** Create the shadow effects on the frames */
 
     ui->labelFeeHeadline->setStyleSheet(STRING_LABEL_COLOR);
@@ -407,14 +408,14 @@ void CreateTokenDialog::toggleIPFSText()
 
 void CreateTokenDialog::showMessage(QString string)
 {
-    ui->messageLabel->setStyleSheet("color: red; font-size: 15pt;font-weight: bold;");
+    ui->messageLabel->setStyleSheet("color: red; font-size: 15pt;font-weight: 600;");
     ui->messageLabel->setText(string);
     ui->messageLabel->show();
 }
 
 void CreateTokenDialog::showValidMessage(QString string)
 {
-    ui->messageLabel->setStyleSheet("color: green; font-size: 15pt;font-weight: bold;");
+    ui->messageLabel->setStyleSheet("color: green; font-size: 15pt;font-weight: 600;");
     ui->messageLabel->setText(string);
     ui->messageLabel->show();
 }
@@ -1181,6 +1182,7 @@ void CreateTokenDialog::clearSelected()
 
 void CreateTokenDialog::updateTokenList()
 {
+    GUIUtil::LogTimer timer("create token dialog list");
     QStringList list;
     list << "";
 

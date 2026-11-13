@@ -15,11 +15,8 @@ CWallet *pwalletMain;
 WalletTestingSetup::WalletTestingSetup(const std::string &chainName) :
         TestingSetup(chainName)
 {
-    bitdb.MakeMock();
-
     bool fFirstRun;
-    std::unique_ptr<CWalletDBWrapper> dbw(new CWalletDBWrapper(&bitdb, "wallet_test.dat"));
-    pwalletMain = new CWallet(std::move(dbw));
+    pwalletMain = new CWallet("mock", CWalletDBWrapper::CreateMock());
     pwalletMain->LoadWallet(fFirstRun);
     RegisterValidationInterface(pwalletMain);
 
@@ -31,7 +28,4 @@ WalletTestingSetup::~WalletTestingSetup()
     UnregisterValidationInterface(pwalletMain);
     delete pwalletMain;
     pwalletMain = nullptr;
-
-    bitdb.Flush(true);
-    bitdb.Reset();
 }

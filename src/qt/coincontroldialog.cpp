@@ -129,6 +129,8 @@ CoinControlDialog::CoinControlDialog(const PlatformStyle *_platformStyle, QWidge
     // change coin control first column label due Qt4 bug.
     // see https://github.com/AokChain/AokChain/issues/5716
     ui->treeWidget->headerItem()->setText(COLUMN_CHECKBOX, QString());
+    // amounts, addresses and dates in the fixed-width font
+    ui->treeWidget->setItemDelegate(new GUIUtil::MonoColumnDelegate({COLUMN_ADDRESS, COLUMN_DATE, COLUMN_CONFIRMATIONS}, this, {COLUMN_AMOUNT}));
 
     ui->treeWidget->setColumnWidth(COLUMN_CHECKBOX, 84);
     ui->treeWidget->setColumnWidth(COLUMN_AMOUNT, 110);

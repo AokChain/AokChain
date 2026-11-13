@@ -10,6 +10,9 @@
 #include "amount.h"
 
 #include <QAbstractTableModel>
+#include <QList>
+#include <QPointer>
+#include <QThread>
 #include <QStringList>
 
 class TokenTablePriv;
@@ -59,11 +62,17 @@ public:
     QString formatTokenQuantity(const TokenRecord *wtx) const;
 
     void checkBalanceChanged();
+    /** The balances as they were read last; for lists that group or search them */
+    const QList<TokenRecord>& records() const;
 
 private:
     WalletModel *walletModel;
     QStringList columns;
     TokenTablePriv *priv;
+    bool refreshRunning;
+    bool refreshPending;
+    QPointer<QThread> refreshThread;
+    void applyBalances(const QList<TokenRecord>& fresh, bool ok);
 
     friend class TokenTablePriv;
 };

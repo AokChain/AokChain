@@ -49,7 +49,8 @@ public:
         SpendZeroConfChange,    // bool
         Listen,                 // bool
         CustomFeeFeatures,      // bool
-        DarkModeEnabled,        // bool
+        BootstrapUse,           // bool
+        BootstrapUrls,          // QString: addresses of the block archives, one per line
         OptionIDRowCount,
     };
 
@@ -71,7 +72,6 @@ public:
     bool getProxySettings(QNetworkProxy& proxy) const;
     bool getCoinControlFeatures() const { return fCoinControlFeatures; }
     bool getCustomFeeFeatures() const { return fCustomFeeFeatures; }
-    bool getDarkModeEnabled() const { /* return fDarkModeEnabled; */ return false; }
     const QString& getOverriddenByCommandLine() { return strOverriddenByCommandLine; }
 
     /* Restart flag helper */
@@ -89,7 +89,6 @@ private:
     bool fCoinControlFeatures;
     /** TOKENS START*/
     bool fCustomFeeFeatures;
-    bool fDarkModeEnabled;
     /** TOKENS END*/
     /* settings that were overridden by command-line */
     QString strOverriddenByCommandLine;

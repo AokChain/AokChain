@@ -5,6 +5,8 @@
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 #if defined(HAVE_CONFIG_H)
+#include "chainparamsbase.h"
+#include "chainparams.h"
 #include "config/aokchain-config.h"
 #endif
 
@@ -12,11 +14,17 @@
 #include "intro.h"
 #include "ui_intro.h"
 
+#include "firstrun.h"
 #include "guiutil.h"
 
 #include "util.h"
 
 #include <QFileDialog>
+#include <QFrame>
+#include <QLabel>
+#include <QPushButton>
+#include <QHBoxLayout>
+#include <QComboBox>
 #include <QSettings>
 #include <QMessageBox>
 
@@ -122,15 +130,130 @@ Intro::Intro(QWidget *parent) :
     signalled(false)
 {
     ui->setupUi(this);
+
+    // The first screen of the first start: the look of the program, the header of the wizard,
+    // then the language and the data folder as cards.
+    setFont(GUIUtil::appFont(13));
+    setMinimumWidth(640);
+    ui->verticalLayout->setContentsMargins(28, 26, 28, 22);
+    ui->verticalLayout->setSpacing(12);
+    ui->welcomeLabel->hide();
+    for (int i = ui->verticalLayout->count() - 1; i >= 0; --i) {
+        // the spacers of the old form
+        if (ui->verticalLayout->itemAt(i)->spacerItem())
+            delete ui->verticalLayout->takeAt(i);
+    }
+    ui->verticalLayout->insertWidget(0, new WizardHeader(WizardHeader::Start, tr("Welcome"), QString(), this));
+
+    // The language, first of all and readable in any language
+    {
+        QFrame *card = new QFrame(this);
+        card->setProperty("role", "card");
+        QHBoxLayout *row = new QHBoxLayout(card);
+        row->setContentsMargins(18, 12, 18, 12);
+        row->setSpacing(12);
+        QLabel *globe = new QLabel(card);
+        globe->setFixedSize(36, 36);
+        globe->setAlignment(Qt::AlignCenter);
+        globe->setPixmap(GUIUtil::lineIcon("globe", 20, GUIUtil::theme().accent, 1.8));
+        globe->setStyleSheet(QString("QLabel { background-color: %1; border-radius: 8px; }").arg(GUIUtil::theme().accentSoft.name()));
+        row->addWidget(globe);
+        const QString word = tr("Language");
+        QLabel *label = new QLabel(word == "Language" ? QString::fromUtf8("Language / 언어") : QString("Language / %1").arg(word), card);
+        label->setProperty("role", "title");
+        row->addWidget(label);
+        row->addStretch(1);
+        QComboBox *language = new QComboBox(card);
+        GUIUtil::fillLanguageCombo(language);
+        language->setMinimumWidth(260);
+        language->setFixedHeight(40);
+        QSettings settings;
+        const int current = language->findData(settings.value("language", "").toString());
+        language->setCurrentIndex(current < 0 ? 0 : current);
+        row->addWidget(language);
+        ui->verticalLayout->insertWidget(1, card);
+        connect(language, static_cast<void (QComboBox::*)(int)>(&QComboBox::activated), this, [this, language](int index) {
+            QSettings store;
+            if (store.value("language", "").toString() == language->itemData(index).toString())
+                return;
+            store.setValue("language", language->itemData(index).toString());
+            done(LanguageChanged);
+        });
+    }
+
+    // Where the data goes
+    {
+        QFrame *card = new QFrame(this);
+        card->setProperty("role", "card");
+        QVBoxLayout *body = new QVBoxLayout(card);
+        body->setContentsMargins(18, 14, 18, 14);
+        body->setSpacing(8);
+        QLabel *title = new QLabel(tr("Data folder"), card);
+        title->setProperty("role", "title");
+        body->addWidget(title);
+        for (QLabel *label : {ui->storageLabel, ui->sizeWarningLabel}) {
+            ui->verticalLayout->removeWidget(label);
+            label->setProperty("role", "secondary");
+            label->setWordWrap(true);
+            body->addWidget(label);
+        }
+        for (QWidget *radio : {(QWidget*)ui->dataDirDefault, (QWidget*)ui->dataDirCustom}) {
+            ui->verticalLayout->removeWidget(radio);
+            body->addWidget(radio);
+        }
+        // the folder, the button to choose one, and what the check of the folder says
+        for (QWidget *widget : {(QWidget*)ui->dataDirectory, (QWidget*)ui->ellipsisButton})
+            ui->horizontalLayout_2->removeWidget(widget);
+        for (QWidget *widget : {(QWidget*)ui->freeSpace, (QWidget*)ui->errorMessage})
+            ui->verticalLayout_2->removeWidget(widget);
+        ui->verticalLayout->removeItem(ui->horizontalLayout);
+        delete ui->horizontalLayout;
+        QHBoxLayout *folderRow = new QHBoxLayout();
+        folderRow->setSpacing(6);
+        folderRow->addWidget(ui->dataDirectory, 1);
+        folderRow->addWidget(ui->ellipsisButton);
+        body->addLayout(folderRow);
+        body->addWidget(ui->freeSpace);
+        body->addWidget(ui->errorMessage);
+        ui->dataDirectory->setFont(GUIUtil::monoFont(12));
+        ui->dataDirectory->setFixedHeight(40);
+        ui->ellipsisButton->setMaximumWidth(QWIDGETSIZE_MAX);
+        ui->ellipsisButton->setFixedSize(44, 40);
+        ui->freeSpace->setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Minimum);
+        ui->errorMessage->setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Minimum);
+        ui->freeSpace->setProperty("role", "caption");
+        ui->errorMessage->setProperty("role", "caption");
+        ui->verticalLayout->insertWidget(2, card);
+    }
+    for (QLabel *label : {ui->lblExplanation1, ui->lblExplanation2, ui->lblExplanation3})
+        label->setProperty("role", "caption");
+    QPushButton *ok = ui->buttonBox->button(QDialogButtonBox::Ok);
+    QPushButton *cancel = ui->buttonBox->button(QDialogButtonBox::Cancel);
+    ok->setText(tr("Continue"));
+    ok->setIcon(QIcon());
+    ok->setProperty("primary", true);
+    ok->setMinimumSize(130, 40);
+    cancel->setText(tr("Quit"));
+    cancel->setIcon(QIcon());
+    cancel->setMinimumHeight(40);
+    // the form was laid out for less: room for the cards, whatever the language
+    resize(680, 660);
+
     ui->welcomeLabel->setText(ui->welcomeLabel->text().arg(tr(PACKAGE_NAME)));
     ui->storageLabel->setText(ui->storageLabel->text().arg(tr(PACKAGE_NAME)));
 
+    // (all four at once: a translation that leaves one of them out must not shift the others)
     ui->lblExplanation1->setText(ui->lblExplanation1->text()
-        .arg(tr(PACKAGE_NAME))
-        .arg(BLOCK_CHAIN_SIZE)
-        .arg(2018)
-        .arg(tr("AokChain"))
-    );
+        .arg(tr(PACKAGE_NAME), QString::number(BLOCK_CHAIN_SIZE), QString::number(2018), tr("AokChain")));
+    // With a chain state snapshot for this network the first start does not process the whole chain.
+    try {
+        const std::unique_ptr<CChainParams> params = CreateChainParams(ChainNameFromCommandLine());
+        if (params->Snapshot().height > 0 && gArgs.GetBoolArg("-snapshot", true) && gArgs.GetBoolArg("-bootstrap", true)) {
+            ui->lblExplanation1->setText(tr("When you continue, %1 downloads a snapshot of the state of the block chain at block %2 (about 1 GB), checks it against the values that are built into the program, and follows the chain from there. This takes a few minutes. The blocks before the snapshot are downloaded later, and only if you need them.")
+                .arg(tr(PACKAGE_NAME), GUIUtil::withThousands(QString::number(params->Snapshot().height))));
+        }
+    } catch (const std::exception&) {
+    }
     ui->lblExplanation2->setText(ui->lblExplanation2->text().arg(tr(PACKAGE_NAME)));
 
     uint64_t pruneTarget = std::max<int64_t>(0, gArgs.GetArg("-prune", 0));
@@ -188,6 +311,13 @@ QString Intro::getDefaultDataDirectory()
     return GUIUtil::boostPathToQString(GetDefaultDataDir());
 }
 
+static std::function<void()> languageChangedCallback;
+
+void Intro::setLanguageChanged(std::function<void()> callback)
+{
+    languageChangedCallback = callback;
+}
+
 bool Intro::pickDataDirectory()
 {
     QSettings settings;
@@ -203,18 +333,24 @@ bool Intro::pickDataDirectory()
     if(!fs::exists(GUIUtil::qstringToBoostPath(dataDir)) || gArgs.GetBoolArg("-choosedatadir", DEFAULT_CHOOSE_DATADIR) || settings.value("fReset", false).toBool() || gArgs.GetBoolArg("-resetguisettings", false))
     {
         /* If current default data directory does not exist, let the user choose one */
-        Intro intro;
-        intro.setDataDirectory(dataDir);
-        intro.setWindowIcon(QIcon(":icons/aokchain"));
-
         while(true)
         {
-            if(!intro.exec())
+            Intro intro;
+            intro.setDataDirectory(dataDir);
+            intro.setWindowIcon(QIcon(":icons/aokchain"));
+            const int result = intro.exec();
+            if(!result)
             {
                 /* Cancel clicked */
                 return false;
             }
             dataDir = intro.getDataDirectory();
+            if (result == LanguageChanged) {
+                /* the same dialog again, in the language that was chosen */
+                if (languageChangedCallback)
+                    languageChangedCallback();
+                continue;
+            }
             try {
                 if (TryCreateDirectories(GUIUtil::qstringToBoostPath(dataDir))) {
                     // If a new data directory has been created, make wallets subdirectory too
@@ -250,7 +386,7 @@ void Intro::setStatus(int status, const QString &message, quint64 bytesAvailable
         break;
     case FreespaceChecker::ST_ERROR:
         ui->errorMessage->setText(tr("Error") + ": " + message);
-        ui->errorMessage->setStyleSheet("QLabel { color: #800000 }");
+        ui->errorMessage->setStyleSheet(QString("QLabel { color: %1 }").arg(GUIUtil::theme().error.name()));
         break;
     }
     /* Indicate number of bytes available */
@@ -262,7 +398,7 @@ void Intro::setStatus(int status, const QString &message, quint64 bytesAvailable
         if(bytesAvailable < requiredSpace * GB_BYTES)
         {
             freeString += " " + tr("(of %n GB needed)", "", requiredSpace);
-            ui->freeSpace->setStyleSheet("QLabel { color: #800000 }");
+            ui->freeSpace->setStyleSheet(QString("QLabel { color: %1 }").arg(GUIUtil::theme().error.name()));
         } else {
             ui->freeSpace->setStyleSheet("");
         }

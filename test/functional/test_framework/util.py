@@ -213,7 +213,7 @@ def hash256(byte_str):
     sha256d.update(sha256.digest())
     return sha256d.digest()[::-1]
 
-x16r_hash_cmd = os.path.dirname(os.path.reaokath(__file__)) + "/../../../src/test/test_aokchain_hash"
+x16r_hash_cmd = os.path.dirname(os.path.realpath(__file__)) + "/../../../src/test/test_aokchain_hash"
 def hash_block(hex_str):
     cmd = [x16r_hash_cmd, hex_str]
     hash = subprocess.run(cmd, stdout=subprocess.PIPE, check=True).stdout.decode('ascii')
@@ -320,6 +320,9 @@ def initialize_datadir(dirname, n):
         f.write("port=" + str(p2p_port(n)) + "\n")
         f.write("rpcport=" + str(rpc_port(n)) + "\n")
         f.write("listenonion=0\n")
+        # Verify the wallet's live transaction index against a full scan on every use
+        f.write("checkwalletlive=1\n")
+        f.write("logratelimit=0\n")
     return datadir
 
 def get_datadir_path(dirname, n):

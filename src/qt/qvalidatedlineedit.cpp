@@ -27,10 +27,7 @@ void QValidatedLineEdit::setValid(bool _valid)
 
     if(_valid)
     {
-        if (darkModeEnabled)
-            setStyleSheet("");
-        else
-            setStyleSheet(STYLE_VALID);
+        setStyleSheet(STYLE_VALID);
     }
     else
     {

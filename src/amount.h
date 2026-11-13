@@ -21,7 +21,10 @@ static const CAmount COIN = 100000000;
 static const CAmount CENT = 1000000;
 
 /** No amount larger than this (in satoshi) is valid.*/
-static const CAmount MAX_MONEY = std::numeric_limits<int64_t>::max();
+/** No amount of AOK is larger than this: more than ten times the coins that will ever exist
+ *  (2.1 billion). It was the largest 64 bit number, which made the range checks pointless: sums
+ *  could overflow before a check saw them. */
+static const CAmount MAX_MONEY = 25000000000 * COIN;
 static const CAmount MAX_MONEY_TOKENS = 25000000000 * COIN;
 
 inline bool MoneyRange(const CAmount& nValue) { return (nValue >= 0 && nValue <= MAX_MONEY); }

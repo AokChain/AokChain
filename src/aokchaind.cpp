@@ -26,6 +26,10 @@
 #include <boost/thread.hpp>
 
 #include <stdio.h>
+#ifndef WIN32
+#include <fcntl.h>
+#include <unistd.h>
+#endif
 
 /* Introduction text for doxygen: */
 
@@ -63,6 +67,11 @@ void WaitForShutdown(boost::thread_group* threadGroup)
 //
 // Start
 //
+#ifndef WIN32
+/** -daemonwait: the pipe to the command that waits for the start. */
+static int daemonWaitFd = -1;
+#endif
+
 bool AppInit(int argc, char* argv[])
 {
     boost::thread_group threadGroup;
@@ -147,7 +156,56 @@ bool AppInit(int argc, char* argv[])
             // InitError will have been called with detailed error, which ends up on console
             exit(EXIT_FAILURE);
         }
-        if (gArgs.GetBoolArg("-daemon", false))
+        if (gArgs.GetBoolArg("-daemonwait", false))
+        {
+#ifndef WIN32
+            // Like -daemon, but the command returns when the node has started (or has failed
+            // to): a service manager then knows that the node answers.
+            fprintf(stdout, "AokChain server starting\n");
+            fflush(stdout);
+            int fds[2];
+            if (pipe(fds) != 0) {
+                fprintf(stderr, "Error: pipe() failed: %s\n", strerror(errno));
+                return false;
+            }
+            const pid_t pid = fork();
+            if (pid < 0) {
+                fprintf(stderr, "Error: fork() failed: %s\n", strerror(errno));
+                return false;
+            }
+            if (pid > 0) {
+                // the command: wait for the word of the node, or for its end
+                close(fds[1]);
+                char byte = 0;
+                ssize_t got;
+                do {
+                    got = read(fds[0], &byte, 1);
+                } while (got < 0 && errno == EINTR);
+                if (got == 1)
+                    _exit(EXIT_SUCCESS);
+                fprintf(stderr, "Error during initialization - check debug.log for details\n");
+                _exit(EXIT_FAILURE);
+            }
+            close(fds[0]);
+            if (setsid() < 0) {
+                fprintf(stderr, "Error: setsid() failed: %s\n", strerror(errno));
+                return false;
+            }
+            const int null = open("/dev/null", O_RDWR);
+            if (null >= 0) {
+                dup2(null, STDIN_FILENO);
+                dup2(null, STDOUT_FILENO);
+                dup2(null, STDERR_FILENO);
+                if (null > STDERR_FILENO)
+                    close(null);
+            }
+            daemonWaitFd = fds[1];
+#else
+            fprintf(stderr, "Error: -daemonwait is not supported on this operating system\n");
+            return false;
+#endif
+        }
+        else if (gArgs.GetBoolArg("-daemon", false))
         {
 #if HAVE_DECL_DAEMON
 #if defined(MAC_OSX)
@@ -176,6 +234,18 @@ bool AppInit(int argc, char* argv[])
             exit(EXIT_FAILURE);
         }
         fRet = AppInitMain(threadGroup, scheduler);
+#ifndef WIN32
+        if (daemonWaitFd >= 0) {
+            // -daemonwait: started. (When the start failed the pipe is closed without a word.)
+            if (fRet) {
+                const char byte = 1;
+                if (write(daemonWaitFd, &byte, 1) != 1)
+                    LogPrintf("-daemonwait: the waiting command is gone\n");
+            }
+            close(daemonWaitFd);
+            daemonWaitFd = -1;
+        }
+#endif
     }
     catch (const std::exception& e) {
         PrintExceptionContinue(&e, "AppInit()");

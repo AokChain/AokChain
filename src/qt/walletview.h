@@ -14,6 +14,8 @@
 class AokChainGUI;
 class ClientModel;
 class OverviewPage;
+class OptionsDialog;
+class SignHubPage;
 class PlatformStyle;
 class ReceiveCoinsDialog;
 class SendCoinsDialog;
@@ -23,9 +25,14 @@ class WalletModel;
 class AddressBookPage;
 class TokensDialog;
 class CreateTokenDialog;
+class TokensPage;
+class ExplorerPage;
 class ReissueTokenDialog;
 
 QT_BEGIN_NAMESPACE
+class QBoxLayout;
+class QButtonGroup;
+class QLabel;
 class QModelIndex;
 class QProgressDialog;
 QT_END_NAMESPACE
@@ -59,6 +66,9 @@ public:
 
     void showOutOfSyncWarning(bool fShow);
 
+protected:
+    bool eventFilter(QObject *object, QEvent *event) override;
+
 private:
     ClientModel *clientModel;
     WalletModel *walletModel;
@@ -81,6 +91,37 @@ private:
     CreateTokenDialog *createTokensPage;
     ReissueTokenDialog *manageTokensPage;
     /** TOKENS END */
+    ExplorerPage *explorerPage;
+    TokensPage *tokenCardsPage;
+    /** AOK and token forms of the send page */
+    QStackedWidget *sendStack;
+    QButtonGroup *sendTabs;
+
+    // each page sits in a shell that carries the page header
+    QWidget *overviewShell;
+    QWidget *receiveShell;
+    QWidget *sendShell;
+    QWidget *tokensShell;
+    QWidget *createTokensShell;
+    QWidget *manageTokensShell;
+    QWidget *explorerShell;
+    QWidget *addressBookShell;
+    QWidget *signShell;
+    QWidget *settingsShell;
+
+    /** Address book page: receiving and sending addresses */
+    QBoxLayout *addressColumns;
+    /** Sign page: prove an address, check a signature, multisig */
+    SignHubPage *signPage;
+    /** Settings page */
+    OptionsDialog *settingsPage;
+    QLabel *versionLabel;
+
+    /** A row of tab buttons as the send page has them */
+    QWidget *makeTabs(const QStringList &names, QButtonGroup **group, QWidget *parent);
+
+    /** Put a page below a header with its title and, optionally, a context widget on the right */
+    QWidget *addPage(QWidget *page, const QString &title, QWidget *context = nullptr);
 
 public Q_SLOTS:
     /** Switch to overview (home) page */
@@ -110,6 +151,12 @@ public Q_SLOTS:
     void changePassphrase();
     /** Ask for passphrase to unlock wallet temporarily */
     void unlockWallet();
+    /** Ask for the passphrase to start staking; by default the keys are then open for staking only */
+    void unlockWalletForStaking();
+    /** Lock a wallet that was unlocked for staking only */
+    void lockWalletAfterStaking();
+    /** Add the keys of another wallet from its recovery words */
+    void restoreFromMnemonic();
     /** Check if wallet is unlocked */
     bool isWalletUnlocked();
 
@@ -136,6 +183,16 @@ public Q_SLOTS:
     void gotoCreateTokensPage();
     void gotoManageTokensPage();
     /** TOKENS END */
+    /** Show the AOK (0) or the token (1) form of the send page */
+    void showSendTab(int tab);
+    void showTokenSendTab();
+    void sendToken(const QString &name);
+    /** Switch to the explorer page; look the query up when one is given */
+    void gotoExplorerPage(QString query = "");
+    /** Switch to the settings page */
+    void gotoSettingsPage();
+    /** Receiving (0) or sending (1) addresses of the address book page */
+    void showAddressTab(int tab);
 
 Q_SIGNALS:
     /** Signal that we want to show the main window */
@@ -152,6 +209,10 @@ Q_SIGNALS:
     void outOfSyncWarningClicked();
     /** Show the tokens GUI */
     void checkTokens();
+    /** The send page is to be shown */
+    void sendPageRequested();
+    /** Look up a transaction id, address or block in the explorer */
+    void explorerRequested(const QString &query);
 };
 
 #endif // AOKCHAIN_QT_WALLETVIEW_H

@@ -4,6 +4,8 @@
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
+#include "pastblocks.h"
+#include <QApplication>
 #include "walletmodel.h"
 
 #include "addresstablemodel.h"
@@ -34,6 +36,7 @@
 #include "wallet/wallet.h"
 #include "wallet/walletdb.h" // for BackupWallet
 
+#include <atomic>
 #include <stdint.h>
 
 #include <QDebug>
@@ -60,6 +63,7 @@ WalletModel::WalletModel(const PlatformStyle *platformStyle, CWallet *_wallet, O
 {
     fHaveWatchOnly = wallet->HaveWatchOnly();
     fForceCheckBalanceChanged = false;
+    cachedLockedBalance = 0;
 
     addressTableModel = new AddressTableModel(wallet, this);
     transactionTableModel = new TransactionTableModel(platformStyle, wallet, this);
@@ -157,13 +161,19 @@ void WalletModel::pollBalanceChanged()
     if(fForceCheckBalanceChanged || chainActive.Height() != cachedNumBlocks)
     {
         fForceCheckBalanceChanged = false;
+        GUIUtil::LogTimer timer("balance poll after a block or a transaction");
 
         // Balance and number of transactions might have changed
         cachedNumBlocks = chainActive.Height();
 
-        checkBalanceChanged();
-        if(transactionTableModel)
+        {
+            GUIUtil::LogTimer part("balance poll: wallet balances (CWallet::GetBalance and the like)");
+            checkBalanceChanged();
+        }
+        if(transactionTableModel) {
+            GUIUtil::LogTimer part("balance poll: confirmations of the transaction rows");
             transactionTableModel->updateConfirmations();
+        }
         if(tokenTableModel)
             tokenTableModel->checkBalanceChanged();
     }
@@ -189,7 +199,7 @@ void WalletModel::checkBalanceChanged()
     }
 
     if(cachedBalance != newBalance || cachedUnconfirmedBalance != newUnconfirmedBalance || cachedImmatureBalance != newImmatureBalance ||
-        cachedWatchOnlyBalance != newWatchOnlyBalance || cachedWatchUnconfBalance != newWatchUnconfBalance || cachedWatchImmatureBalance != newWatchImmatureBalance || cachedStake != newStake || cachedWatchOnlyStake != newWatchOnlyStake)
+        cachedWatchOnlyBalance != newWatchOnlyBalance || cachedWatchUnconfBalance != newWatchUnconfBalance || cachedWatchImmatureBalance != newWatchImmatureBalance || cachedStake != newStake || cachedWatchOnlyStake != newWatchOnlyStake || cachedLockedBalance != newLockedBalance)
     {
         cachedBalance = newBalance;
         cachedUnconfirmedBalance = newUnconfirmedBalance;
@@ -199,7 +209,7 @@ void WalletModel::checkBalanceChanged()
         cachedWatchUnconfBalance = newWatchUnconfBalance;
         cachedWatchImmatureBalance = newWatchImmatureBalance;
         cachedWatchOnlyStake = newWatchOnlyStake;
-        cachedLockedBalance = newWatchOnlyStake;
+        cachedLockedBalance = newLockedBalance;
         Q_EMIT balanceChanged(newBalance, newUnconfirmedBalance, newImmatureBalance, newStake,
                             newWatchOnlyBalance, newWatchUnconfBalance, newWatchImmatureBalance, newWatchOnlyStake, newLockedBalance);
     }
@@ -504,10 +514,62 @@ WalletModel::EncryptionStatus WalletModel::getEncryptionStatus() const
     {
         return Locked;
     }
+    else if (wallet->fUnlockStakingOnly)
+    {
+        return UnlockedForStaking;
+    }
     else
     {
         return Unlocked;
     }
+}
+
+bool WalletModel::isKnownAddress(const QString &address) const
+{
+    const CTxDestination dest = DecodeDestination(address.toStdString());
+    if (!IsValidDestination(dest))
+        return false;
+    LOCK2(cs_main, wallet->cs_wallet);
+    return wallet->mapAddressBook.count(dest) > 0 || wallet->IsMineDest(dest) != ISMINE_NO;
+}
+
+bool WalletModel::isFreshUnencrypted() const
+{
+    LOCK(wallet->cs_wallet);
+    return !wallet->IsCrypted() && wallet->mapWallet.empty();
+}
+
+bool WalletModel::ensurePastBlocksAvailable(QString *reason) const
+{
+    // The one place that knows whether the blocks of the past are on this node.
+    // A node that started from a chain state snapshot fetches them when they are asked for:
+    // the question whether to download them is put here.
+    if (PastBlocks::missing()) {
+        const bool downloading = PastBlocks::offerForWallet(QApplication::activeWindow(), tr("Looking for the earlier transactions of these keys"));
+        if (reason)
+            *reason = downloading
+                ? tr("The blocks of the past are being downloaded (the sync line at the bottom of the side bar shows how far the download is). Open this again when the download has finished.")
+                : tr("This wallet started from a snapshot of the chain state and does not hold the blocks of the past, so it cannot look for earlier transactions yet. Download them under Settings, Network settings, then open this again.");
+        return false;
+    }
+    if (fPruneMode) {
+        if (reason)
+            *reason = tr("This node does not keep the blocks of the past (pruning), so the wallet cannot look for earlier transactions.");
+        return false;
+    }
+    return true;
+}
+
+static std::atomic<bool> fProgressQuiet(false);
+
+void WalletModel::setProgressQuiet(bool quiet)
+{
+    fProgressQuiet = quiet;
+}
+
+bool WalletModel::progressQuiet() const
+{
+    return fProgressQuiet;
 }
 
 bool WalletModel::setWalletEncrypted(bool encrypted, const SecureString &passphrase)
@@ -524,17 +586,27 @@ bool WalletModel::setWalletEncrypted(bool encrypted, const SecureString &passphr
     }
 }
 
-bool WalletModel::setWalletLocked(bool locked, const SecureString &passPhrase)
+void WalletModel::setUnlockStakingOnly(bool stakingOnly)
+{
+    wallet->fUnlockStakingOnly = stakingOnly;
+}
+
+bool WalletModel::setWalletLocked(bool locked, const SecureString &passPhrase, bool stakingOnly)
 {
     if(locked)
     {
         // Lock
+        wallet->fUnlockStakingOnly = false;
         return wallet->Lock();
     }
     else
     {
         // Unlock
-        return wallet->Unlock(passPhrase);
+        if (!wallet->Unlock(passPhrase))
+            return false;
+        wallet->fUnlockStakingOnly = stakingOnly;
+        updateStatus();
+        return true;
     }
 }
 
@@ -588,6 +660,8 @@ static void NotifyTransactionChanged(WalletModel *walletmodel, CWallet *wallet, 
 
 static void ShowProgress(WalletModel *walletmodel, const std::string &title, int nProgress)
 {
+    if (fProgressQuiet)
+        return;
     // emits signal "showProgress"
     QMetaObject::invokeMethod(walletmodel, "showProgress", Qt::QueuedConnection,
                               Q_ARG(QString, QString::fromStdString(title)),
@@ -623,7 +697,9 @@ void WalletModel::unsubscribeFromCoreSignals()
 // WalletModel::UnlockContext implementation
 WalletModel::UnlockContext WalletModel::requestUnlock()
 {
-    bool was_locked = getEncryptionStatus() == Locked;
+    const EncryptionStatus before = getEncryptionStatus();
+    // unlocked for staking only counts as locked here: the keys are not for sending or signing
+    bool was_locked = before == Locked || before == UnlockedForStaking;
 
     if(was_locked)
     {
@@ -631,15 +707,17 @@ WalletModel::UnlockContext WalletModel::requestUnlock()
         Q_EMIT requireUnlock();
     }
     // If wallet is still locked, unlock was failed or cancelled, mark context as invalid
-    bool valid = getEncryptionStatus() != Locked;
+    const EncryptionStatus after = getEncryptionStatus();
+    bool valid = after != Locked && after != UnlockedForStaking;
 
-    return UnlockContext(this, valid, was_locked);
+    return UnlockContext(this, valid, was_locked, before == UnlockedForStaking);
 }
 
-WalletModel::UnlockContext::UnlockContext(WalletModel *_wallet, bool _valid, bool _relock):
+WalletModel::UnlockContext::UnlockContext(WalletModel *_wallet, bool _valid, bool _relock, bool _stakingOnly):
         wallet(_wallet),
         valid(_valid),
-        relock(_relock)
+        relock(_relock),
+        stakingOnly(_stakingOnly)
 {
 }
 
@@ -647,7 +725,13 @@ WalletModel::UnlockContext::~UnlockContext()
 {
     if(valid && relock)
     {
-        wallet->setWalletLocked(true);
+        if (stakingOnly && wallet->getEncryptionStatus() == Unlocked) {
+            // staking goes on: back to "for staking only" without locking the keys away
+            wallet->setUnlockStakingOnly(true);
+            wallet->updateStatus();
+        } else {
+            wallet->setWalletLocked(true);
+        }
     }
 }
 

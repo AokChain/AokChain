@@ -495,11 +495,30 @@ void CConnman::ClearBanned()
     {
         LOCK(cs_setBanned);
         setBanned.clear();
+        m_discouraged.reset();
         setBannedIsDirty = true;
     }
     DumpBanlist(); //store banlist to disk
     if(clientInterface)
         clientInterface->BannedListChanged();
+}
+
+static std::vector<unsigned char> DiscourageKey(const CNetAddr& netAddr)
+{
+    const std::string ip = netAddr.ToStringIP();
+    return std::vector<unsigned char>(ip.begin(), ip.end());
+}
+
+void CConnman::Discourage(const CNetAddr& netAddr)
+{
+    LOCK(cs_setBanned);
+    m_discouraged.insert(DiscourageKey(netAddr));
+}
+
+bool CConnman::IsDiscouraged(const CNetAddr& netAddr)
+{
+    LOCK(cs_setBanned);
+    return m_discouraged.contains(DiscourageKey(netAddr));
 }
 
 bool CConnman::IsBanned(CNetAddr ip)
@@ -1123,6 +1142,15 @@ void CConnman::AcceptConnection(const ListenSocket& hListenSocket) {
         return;
     }
 
+    // A peer at this address misbehaved before: take the connection only
+    // while there is room (it may be someone else behind the same address).
+    if (!whitelisted && nInbound + 1 >= nMaxInbound && IsDiscouraged(addr))
+    {
+        LogPrint(BCLog::NET, "connection from %s dropped (discouraged)\n", addr.ToString());
+        CloseSocket(hSocket);
+        return;
+    }
+
     if (nInbound >= nMaxInbound)
     {
         if (!AttemptToEvictConnection()) {
@@ -1264,7 +1292,11 @@ void CConnman::ThreadSocketHandler()
                 if (pnode->hSocket == INVALID_SOCKET)
                     continue;
 
-                FD_SET(pnode->hSocket, &fdsetError);
+                // (not for a peer whose receiving is paused and that has nothing to be sent: urgent
+                // TCP data raises this condition, and reading on it would take in data past the
+                // limit that the pause is there for, CVE-2026-117350)
+                if (select_recv || select_send)
+                    FD_SET(pnode->hSocket, &fdsetError);
                 hSocketMax = std::max(hSocketMax, pnode->hSocket);
                 have_fds = true;
 
@@ -1338,7 +1370,7 @@ void CConnman::ThreadSocketHandler()
                 sendSet = FD_ISSET(pnode->hSocket, &fdsetSend);
                 errorSet = FD_ISSET(pnode->hSocket, &fdsetError);
             }
-            if (recvSet || errorSet)
+            if (recvSet || (errorSet && !pnode->fPauseRecv))
             {
                 // typical socket buffer is 8K-64K
                 char pchBuf[0x10000];
@@ -1486,7 +1518,12 @@ void ThreadMapPort()
     struct IGDdatas data;
     int r;
 
+#if MINIUPNPC_API_VERSION >= 18
+    /* miniupnpc 2.2.8 added the WAN address output parameters */
+    r = UPNP_GetValidIGD(devlist, &urls, &data, lanaddr, sizeof(lanaddr), nullptr, 0);
+#else
     r = UPNP_GetValidIGD(devlist, &urls, &data, lanaddr, sizeof(lanaddr));
+#endif
     if (r == 1)
     {
         if (fDiscover) {
@@ -1991,7 +2028,7 @@ bool CConnman::OpenNetworkConnection(const CAddress& addrConnect, bool fCountFai
     }
     if (!pszDest) {
         if (IsLocal(addrConnect) ||
-            FindNode(static_cast<CNetAddr>(addrConnect)) || IsBanned(addrConnect) ||
+            FindNode(static_cast<CNetAddr>(addrConnect)) || IsBanned(addrConnect) || IsDiscouraged(addrConnect) ||
             FindNode(addrConnect.ToStringIPPort()))
             return false;
     } else if (FindNode(std::string(pszDest)))

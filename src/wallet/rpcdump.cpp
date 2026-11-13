@@ -4,6 +4,8 @@
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
+#include "snapshot.h"
+#include "wallet/mnemonicrestore.h"
 #include <base58.h>
 #include <chain.h>
 #include <rpc/safemode.h>
@@ -120,12 +122,18 @@ UniValue importprivkey(const JSONRPCRequest& request)
 
     if (fRescan && fPruneMode)
         throw JSONRPCError(RPC_WALLET_ERROR, "Rescan is disabled in pruned mode");
+    // A node that started from a chain state snapshot cannot scan the blocks before it yet. The
+    // key is imported all the same, and the wallet is scanned from the first block when the
+    // past blocks have been downloaded.
+    const bool fWaitForPastBlocks = fRescan && PastBlocksMissing();
+    if (fWaitForPastBlocks)
+        fRescan = false;
 
     CAokChainSecret vchSecret;
     bool fGood = vchSecret.SetString(strSecret);
 
     if (!fGood) throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Invalid private key encoding");
-    if (fWalletUnlockStakingOnly)
+    if (pwallet->fUnlockStakingOnly)
         throw JSONRPCError(RPC_WALLET_UNLOCK_NEEDED, "Wallet is unlocked for staking only.");
 
     CKey key = vchSecret.GetKey();
@@ -140,6 +148,8 @@ UniValue importprivkey(const JSONRPCRequest& request)
 
         // Don't throw error in case a key is already there
         if (pwallet->HaveKey(vchAddress)) {
+            if (fWaitForPastBlocks)
+                SetWalletRescanPending(true);
             return NullUniValue;
         }
 
@@ -157,7 +167,111 @@ UniValue importprivkey(const JSONRPCRequest& request)
         }
     }
 
+    if (fWaitForPastBlocks) {
+        SetWalletRescanPending(true);
+        return GetPastBlocksInfo().fetching
+            ? "The key is imported. Its transactions and balance appear when the download of the past blocks, which is running, has finished."
+            : "The key is imported. This node started from a chain state snapshot and does not have the past blocks yet: the transactions and the balance of the key appear after they have been downloaded (about 1.4 GB). Start the download with the RPC \"fetchblocks\" or in the wallet under Settings, Network settings.";
+    }
     return NullUniValue;
+}
+
+UniValue importmnemonic(const JSONRPCRequest& request)
+{
+    CWallet * const pwallet = GetWalletForJSONRPCRequest(request);
+    if (!EnsureWalletIsAvailable(pwallet, request.fHelp)) {
+        return NullUniValue;
+    }
+
+    if (request.fHelp || request.params.size() < 1 || request.params.size() > 4)
+        throw std::runtime_error(
+            "importmnemonic \"mnemonic\" ( \"passphrase\" \"address\" rescan )\n"
+            "\nAdds the keys of another wallet to this wallet, from its BIP39 mnemonic (recovery words).\n"
+            "The usual key paths are searched for addresses that hold coins now (unspent outputs of the\n"
+            "chain); the keys of those paths are imported up to 20 places past the last one in use,\n"
+            "together with the matching change path. If an address of that wallet is given, its path is\n"
+            "searched among all coin types (up to a minute) and imported even if it holds nothing now.\n"
+            "The keys are separate from the HD seed of this wallet: make a new backup afterwards.\n"
+            "WARNING: anyone who sees the mnemonic can spend the coins.\n"
+            "\nArguments:\n"
+            "1. \"mnemonic\"    (string, required) The 12 to 24 words, separated by spaces (English or Korean word list)\n"
+            "2. \"passphrase\"  (string, optional, default=\"\") The optional BIP39 passphrase (\"25th word\")\n"
+            "3. \"address\"     (string, optional, default=\"\") An address of the wallet that created the mnemonic\n"
+            "4. rescan        (boolean, optional, default=true) Rescan the chain for the transactions of the imported keys\n"
+            "\nResult:\n"
+            "{\n"
+            "  \"language\": \"xxx\",   (string) word list of the mnemonic\n"
+            "  \"searched\": n,       (numeric) number of keys tried\n"
+            "  \"imported\": n,       (numeric) number of keys added to the wallet\n"
+            "  \"found\": [           (array) addresses that hold coins now\n"
+            "    { \"path\": \"xxx\", \"address\": \"xxx\", \"amount\": x.xxx, \"outputs\": n, \"tokens\": true|false }, ...\n"
+            "  ]\n"
+            "}\n"
+            "\nExamples:\n"
+            + HelpExampleCli("importmnemonic", "\"word1 word2 ... word12\"")
+        );
+
+    if (PastBlocksMissing() && (request.params[3].isNull() || request.params[3].get_bool()))
+        throw JSONRPCError(RPC_WALLET_ERROR, PastBlocksMessage());
+    if (fPruneMode && (request.params[3].isNull() || request.params[3].get_bool()))
+        throw JSONRPCError(RPC_WALLET_ERROR, "Rescan is disabled in pruned mode");
+    {
+        LOCK2(cs_main, pwallet->cs_wallet);
+        EnsureWalletIsUnlocked(pwallet);
+    }
+
+    CKeyID known;
+    const bool fKnown = !request.params[2].isNull() && !request.params[2].get_str().empty();
+    if (fKnown) {
+        const CTxDestination dest = DecodeDestination(request.params[2].get_str());
+        const CKeyID* keyid = boost::get<CKeyID>(&dest);
+        if (!keyid)
+            throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "The address must be a pay-to-pubkey-hash address of this network");
+        known = *keyid;
+    }
+
+    CExtKey master;
+    std::string language, error;
+    {
+        const SecureString words(request.params[0].get_str().c_str());
+        const SecureString passphrase(request.params[1].isNull() ? "" : request.params[1].get_str().c_str());
+        if (!mnemonicrestore::MasterFromMnemonic(words, passphrase, master, language, error))
+            throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid mnemonic: " + error);
+    }
+
+    mnemonicrestore::Plan plan;
+    std::atomic<bool> fCancel(false);
+    if (!mnemonicrestore::BuildPlan(master, fKnown ? &known : nullptr, fCancel, plan, error))
+        throw JSONRPCError(RPC_WALLET_ERROR, error);
+    if (fKnown && plan.knownPath.empty() && plan.found.empty())
+        throw JSONRPCError(RPC_WALLET_ERROR, "The address does not belong to this mnemonic");
+
+    const int nImported = mnemonicrestore::ImportKeys(pwallet, plan, "restored", error);
+    if (nImported < 0)
+        throw JSONRPCError(RPC_WALLET_ERROR, error);
+
+    UniValue found(UniValue::VARR);
+    for (const mnemonicrestore::FoundAddress& entry : plan.found) {
+        UniValue obj(UniValue::VOBJ);
+        obj.pushKV("path", entry.path);
+        obj.pushKV("address", EncodeDestination(entry.keyid));
+        obj.pushKV("amount", ValueFromAmount(entry.nAmount));
+        obj.pushKV("outputs", entry.nOutputs);
+        obj.pushKV("tokens", UniValue(entry.fTokens));
+        found.push_back(obj);
+    }
+    UniValue result(UniValue::VOBJ);
+    result.pushKV("language", language);
+    result.pushKV("searched", plan.nDerived);
+    result.pushKV("imported", nImported);
+    result.pushKV("found", found);
+    plan.Clear();
+
+    if (request.params[3].isNull() || request.params[3].get_bool()) {
+        if (!mnemonicrestore::Rescan(pwallet, fCancel, [](int) {}, error))
+            throw JSONRPCError(RPC_WALLET_ERROR, "The keys were imported, but the rescan did not finish: " + error);
+    }
+    return result;
 }
 
 UniValue abortrescan(const JSONRPCRequest& request)
@@ -268,6 +382,8 @@ UniValue importaddress(const JSONRPCRequest& request)
 
     if (fRescan && fPruneMode)
         throw JSONRPCError(RPC_WALLET_ERROR, "Rescan is disabled in pruned mode");
+    if (fRescan && PastBlocksMissing())
+        throw JSONRPCError(RPC_WALLET_ERROR, PastBlocksMessage());
 
     // Whether to import a p2sh version, too
     bool fP2SH = false;
@@ -332,6 +448,8 @@ UniValue removeaddress(const JSONRPCRequest& request)
         throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Invalid AokChain address or script");
     }
 
+    if (fRescan && PastBlocksMissing())
+        fRescan = false; // nothing of the past blocks can be scanned; what the wallet has stays
     if (fRescan)
     {
         pwallet->RescanFromTime(TIMESTAMP_MIN, true /* update */);
@@ -477,6 +595,8 @@ UniValue importpubkey(const JSONRPCRequest& request)
 
     if (fRescan && fPruneMode)
         throw JSONRPCError(RPC_WALLET_ERROR, "Rescan is disabled in pruned mode");
+    if (fRescan && PastBlocksMissing())
+        throw JSONRPCError(RPC_WALLET_ERROR, PastBlocksMessage());
 
     if (!IsHex(request.params[0].get_str()))
         throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Pubkey must be a hex string");
@@ -524,6 +644,8 @@ UniValue importwallet(const JSONRPCRequest& request)
 
     if (fPruneMode)
         throw JSONRPCError(RPC_WALLET_ERROR, "Importing wallets is disabled in pruned mode");
+    if (PastBlocksMissing())
+        throw JSONRPCError(RPC_WALLET_ERROR, PastBlocksMessage());
 
     LOCK2(cs_main, pwallet->cs_wallet);
 
@@ -641,7 +763,7 @@ UniValue dumpprivkey(const JSONRPCRequest& request)
         throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Invalid AokChain address");
     }
 
-    if (fWalletUnlockStakingOnly)
+    if (pwallet->fUnlockStakingOnly)
         throw JSONRPCError(RPC_WALLET_UNLOCK_NEEDED, "Wallet is unlocked for staking only.");
 
     const CKeyID *keyID = boost::get<CKeyID>(&dest);
@@ -1196,6 +1318,12 @@ UniValue importmulti(const JSONRPCRequest& mainRequest)
         }
     }
 
+    if (fRescan && fRunScan && requests.size() && PastBlocksMissing()) {
+        // the keys are imported; what was paid to them before the snapshot cannot be found yet
+        const CBlockIndex* pindexSnapshot = chainActive[SnapshotHeight()];
+        if (pindexSnapshot && nLowestTimestamp <= pindexSnapshot->GetBlockTime() + TIMESTAMP_WINDOW)
+            throw JSONRPCError(RPC_WALLET_ERROR, "The keys were imported, but not scanned for. " + PastBlocksMessage());
+    }
     if (fRescan && fRunScan && requests.size()) {
         int64_t scannedTime = pwallet->RescanFromTime(nLowestTimestamp, true /* update */);
         pwallet->ReacceptWalletTransactions();

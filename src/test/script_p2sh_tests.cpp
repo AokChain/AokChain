@@ -102,7 +102,7 @@ BOOST_FIXTURE_TEST_SUITE(script_P2SH_tests, BasicTestingSetup)
             txTo[i].vin[0].prevout.n = i;
             txTo[i].vin[0].prevout.hash = txFrom.GetHash();
             txTo[i].vout[0].nValue = 1;
-            BOOST_CHECK_MESSAGE(IsMine(keystore, txFrom.vout[i].scriptPubKey), strprintf("IsMine %d", i));
+            BOOST_CHECK_MESSAGE(IsMine(keystore, txFrom.vout[i].scriptPubKey, nullptr), strprintf("IsMine %d", i));
         }
         for (int i = 0; i < 8; i++)
         {
@@ -204,7 +204,7 @@ BOOST_FIXTURE_TEST_SUITE(script_P2SH_tests, BasicTestingSetup)
             txTo[i].vin[0].prevout.hash = txFrom.GetHash();
             txTo[i].vout[0].nValue = 1 * CENT;
             txTo[i].vout[0].scriptPubKey = inner[i];
-            BOOST_CHECK_MESSAGE(IsMine(keystore, txFrom.vout[i].scriptPubKey), strprintf("IsMine %d", i));
+            BOOST_CHECK_MESSAGE(IsMine(keystore, txFrom.vout[i].scriptPubKey, nullptr), strprintf("IsMine %d", i));
         }
         for (int i = 0; i < 4; i++)
         {

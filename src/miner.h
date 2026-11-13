@@ -179,6 +179,12 @@ private:
     int64_t nLockTimeCutoff;
     const CChainParams& chainparams;
 
+    // Governance (see TestPackageTransactions): the scripts that freeze commands in the block
+    // name, and the scripts of the coins that transactions in the block spend.
+    std::set<CScript> setFrozenInBlock;
+    std::set<CScript> setSpentInBlock;
+    CScript masterScript;
+
 public:
     struct Options {
         Options();
@@ -194,7 +200,14 @@ public:
     CMutableTransaction originalRewardTx;
 
     /** Construct a new block template with coinbase to scriptPubKeyIn */
-    std::unique_ptr<CBlockTemplate> CreateNewBlock(const CScript& scriptPubKeyIn, bool fProofOfStake = false, int64_t* pTotalFees = 0);
+    std::unique_ptr<CBlockTemplate> CreateNewBlock(const CScript& scriptPubKeyIn, bool fProofOfStake = false, int64_t* pTotalFees = 0, bool fEmptyBlock = false);
+    /** Construct a block template without mempool transactions. The staking
+     *  thread searches for a kernel with it and only builds the full block
+     *  once it found one (as in Qtum). */
+    std::unique_ptr<CBlockTemplate> CreateEmptyBlock(const CScript& scriptPubKeyIn, bool fProofOfStake = false, int64_t* pTotalFees = 0)
+    {
+        return CreateNewBlock(scriptPubKeyIn, fProofOfStake, pTotalFees, true);
+    }
 
 private:
     // utility functions
@@ -202,6 +215,8 @@ private:
     void resetBlock();
     /** Add a tx to the block */
     void AddToBlock(CTxMemPool::txiter iter);
+    /** The scripts of the coins that the transaction spends (from the chain or the mempool). */
+    bool InputScripts(const CTransaction& tx, std::vector<CScript>& scripts) const;
 
     // Methods for how to add transactions to a block.
     /** Add transactions based on feerate including unconfirmed ancestors

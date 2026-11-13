@@ -35,7 +35,19 @@
 #include <utility>
 #include <vector>
 
+/**
+ * A stake gathers the coins of its address that are smaller than this, until it has twice this
+ * amount, and is paid out in two halves when it has: the staking coins of a wallet end up
+ * between one and two times the threshold. Larger coins mean fewer of them (a smaller wallet
+ * file, faster wallet), smaller coins mean that less is tied up while a stake matures.
+ */
+static const CAmount DEFAULT_STAKE_COMBINE_THRESHOLD = 1000 * COIN;
+/** -stakecombinethreshold */
+extern CAmount nStakeCombineThreshold;
 extern std::vector<CWallet*> vpwallets;
+/** Wallets that unloadwallet took out of vpwallets. They are deleted at shutdown only: another
+ *  thread may still hold a pointer to one of them. */
+extern std::vector<CWallet*> vpwalletsUnloaded;
 
 bool AddWallet(CWallet* wallet);
 bool RemoveWallet(CWallet* wallet);
@@ -49,12 +61,12 @@ CWallet* GetWallet(const std::string& name);
 extern CFeeRate payTxFee;
 extern unsigned int nTxConfirmTarget;
 extern bool bSpendZeroConfChange;
+/** -spendofflinestaking: a payment may take coins at an offline staking address on its own */
+extern bool fSpendOfflineStaking;
 extern bool fWalletRbf;
-extern bool fWalletUnlockStakingOnly;
 
 extern CAmount nReserveBalance;
 extern CAmount nMinimumInputValue;
-extern bool fWalletUnlockStakingOnly;
 
 static const unsigned int DEFAULT_KEYPOOL_SIZE = 1000;
 //! -paytxfee default
@@ -73,6 +85,7 @@ static const CAmount MIN_CHANGE = CENT;
 static const CAmount MIN_FINAL_CHANGE = MIN_CHANGE/2;
 //! Default for -spendzeroconfchange
 static const bool DEFAULT_SPEND_ZEROCONF_CHANGE = true;
+static const bool DEFAULT_SPEND_OFFLINE_STAKING = false;
 //! Default for -walletrejectlongchains
 static const bool DEFAULT_WALLET_REJECT_LONG_CHAINS = false;
 //! -txconfirmtarget default
@@ -230,6 +243,12 @@ public:
      */
     int nIndex;
 
+    /** Memoized mapBlockIndex lookup for hashBlock (block index entries are
+     *  never freed while the node runs). Keyed by the hash so that any change
+     *  to hashBlock invalidates it. */
+    mutable uint256 m_cached_block_hash;
+    mutable const CBlockIndex* m_cached_block_index = nullptr;
+
     CMerkleTx()
     {
         SetTx(MakeTransactionRef());
@@ -357,6 +376,12 @@ public:
     mutable bool fImmatureWatchCreditCached;
     mutable bool fAvailableWatchCreditCached;
     mutable bool fChangeCached;
+    std::multimap<int64_t, std::pair<CWalletTx*, CAccountingEntry*>>::const_iterator m_it_wtxOrdered;
+    mutable bool fFullySpentCached;
+    mutable const CBlockIndex* pindexFullySpentTip; //!< tip when fFullySpentCached was computed
+    mutable uint64_t nFullySpentKeyEpoch;           //!< CWallet::nKeyEpoch when computed
+    mutable std::vector<uint32_t> vFullySpentNotMine; //!< outputs that were not ours when computed
+    mutable uint64_t nForeignIndexGen;              //!< CWallet::nForeignIndexGen when those outputs were indexed
     mutable bool fSpendsOfflineStaking;
     mutable bool fInMempool;
     mutable CAmount nDebitCached;
@@ -408,6 +433,11 @@ public:
         fAvailableWatchCreditCached = false;
         fSpendsOfflineStaking = false;
         fChangeCached = false;
+        fFullySpentCached = false;
+        pindexFullySpentTip = nullptr;
+        nFullySpentKeyEpoch = 0;
+        vFullySpentNotMine.clear();
+        nForeignIndexGen = 0;
         fInMempool = false;
         nDebitCached = 0;
         nCreditCached = 0;
@@ -464,21 +494,20 @@ public:
     }
 
     //! make sure balances are recalculated
-    void MarkDirty()
-    {
-        fCreditCached = false;
-        fAvailableCreditCached = false;
-        fLockedCreditCached = false;
-        fImmatureCreditCached = false;
-        fWatchDebitCached = false;
-        fWatchCreditCached = false;
-        fOfflineStakingCreditCached = false;
-        fOfflineStakingDebitCached = false;
-        fAvailableWatchCreditCached = false;
-        fImmatureWatchCreditCached = false;
-        fDebitCached = false;
-        fChangeCached = false;
-    }
+    void MarkDirty();
+
+    /**
+     * True if every output of this transaction that belongs to the wallet has
+     * been spent by a transaction confirmed in the active chain. Such a
+     * transaction contributes nothing to balances or coin selection, so the
+     * per-call scans over mapWallet skip it. The answer is memoized; see the
+     * implementation for the invalidation rules.
+     */
+    bool IsFullySpent() const;
+    /** The uncached computation behind IsFullySpent(). */
+    bool ComputeFullySpent(std::vector<uint32_t>& vNotMine) const;
+    /** Drop the memoized IsFullySpent() answer without touching other caches. */
+    void ForgetFullySpent() const { fFullySpentCached = false; }
 
     void BindWallet(CWallet *pwalletIn)
     {
@@ -748,6 +777,42 @@ private:
      */
     typedef std::multimap<COutPoint, uint256> TxSpends;
     TxSpends mapTxSpends GUARDED_BY(cs_wallet);
+
+    /** Incremented whenever a key, script or watch-only entry is added or
+     *  removed, i.e. whenever IsMine() answers may change. */
+    std::atomic<uint64_t> nKeyEpoch{1};
+
+    /** Transactions marked dirty since mapLiveTx was last brought up to date.
+     *  Has its own lock because MarkDirty() also runs on CWalletTx objects
+     *  that are not (yet) in mapWallet, without cs_wallet. */
+    mutable CCriticalSection cs_dirty_txs;
+    mutable std::vector<uint256> vDirtyTxs;
+    mutable bool fLiveNeedsRebuild = true;
+    mutable std::map<uint256, const CWalletTx*> mapLiveTx;
+    mutable uint64_t nLiveKeyEpoch = 0;
+    mutable const CBlockIndex* pindexLivePruneTip = nullptr;
+
+    /** Coinbase and coinstake transactions left out of mapLiveTx because
+     *  their block is not in the active chain (orphaned stakes), with that
+     *  block. They are put back as soon as the block is in the active chain. */
+    mutable std::map<uint256, const CBlockIndex*> mapDeadGenerated;
+    mutable const CBlockIndex* pindexDeadCheckedTip = nullptr;
+
+    /** Index of the outputs that are not ours in fully spent transactions, by
+     *  the key ids (and hashes of public keys) their scripts mention. A new
+     *  key can only turn such an output into ours if the script mentions it,
+     *  so adding a key re-examines just those transactions instead of all of
+     *  them. Transactions whose foreign outputs cannot be indexed this way
+     *  (they refer to a script the wallet knows) are re-examined on every key.
+     *  Guarded by cs_dirty_txs. */
+    mutable std::map<uint160, std::vector<uint256>> mapForeignIds;
+    mutable std::set<uint256> setForeignComplex;
+    mutable std::vector<uint256> vKeyRecheckTxs;
+    mutable uint64_t nForeignIndexGen = 1;
+    /** A key was added to the keystore. */
+    void NoteKeyAdded(const CPubKey& pubkey);
+    /** A script or watch-only entry changed: IsMine() may change for anything. */
+    void BumpKeyEpoch();
     void AddToSpends(const COutPoint& outpoint, const uint256& wtxid) EXCLUSIVE_LOCKS_REQUIRED(cs_wallet);
     void RemoveFromSpends(const COutPoint& outpoint, const uint256& wtxid);
     void AddToSpends(const uint256& wtxid) EXCLUSIVE_LOCKS_REQUIRED(cs_wallet);
@@ -920,7 +985,25 @@ public:
                         const CAmount& nMinimumSumAmount = MAX_MONEY, const uint64_t& nMaximumCount = 0,
                         const int& nMinDepth = 0, const int& nMaxDepth = 9999999) const EXCLUSIVE_LOCKS_REQUIRED(cs_main, cs_wallet);
 
+    /** The wallet is unlocked for staking only: its keys sign stakes and nothing else. One flag
+     *  per wallet (it was one for all wallets, so unlocking a second wallet for staking only
+     *  also closed the first one for payments, and locking it opened the first one again). */
+    std::atomic<bool> fUnlockStakingOnly{false};
+    /** The wallet was open for staking only when walletpassphrase opened it for a time: when
+     *  that time is over it goes back to staking only instead of being locked. Guarded by
+     *  cs_wallet. Per wallet: with one flag for all, the timer of another wallet used it up. */
+    bool fRestoreStakingOnlyUnlock = false;
+
     uint64_t GetStakeWeight() const;
+
+    /** What staking brought since a time: stakes that are in the chain, their gain, and stakes
+     *  that lost against another block (which earn nothing). */
+    struct StakeStats {
+        int nStakes = 0;
+        int nOrphaned = 0;
+        CAmount nReward = 0;
+    };
+    StakeStats GetStakeStats(int64_t nSince) const EXCLUSIVE_LOCKS_REQUIRED(cs_main, cs_wallet);
     bool HaveAvailableCoinsForStaking() const EXCLUSIVE_LOCKS_REQUIRED(cs_main, cs_wallet);
 
     /**
@@ -949,6 +1032,24 @@ public:
     bool SelectTokensMinConf(const CAmount& nTargetValue, const int nConfMine, const int nConfTheirs, const uint64_t nMaxAncestors, const std::string& strTokenName, std::vector<COutput> vCoins, std::set<CInputCoin>& setCoinsRet, CAmount& nValueRet) const;
 
     bool IsSpent(const uint256& hash, unsigned int n) const EXCLUSIVE_LOCKS_REQUIRED(cs_main, cs_wallet);
+    /** Like IsSpent(), but only counts spends confirmed in the active chain. */
+    bool IsSpentByConfirmed(const uint256& hash, unsigned int n) const EXCLUSIVE_LOCKS_REQUIRED(cs_main, cs_wallet);
+    uint64_t GetKeyEpoch() const { return nKeyEpoch; }
+    /** Called by CWalletTx::IsFullySpent() when it memoizes a transaction
+     *  that has outputs which are not ours. */
+    void IndexForeignOutputs(const CWalletTx& wtx) const;
+    /** A coinbase/coinstake whose block is not in the active chain. */
+    bool IsDeadGenerated(const CWalletTx& wtx) const EXCLUSIVE_LOCKS_REQUIRED(cs_main);
+    /** Called by CWalletTx::MarkDirty(). */
+    void NotifyTxDirty(const uint256& hash) const;
+    /**
+     * Wallet transactions that may still hold unspent outputs of ours (see
+     * CWalletTx::IsFullySpent()), in txid order. Balance, coin selection and
+     * staking scans iterate this instead of all of mapWallet, so their cost
+     * follows the number of unspent outputs rather than the wallet's history.
+     * Returned by value so that callers are unaffected by a rebuild.
+     */
+    std::vector<std::pair<uint256, const CWalletTx*>> GetLiveTxs() const EXCLUSIVE_LOCKS_REQUIRED(cs_main, cs_wallet);
 
     bool IsLockedCoin(uint256 hash, unsigned int n) const EXCLUSIVE_LOCKS_REQUIRED(cs_wallet);
     void LockCoin(const COutPoint& output) EXCLUSIVE_LOCKS_REQUIRED(cs_wallet);
@@ -972,7 +1073,7 @@ public:
     bool AddKeyPubKey(const CKey& key, const CPubKey &pubkey) override EXCLUSIVE_LOCKS_REQUIRED(cs_wallet);
     bool AddKeyPubKeyWithDB(CWalletDB &walletdb,const CKey& key, const CPubKey &pubkey) EXCLUSIVE_LOCKS_REQUIRED(cs_wallet);
     //! Adds a key to the store, without saving it to disk (used by LoadWallet)
-    bool LoadKey(const CKey& key, const CPubKey &pubkey) { return CCryptoKeyStore::AddKeyPubKey(key, pubkey); }
+    bool LoadKey(const CKey& key, const CPubKey &pubkey) { NoteKeyAdded(pubkey); return CCryptoKeyStore::AddKeyPubKey(key, pubkey); }
     //! Load metadata (used by LoadWallet)
     bool LoadKeyMetadata(const CKeyID& keyID, const CKeyMetadata &metadata) EXCLUSIVE_LOCKS_REQUIRED(cs_wallet);
     bool LoadScriptMetadata(const CScriptID& script_id, const CKeyMetadata &metadata) EXCLUSIVE_LOCKS_REQUIRED(cs_wallet);
@@ -1031,7 +1132,7 @@ public:
     void BlockDisconnected(const std::shared_ptr<const CBlock>& pblock) override;
     bool AddToWalletIfInvolvingMe(const CTransactionRef& tx, const CBlockIndex* pIndex, int posInBlock, bool fUpdate) EXCLUSIVE_LOCKS_REQUIRED(cs_wallet);
     int64_t RescanFromTime(int64_t startTime, bool update);
-    CBlockIndex* ScanForWalletTransactions(CBlockIndex* pindexStart, CBlockIndex* pindexStop, bool fUpdate = false);
+    CBlockIndex* ScanForWalletTransactions(CBlockIndex* pindexStart, CBlockIndex* pindexStop, bool fUpdate = false, bool fQuiet = false);
     void TransactionRemovedFromMempool(const CTransactionRef &ptx) override;
     void ReacceptWalletTransactions();
     void ResendWalletTransactions(int64_t nBestBlockTime, CConnman* connman) override EXCLUSIVE_LOCKS_REQUIRED(cs_main);
@@ -1226,6 +1327,9 @@ public:
      * Wallet post-init setup
      * Gives the wallet a chance to register repetitive tasks and complete post-init tasks
      */
+    /** Abandon this wallet's coinstakes that are not in the active chain. */
+    void CleanCoinStake();
+
     void postInitProcess();
 
     bool BackupWallet(const std::string& strDest);
@@ -1255,8 +1359,11 @@ public:
     /* Stop staking coins */
     void StopStake() { StakeCoins(false); }
 
-    int64_t m_last_coin_stake_search_time{0};
-    int64_t m_last_coin_stake_search_interval{0};
+    //! Block time of the staking thread's last kernel search, and its distance
+    //! to the search before it; the interval is 0 while the thread is not
+    //! searching. Reported by getstakinginfo.
+    std::atomic<int64_t> m_last_coin_stake_search_time{0};
+    std::atomic<int64_t> m_last_coin_stake_search_interval{0};
 
     /**
      * Blocks until the wallet state is up-to-date to /at least/ the current

@@ -4,6 +4,7 @@
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
+#include "random.h"
 #include "rpc/server.h"
 
 #include "chainparams.h"
@@ -649,12 +650,63 @@ UniValue setnetworkactive(const JSONRPCRequest& request)
     return g_connman->GetNetworkActive();
 }
 
+UniValue getnodeaddresses(const JSONRPCRequest& request)
+{
+    if (request.fHelp || request.params.size() > 1)
+        throw std::runtime_error(
+            "getnodeaddresses ( count )\n"
+            "\nReturns known addresses of nodes, which can be used to find new nodes in the network.\n"
+            "\nArguments:\n"
+            "1. count    (numeric, optional, default=1) How many addresses to return, at most 2500; 0 returns all that are known\n"
+            "\nResult:\n"
+            "[\n"
+            "  {\n"
+            "    \"time\": ttt,          (numeric) Timestamp in seconds since the epoch when the node was last seen\n"
+            "    \"services\": n,        (numeric) The services offered\n"
+            "    \"address\": \"host\",    (string) The address of the node\n"
+            "    \"port\": n             (numeric) The port of the node\n"
+            "  }, ...\n"
+            "]\n"
+            "\nExamples:\n"
+            + HelpExampleCli("getnodeaddresses", "8")
+            + HelpExampleRpc("getnodeaddresses", "8")
+        );
+    if (!g_connman)
+        throw JSONRPCError(RPC_CLIENT_P2P_DISABLED, "Error: Peer-to-peer functionality missing or disabled");
+
+    int count = 1;
+    if (!request.params[0].isNull()) {
+        count = request.params[0].get_int();
+        if (count < 0 || count > 2500)
+            throw JSONRPCError(RPC_INVALID_PARAMETER, "Address count out of range");
+    }
+    // (a random selection, as the answer to a getaddr message is)
+    std::vector<CAddress> addresses = g_connman->GetAddresses();
+    FastRandomContext random;
+    for (size_t n = addresses.size(); n > 1; n--)
+        std::swap(addresses[n - 1], addresses[random.randrange(n)]);
+    if (count > 0 && addresses.size() > (size_t)count)
+        addresses.resize(count);
+
+    UniValue result(UniValue::VARR);
+    for (const CAddress& address : addresses) {
+        UniValue entry(UniValue::VOBJ);
+        entry.pushKV("time", (int64_t)address.nTime);
+        entry.pushKV("services", (uint64_t)address.nServices);
+        entry.pushKV("address", address.ToStringIP());
+        entry.pushKV("port", (int)address.GetPort());
+        result.push_back(entry);
+    }
+    return result;
+}
+
 static const CRPCCommand commands[] =
 { //  category              name                      actor (function)         argNames
   //  --------------------- ------------------------  -----------------------  ----------
     { "network",            "getconnectioncount",     &getconnectioncount,     {} },
     { "network",            "ping",                   &ping,                   {} },
     { "network",            "getpeerinfo",            &getpeerinfo,            {} },
+    { "network",            "getnodeaddresses",       &getnodeaddresses,       {"count"} },
     { "network",            "addnode",                &addnode,                {"node","command"} },
     { "network",            "disconnectnode",         &disconnectnode,         {"address", "nodeid"} },
     { "network",            "getaddednodeinfo",       &getaddednodeinfo,       {"node"} },

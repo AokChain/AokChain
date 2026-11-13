@@ -69,6 +69,12 @@ if BUILD_AOKCHAIND
   bin_PROGRAMS += aokchaind
 endif
 
+if BUILD_AOKCHAIND
+if ENABLE_WALLET
+  bin_PROGRAMS += aokchain-wallet
+endif
+endif
+
 if BUILD_AOKCHAIN_CLI
   bin_PROGRAMS += aokchain-cli
 endif
@@ -87,6 +93,8 @@ AOKCHAIN_CORE_H = \
   tokens/tokendb.h \
   tokens/tokentypes.h \
   base58.h \
+  bip39.h \
+  bip39_wordlists.h \
   bloom.h \
   blockencodings.h \
   chain.h \
@@ -170,6 +178,9 @@ AOKCHAIN_CORE_H = \
   utilmoneystr.h \
   utiltime.h \
   validation.h \
+  bootstrap.h \
+  snapshot.h \
+  gunzip.h \
   validationinterface.h \
   versionbits.h \
   walletinitinterface.h \
@@ -177,6 +188,7 @@ AOKCHAIN_CORE_H = \
   wallet/crypter.h \
   wallet/db.h \
   wallet/feebumper.h \
+  wallet/mnemonicrestore.h \
   wallet/fees.h \
   wallet/rpcwallet.h \
   wallet/wallet.h \
@@ -243,6 +255,9 @@ libaokchain_server_a_SOURCES = \
   txmempool.cpp \
   ui_interface.cpp \
   validation.cpp \
+  bootstrap.cpp \
+  snapshot.cpp \
+  gunzip.cpp \
   validationinterface.cpp \
   versionbits.cpp \
   $(AOKCHAIN_CORE_H)
@@ -265,6 +280,7 @@ libaokchain_wallet_a_SOURCES = \
   wallet/crypter.cpp \
   wallet/db.cpp \
   wallet/feebumper.cpp \
+  wallet/mnemonicrestore.cpp \
   wallet/fees.cpp \
   wallet/init.cpp \
   wallet/rpcdump.cpp \
@@ -347,6 +363,7 @@ libaokchain_common_a_CPPFLAGS = $(AM_CPPFLAGS) $(AOKCHAIN_INCLUDES)
 libaokchain_common_a_CXXFLAGS = $(AM_CXXFLAGS) $(PIE_FLAGS)
 libaokchain_common_a_SOURCES = \
   base58.cpp \
+  bip39.cpp \
   chainparams.cpp \
   coins.cpp \
   compressor.cpp \
@@ -458,16 +475,40 @@ if TARGET_WINDOWS
 aokchain_tx_SOURCES += aokchain-tx-res.rc
 endif
 
-aokchain_tx_LDADD = \
-  $(LIBUNIVALUE) \
+# Token support lives in libaokchain_server but is referenced from objects in
+# libaokchain_common/libaokchain_consensus (coins.cpp, core_write.cpp,
+# primitives/transaction.cpp), so aokchain-tx needs the same libraries as
+# aokchaind and the static archives must be scanned twice to resolve the
+# circular references. libtool drops duplicate archive names (and moves
+# -Wl,--start-group to the front), so the second pass uses ./-prefixed paths.
+AOKCHAIN_TX_LIBS = \
+  $(LIBAOKCHAIN_SERVER) \
   $(LIBAOKCHAIN_COMMON) \
   $(LIBAOKCHAIN_UTIL) \
+  $(LIBAOKCHAIN_WALLET) \
+  $(LIBAOKCHAIN_ZMQ) \
   $(LIBAOKCHAIN_CONSENSUS) \
-  $(LIBAOKCHAIN_CRYPTO) \
+  $(LIBAOKCHAIN_CRYPTO)
+
+aokchain_tx_LDADD = \
+  $(AOKCHAIN_TX_LIBS) \
+  $(addprefix ./,$(AOKCHAIN_TX_LIBS)) \
+  $(LIBUNIVALUE) \
+  $(LIBLEVELDB) \
+  $(LIBLEVELDB_SSE42) \
+  $(LIBMEMENV) \
   $(LIBSECP256K1)
 
-aokchain_tx_LDADD += $(BOOST_LIBS) $(CRYPTO_LIBS)
+aokchain_tx_LDADD += $(BOOST_LIBS) $(BDB_LIBS) $(SSL_LIBS) $(CRYPTO_LIBS) $(MINIUPNPC_LIBS) $(EVENT_PTHREADS_LIBS) $(EVENT_LIBS) $(ZMQ_LIBS)
 #
+
+# aokchain-wallet binary #
+aokchain_wallet_SOURCES = aokchain-wallet.cpp
+aokchain_wallet_CPPFLAGS = $(AM_CPPFLAGS) $(AOKCHAIN_INCLUDES)
+aokchain_wallet_CXXFLAGS = $(AM_CXXFLAGS) $(PIE_FLAGS)
+aokchain_wallet_LDFLAGS = $(RELDFLAGS) $(AM_LDFLAGS) $(LIBTOOL_APP_LDFLAGS)
+# (the archives are scanned twice, see aokchain-tx below)
+aokchain_wallet_LDADD = $(aokchain_tx_LDADD)
 
 # aokchainconsensus library #
 if BUILD_AOKCHAIN_LIBS

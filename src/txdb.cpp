@@ -22,6 +22,31 @@
 
 #include <boost/thread.hpp>
 
+#ifdef WIN32
+#include <windows.h>
+#else
+#include <unistd.h>
+#endif
+
+int64_t GetDefaultDbCache()
+{
+    if (sizeof(void*) < 8)
+        return nDefaultDbCache;
+    uint64_t nMemory = 0;
+#ifdef WIN32
+    MEMORYSTATUSEX status;
+    status.dwLength = sizeof(status);
+    if (GlobalMemoryStatusEx(&status))
+        nMemory = status.ullTotalPhys;
+#elif defined(_SC_PHYS_PAGES) && defined(_SC_PAGESIZE)
+    const long pages = sysconf(_SC_PHYS_PAGES);
+    const long page = sysconf(_SC_PAGESIZE);
+    if (pages > 0 && page > 0)
+        nMemory = (uint64_t)pages * (uint64_t)page;
+#endif
+    return nMemory >= (uint64_t)4000 * 1024 * 1024 ? nDefaultDbCacheLarge : nDefaultDbCache;
+}
+
 static const char DB_COIN = 'C';
 static const char DB_COINS = 'c';
 static const char DB_BLOCK_FILES = 'f';

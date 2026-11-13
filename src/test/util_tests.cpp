@@ -106,6 +106,13 @@ BOOST_FIXTURE_TEST_SUITE(util_tests, BasicTestingSetup)
         BOOST_CHECK_EQUAL(DateTimeStrFormat("%Y-%m-%d %H:%M:%S", 0), "1970-01-01 00:00:00");
         BOOST_CHECK_EQUAL(DateTimeStrFormat("%Y-%m-%d %H:%M:%S", 0x7FFFFFFF), "2038-01-19 03:14:07");
         BOOST_CHECK_EQUAL(DateTimeStrFormat("%Y-%m-%d %H:%M:%S", 1317425777), "2011-09-30 23:36:17");
+        // leap days, year ends, and the same through the general path
+        BOOST_CHECK_EQUAL(DateTimeStrFormat("%Y-%m-%d %H:%M:%S", 951782400), "2000-02-29 00:00:00");
+        BOOST_CHECK_EQUAL(DateTimeStrFormat("%Y-%m-%d %H:%M:%S", 1709251199), "2024-02-29 23:59:59");
+        BOOST_CHECK_EQUAL(DateTimeStrFormat("%Y-%m-%d %H:%M:%S", 1767225599), "2025-12-31 23:59:59");
+        BOOST_CHECK_EQUAL(DateTimeStrFormat("%Y-%m-%d %H:%M:%S", 4102444800LL), "2100-01-01 00:00:00");
+        for (int64_t t = 0; t < 4200000000LL; t += 86400 * 13 + 3607)
+            BOOST_CHECK_EQUAL(DateTimeStrFormat("%Y-%m-%d %H:%M:%S", t), DateTimeStrFormat("%Y-%m-%d", t) + " " + DateTimeStrFormat("%H:%M:%S", t));
         BOOST_CHECK_EQUAL(DateTimeStrFormat("%Y-%m-%d %H:%M", 1317425777), "2011-09-30 23:36");
         BOOST_CHECK_EQUAL(DateTimeStrFormat("%a, %d %b %Y %H:%M:%S +0000", 1317425777), "Fri, 30 Sep 2011 23:36:17 +0000");
     }
@@ -658,6 +665,34 @@ BOOST_FIXTURE_TEST_SUITE(util_tests, BasicTestingSetup)
         BOOST_CHECK(ParseFixedPoint("21000000000", 8, &amount));
         BOOST_CHECK(ParseFixedPoint("42000000000", 8, &amount));
         BOOST_CHECK(!ParseFixedPoint("42000000001", 8, &amount));
+    }
+
+    BOOST_AUTO_TEST_CASE(log_rate_limit_test)
+    {
+        const bool before = fLogRateLimit;
+        fLogRateLimit = true;
+        static const char source[] = "test-source";
+        static const char other[] = "other-source";
+        const int64_t t = 2000000000;
+        // up to 1 MiB within an hour passes
+        for (int n = 0; n < 1024; n++)
+            BOOST_CHECK(!LogRateLimitDrop(source, 1, 1024, t + n));
+        // the next message is dropped, and so are the following ones of that hour
+        BOOST_CHECK(LogRateLimitDrop(source, 1, 1, t + 1500));
+        BOOST_CHECK(LogRateLimitDrop(source, 1, 100, t + 3599));
+        // another line and another source are not affected
+        BOOST_CHECK(!LogRateLimitDrop(source, 2, 1024, t + 1500));
+        BOOST_CHECK(!LogRateLimitDrop(other, 1, 1024, t + 1500));
+        // a new hour begins with the next message after the old one has passed
+        BOOST_CHECK(!LogRateLimitDrop(source, 1, 1024, t + 3600));
+        BOOST_CHECK(!LogRateLimitDrop(source, 1, LOG_RATELIMIT_BYTES - 1024, t + 3601));
+        BOOST_CHECK(LogRateLimitDrop(source, 1, 1, t + 3602));
+        // one message larger than the limit is dropped as well
+        BOOST_CHECK(LogRateLimitDrop(other, 7, LOG_RATELIMIT_BYTES + 1, t));
+        // switched off, nothing is dropped
+        fLogRateLimit = false;
+        BOOST_CHECK(!LogRateLimitDrop(source, 1, 1, t + 3603));
+        fLogRateLimit = before;
     }
 
 BOOST_AUTO_TEST_SUITE_END()

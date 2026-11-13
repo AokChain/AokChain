@@ -16,33 +16,88 @@
 #include "csvmodelwriter.h"
 #include "editaddressdialog.h"
 #include "guiutil.h"
+#include "receiverequestdialog.h"
+#include "walletmodel.h"
 #include "platformstyle.h"
 
 #include <QIcon>
+#include <QPushButton>
+#include <QLineEdit>
+#include <QHeaderView>
+#include <QHBoxLayout>
 #include <QMenu>
 #include <QMessageBox>
 #include <QSortFilterProxyModel>
+#include <QStyledItemDelegate>
+#include <QHelpEvent>
+#include <QToolTip>
 
 AddressBookPage::AddressBookPage(const PlatformStyle *platformStyle, Mode _mode, Tabs _tab, QWidget *parent) :
     QDialog(parent),
     ui(new Ui::AddressBookPage),
     model(0),
     mode(_mode),
-    tab(_tab)
+    tab(_tab),
+    proxyModel(nullptr),
+    optionsModel(0),
+    embedded(false)
 {
     ui->setupUi(this);
+    setMinimumSize(760, 520);
 
-    if (!platformStyle->getImagesOnButtons()) {
-        ui->newAddress->setIcon(QIcon());
-        ui->copyAddress->setIcon(QIcon());
-        ui->deleteAddress->setIcon(QIcon());
-        ui->exportButton->setIcon(QIcon());
-    } else {
-        ui->newAddress->setIcon(platformStyle->SingleColorIcon(":/icons/add"));
-        ui->copyAddress->setIcon(platformStyle->SingleColorIcon(":/icons/editcopy"));
-        ui->deleteAddress->setIcon(platformStyle->SingleColorIcon(":/icons/remove"));
-        ui->exportButton->setIcon(platformStyle->SingleColorIcon(":/icons/export"));
-    }
+    // search above the list, with the button for a new address
+    QHBoxLayout *topRow = new QHBoxLayout();
+    topRow->setSpacing(10);
+    searchEdit = new QLineEdit(this);
+    searchEdit->setProperty("look", "search");
+    searchEdit->setPlaceholderText(tr("Search by label or address"));
+    searchEdit->setClearButtonEnabled(true);
+    searchEdit->addAction(QIcon(GUIUtil::lineIcon("search", 16, GUIUtil::theme().textSecondary, 2.0)), QLineEdit::LeadingPosition);
+    searchEdit->setFixedHeight(40);
+    topRow->addWidget(searchEdit, 1);
+    ui->horizontalLayout->removeWidget(ui->newAddress);
+    ui->newAddress->setText(_tab == SendingTab ? tr("Add address") : tr("New address"));
+    ui->newAddress->setProperty("primary", true);
+    ui->newAddress->setFixedHeight(40);
+    topRow->addWidget(ui->newAddress);
+    ui->verticalLayout->insertLayout(1, topRow);
+    ui->verticalLayout->setSpacing(12);
+    ui->labelExplanation->setProperty("role", "secondary");
+
+    // the list: rows instead of a grid, the whole address in the mono font
+    ui->tableView->setShowGrid(false);
+    ui->tableView->setAlternatingRowColors(false);
+    ui->tableView->verticalHeader()->setDefaultSectionSize(42);
+    ui->tableView->horizontalHeader()->setHighlightSections(false);
+    ui->tableView->horizontalHeader()->setDefaultAlignment(Qt::AlignLeft | Qt::AlignVCenter);
+    ui->tableView->setFocusPolicy(Qt::StrongFocus);
+
+    // what can be done with the chosen address
+    editButton = new QPushButton(tr("Edit"), this);
+    editButton->setToolTip(tr("Change the label of the selected address"));
+    qrButton = new QPushButton(tr("QR code"), this);
+    qrButton->setToolTip(tr("Show the QR code of the selected address"));
+    sendButton = new QPushButton(tr("Send to this address"), this);
+    sendButton->setToolTip(tr("Open the send page with the selected address"));
+    ui->horizontalLayout->insertWidget(1, editButton);
+    ui->horizontalLayout->insertWidget(2, qrButton);
+    ui->horizontalLayout->insertWidget(3, sendButton);
+    ui->horizontalLayout->setSpacing(8);
+    for (QPushButton *button : {editButton, qrButton, sendButton, ui->copyAddress, ui->deleteAddress, ui->exportButton, ui->newAddress})
+        button->setAutoDefault(false);
+    qrButton->setVisible(_tab == ReceivingTab && _mode == ForEditing);
+    sendButton->setVisible(_tab == SendingTab && _mode == ForEditing);
+    connect(editButton, SIGNAL(clicked()), this, SLOT(onEditAction()));
+    connect(qrButton, SIGNAL(clicked()), this, SLOT(showQrCode()));
+    connect(sendButton, SIGNAL(clicked()), this, SLOT(sendToSelected()));
+
+    Q_UNUSED(platformStyle);
+    ui->newAddress->setIcon(QIcon(GUIUtil::lineIcon("plus", 14, GUIUtil::theme().onFill, 2.4)));
+    ui->copyAddress->setIcon(QIcon(GUIUtil::lineIcon("copy", 14, GUIUtil::theme().text, 2.0)));
+    ui->deleteAddress->setIcon(QIcon());
+    ui->exportButton->setIcon(QIcon(GUIUtil::lineIcon("download", 14, GUIUtil::theme().text, 2.2)));
+    qrButton->setIcon(QIcon(GUIUtil::lineIcon("qr", 14, GUIUtil::theme().text, 2.0)));
+    sendButton->setIcon(QIcon(GUIUtil::lineIcon("send", 14, GUIUtil::theme().text, 2.2)));
 
     switch(mode)
     {
@@ -56,6 +111,7 @@ AddressBookPage::AddressBookPage(const PlatformStyle *platformStyle, Mode _mode,
         ui->tableView->setEditTriggers(QAbstractItemView::NoEditTriggers);
         ui->tableView->setFocus();
         ui->closeButton->setText(tr("C&hoose"));
+        ui->closeButton->setProperty("primary", true);
         ui->exportButton->hide();
         break;
     case ForEditing:
@@ -104,6 +160,140 @@ AddressBookPage::AddressBookPage(const PlatformStyle *platformStyle, Mode _mode,
     connect(ui->closeButton, SIGNAL(clicked()), this, SLOT(accept()));
 }
 
+/** The addresses of one kind (sending or receiving) that match the search text in label or address. */
+class AddressBookFilterProxy : public QSortFilterProxyModel
+{
+public:
+    AddressBookFilterProxy(const QString &_type, QObject *parent) : QSortFilterProxyModel(parent), type(_type) {}
+
+    void setSearch(const QString &text)
+    {
+        search = text.trimmed();
+        invalidateFilter();
+    }
+
+protected:
+    bool filterAcceptsRow(int row, const QModelIndex &parent) const override
+    {
+        const QAbstractItemModel *source = sourceModel();
+        const QModelIndex label = source->index(row, AddressTableModel::Label, parent);
+        if (label.data(AddressTableModel::TypeRole).toString() != type)
+            return false;
+        if (search.isEmpty())
+            return true;
+        const QModelIndex address = source->index(row, AddressTableModel::Address, parent);
+        return label.data(Qt::EditRole).toString().contains(search, Qt::CaseInsensitive)
+               || address.data(Qt::EditRole).toString().contains(search, Qt::CaseInsensitive);
+    }
+
+private:
+    QString type;
+    QString search;
+};
+
+/** The address as 4…4 in the mono font; the whole address is the tool tip. */
+class ShortAddressDelegate : public QStyledItemDelegate
+{
+public:
+    explicit ShortAddressDelegate(QObject *parent) : QStyledItemDelegate(parent) {}
+
+    bool helpEvent(QHelpEvent *event, QAbstractItemView *view, const QStyleOptionViewItem &option, const QModelIndex &index) override
+    {
+        if (event->type() == QEvent::ToolTip && index.isValid()) {
+            QToolTip::showText(event->globalPos(), GUIUtil::monoToolTip(index.data(Qt::EditRole).toString()), view);
+            return true;
+        }
+        return QStyledItemDelegate::helpEvent(event, view, option, index);
+    }
+
+protected:
+    void initStyleOption(QStyleOptionViewItem *option, const QModelIndex &index) const override
+    {
+        QStyledItemDelegate::initStyleOption(option, index);
+        option->text = GUIUtil::shortAddress(index.data(Qt::EditRole).toString());
+        option->font = GUIUtil::monoFont(13);
+    }
+};
+
+void AddressBookPage::setCompact()
+{
+    // one of two lists side by side: short addresses, short button texts, the explanation as a tool tip
+    ui->tableView->setItemDelegateForColumn(AddressTableModel::Address, new ShortAddressDelegate(this));
+    ui->labelExplanation->hide();
+    searchEdit->setToolTip(ui->labelExplanation->text());
+    searchEdit->setPlaceholderText(tr("Search"));
+    searchEdit->setMinimumWidth(60);
+    sendButton->setText(tr("Send"));
+    ui->copyAddress->setText(tr("Copy"));
+    ui->newAddress->setText(tab == SendingTab ? tr("Add") : tr("New"));
+    // the export as an icon at the end of the row
+    ui->exportButton->setText(QString());
+    ui->exportButton->setFixedWidth(40);
+    for (QPushButton *button : {editButton, qrButton, sendButton, ui->copyAddress, ui->deleteAddress}) {
+        button->setIcon(QIcon());
+        button->setMinimumWidth(0);
+        button->setSizePolicy(QSizePolicy::Minimum, QSizePolicy::Fixed);
+        button->setStyleSheet("padding-left: 10px; padding-right: 10px;");
+    }
+    ui->horizontalLayout->setSpacing(6);
+    ui->tableView->setMinimumHeight(120);
+}
+
+int AddressBookPage::addressCount() const
+{
+    return proxyModel ? proxyModel->rowCount() : 0;
+}
+
+void AddressBookPage::embedAsPage()
+{
+    embedded = true;
+    setWindowFlags(Qt::Widget);
+    setMinimumSize(0, 0);
+    // the card of the page is the background
+    setAttribute(Qt::WA_StyledBackground, false);
+    setStyleSheet(QString("#%1 { background: transparent; }").arg(objectName()));
+    if (layout())
+        layout()->setContentsMargins(0, 0, 0, 0);
+    ui->closeButton->hide();
+    ui->tableView->setFrameShape(QFrame::NoFrame);
+    ui->tableView->setStyleSheet("QTableView { border: none; border-radius: 0; }");
+}
+
+void AddressBookPage::setOptionsModel(OptionsModel *_optionsModel)
+{
+    optionsModel = _optionsModel;
+}
+
+QString AddressBookPage::selectedAddress(int column) const
+{
+    if (!ui->tableView->selectionModel())
+        return QString();
+    const QModelIndexList indexes = ui->tableView->selectionModel()->selectedRows(column);
+    return indexes.isEmpty() ? QString() : indexes.at(0).data(Qt::EditRole).toString();
+}
+
+void AddressBookPage::showQrCode()
+{
+    const QString address = selectedAddress(AddressTableModel::Address);
+    if (address.isEmpty())
+        return;
+    SendCoinsRecipient info;
+    info.address = address;
+    info.label = selectedAddress(AddressTableModel::Label);
+    ReceiveRequestDialog *dialog = new ReceiveRequestDialog(this);
+    dialog->setAttribute(Qt::WA_DeleteOnClose);
+    dialog->setModel(optionsModel);
+    dialog->setInfo(info);
+    dialog->show();
+}
+
+void AddressBookPage::sendToSelected()
+{
+    const QString address = selectedAddress(AddressTableModel::Address);
+    if (!address.isEmpty())
+        Q_EMIT sendCoins(address);
+}
+
 AddressBookPage::~AddressBookPage()
 {
     delete ui;
@@ -115,26 +305,20 @@ void AddressBookPage::setModel(AddressTableModel *_model)
     if(!_model)
         return;
 
-    proxyModel = new QSortFilterProxyModel(this);
+    AddressBookFilterProxy *filter = new AddressBookFilterProxy(tab == ReceivingTab ? AddressTableModel::Receive : AddressTableModel::Send, this);
+    proxyModel = filter;
     proxyModel->setSourceModel(_model);
     proxyModel->setDynamicSortFilter(true);
     proxyModel->setSortCaseSensitivity(Qt::CaseInsensitive);
-    proxyModel->setFilterCaseSensitivity(Qt::CaseInsensitive);
-    switch(tab)
-    {
-    case ReceivingTab:
-        // Receive filter
-        proxyModel->setFilterRole(AddressTableModel::TypeRole);
-        proxyModel->setFilterFixedString(AddressTableModel::Receive);
-        break;
-    case SendingTab:
-        // Send filter
-        proxyModel->setFilterRole(AddressTableModel::TypeRole);
-        proxyModel->setFilterFixedString(AddressTableModel::Send);
-        break;
-    }
+    connect(searchEdit, &QLineEdit::textChanged, this, [this, filter](const QString &text) {
+        filter->setSearch(text);
+        selectionChanged();
+    });
     ui->tableView->setModel(proxyModel);
     ui->tableView->sortByColumn(0, Qt::AscendingOrder);
+    for (const char *change : {SIGNAL(rowsInserted(QModelIndex,int,int)), SIGNAL(rowsRemoved(QModelIndex,int,int)), SIGNAL(modelReset()), SIGNAL(layoutChanged())})
+        connect(proxyModel, change, this, SIGNAL(countChanged()));
+    Q_EMIT countChanged();
 
     // Set column widths
 #if QT_VERSION < 0x050000
@@ -245,10 +429,18 @@ void AddressBookPage::selectionChanged()
         ui->deleteAddress->setEnabled(false);
         ui->copyAddress->setEnabled(false);
     }
+    const bool chosen = table->selectionModel()->hasSelection();
+    editButton->setEnabled(chosen);
+    qrButton->setEnabled(chosen);
+    sendButton->setEnabled(chosen);
 }
 
 void AddressBookPage::done(int retval)
 {
+    // inside a page there is nothing to close
+    if (embedded)
+        return;
+
     QTableView *table = ui->tableView;
     if(!table->selectionModel() || !table->model())
         return;

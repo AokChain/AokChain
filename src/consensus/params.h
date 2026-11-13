@@ -81,6 +81,16 @@ struct Params {
     int nGovernanceHeight;
 
     int nStakeTimestampMask;
+    /** Soft fork (doc/aokchain/07-upstream-backports.md S-05): from this
+     *  height proof-of-stake block times must be multiples of
+     *  nStakeTimestampMask + 1. INT_MAX = not scheduled. */
+    int nStakeTimestampMaskHeight;
+    /** From this height on a block must not be more than nFutureDriftSeconds ahead of the clock of
+     *  the node that receives it (before: 10 minutes, see FutureDrift()). A staker that sets its
+     *  clock ahead can try the kernels of the coming slots early; the smaller the allowance, the
+     *  less that gains. INT_MAX = not scheduled. */
+    int nFutureDriftHeight;
+    int64_t nFutureDriftSeconds;
 };
 } // namespace Consensus
 

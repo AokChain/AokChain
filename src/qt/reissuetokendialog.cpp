@@ -48,6 +48,7 @@ ReissueTokenDialog::ReissueTokenDialog(const PlatformStyle *_platformStyle, QWid
         platformStyle(_platformStyle)
 {
     ui->setupUi(this);
+    ui->reissueTokenButton->setProperty("primary", true);
     setWindowTitle("Reissue Tokens");
     connect(ui->comboBox, SIGNAL(activated(int)), this, SLOT(onTokenSelected(int)));
     connect(ui->quantitySpinBox, SIGNAL(valueChanged(double)), this, SLOT(onQuantityChanged(double)));
@@ -114,8 +115,6 @@ ReissueTokenDialog::ReissueTokenDialog(const PlatformStyle *_platformStyle, QWid
 
     formatGreen = "%1%2 <font color=green><b>%3</b></font>";
     formatBlack = "%1%2 <font color=black><b>%3</b></font>";
-    if (darkModeEnabled)
-        formatBlack = "%1%2 <font color=white><b>%3</b></font>";
 
     setupCoinControlFrame(platformStyle);
     setupTokenDataView(platformStyle);
@@ -157,7 +156,7 @@ void ReissueTokenDialog::setModel(WalletModel *_model)
     {
         setBalance(_model->getBalance(), _model->getUnconfirmedBalance(), _model->getImmatureBalance(),
                    _model->getWatchBalance(), _model->getWatchUnconfirmedBalance(), _model->getWatchImmatureBalance());
-        connect(_model, SIGNAL(balanceChanged(CAmount,CAmount,CAmount,CAmount,CAmount,CAmount)), this, SLOT(setBalance(CAmount,CAmount,CAmount,CAmount,CAmount,CAmount)));
+        connect(_model, SIGNAL(balanceChanged(CAmount,CAmount,CAmount,CAmount,CAmount,CAmount,CAmount,CAmount,CAmount)), this, SLOT(setBalance(CAmount,CAmount,CAmount,CAmount,CAmount,CAmount)));
         connect(_model->getOptionsModel(), SIGNAL(displayUnitChanged(int)), this, SLOT(updateDisplayUnit()));
         updateDisplayUnit();
 
@@ -233,7 +232,7 @@ void ReissueTokenDialog::setUpValues()
     ui->reissuableBox->setCheckState(Qt::CheckState::Checked);
     hideMessage();
 
-    ui->unitExampleLabel->setStyleSheet("font-weight: bold");
+    ui->unitExampleLabel->setStyleSheet("font-weight: 600");
 
     updateTokensList();
 
@@ -256,7 +255,7 @@ void ReissueTokenDialog::setUpValues()
 void ReissueTokenDialog::setupCoinControlFrame(const PlatformStyle *platformStyle)
 {
     /** Update the tokencontrol frame */
-    ui->frameCoinControl->setStyleSheet(QString(".QFrame {background-color: %1; padding-top: 10px; padding-right: 5px; border: none;}").arg(platformStyle->WidgetBackGroundColor().name()));
+    ui->frameCoinControl->setStyleSheet(GUIUtil::cardFrameStyle());
     ui->widgetCoinControl->setStyleSheet(".QWidget {background-color: transparent;}");
     /** Create the shadow effects on the frames */
 
@@ -307,7 +306,7 @@ void ReissueTokenDialog::setupCoinControlFrame(const PlatformStyle *platformStyl
 void ReissueTokenDialog::setupTokenDataView(const PlatformStyle *platformStyle)
 {
     /** Update the scrollview*/
-    ui->frame->setStyleSheet(QString(".QFrame {background-color: %1; padding-top: 10px; padding-right: 5px; border: none;}").arg(platformStyle->WidgetBackGroundColor().name()));
+    ui->frame->setStyleSheet(GUIUtil::cardFrameStyle());
 
     ui->tokenNameLabel->setStyleSheet(STRING_LABEL_COLOR);
     ui->tokenNameLabel->setFont(GUIUtil::getSubLabelFont());
@@ -325,9 +324,9 @@ void ReissueTokenDialog::setupTokenDataView(const PlatformStyle *platformStyle)
 
     ui->ipfsBox->setStyleSheet(QString(".QCheckBox{ %1; }").arg(STRING_LABEL_COLOR));
 
-    ui->frame_3->setStyleSheet(QString(".QFrame {background-color: %1; padding-top: 10px; padding-right: 5px; border: none;}").arg(platformStyle->WidgetBackGroundColor().name()));
+    ui->frame_3->setStyleSheet(GUIUtil::cardFrameStyle());
 
-    ui->frame_2->setStyleSheet(QString(".QFrame {background-color: %1; padding-top: 10px; padding-right: 5px; border: none;}").arg(platformStyle->WidgetBackGroundColor().name()));
+    ui->frame_2->setStyleSheet(GUIUtil::cardFrameStyle());
 
     ui->currentDataLabel->setStyleSheet(STRING_LABEL_COLOR);
     ui->currentDataLabel->setFont(GUIUtil::getTopLabelFont());
@@ -340,7 +339,7 @@ void ReissueTokenDialog::setupTokenDataView(const PlatformStyle *platformStyle)
 void ReissueTokenDialog::setupFeeControl(const PlatformStyle *platformStyle)
 {
     /** Update the coincontrol frame */
-    ui->frameFee->setStyleSheet(QString(".QFrame {background-color: %1; padding-top: 10px; padding-right: 5px; border: none;}").arg(platformStyle->WidgetBackGroundColor().name()));
+    ui->frameFee->setStyleSheet(GUIUtil::cardFrameStyle());
     /** Create the shadow effects on the frames */
 
     ui->labelFeeHeadline->setStyleSheet(STRING_LABEL_COLOR);
@@ -1141,6 +1140,7 @@ void ReissueTokenDialog::onUnitChanged(int value)
 
 void ReissueTokenDialog::updateTokensList()
 {
+    GUIUtil::LogTimer timer("manage token dialog list");
     LOCK(cs_main);
     std::vector<std::string> tokens;
     GetAllAdministrativeTokens(model->getWallet(), tokens, 0);

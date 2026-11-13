@@ -272,3 +272,14 @@ bool IsTimeLock(const CScript& scriptPubKey, CScriptNum& nLockTime)
     }
     return false;
 }
+
+// Defined here rather than in primitives/transaction.cpp so that the
+// consensus library does not depend on IsTimeLock (libaokchain_server).
+uint32_t CTxOut::GetLockTime() const
+{
+    CScriptNum nLockTime(0);
+
+    IsTimeLock(scriptPubKey, nLockTime);
+
+    return nLockTime.getint64();
+}

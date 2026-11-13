@@ -19,6 +19,9 @@
 #include "validation.h"
 #include "platformstyle.h"
 
+#include <QPointer>
+#include <QThread>
+
 #include <QDebug>
 #include <QStringList>
 
@@ -35,10 +38,16 @@ public:
 
     QList<TokenRecord> cachedBalances;
 
-    // loads all current balances into cache
-    void refreshWallet() {
+    /**
+     * Read the token balances of the wallet. This walks every token output of the
+     * wallet (GetAllMyTokenBalances) and looks up the meta data of every token, so
+     * it is done on a worker thread, see TokenTableModel::checkBalanceChanged().
+     * Returns false when the balances could not be read.
+     */
+    static bool compute(QList<TokenRecord>& out) {
         qDebug() << "TokenTablePriv::refreshWallet";
-        cachedBalances.clear();
+        GUIUtil::LogTimer timer("token table refresh (wallet scan and meta data)");
+        out.clear();
         auto currentActiveTokenCache = GetCurrentTokenCache();
         if (currentActiveTokenCache) {
             {
@@ -50,13 +59,15 @@ public:
 
                 if (!GetAllMyTokenBalances(outputs, balances)) {
                     qWarning("TokenTablePriv::refreshWallet: Error retrieving token balances");
-                    return;
+                    return false;
                 }
 
                 if (!GetAllMyLockedTokenBalances(outputs_locked, locked_balances)) {
                     qWarning("TokenTablePriv::refreshWallet: Error retrieving locked token balances");
-                    return;
+                    return false;
                 }
+                timer.setDetail(QString("%1 tokens").arg(balances.size()));
+                LogPrint(BCLog::QT, "GUI timing: GetAllMyTokenBalances + GetAllMyLockedTokenBalances done\n");
 
                 std::set<std::string> setTokensToSkip;
                 auto bal = balances.begin();
@@ -73,7 +84,7 @@ public:
                         CNewToken tokenData;
                         if (!currentActiveTokenCache->GetTokenMetaDataIfExists(bal->first, tokenData)) {
                             qWarning("TokenTablePriv::refreshWallet: Error retrieving token data");
-                            return;
+                            return false;
                         }
                         units = tokenData.units;
                         // If we have the administrator token, add it to the skip listå
@@ -91,7 +102,7 @@ public:
                             continue;
                         }
                     }
-                    cachedBalances.append(TokenRecord(bal->first, bal->second, units, fIsAdministrator, false));
+                    out.append(TokenRecord(bal->first, bal->second, units, fIsAdministrator, false));
                 }
 
                 auto lbal = locked_balances.begin();
@@ -99,14 +110,21 @@ public:
                     CNewToken tokenData;
                     if (!currentActiveTokenCache->GetTokenMetaDataIfExists(lbal->first, tokenData)) {
                         qWarning("TokenTablePriv::refreshWallet: Error retrieving locked token data");
-                        return;
+                        return false;
                     }
-                    cachedBalances.append(TokenRecord(lbal->first + " (LOCKED)", lbal->second, tokenData.units, false, true));
+                    out.append(TokenRecord(lbal->first + " (LOCKED)", lbal->second, tokenData.units, false, true));
                 }
             }
         }
+        return true;
     }
 
+    // loads all current balances into cache
+    void refreshWallet() {
+        QList<TokenRecord> fresh;
+        compute(fresh);
+        cachedBalances = fresh;
+    }
 
     int size() {
         return cachedBalances.size();
@@ -124,7 +142,9 @@ public:
 TokenTableModel::TokenTableModel(WalletModel *parent) :
         QAbstractTableModel(parent),
         walletModel(parent),
-        priv(new TokenTablePriv(this))
+        priv(new TokenTablePriv(this)),
+        refreshRunning(false),
+        refreshPending(false)
 {
     columns << tr("Name") << tr("Quantity");
 
@@ -133,16 +153,65 @@ TokenTableModel::TokenTableModel(WalletModel *parent) :
 
 TokenTableModel::~TokenTableModel()
 {
+    // a refresh may still be reading the wallet
+    if (refreshThread)
+        refreshThread->wait();
     delete priv;
 };
 
+static bool sameRecords(const QList<TokenRecord>& a, const QList<TokenRecord>& b)
+{
+    if (a.size() != b.size())
+        return false;
+    for (int i = 0; i < a.size(); ++i) {
+        if (a[i].name != b[i].name || a[i].quantity != b[i].quantity || a[i].units != b[i].units ||
+            a[i].fIsAdministrator != b[i].fIsAdministrator || a[i].fIsLocked != b[i].fIsLocked)
+            return false;
+    }
+    return true;
+}
+
+/**
+ * Called for every new block and every wallet transaction. Reading the balances walks all
+ * token outputs of the wallet, which takes long with tens of thousands of tokens: it runs on
+ * a worker thread, requests that arrive meanwhile are folded into one more run, and the views
+ * are only told when something changed.
+ */
 void TokenTableModel::checkBalanceChanged() {
     qDebug() << "TokenTableModel::CheckBalanceChanged";
-    // TODO: optimize by 1) updating cache incrementally; and 2) emitting more specific dataChanged signals
-    Q_EMIT layoutAboutToBeChanged();
-    priv->refreshWallet();
-    Q_EMIT dataChanged(index(0, 0, QModelIndex()), index(priv->size(), columns.length()-1, QModelIndex()));
-    Q_EMIT layoutChanged();
+    if (refreshRunning) {
+        refreshPending = true;
+        return;
+    }
+    refreshRunning = true;
+    refreshThread = QThread::create([this] {
+        QList<TokenRecord> fresh;
+        const bool ok = TokenTablePriv::compute(fresh);
+        // back on the thread of the model; dropped when the model is gone
+        QMetaObject::invokeMethod(this, [this, fresh, ok] { applyBalances(fresh, ok); }, Qt::QueuedConnection);
+    });
+    connect(refreshThread, &QThread::finished, refreshThread, &QObject::deleteLater);
+    refreshThread->start();
+}
+
+void TokenTableModel::applyBalances(const QList<TokenRecord>& fresh, bool ok)
+{
+    refreshRunning = false;
+    if (ok && !sameRecords(fresh, priv->cachedBalances)) {
+        Q_EMIT layoutAboutToBeChanged();
+        priv->cachedBalances = fresh;
+        Q_EMIT dataChanged(index(0, 0, QModelIndex()), index(priv->size(), columns.length()-1, QModelIndex()));
+        Q_EMIT layoutChanged();
+    }
+    if (refreshPending) {
+        refreshPending = false;
+        checkBalanceChanged();
+    }
+}
+
+const QList<TokenRecord>& TokenTableModel::records() const
+{
+    return priv->cachedBalances;
 }
 
 int TokenTableModel::rowCount(const QModelIndex &parent) const

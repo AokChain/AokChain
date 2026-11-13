@@ -10,6 +10,8 @@
 #endif
 
 #include "util.h"
+
+#include <mutex>
 #include "init.h"
 #include "chainparamsbase.h"
 #include "fs.h"
@@ -100,6 +102,7 @@ bool fPrintToDebugLog = true;
 bool fLogTimestamps = DEFAULT_LOGTIMESTAMPS;
 bool fLogTimeMicros = DEFAULT_LOGTIMEMICROS;
 bool fLogIPs = DEFAULT_LOGIPS;
+bool fLogRateLimit = DEFAULT_LOGRATELIMIT;
 std::atomic<bool> fReopenDebugLog(false);
 CTranslationInterface translationInterface;
 
@@ -251,6 +254,7 @@ const CLogCategoryDesc LogCategories[] =
                 {BCLog::COINDB,      "coindb"},
                 {BCLog::QT,          "qt"},
                 {BCLog::LEVELDB,     "leveldb"},
+                {BCLog::COINSTAKE,   "coinstake"},
                 {BCLog::ALL,         "1"},
                 {BCLog::ALL,         "all"},
         };
@@ -345,6 +349,54 @@ static std::string LogTimestampStr(const std::string &str, std::atomic_bool *fSt
     return strStamped;
 }
 
+bool LogRateLimitDrop(const char* source, int line, size_t bytes, int64_t now)
+{
+    if (!fLogRateLimit)
+        return false;
+    struct Window {
+        int64_t start = 0;
+        uint64_t bytes = 0;
+        uint64_t dropped = 0;
+    };
+    // (never destroyed: messages are logged until the very end of the process)
+    static std::mutex* mutex = new std::mutex();
+    static std::map<std::pair<const char*, int>, Window>* windows = new std::map<std::pair<const char*, int>, Window>();
+    if (now == 0)
+        now = GetSystemTimeInSeconds();
+
+    std::string notice;
+    bool drop = false;
+    {
+        std::lock_guard<std::mutex> lock(*mutex);
+        Window& window = (*windows)[std::make_pair(source, line)];
+        auto name = [&]() {
+            // a file name, or the beginning of a format string
+            std::string text(source);
+            if (line > 0)
+                return strprintf("%s:%d", text, line);
+            text = text.substr(0, 60);
+            text.erase(std::remove(text.begin(), text.end(), '\n'), text.end());
+            return "\"" + text + "\"";
+        };
+        if (now - window.start >= 3600 || now < window.start) {
+            if (window.dropped > 0)
+                notice = strprintf("Restarting logging from %s: %u bytes were dropped during the last hour.\n", name(), window.dropped);
+            window = Window();
+            window.start = now;
+        }
+        window.bytes += bytes;
+        if (window.bytes > LOG_RATELIMIT_BYTES) {
+            if (window.dropped == 0)
+                notice = strprintf("Excessive logging detected from %s: more than %u KiB logged during the last hour. Logging from this source location is suppressed for up to one hour (-logratelimit=0 turns this off).\n", name(), (unsigned int)(LOG_RATELIMIT_BYTES / 1024));
+            window.dropped += bytes;
+            drop = true;
+        }
+    }
+    if (!notice.empty())
+        LogPrintStr(notice);
+    return drop;
+}
+
 int LogPrintStr(const std::string &str)
 {
     int ret = 0; // Returns total number of characters written
@@ -385,6 +437,23 @@ int LogPrintStr(const std::string &str)
     return ret;
 }
 
+/** The directory locks of this process, by the path of the lock file. */
+static std::map<std::string, boost::interprocess::file_lock> dir_locks;
+static std::mutex cs_dir_locks;
+
+void UnlockDirectory(const fs::path& directory, const std::string& lockfile_name)
+{
+    std::lock_guard<std::mutex> guard(cs_dir_locks);
+    auto it = dir_locks.find((directory / lockfile_name).string());
+    if (it == dir_locks.end())
+        return;
+    try {
+        it->second.unlock();
+    } catch (const boost::interprocess::interprocess_exception&) {
+    }
+    dir_locks.erase(it);
+}
+
 bool LockDirectory(const fs::path& directory, const std::string lockfile_name, bool probe_only)
 {
     fs::path pathLockFile = directory / lockfile_name;
@@ -392,8 +461,8 @@ bool LockDirectory(const fs::path& directory, const std::string lockfile_name, b
     if (file) fclose(file);
 
     try {
-        static std::map<std::string, boost::interprocess::file_lock> locks;
-        boost::interprocess::file_lock& lock = locks.emplace(pathLockFile.string(), pathLockFile.string().c_str()).first->second;
+        std::lock_guard<std::mutex> guard(cs_dir_locks);
+        boost::interprocess::file_lock& lock = dir_locks.emplace(pathLockFile.string(), pathLockFile.string().c_str()).first->second;
         if (!lock.try_lock()) {
             return false;
         }

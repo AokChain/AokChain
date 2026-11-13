@@ -12,7 +12,13 @@
 #include <cassert>
 #include <cstdio>
 
+#include "guiutil.h"
+#include "util.h"
+#include "walletmodel.h"
+
 #include <QHBoxLayout>
+#include <QPushButton>
+#include <QVBoxLayout>
 #include <QLabel>
 
 WalletFrame::WalletFrame(const PlatformStyle *_platformStyle, AokChainGUI *_gui) :
@@ -21,11 +27,45 @@ WalletFrame::WalletFrame(const PlatformStyle *_platformStyle, AokChainGUI *_gui)
     platformStyle(_platformStyle)
 {
     // Leave HBox hook for adding a list view later
-    QHBoxLayout *walletFrameLayout = new QHBoxLayout(this);
+    QVBoxLayout *walletFrameLayout = new QVBoxLayout(this);
     setContentsMargins(0,0,0,0);
-    walletStack = new QStackedWidget(this);
     walletFrameLayout->setContentsMargins(0,0,0,0);
-    walletFrameLayout->addWidget(walletStack);
+    walletFrameLayout->setSpacing(0);
+
+    // A wallet without a passphrase: a warning above the pages until it is encrypted
+    // (or closed, for this run of the program).
+    encryptBanner = new QFrame(this);
+    encryptBanner->setObjectName("encryptBanner");
+    encryptBanner->setStyleSheet(QString("QFrame#encryptBanner { background-color: %1; border: none; border-bottom: 1px solid %2; } QFrame#encryptBanner QLabel { color: %3; background: transparent; }")
+        .arg(GUIUtil::theme().warnBg.name(), GUIUtil::theme().warnBorder.name(), GUIUtil::theme().warnText.name()));
+    QHBoxLayout *bannerLayout = new QHBoxLayout(encryptBanner);
+    bannerLayout->setContentsMargins(36, 8, 20, 8);
+    bannerLayout->setSpacing(12);
+    QLabel *bannerIcon = new QLabel(encryptBanner);
+    bannerIcon->setPixmap(GUIUtil::lineIcon("lock", 16, GUIUtil::theme().warnText, 2.0));
+    bannerLayout->addWidget(bannerIcon);
+    QLabel *bannerText = new QLabel(tr("This wallet is not encrypted. Anyone who copies the wallet file or uses this computer can send the coins."), encryptBanner);
+    bannerText->setWordWrap(true);
+    bannerLayout->addWidget(bannerText, 1);
+    QPushButton *bannerEncrypt = new QPushButton(tr("Encrypt"), encryptBanner);
+    bannerEncrypt->setProperty("primary", true);
+    bannerEncrypt->setFixedHeight(32);
+    bannerEncrypt->setCursor(Qt::PointingHandCursor);
+    bannerLayout->addWidget(bannerEncrypt);
+    QPushButton *bannerClose = new QPushButton(encryptBanner);
+    bannerClose->setProperty("look", "icon");
+    bannerClose->setIcon(QIcon(GUIUtil::lineIcon("remove", 14, GUIUtil::theme().warnText, 2.0)));
+    bannerClose->setFixedSize(28, 28);
+    bannerClose->setToolTip(tr("Hide until the next start"));
+    bannerClose->setCursor(Qt::PointingHandCursor);
+    bannerLayout->addWidget(bannerClose);
+    encryptBanner->hide();
+    walletFrameLayout->addWidget(encryptBanner);
+    connect(bannerEncrypt, &QPushButton::clicked, this, [this] { encryptWallet(true); });
+    connect(bannerClose, &QPushButton::clicked, this, [this] { bannerDismissed = true; encryptBanner->hide(); });
+
+    walletStack = new QStackedWidget(this);
+    walletFrameLayout->addWidget(walletStack, 1);
 
     QLabel *noWallet = new QLabel(tr("No wallet has been loaded."));
     noWallet->setAlignment(Qt::AlignCenter);
@@ -61,6 +101,8 @@ bool WalletFrame::addWallet(const QString& name, WalletModel *walletModel)
     connect(walletView, SIGNAL(showNormalIfMinimized()), gui, SLOT(showNormalIfMinimized()));
 
     connect(walletView, SIGNAL(outOfSyncWarningClicked()), this, SLOT(outOfSyncWarningClicked()));
+    connect(walletView, SIGNAL(encryptionStatusChanged(int)), this, SLOT(updateEncryptBanner(int)));
+    updateEncryptBanner(walletModel->getEncryptionStatus());
 
     return true;
 }
@@ -182,6 +224,31 @@ void WalletFrame::unlockWallet()
         walletView->unlockWallet();
 }
 
+void WalletFrame::updateEncryptBanner(int status)
+{
+    // (-skipencryptprompt: tests and scripts that drive the window)
+    encryptBanner->setVisible(status == WalletModel::Unencrypted && !bannerDismissed && !gArgs.GetBoolArg("-skipencryptprompt", false));
+}
+
+void WalletFrame::unlockWalletForStaking()
+{
+    WalletView *walletView = currentWalletView();
+    if (walletView)
+        walletView->unlockWalletForStaking();
+}
+
+void WalletFrame::lockWalletAfterStaking()
+{
+    WalletView *walletView = currentWalletView();
+    if (walletView)
+        walletView->lockWalletAfterStaking();
+}
+
+bool WalletFrame::hasWallet() const
+{
+    return !mapWalletViews.isEmpty();
+}
+
 bool WalletFrame::isWalletUnlocked()
 {
     WalletView *walletView = currentWalletView();
@@ -242,4 +309,18 @@ void WalletFrame::gotoManageTokensPage()
     QMap<QString, WalletView*>::const_iterator i;
     for (i = mapWalletViews.constBegin(); i != mapWalletViews.constEnd(); ++i)
         i.value()->gotoManageTokensPage();
+}
+
+void WalletFrame::gotoSettingsPage()
+{
+    QMap<QString, WalletView*>::const_iterator i;
+    for (i = mapWalletViews.constBegin(); i != mapWalletViews.constEnd(); ++i)
+        i.value()->gotoSettingsPage();
+}
+
+void WalletFrame::gotoExplorerPage(QString query)
+{
+    QMap<QString, WalletView*>::const_iterator i;
+    for (i = mapWalletViews.constBegin(); i != mapWalletViews.constEnd(); ++i)
+        i.value()->gotoExplorerPage(query);
 }

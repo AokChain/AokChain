@@ -29,6 +29,11 @@ class uint256;
 static constexpr int MAX_BLOCK_COINSDB_USAGE = 10;
 //! -dbcache default (MiB)
 static const int64_t nDefaultDbCache = 450;
+//! -dbcache default (MiB) on a computer with at least 4 GiB of memory
+static const int64_t nDefaultDbCacheLarge = 1024;
+/** The -dbcache default of this computer: nDefaultDbCacheLarge with 4 GiB of memory or more (and a
+ *  64 bit program), nDefaultDbCache otherwise or when the amount of memory is not known. */
+int64_t GetDefaultDbCache();
 //! -dbbatchsize default (bytes)
 static const int64_t nDefaultDbBatchSize = 16 << 20;
 //! max. -dbcache (MiB)

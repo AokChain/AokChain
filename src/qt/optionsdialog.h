@@ -11,6 +11,12 @@
 #include <QValidator>
 
 class OptionsModel;
+class QCheckBox;
+class QFrame;
+class QLabel;
+class QPushButton;
+class QPlainTextEdit;
+class QVBoxLayout;
 class QValidatedLineEdit;
 
 QT_BEGIN_NAMESPACE
@@ -44,6 +50,21 @@ public:
 
     void setModel(OptionsModel *model);
     void setMapper();
+    /** Show the options as cards inside a page of the main window; they are saved with a button */
+    void embedAsPage();
+    /** Add a card of the page below the cards of the options (right column) */
+    void addCard(QWidget *card);
+    /** A card with a title, as the page uses them */
+    static QFrame *makeCard(const QString &title, QWidget *parent, QVBoxLayout **body);
+    /** The note about options overridden on the command line, for the end of the information card (page only) */
+    QWidget *overrideBlock();
+
+public Q_SLOTS:
+    /** The network options (port mapping, incoming connections, proxy, fast synchronization) in a window of their own */
+    void showNetworkDialog();
+
+public Q_SLOTS:
+    void done(int retval) override;
 
 private Q_SLOTS:
     /* set OK button state (enabled / disabled) */
@@ -54,6 +75,8 @@ private Q_SLOTS:
     void on_cancelButton_clicked();
     
     void on_hideTrayIcon_stateChanged(int fState);
+    void chooseBootstrapFolder();
+    void languageChosen();
 
     void showRestartWarning(bool fPersistent = false);
     void clearStatusLabel();
@@ -68,6 +91,16 @@ private:
     Ui::OptionsDialog *ui;
     OptionsModel *model;
     QDataWidgetMapper *mapper;
+    QLabel *languageNotice;
+    QPushButton *languageRestart;
+    QCheckBox *bootstrapUse;
+    QPlainTextEdit *bootstrapUrls;
+    bool walletEnabled;
+    bool embedded;
+    QVBoxLayout *extraColumn;
+    QDialog *networkDialog;
+    QLabel *networkStatus;
+    QPushButton *networkSave;
 };
 
 #endif // AOKCHAIN_QT_OPTIONSDIALOG_H

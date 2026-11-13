@@ -5,6 +5,7 @@
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
+#include "snapshot.h"
 #include <amount.h>
 #include <base58.h>
 #include <chain.h>
@@ -91,7 +92,7 @@ void EnsureWalletIsUnlocked(CWallet * const pwallet)
     if (pwallet->IsLocked()) {
         throw JSONRPCError(RPC_WALLET_UNLOCK_NEEDED, "Error: Please enter the wallet passphrase with walletpassphrase first.");
     }
-    if (fWalletUnlockStakingOnly)
+    if (pwallet->fUnlockStakingOnly)
         throw JSONRPCError(RPC_WALLET_UNLOCK_NEEDED, "Error: Wallet is unlocked for staking only.");
 }
 
@@ -447,7 +448,7 @@ static void SendMoney(CWallet * const pwallet, const CTxDestination &address, CA
         throw JSONRPCError(RPC_CLIENT_P2P_DISABLED, "Error: Peer-to-peer functionality missing or disabled");
     }
 
-    if (fWalletUnlockStakingOnly) {
+    if (pwallet->fUnlockStakingOnly) {
         std::string strError = _("Error: Wallet unlocked for staking only, unable to create transaction.");
         throw JSONRPCError(RPC_WALLET_ERROR, strError);
     }
@@ -2247,7 +2248,7 @@ UniValue listsinceblock(const JSONRPCRequest& request)
     while (include_removed && paltindex && paltindex != pindex) {
         CBlock block;
         if (!ReadBlockFromDisk(block, paltindex, Params().GetConsensus())) {
-            throw JSONRPCError(RPC_INTERNAL_ERROR, "Can't read block from disk");
+            throw JSONRPCError(RPC_INTERNAL_ERROR, IsPastBlockMissing(paltindex) ? PastBlocksMessage() : "Can't read block from disk");
         }
         for (const CTransactionRef& tx : block.vtx) {
             auto it = pwallet->mapWallet.find(tx->GetHash());
@@ -2381,6 +2382,56 @@ UniValue gettransaction(const JSONRPCRequest& request)
     return entry;
 }
 
+UniValue purgeorphanstakes(const JSONRPCRequest& request)
+{
+    CWallet * const pwallet = GetWalletForJSONRPCRequest(request);
+    if (!EnsureWalletIsAvailable(pwallet, request.fHelp)) {
+        return NullUniValue;
+    }
+
+    if (request.fHelp || request.params.size() > 1)
+        throw std::runtime_error(
+            "purgeorphanstakes ( minage )\n"
+            "\nDeletes this wallet's orphaned coinstake transactions from the wallet.\n"
+            "A coinstake is orphaned when the block it was staked in lost against another block. The wallet\n"
+            "abandons it and frees the staked coins at that moment, but keeps the transaction forever, which\n"
+            "makes the wallet file and its loading time grow on a staking wallet. Balances are not affected.\n"
+            "If the orphaned block ever becomes part of the best chain again, the transaction is added back.\n"
+            "\nArguments:\n"
+            "1. minage    (numeric, optional, default=86400) Only delete transactions the wallet received at least this many seconds ago\n"
+            "\nResult:\n"
+            "n            (numeric) The number of transactions deleted\n"
+            "\nExamples:\n"
+            + HelpExampleCli("purgeorphanstakes", "")
+            + HelpExampleRpc("purgeorphanstakes", "3600")
+        );
+
+    int64_t nMinAge = 86400;
+    if (!request.params[0].isNull()) {
+        nMinAge = request.params[0].get_int64();
+        if (nMinAge < 0)
+            throw JSONRPCError(RPC_INVALID_PARAMETER, "minage must not be negative");
+    }
+
+    ObserveSafeMode();
+    LOCK2(cs_main, pwallet->cs_wallet);
+
+    const int64_t nNow = GetAdjustedTime();
+    std::vector<uint256> vHash;
+    for (const std::pair<const uint256, CWalletTx>& item : pwallet->mapWallet) {
+        const CWalletTx& wtx = item.second;
+        if (wtx.IsCoinStake() && wtx.isAbandoned() && !wtx.InMempool() &&
+            wtx.GetDepthInMainChain() == 0 && (int64_t)wtx.nTimeReceived + nMinAge <= nNow)
+            vHash.push_back(item.first);
+    }
+
+    std::vector<uint256> vHashOut;
+    if (!vHash.empty() && pwallet->ZapSelectTx(vHash, vHashOut) != DB_LOAD_OK)
+        throw JSONRPCError(RPC_WALLET_ERROR, "Could not properly delete the transactions.");
+
+    return (uint64_t)vHashOut.size();
+}
+
 UniValue abandontransaction(const JSONRPCRequest& request)
 {
     CWallet * const pwallet = GetWalletForJSONRPCRequest(request);
@@ -2500,10 +2551,23 @@ UniValue keypoolrefill(const JSONRPCRequest& request)
 }
 
 
-static void LockWallet(CWallet* pWallet)
+/** The timer of walletpassphrase. nRelockTime: the time the call set; a later call, walletlock
+ *  or an unlock for staking only changed it, and then this timer has nothing to do. */
+static void LockWallet(CWallet* pWallet, int64_t nRelockTime)
 {
     LOCK(pWallet->cs_wallet);
+    if (pWallet->nRelockTime != nRelockTime)
+        return;
     pWallet->nRelockTime = 0;
+    if (pWallet->fRestoreStakingOnlyUnlock && !pWallet->IsLocked()) {
+        // The time of walletpassphrase is over: back to what was before it, open for staking only.
+        // Locking here would stop the staking that the user switched on.
+        pWallet->fRestoreStakingOnlyUnlock = false;
+        pWallet->fUnlockStakingOnly = true;
+        pWallet->NotifyStatusChanged(pWallet);
+        return;
+    }
+    pWallet->fRestoreStakingOnlyUnlock = false;
     pWallet->Lock();
 }
 
@@ -2522,7 +2586,8 @@ UniValue walletpassphrase(const JSONRPCRequest& request)
             "\nArguments:\n"
             "1. \"passphrase\"     (string, required) The wallet passphrase\n"
             "2. timeout            (numeric, required) The time to keep the decryption key in seconds.\n"
-            "3. stakingonly        (bool, optional, default=false) Unlock wallet for staking only.\n"
+            "3. stakingonly        (bool, optional, default=false) Unlock wallet for staking only. With a timeout of 0\n"
+            "                      the wallet then stays open for staking until it is locked or the node stops.\n"
             "\nNote:\n"
             "Issuing the walletpassphrase command while the wallet is already unlocked will set a new unlock\n"
             "time that overrides the old one.\n"
@@ -2536,6 +2601,14 @@ UniValue walletpassphrase(const JSONRPCRequest& request)
         );
     }
 
+    // The relock timer is queued or cancelled after the locks are released: replacing a timer
+    // waits for its callback when that runs at the moment, and the callback takes cs_wallet
+    // (upstream PR #18487).
+    const std::string strTimer = strprintf("lockwallet(%s)", pwallet->GetName());
+    bool fCancelTimer = false;
+    int64_t nRelockTime = 0;
+    int64_t nTimerSeconds = 0;
+    {
     LOCK2(cs_main, pwallet->cs_wallet);
 
     if (request.fHelp)
@@ -2551,6 +2624,16 @@ UniValue walletpassphrase(const JSONRPCRequest& request)
     // Alternately, find a way to make request.params[0] mlock()'d to begin with.
     strWalletPass = request.params[0].get_str().c_str();
 
+    // Every argument is checked before the wallet is opened: a call that fails must leave
+    // the wallet as it was (it used to stay open, for payments and without a time limit).
+    const int64_t nSleepTime = request.params[1].get_int64();
+    const bool fStakingOnly = request.params.size() > 2 && request.params[2].get_bool();
+    if (nSleepTime < 0)
+        throw JSONRPCError(RPC_INVALID_PARAMETER, "Timeout cannot be negative.");
+
+    // open for staking only before this call, and not by an earlier call with a time
+    const bool fWasStakingOnly = !pwallet->IsLocked() && pwallet->fUnlockStakingOnly && pwallet->nRelockTime == 0;
+
     if (strWalletPass.length() > 0)
     {
         if (!pwallet->Unlock(strWalletPass)) {
@@ -2564,15 +2647,31 @@ UniValue walletpassphrase(const JSONRPCRequest& request)
 
     pwallet->TopUpKeyPool();
 
-    int64_t nSleepTime = request.params[1].get_int64();
-    pwallet->nRelockTime = GetTime() + nSleepTime;
-    RPCRunLater(strprintf("lockwallet(%s)", pwallet->GetName()), boost::bind(LockWallet, pwallet), nSleepTime);
+    if (fWasStakingOnly)
+        pwallet->fRestoreStakingOnlyUnlock = true;
+
+    if (nSleepTime == 0 && fStakingOnly) {
+        // A staking node: open for staking only until it is locked or stopped. (Without
+        // stakingonly a timeout of 0 locks at once, as before.)
+        pwallet->nRelockTime = 0;
+        pwallet->fRestoreStakingOnlyUnlock = false;
+        fCancelTimer = true;
+    } else {
+        pwallet->nRelockTime = GetTime() + nSleepTime;
+        nRelockTime = pwallet->nRelockTime;
+        nTimerSeconds = nSleepTime;
+    }
 
     // ppcoin: if user OS account compromised prevent trivial sendmoney commands
-    if (request.params.size() > 2)
-        fWalletUnlockStakingOnly = request.params[2].get_bool();
-    else
-        fWalletUnlockStakingOnly = false;
+    pwallet->fUnlockStakingOnly = fStakingOnly;
+    }
+
+    if (fCancelTimer) {
+        RPCCancelLater(strTimer);
+    } else {
+        CWallet* const pwalletTimer = pwallet;
+        RPCRunLater(strTimer, [pwalletTimer, nRelockTime]() { LockWallet(pwalletTimer, nRelockTime); }, nTimerSeconds);
+    }
 
     return NullUniValue;
 }
@@ -2663,6 +2762,7 @@ UniValue walletlock(const JSONRPCRequest& request)
     }
 
     pwallet->Lock();
+    pwallet->fRestoreStakingOnlyUnlock = false;
     pwallet->nRelockTime = 0;
 
     return NullUniValue;
@@ -2906,6 +3006,118 @@ UniValue settxfee(const JSONRPCRequest& request)
     return true;
 }
 
+UniValue validateaddress(const JSONRPCRequest& request);
+
+UniValue getaddressinfo(const JSONRPCRequest& request)
+{
+    CWallet * const pwallet = GetWalletForJSONRPCRequest(request);
+    if (!EnsureWalletIsAvailable(pwallet, request.fHelp))
+        return NullUniValue;
+
+    if (request.fHelp || request.params.size() != 1)
+        throw std::runtime_error(
+            "getaddressinfo \"address\"\n"
+            "\nReturns what the wallet knows about an address. The fields are those of validateaddress without\n"
+            "\"isvalid\" (an invalid address is an error here), with the label of the address.\n"
+            "\nArguments:\n"
+            "1. \"address\"     (string, required) The address to look up\n"
+            "\nResult:\n"
+            "{\n"
+            "  \"address\" : \"address\",   (string) The address\n"
+            "  \"scriptPubKey\" : \"hex\",  (string) The hex encoded scriptPubKey of the address\n"
+            "  \"ismine\" : true|false,    (boolean) If the address is yours\n"
+            "  \"iswatchonly\" : true|false, (boolean) If the address is watch-only\n"
+            "  \"isscript\" : true|false,  (boolean) If the key is a script\n"
+            "  \"pubkey\" : \"hex\",        (string) The hex value of the raw public key (when the wallet has it)\n"
+            "  \"label\" : \"label\",       (string) The label of the address (\"\" without one)\n"
+            "  \"labels\" : [ { \"name\": \"label\", \"purpose\": \"send|receive\" } ],\n"
+            "  ...                        (the other fields of validateaddress)\n"
+            "}\n"
+            "\nExamples:\n"
+            + HelpExampleCli("getaddressinfo", "\"address\"")
+            + HelpExampleRpc("getaddressinfo", "\"address\"")
+        );
+
+    const CTxDestination dest = DecodeDestination(request.params[0].get_str());
+    if (!IsValidDestination(dest))
+        throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Invalid address");
+
+    const UniValue info = validateaddress(request);
+    UniValue result(UniValue::VOBJ);
+    const std::vector<std::string>& keys = info.getKeys();
+    const std::vector<UniValue>& values = info.getValues();
+    for (size_t n = 0; n < keys.size(); n++) {
+        if (keys[n] != "isvalid" && keys[n] != "account")
+            result.pushKV(keys[n], values[n]);
+    }
+    LOCK(pwallet->cs_wallet);
+    UniValue labels(UniValue::VARR);
+    std::string label;
+    std::map<CTxDestination, CAddressBookData>::const_iterator mi = pwallet->mapAddressBook.find(dest);
+    if (mi != pwallet->mapAddressBook.end()) {
+        label = mi->second.name;
+        UniValue entry(UniValue::VOBJ);
+        entry.pushKV("name", mi->second.name);
+        entry.pushKV("purpose", mi->second.purpose);
+        labels.push_back(entry);
+    }
+    result.pushKV("label", label);
+    result.pushKV("labels", labels);
+    return result;
+}
+
+UniValue getbalances(const JSONRPCRequest& request)
+{
+    CWallet * const pwallet = GetWalletForJSONRPCRequest(request);
+    if (!EnsureWalletIsAvailable(pwallet, request.fHelp))
+        return NullUniValue;
+
+    if (request.fHelp || request.params.size() != 0)
+        throw std::runtime_error(
+            "getbalances\n"
+            "\nReturns all balances of the wallet in " + CURRENCY_UNIT + ".\n"
+            "\nResult:\n"
+            "{\n"
+            "  \"mine\": {\n"
+            "    \"trusted\": xxx,            (numeric) balance that can be spent\n"
+            "    \"untrusted_pending\": xxx,  (numeric) received and not confirmed yet\n"
+            "    \"immature\": xxx,           (numeric) stake and coinbase rewards that are not mature yet\n"
+            "    \"staked\": xxx,             (numeric) coins that are tied up in stakes that are not mature yet\n"
+            "    \"locked\": xxx,             (numeric) coins in time locked outputs\n"
+            "    \"offline_staking\": xxx     (numeric) coins in offline staking outputs\n"
+            "  },\n"
+            "  \"watchonly\": {               (only when the wallet watches addresses)\n"
+            "    \"trusted\": xxx, \"untrusted_pending\": xxx, \"immature\": xxx\n"
+            "  }\n"
+            "}\n"
+            "\nExamples:\n"
+            + HelpExampleCli("getbalances", "")
+            + HelpExampleRpc("getbalances", "")
+        );
+
+    ObserveSafeMode();
+    pwallet->BlockUntilSyncedToCurrentChain();
+    LOCK2(cs_main, pwallet->cs_wallet);
+
+    UniValue mine(UniValue::VOBJ);
+    mine.pushKV("trusted", ValueFromAmount(pwallet->GetBalance()));
+    mine.pushKV("untrusted_pending", ValueFromAmount(pwallet->GetUnconfirmedBalance()));
+    mine.pushKV("immature", ValueFromAmount(pwallet->GetImmatureBalance()));
+    mine.pushKV("staked", ValueFromAmount(pwallet->GetStake()));
+    mine.pushKV("locked", ValueFromAmount(pwallet->GetLockedBalance()));
+    mine.pushKV("offline_staking", ValueFromAmount(pwallet->GetOfflineStakingBalance()));
+    UniValue result(UniValue::VOBJ);
+    result.pushKV("mine", mine);
+    if (pwallet->HaveWatchOnly()) {
+        UniValue watch(UniValue::VOBJ);
+        watch.pushKV("trusted", ValueFromAmount(pwallet->GetWatchOnlyBalance()));
+        watch.pushKV("untrusted_pending", ValueFromAmount(pwallet->GetUnconfirmedWatchOnlyBalance()));
+        watch.pushKV("immature", ValueFromAmount(pwallet->GetImmatureWatchOnlyBalance()));
+        result.pushKV("watchonly", watch);
+    }
+    return result;
+}
+
 UniValue getwalletinfo(const JSONRPCRequest& request)
 {
     CWallet * const pwallet = GetWalletForJSONRPCRequest(request);
@@ -2966,9 +3178,10 @@ UniValue getwalletinfo(const JSONRPCRequest& request)
         obj.pushKV("unlocked_until", pwallet->nRelockTime);
     }
     obj.pushKV("paytxfee",      ValueFromAmount(payTxFee.GetFeePerK()));
-    if (!seed_id.IsNull())
-         obj.pushKV("hdseedid", seed_id.GetHex());
-         obj.pushKV("hdmasterkeyid", seed_id.GetHex());
+    if (!seed_id.IsNull()) {
+        obj.pushKV("hdseedid", seed_id.GetHex());
+        obj.pushKV("hdmasterkeyid", seed_id.GetHex());
+    }
     return obj;
 }
 
@@ -3037,6 +3250,16 @@ UniValue listwallets(const JSONRPCRequest& request)
     return obj;
 }
 
+/** A wallet name must not walk out of the place that it names ("..", "."): a caller that may
+ *  load or create wallets would otherwise reach any folder through a harmless looking name. */
+static void CheckWalletName(const std::string& name)
+{
+    for (const fs::path& part : fs::path(name)) {
+        if (part == ".." || part == ".")
+            throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid wallet name: \".\" and \"..\" are not allowed in it");
+    }
+}
+
 UniValue loadwallet(const JSONRPCRequest& request)
 {
     if (request.fHelp || request.params.size() != 1)
@@ -3057,6 +3280,7 @@ UniValue loadwallet(const JSONRPCRequest& request)
             + HelpExampleRpc("loadwallet", "\"test.dat\"")
         );
     std::string wallet_file = request.params[0].get_str();
+    CheckWalletName(wallet_file);
     std::string error;
 
     fs::path wallet_path = fs::absolute(wallet_file, GetWalletDir());
@@ -3069,6 +3293,9 @@ UniValue loadwallet(const JSONRPCRequest& request)
             throw JSONRPCError(RPC_WALLET_NOT_FOUND, "Directory " + wallet_file + " does not contain a wallet.dat file.");
         }
     }
+
+    if (GetWallet(wallet_file))
+        throw JSONRPCError(RPC_WALLET_ERROR, "Wallet " + wallet_file + " is already loaded.");
 
     std::string warning;
     if (!CWallet::Verify(wallet_file, false, error, warning)) {
@@ -3087,6 +3314,126 @@ UniValue loadwallet(const JSONRPCRequest& request)
     obj.pushKV("name", wallet->GetName());
     obj.pushKV("warning", warning);
 
+    return obj;
+}
+
+UniValue restorewallet(const JSONRPCRequest& request)
+{
+    if (request.fHelp || request.params.size() != 2)
+        throw std::runtime_error(
+            "restorewallet \"wallet_name\" \"backup_file\"\n"
+            "\nRestores a wallet from a backup file (of backupwallet, or a copy of a wallet.dat) and loads it.\n"
+            "The backup is copied to the folder <wallet_name> in the wallet directory; the backup file\n"
+            "itself is not changed. What happened to the wallet after the backup is found by the rescan\n"
+            "that loading does.\n"
+            "\nArguments:\n"
+            "1. \"wallet_name\"    (string, required) The name of the new wallet; there must be no wallet of that name\n"
+            "2. \"backup_file\"    (string, required) The backup file to restore from\n"
+            "\nResult:\n"
+            "{\n"
+            "  \"name\" :    <wallet_name>,        (string) The wallet name if restored successfully.\n"
+            "  \"warning\" : <warning>,            (string) Warning message if wallet was not loaded cleanly.\n"
+            "}\n"
+            "\nExamples:\n"
+            + HelpExampleCli("restorewallet", "\"restored\" \"/home/user/backup.dat\"")
+            + HelpExampleRpc("restorewallet", "\"restored\", \"/home/user/backup.dat\"")
+        );
+
+    const std::string name = request.params[0].get_str();
+    const fs::path backup = fs::absolute(request.params[1].get_str());
+    if (name.empty() || fs::path(name).filename().string() != name)
+        throw JSONRPCError(RPC_INVALID_PARAMETER, "The wallet name must be a plain name without a path");
+    if (!fs::exists(backup) || !fs::is_regular_file(backup))
+        throw JSONRPCError(RPC_INVALID_PARAMETER, "Backup file does not exist");
+    if (GetWallet(name))
+        throw JSONRPCError(RPC_WALLET_ERROR, "Wallet " + name + " is already loaded.");
+    const fs::path folder = fs::absolute(name, GetWalletDir());
+    if (fs::exists(folder))
+        throw JSONRPCError(RPC_WALLET_ERROR, "There is a wallet or a file of that name already: " + folder.string());
+
+    boost::system::error_code ec;
+    fs::create_directories(folder, ec);
+    if (!ec)
+        fs::copy_file(backup, folder / "wallet.dat", ec);
+    if (ec) {
+        fs::remove_all(folder, ec);
+        throw JSONRPCError(RPC_WALLET_ERROR, "Cannot copy the backup to " + folder.string());
+    }
+
+    JSONRPCRequest inner(request);
+    inner.params = UniValue(UniValue::VARR);
+    inner.params.push_back(name);
+    try {
+        return loadwallet(inner);
+    } catch (...) {
+        // nothing of a failed restore is left behind
+        if (!GetWallet(name))
+            fs::remove_all(folder, ec);
+        throw;
+    }
+}
+
+UniValue unloadwallet(const JSONRPCRequest& request)
+{
+    if (request.fHelp || request.params.size() > 1)
+        throw std::runtime_error(
+            "unloadwallet ( \"wallet_name\" )\n"
+            "\nUnloads a wallet that was loaded with loadwallet, createwallet or a second -wallet option.\n"
+            "The wallet is taken from the request endpoint (/wallet/<name>) if no name is given.\n"
+            "The first wallet cannot be unloaded: it stakes, and the GUI shows it. To run without it,\n"
+            "restart the node with another -wallet option.\n"
+            "\nArguments:\n"
+            "1. \"wallet_name\"    (string, optional) The name of the wallet to unload, as listwallets shows it.\n"
+            "\nExamples:\n"
+            + HelpExampleCli("unloadwallet", "\"test.dat\"")
+            + HelpExampleRpc("unloadwallet", "\"test.dat\"")
+        );
+
+    CWallet* pwallet = nullptr;
+    if (!request.params[0].isNull()) {
+        pwallet = GetWallet(request.params[0].get_str());
+        if (!pwallet)
+            throw JSONRPCError(RPC_WALLET_NOT_FOUND, "Requested wallet does not exist or is not loaded");
+    } else {
+        // without a name: only the wallet of the request endpoint, never a wallet chosen by default
+        if (request.URI.substr(0, WALLET_ENDPOINT_BASE.size()) != WALLET_ENDPOINT_BASE)
+            throw JSONRPCError(RPC_INVALID_PARAMETER, "Give the name of the wallet to unload, or call this through the /wallet/<name> endpoint");
+        pwallet = GetWalletForJSONRPCRequest(request);
+        if (!pwallet)
+            throw JSONRPCError(RPC_WALLET_NOT_FOUND, "Requested wallet does not exist or is not loaded");
+    }
+
+    {
+        LOCK(cs_main);
+        if (vpwallets.empty() || pwallet == vpwallets[0])
+            throw JSONRPCError(RPC_MISC_ERROR, "The first wallet cannot be unloaded (it stakes, and the GUI shows it). Restart the node with another -wallet option to run without it.");
+        if (pwallet->IsScanning())
+            throw JSONRPCError(RPC_WALLET_ERROR, "The wallet is being rescanned. Wait for the rescan or stop it with abortrescan.");
+        // no more blocks and transactions for it, and no more requests
+        UnregisterValidationInterface(pwallet);
+        RemoveWallet(pwallet);
+        vpwalletsUnloaded.push_back(pwallet);
+    }
+    pwallet->StopStake();
+    pwallet->Flush(false);
+    // close its file, so that it can be copied, moved or loaded again
+    bool closed = false;
+    for (int i = 0; i < 100 && !closed; i++) {
+        std::vector<CWalletDBWrapper*> loaded;
+        {
+            LOCK(cs_main);
+            for (CWallet* other : vpwallets)
+                loaded.push_back(&other->GetDBHandle());
+        }
+        closed = CDB::CloseForUnload(pwallet->GetDBHandle(), loaded);
+        if (!closed)
+            MilliSleep(100);
+    }
+    LogPrintf("unloadwallet: %s unloaded%s\n", pwallet->GetName(), closed ? "" : " (its file is still in use and is closed at shutdown)");
+
+    UniValue obj(UniValue::VOBJ);
+    obj.pushKV("name", pwallet->GetName());
+    obj.pushKV("warning", closed ? "" : "The wallet file is still in use by a running request. It is closed when the node shuts down; do not copy or move it before.");
     return obj;
 }
 
@@ -3109,6 +3456,7 @@ UniValue createwallet(const JSONRPCRequest& request)
         );
     }
     std::string wallet_name = request.params[0].get_str();
+    CheckWalletName(wallet_name);
     std::string error;
     std::string warning;
 
@@ -3941,6 +4289,9 @@ UniValue rescanblockchain(const JSONRPCRequest& request)
         }
     }
 
+    if (PastBlocksMissing() && pindexStart->nHeight <= SnapshotHeight())
+        throw JSONRPCError(RPC_MISC_ERROR, PastBlocksMessage());
+
     // We can't rescan beyond non-pruned blocks, stop and throw an error
     if (fPruneMode) {
         CBlockIndex *block = pindexStop ? pindexStop : chainActive.Tip();
@@ -4079,6 +4430,7 @@ UniValue listlabels(const JSONRPCRequest& request)
 extern UniValue abortrescan(const JSONRPCRequest& request); // in rpcdump.cpp
 extern UniValue dumpprivkey(const JSONRPCRequest& request); // in rpcdump.cpp
 extern UniValue importprivkey(const JSONRPCRequest& request);
+extern UniValue importmnemonic(const JSONRPCRequest& request);
 extern UniValue importaddress(const JSONRPCRequest& request);
 extern UniValue removeaddress(const JSONRPCRequest& request);
 extern UniValue importpubkey(const JSONRPCRequest& request);
@@ -4117,6 +4469,9 @@ static const CRPCCommand commands[] =
     { "wallet",             "gettransaction",           &gettransaction,           {"txid","include_watchonly"} },
     { "wallet",             "getunconfirmedbalance",    &getunconfirmedbalance,    {} },
     { "wallet",             "getwalletinfo",            &getwalletinfo,            {} },
+    { "wallet",             "getaddressinfo",           &getaddressinfo,           {"address"} },
+    { "wallet",             "getbalances",              &getbalances,              {} },
+    { "wallet",             "importmnemonic",           &importmnemonic,           {"mnemonic","passphrase","address","rescan"} },
     { "wallet",             "importmulti",              &importmulti,              {"requests","options"} },
     { "wallet",             "importprivkey",            &importprivkey,            {"privkey","label","rescan"} },
     { "wallet",             "importwallet",             &importwallet,             {"filename"} },
@@ -4138,6 +4493,8 @@ static const CRPCCommand commands[] =
     { "wallet",             "listwalletdir",            &listwalletdir,            {} },
     { "wallet",             "listwallets",              &listwallets,              {} },
     { "wallet",             "loadwallet",               &loadwallet,               {"filename"} },
+    { "wallet",             "unloadwallet",             &unloadwallet,             {"wallet_name"} },
+    { "wallet",             "restorewallet",            &restorewallet,            {"wallet_name","backup_file"} },
     { "wallet",             "createwallet",             &createwallet,             {"wallet_name"} },
     { "wallet",             "lockunspent",              &lockunspent,              {"unlock","transactions"} },
     // { "wallet",             "move",                     &movecmd,                  {"fromaccount","toaccount","amount","minconf","comment"} },
@@ -4152,6 +4509,7 @@ static const CRPCCommand commands[] =
     { "wallet",             "walletpassphrasechange",   &walletpassphrasechange,   {"oldpassphrase","newpassphrase"} },
     { "wallet",             "walletpassphrase",         &walletpassphrase,         {"passphrase", "timeout", "stakingonly"} },
     { "wallet",             "removeprunedfunds",        &removeprunedfunds,        {"txid"} },
+    { "wallet",             "purgeorphanstakes",        &purgeorphanstakes,        {"minage"} },
     { "wallet",             "rescanblockchain",         &rescanblockchain,         {"start_height", "stop_height"} },
 
     /** Account functions (deprecated) */

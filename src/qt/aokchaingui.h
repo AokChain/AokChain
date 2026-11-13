@@ -33,6 +33,7 @@ class WalletFrame;
 class WalletModel;
 class HelpMessageDialog;
 class ModalOverlay;
+class Sidebar;
 
 QT_BEGIN_NAMESPACE
 class QAction;
@@ -55,6 +56,9 @@ public:
     static const std::string DEFAULT_UIPLATFORM;
 
     explicit AokChainGUI(const PlatformStyle *platformStyle, const NetworkStyle *networkStyle, QWidget *parent = 0);
+    /** The actions of the former menus for the cards of the settings page:
+        wallet management (0) or information (1) */
+    QList<QAction*> settingsActions(int group) const;
     ~AokChainGUI();
 
     /** Set the client model.
@@ -121,8 +125,30 @@ private:
     QAction *transferTokenAction;
     QAction *createTokenAction;
     QAction *manageTokenAction;
+    QAction *explorerAction;
+    QAction *addressBookAction;
+    QAction *signPageAction;
+    QAction *settingsPageAction;
     QWidget *footerWidget;
     QPushButton *stakingButton;
+    Sidebar *sidebar;
+    bool bootstrapActive;
+    /** (time in ms, value) samples of the fast sync, for the time that is left */
+    QList<QPair<qint64, double> > bootstrapSamples;
+    bool bootstrapSamplesAreBlocks;
+    bool pastBlocksAsked;
+    bool pastBlocksWereFetching;
+    /** The staking of the last 24 hours, for the side bar (kept while the wallet is busy) */
+    QString stakeStatsLine;
+    QString stakeStatsTip;
+    /** Start of the measured span of the past block download, for the time that is left */
+    qint64 pastBlocksSeenAt;
+    quint64 pastBlocksSeenBytes;
+    /** "about 12 min left" for the fast sync: value now, and its end */
+    QString bootstrapTimeLeft(bool blocks, double value, double end);
+    QString bootstrapLastState;
+    /** The sync line of the side bar; the block bootstrap has it while it runs */
+    void setSideSync(const QString& status, const QString& remaining, double progress, bool showProgress, const QString& toolTip);
     /** TOKENS END */
 
     QSystemTrayIcon *trayIcon;
@@ -138,6 +164,8 @@ private:
 
     uint64_t nWeight;
     bool nStaking;
+    /** The chain tip is behind: the synchronization overlay may be opened */
+    bool fSyncing;
 
     const PlatformStyle *platformStyle;
 
@@ -235,6 +263,17 @@ private Q_SLOTS:
     void gotoCreateTokensPage();
     void gotoManageTokensPage();
     /** TOKENS END */
+    /** Switch to the explorer page and look up a transaction id, address or block */
+    void gotoExplorerPage(QString query = "");
+    /** Switch to the address book page: receiving addresses, or the sending ones */
+    void gotoAddressBookPage();
+    void gotoSendingAddressesPage();
+    /** Switch to the settings page */
+    void gotoSettingsPage();
+    /** Show the state of the block bootstrap in the side bar and in the sync overlay */
+    void updateBootstrap();
+    void skipBootstrap();
+    void chooseBootstrapFolder();
 
 #endif // ENABLE_WALLET
     /** Show configuration dialog */
@@ -258,6 +297,8 @@ private Q_SLOTS:
     void toggleHidden();
 
     void updateStakingIcon();
+    /** Show the warnings of the node in the side bar */
+    void updateAlerts(const QString &warnings);
 
     /** called by a timer to check if fRequestShutdown has been set **/
     void detectShutdown();

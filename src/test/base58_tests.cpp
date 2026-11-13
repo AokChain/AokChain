@@ -104,6 +104,11 @@ BOOST_FIXTURE_TEST_SUITE(base58_tests, BasicTestingSetup)
         {
             return (exp_addrType == "none");
         }
+
+        bool operator()(const std::pair<CKeyID, CKeyID> &offline) const
+        {
+            return (exp_addrType == "offlinestaking");
+        }
     };
 
     // Visitor to check address payload
@@ -130,6 +135,11 @@ BOOST_FIXTURE_TEST_SUITE(base58_tests, BasicTestingSetup)
         bool operator()(const CNoDestination &no) const
         {
             return exp_payload.size() == 0;
+        }
+
+        bool operator()(const std::pair<CKeyID, CKeyID> &offline) const
+        {
+            return false;
         }
     };
 

@@ -17,6 +17,71 @@
 
 BOOST_FIXTURE_TEST_SUITE(token_tx_tests, BasicTestingSetup)
 
+    // SEC-02: output amounts that wrap around INT64_MAX must not be able to
+    // match the input amount (this used to mint tokens).
+    BOOST_AUTO_TEST_CASE(token_tx_overflow_test)
+    {
+        BOOST_TEST_MESSAGE("Running Token TX Overflow Test");
+
+        SelectParams(CBaseChainParams::MAIN);
+        CScript dest = GetScriptForDestination(DecodeDestination(Params().TokenFeeAddress()));
+
+        auto transfer_script = [&](CAmount amount) {
+            CTokenTransfer transfer("AOKTOKEN", amount, 0);
+            CScript script = dest;
+            transfer.ConstructTransaction(script);
+            return script;
+        };
+
+        CCoinsView view;
+        CCoinsViewCache coins(&view);
+
+        // One input holding 1000 tokens
+        CTxOut in_out(0, transfer_script(1000));
+        COutPoint outpoint(uint256S("BF50CB9A63BE0019171456252989A459A7D0A5F494735278290079D22AB704A3"), 1);
+        coins.AddCoin(outpoint, Coin(in_out, 10, 0, 0, 0), true);
+
+        auto check = [&](const std::vector<CAmount>& outputs, std::string& reason) {
+            CMutableTransaction mtx;
+            CTxIn in;
+            in.prevout = outpoint;
+            mtx.vin.emplace_back(in);
+            for (CAmount amount : outputs)
+                mtx.vout.emplace_back(CTxOut(0, transfer_script(amount)));
+            CTransaction tx(mtx);
+            CValidationState state;
+            std::vector<std::pair<std::string, uint256>> vReissueTokens;
+            bool ok = Consensus::CheckTxTokens(tx, state, coins, 100000, 100, vReissueTokens, true);
+            reason = state.GetRejectReason();
+            return ok;
+        };
+
+        std::string reason;
+        // Control: splitting 1000 into 400 + 600 is fine
+        BOOST_CHECK_MESSAGE(check({400, 600}, reason), "valid split rejected: " + reason);
+
+        // INT64_MAX + INT64_MAX + 1002 wraps to 1000
+        const CAmount max = std::numeric_limits<CAmount>::max();
+        BOOST_CHECK(!check({max, max, 1002}, reason));
+        BOOST_CHECK_EQUAL(reason, "bad-txns-token-transfer-amount-out-of-range");
+
+        // Amounts within MAX_MONEY_TOKENS whose sum overflows the limit
+        BOOST_CHECK(!check({MAX_MONEY_TOKENS, MAX_MONEY_TOKENS}, reason));
+        BOOST_CHECK_EQUAL(reason, "bad-txns-token-outputs-sum-out-of-range");
+    }
+
+    BOOST_AUTO_TEST_CASE(token_units_check_test)
+    {
+        BOOST_CHECK(CheckAmountWithUnits(1 * COIN, 0));
+        BOOST_CHECK(!CheckAmountWithUnits(COIN + 1, 0));
+        BOOST_CHECK(CheckAmountWithUnits(COIN + 10, 7));
+        BOOST_CHECK(!CheckAmountWithUnits(COIN + 1, 7));
+        BOOST_CHECK(CheckAmountWithUnits(1, 8));
+        // Out-of-range units used to divide by zero
+        BOOST_CHECK(!CheckAmountWithUnits(COIN, 9));
+        BOOST_CHECK(!CheckAmountWithUnits(COIN, -1));
+    }
+
     BOOST_AUTO_TEST_CASE(token_tx_valid_test)
     {
         BOOST_TEST_MESSAGE("Running Token TX Valid Test");
@@ -24,8 +89,8 @@ BOOST_FIXTURE_TEST_SUITE(token_tx_tests, BasicTestingSetup)
         SelectParams(CBaseChainParams::MAIN);
 
         // Create the token scriptPubKey
-        CTokenTransfer token("AOKCHAIN", 1000, 0);
-        CScript scriptPubKey = GetScriptForDestination(DecodeDestination(Params().GlobalBurnAddress()));
+        CTokenTransfer token("AOKTOKEN", 1000, 0);
+        CScript scriptPubKey = GetScriptForDestination(DecodeDestination(Params().TokenFeeAddress()));
         token.ConstructTransaction(scriptPubKey);
 
         CCoinsView view;
@@ -60,7 +125,7 @@ BOOST_FIXTURE_TEST_SUITE(token_tx_tests, BasicTestingSetup)
         // The outputs are assigning a destination to 1000 Tokens
         // This test should pass because all tokens are assigned a destination
         std::vector<std::pair<std::string, uint256>> vReissueTokens;
-        BOOST_CHECK_MESSAGE(Consensus::CheckTxTokens(tx, state, coins, 100000, 100, vReissueTokens, true), "CheckTxTokens Failed");
+        BOOST_CHECK_MESSAGE(Consensus::CheckTxTokens(tx, state, coins, 100000, 100, vReissueTokens, true), "CheckTxTokens failed: " + state.GetRejectReason());
     }
 
     BOOST_AUTO_TEST_CASE(token_tx_not_valid_test)
@@ -70,8 +135,8 @@ BOOST_FIXTURE_TEST_SUITE(token_tx_tests, BasicTestingSetup)
         SelectParams(CBaseChainParams::MAIN);
 
         // Create the token scriptPubKey
-        CTokenTransfer token("AOKCHAIN", 1000, 0);
-        CScript scriptPubKey = GetScriptForDestination(DecodeDestination(Params().GlobalBurnAddress()));
+        CTokenTransfer token("AOKTOKEN", 1000, 0);
+        CScript scriptPubKey = GetScriptForDestination(DecodeDestination(Params().TokenFeeAddress()));
         token.ConstructTransaction(scriptPubKey);
 
         CCoinsView view;
@@ -97,8 +162,8 @@ BOOST_FIXTURE_TEST_SUITE(token_tx_tests, BasicTestingSetup)
 
         // Create CTxOut that will only send 100 of the token
         // This should fail because 900 AOKCHAIN doesn't have a destination
-        CTokenTransfer tokenTransfer("AOKCHAIN", 100, 0);
-        CScript scriptLess = GetScriptForDestination(DecodeDestination(Params().GlobalBurnAddress()));
+        CTokenTransfer tokenTransfer("AOKTOKEN", 100, 0);
+        CScript scriptLess = GetScriptForDestination(DecodeDestination(Params().TokenFeeAddress()));
         tokenTransfer.ConstructTransaction(scriptLess);
 
         CTxOut txOut2;
@@ -126,8 +191,8 @@ BOOST_FIXTURE_TEST_SUITE(token_tx_tests, BasicTestingSetup)
         SelectParams(CBaseChainParams::MAIN);
 
         // Create the token scriptPubKey
-        CTokenTransfer token("AOKCHAIN", 1000, 0);
-        CScript scriptPubKey = GetScriptForDestination(DecodeDestination(Params().GlobalBurnAddress()));
+        CTokenTransfer token("AOKTOKEN", 1000, 0);
+        CScript scriptPubKey = GetScriptForDestination(DecodeDestination(Params().TokenFeeAddress()));
         token.ConstructTransaction(scriptPubKey);
 
         CCoinsView view;
@@ -154,8 +219,8 @@ BOOST_FIXTURE_TEST_SUITE(token_tx_tests, BasicTestingSetup)
         // Create CTxOut that will only send 100 of the token 10 times total = 1000
         for (int i = 0; i < 10; i++)
         {
-            CTokenTransfer token2("AOKCHAIN", 100, 0);
-            CScript scriptPubKey2 = GetScriptForDestination(DecodeDestination(Params().GlobalBurnAddress()));
+            CTokenTransfer token2("AOKTOKEN", 100, 0);
+            CScript scriptPubKey2 = GetScriptForDestination(DecodeDestination(Params().TokenFeeAddress()));
             token2.ConstructTransaction(scriptPubKey2);
 
             CTxOut txOut2;
@@ -176,7 +241,7 @@ BOOST_FIXTURE_TEST_SUITE(token_tx_tests, BasicTestingSetup)
         // The outputs are assigned 100 Tokens to 10 destinations (10 * 100) = 1000
         // This test should pass all tokens that are being spent are assigned to a destination
         std::vector<std::pair<std::string, uint256>> vReissueTokens;
-        BOOST_CHECK_MESSAGE(Consensus::CheckTxTokens(tx, state, coins, 100000, 100, vReissueTokens, true), "CheckTxTokens failed");
+        BOOST_CHECK_MESSAGE(Consensus::CheckTxTokens(tx, state, coins, 100000, 100, vReissueTokens, true), "CheckTxTokens failed: " + state.GetRejectReason());
     }
 
     BOOST_AUTO_TEST_CASE(token_tx_multiple_outs_invalid_test)
@@ -186,8 +251,8 @@ BOOST_FIXTURE_TEST_SUITE(token_tx_tests, BasicTestingSetup)
         SelectParams(CBaseChainParams::MAIN);
 
         // Create the token scriptPubKey
-        CTokenTransfer token("AOKCHAIN", 1000, 0);
-        CScript scriptPubKey = GetScriptForDestination(DecodeDestination(Params().GlobalBurnAddress()));
+        CTokenTransfer token("AOKTOKEN", 1000, 0);
+        CScript scriptPubKey = GetScriptForDestination(DecodeDestination(Params().TokenFeeAddress()));
         token.ConstructTransaction(scriptPubKey);
 
         CCoinsView view;
@@ -214,8 +279,8 @@ BOOST_FIXTURE_TEST_SUITE(token_tx_tests, BasicTestingSetup)
         // Create CTxOut that will only send 100 of the token 12 times, total = 1200
         for (int i = 0; i < 12; i++)
         {
-            CTokenTransfer token2("AOKCHAIN", 100, 0);
-            CScript scriptPubKey2 = GetScriptForDestination(DecodeDestination(Params().GlobalBurnAddress()));
+            CTokenTransfer token2("AOKTOKEN", 100, 0);
+            CScript scriptPubKey2 = GetScriptForDestination(DecodeDestination(Params().TokenFeeAddress()));
             token2.ConstructTransaction(scriptPubKey2);
 
             CTxOut txOut2;
@@ -246,16 +311,16 @@ BOOST_FIXTURE_TEST_SUITE(token_tx_tests, BasicTestingSetup)
         SelectParams(CBaseChainParams::MAIN);
 
         // Create the token scriptPubKeys
-        CTokenTransfer token("AOKCHAIN", 1000, 0);
-        CScript scriptPubKey = GetScriptForDestination(DecodeDestination(Params().GlobalBurnAddress()));
+        CTokenTransfer token("AOKTOKEN", 1000, 0);
+        CScript scriptPubKey = GetScriptForDestination(DecodeDestination(Params().TokenFeeAddress()));
         token.ConstructTransaction(scriptPubKey);
 
         CTokenTransfer token2("AOKCHAINTEST", 1000, 0);
-        CScript scriptPubKey2 = GetScriptForDestination(DecodeDestination(Params().GlobalBurnAddress()));
+        CScript scriptPubKey2 = GetScriptForDestination(DecodeDestination(Params().TokenFeeAddress()));
         token2.ConstructTransaction(scriptPubKey2);
 
         CTokenTransfer token3("AOKCHAINTESTTEST", 1000, 0);
-        CScript scriptPubKey3 = GetScriptForDestination(DecodeDestination(Params().GlobalBurnAddress()));
+        CScript scriptPubKey3 = GetScriptForDestination(DecodeDestination(Params().TokenFeeAddress()));
         token3.ConstructTransaction(scriptPubKey3);
 
         CCoinsView view;
@@ -310,8 +375,8 @@ BOOST_FIXTURE_TEST_SUITE(token_tx_tests, BasicTestingSetup)
         for (int i = 0; i < 10; i++)
         {
             // Add the first token
-            CTokenTransfer outToken("AOKCHAIN", 100, 0);
-            CScript outScript = GetScriptForDestination(DecodeDestination(Params().GlobalBurnAddress()));
+            CTokenTransfer outToken("AOKTOKEN", 100, 0);
+            CScript outScript = GetScriptForDestination(DecodeDestination(Params().TokenFeeAddress()));
             outToken.ConstructTransaction(outScript);
 
             CTxOut txOutNew;
@@ -322,7 +387,7 @@ BOOST_FIXTURE_TEST_SUITE(token_tx_tests, BasicTestingSetup)
 
             // Add the second token
             CTokenTransfer outToken2("AOKCHAINTEST", 100, 0);
-            CScript outScript2 = GetScriptForDestination(DecodeDestination(Params().GlobalBurnAddress()));
+            CScript outScript2 = GetScriptForDestination(DecodeDestination(Params().TokenFeeAddress()));
             outToken2.ConstructTransaction(outScript2);
 
             CTxOut txOutNew2;
@@ -333,7 +398,7 @@ BOOST_FIXTURE_TEST_SUITE(token_tx_tests, BasicTestingSetup)
 
             // Add the third token
             CTokenTransfer outToken3("AOKCHAINTESTTEST", 100, 0);
-            CScript outScript3 = GetScriptForDestination(DecodeDestination(Params().GlobalBurnAddress()));
+            CScript outScript3 = GetScriptForDestination(DecodeDestination(Params().TokenFeeAddress()));
             outToken3.ConstructTransaction(outScript3);
 
             CTxOut txOutNew3;
@@ -355,7 +420,7 @@ BOOST_FIXTURE_TEST_SUITE(token_tx_tests, BasicTestingSetup)
         // The outputs are spending 100 Tokens to 10 destinations (10 * 100 = 1000) (of each AOKCHAIN, AOKCHAINTEST, AOKCHAINTESTTEST)
         // This test should pass because for each token that is spent. It is assigned a destination
         std::vector<std::pair<std::string, uint256>> vReissueTokens;
-        BOOST_CHECK_MESSAGE(Consensus::CheckTxTokens(tx, state, coins, 100000, 100, vReissueTokens, true), "CheckTxTokens Failed");
+        BOOST_CHECK_MESSAGE(Consensus::CheckTxTokens(tx, state, coins, 100000, 100, vReissueTokens, true), "CheckTxTokens failed: " + state.GetRejectReason());
 
 
         // Try it not but only spend 900 of each token instead of 1000
@@ -365,8 +430,8 @@ BOOST_FIXTURE_TEST_SUITE(token_tx_tests, BasicTestingSetup)
         for (int i = 0; i < 9; i++)
         {
             // Add the first token
-            CTokenTransfer outToken("AOKCHAIN", 100, 0);
-            CScript outScript = GetScriptForDestination(DecodeDestination(Params().GlobalBurnAddress()));
+            CTokenTransfer outToken("AOKTOKEN", 100, 0);
+            CScript outScript = GetScriptForDestination(DecodeDestination(Params().TokenFeeAddress()));
             outToken.ConstructTransaction(outScript);
 
             CTxOut txOutNew;
@@ -377,7 +442,7 @@ BOOST_FIXTURE_TEST_SUITE(token_tx_tests, BasicTestingSetup)
 
             // Add the second token
             CTokenTransfer outToken2("AOKCHAINTEST", 100, 0);
-            CScript outScript2 = GetScriptForDestination(DecodeDestination(Params().GlobalBurnAddress()));
+            CScript outScript2 = GetScriptForDestination(DecodeDestination(Params().TokenFeeAddress()));
             outToken2.ConstructTransaction(outScript2);
 
             CTxOut txOutNew2;
@@ -388,7 +453,7 @@ BOOST_FIXTURE_TEST_SUITE(token_tx_tests, BasicTestingSetup)
 
             // Add the third token
             CTokenTransfer outToken3("AOKCHAINTESTTEST", 100, 0);
-            CScript outScript3 = GetScriptForDestination(DecodeDestination(Params().GlobalBurnAddress()));
+            CScript outScript3 = GetScriptForDestination(DecodeDestination(Params().TokenFeeAddress()));
             outToken3.ConstructTransaction(outScript3);
 
             CTxOut txOutNew3;

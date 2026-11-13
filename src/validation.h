@@ -40,6 +40,7 @@
 #include <governance/governance.h>
 
 class CBlockIndex;
+class CBlockUndo;
 class CBlockTreeDB;
 class CChainParams;
 class CCoinsViewDB;
@@ -301,7 +302,30 @@ void UnloadBlockIndex();
 void ThreadScriptCheck();
 /** Check whether we are doing an initial block download (synchronizing from disk or network) */
 bool IsInitialBlockDownload();
+
+/** Blocks with the same stake (coin and time) that are stored before further ones are left out (-maxblocksperstake). */
+static const unsigned int DEFAULT_MAX_BLOCKS_PER_STAKE = 4;
+extern unsigned int nMaxBlocksPerStake;
+/** Whether the block was received and not stored because of that limit. It is fetched again
+ *  when it is on the best chain of headers (IsOnBestHeaderChain). */
+bool IsSkippedStakeVariant(const CBlockIndex* pindex);
+/** Whether the block is pindexBestHeader or one of its ancestors. */
+bool IsOnBestHeaderChain(const CBlockIndex* pindex);
 bool IsInitialSyncSpeedUp();
+/**
+ * Time and coinstake mark of the transaction that created a coin. For a coin that lost them: the
+ * undo data keeps neither, so before 4.0 a coin that a disconnected block gave back had time 0.
+ * False if they cannot be found (no transaction index, or the past blocks are missing).
+ */
+bool ReadCoinTxInfo(const COutPoint& out, int nCoinHeight, unsigned int& nTime, bool& fCoinStake);
+/**
+ * Look for unspent coins without a time in the chain state and, with fWrite, give them the time
+ * and the coinstake mark of their transaction.
+ */
+bool RepairCoins(bool fWrite, uint64_t& nScanned, uint64_t& nDamaged, uint64_t& nRepaired, uint64_t& nUnreadable);
+/** Regtest only: -restorecointime=0 restores coins of disconnected blocks without their time. */
+void SetRestoreCoinTime(bool fRestore);
+
 /** Retrieve a transaction (from memory pool, or from disk, if possible) */
 bool GetTransaction(const uint256 &hash, CTransactionRef &tx, const Consensus::Params& params, uint256 &hashBlock, bool fAllowSlow = false);
 /** Find the best known block, and make it the tip of the block chain */
@@ -328,6 +352,8 @@ void UnlinkPrunedFiles(const std::set<int>& setFilesToPrune);
 CBlockIndex * InsertBlockIndex(uint256 hash);
 /** Flush all state, indexes and buffers to disk. */
 void FlushStateToDisk();
+/** Read the undo data of a block that has a parent. */
+bool ReadBlockUndo(CBlockUndo& blockundo, const CBlockIndex* pindex);
 /** Prune block files and flush state to disk. */
 void PruneAndFlush();
 /** Prune block files up to a given height */
@@ -337,7 +363,7 @@ void PruneBlockFilesManual(int nManualPruneHeight);
  * plTxnReplaced will be appended to with all transactions replaced from mempool **/
 bool AcceptToMemoryPool(CTxMemPool& pool, CValidationState &state, const CTransactionRef &tx,
                         bool* pfMissingInputs, std::list<CTransactionRef>* plTxnReplaced,
-                        bool bypass_limits, const CAmount nAbsurdFee);
+                        bool bypass_limits, const CAmount nAbsurdFee, bool test_accept = false);
 
 /** Convert CValidationState to a human-readable message for logging */
 std::string FormatStateMessage(const CValidationState &state);
@@ -448,6 +474,9 @@ bool ReadBlockFromDisk(CBlock& block, const CBlockIndex* pindex, const Consensus
 
 /** Context-independent validity checks */
 bool CheckBlock(const CBlock& block, CValidationState& state, const uint256& hash, const Consensus::Params& consensusParams, bool fCheckPOW = false, bool fCheckMerkleRoot = true, bool fCheckTokenDuplicate = true, bool fForceDuplicateCheck = true, bool fCheckSig = true);
+
+/** Check the block signature (vchBlockSig; must be empty for proof-of-work blocks) */
+bool CheckBlockSignature(const CBlock& block, const uint256& hash);
 
 /** Check a block is completely valid from start to finish (only works on top of our current best block, with cs_main held) */
 bool TestBlockValidity(CValidationState& state, const CChainParams& chainparams, const CBlock& block, CBlockIndex* pindexPrev, bool fCheckPOW = false, bool fCheckMerkleRoot = true, bool fCheckSig = true);

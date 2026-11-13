@@ -7,6 +7,8 @@
 
 #include "rpc/server.h"
 
+#include <list>
+
 #include "base58.h"
 #include "fs.h"
 #include "init.h"
@@ -37,6 +39,9 @@ static CCriticalSection cs_rpcWarmup;
 /* Timer-creating functions */
 static RPCTimerInterface* timerInterface = nullptr;
 /* Map of name to timer. */
+/* Timers of RPCRunLater(), by name. Guarded by cs_deadlineTimers: RPC calls run in several
+ * threads, and two walletpassphrase calls at once changed the map at the same time. */
+static CCriticalSection cs_deadlineTimers;
 static std::map<std::string, std::unique_ptr<RPCTimerBase> > deadlineTimers;
 
 static struct CRPCSignals
@@ -247,6 +252,48 @@ UniValue stop(const JSONRPCRequest& jsonRequest)
     return "AokChain server stopping";
 }
 
+struct RPCCommandExecutionInfo
+{
+    std::string method;
+    int64_t start;
+};
+static CCriticalSection cs_rpcActive;
+static std::list<RPCCommandExecutionInfo> rpcActiveCommands;
+
+UniValue getrpcinfo(const JSONRPCRequest& request)
+{
+    if (request.fHelp || request.params.size() > 0)
+        throw std::runtime_error(
+            "getrpcinfo\n"
+            "\nReturns details of the RPC server.\n"
+            "\nResult:\n"
+            "{\n"
+            "  \"active_commands\": [        (array) The commands that are running now, this one included\n"
+            "    {\n"
+            "      \"method\": \"name\",       (string) The name of the command\n"
+            "      \"duration\": n            (numeric) The running time in microseconds\n"
+            "    }, ...\n"
+            "  ]\n"
+            "}\n"
+            "\nExamples:\n"
+            + HelpExampleCli("getrpcinfo", "")
+            + HelpExampleRpc("getrpcinfo", "")
+        );
+
+    LOCK(cs_rpcActive);
+    UniValue commands(UniValue::VARR);
+    const int64_t now = GetTimeMicros();
+    for (const RPCCommandExecutionInfo& info : rpcActiveCommands) {
+        UniValue entry(UniValue::VOBJ);
+        entry.pushKV("method", info.method);
+        entry.pushKV("duration", now - info.start);
+        commands.push_back(entry);
+    }
+    UniValue result(UniValue::VOBJ);
+    result.pushKV("active_commands", commands);
+    return result;
+}
+
 UniValue uptime(const JSONRPCRequest& jsonRequest)
 {
     if (jsonRequest.fHelp || jsonRequest.params.size() > 1)
@@ -273,6 +320,7 @@ static const CRPCCommand vRPCCommands[] =
     { "control",            "help",                   &help,                   {"command"}  },
     { "control",            "stop",                   &stop,                   {}  },
     { "control",            "uptime",                 &uptime,                 {}  },
+    { "control",            "getrpcinfo",             &getrpcinfo,             {}  },
     
    
 };
@@ -329,7 +377,10 @@ void InterruptRPC()
 void StopRPC()
 {
     LogPrint(BCLog::RPC, "Stopping RPC\n");
-    deadlineTimers.clear();
+    {
+        LOCK(cs_deadlineTimers);
+        deadlineTimers.clear();
+    }
     DeleteAuthCookie();
     g_rpcSignals.Stopped();
 }
@@ -494,6 +545,19 @@ UniValue CRPCTable::execute(const JSONRPCRequest &request) const
 
     g_rpcSignals.PreCommand(*pcmd);
 
+    // for getrpcinfo: this call is listed while it runs
+    struct ActiveCommand {
+        std::list<RPCCommandExecutionInfo>::iterator it;
+        explicit ActiveCommand(const std::string& method) {
+            LOCK(cs_rpcActive);
+            it = rpcActiveCommands.insert(rpcActiveCommands.end(), {method, GetTimeMicros()});
+        }
+        ~ActiveCommand() {
+            LOCK(cs_rpcActive);
+            rpcActiveCommands.erase(it);
+        }
+    } active(request.strMethod);
+
     try
     {
         // Execute, convert arguments to array if necessary
@@ -552,9 +616,16 @@ void RPCRunLater(const std::string& name, std::function<void(void)> func, int64_
 {
     if (!timerInterface)
         throw JSONRPCError(RPC_INTERNAL_ERROR, "No timer handler registered for RPC");
+    LOCK(cs_deadlineTimers);
     deadlineTimers.erase(name);
     LogPrint(BCLog::RPC, "queue run of timer %s in %i seconds (using %s)\n", name, nSeconds, timerInterface->Name());
     deadlineTimers.emplace(name, std::unique_ptr<RPCTimerBase>(timerInterface->NewTimer(func, nSeconds*1000)));
+}
+
+void RPCCancelLater(const std::string& name)
+{
+    LOCK(cs_deadlineTimers);
+    deadlineTimers.erase(name);
 }
 
 int RPCSerializationFlags()

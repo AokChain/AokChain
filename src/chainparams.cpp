@@ -93,6 +93,21 @@ void CChainParams::UpdateVersionBitsParameters(Consensus::DeploymentPos d, int64
     consensus.vDeployments[d].nTimeout = nTimeout;
 }
 
+void CChainParams::UpdateLastPOWBlock(int nHeight)
+{
+    consensus.nLastPOWBlock = nHeight;
+}
+
+void CChainParams::UpdateFutureDriftHeight(int nHeight)
+{
+    consensus.nFutureDriftHeight = nHeight;
+}
+
+void CChainParams::UpdateMasterAddress(const std::string& address)
+{
+    strMasterAddress = address;
+}
+
 void CChainParams::TurnOffSegwit() {
 	consensus.nSegwitEnabled = false;
 }
@@ -118,11 +133,11 @@ bool CChainParams::BIP34() {
 }
 
 bool CChainParams::BIP65() {
-	return consensus.nBIP34Enabled;
+	return consensus.nBIP65Enabled;
 }
 
 bool CChainParams::BIP66() {
-	return consensus.nBIP34Enabled;
+	return consensus.nBIP66Enabled;
 }
 
 bool CChainParams::CSVEnabled() const{
@@ -164,10 +179,12 @@ public:
         consensus.vDeployments[Consensus::DEPLOYMENT_TESTDUMMY].nTimeout = 1230767999; // December 31, 2008
 
         // The best chain should have at least this much work.
-        consensus.nMinimumChainWork = uint256S("0x000000000000000000000000000000000000000000000331d1ab12e374d430be");
+        // chain work of block 3,030,000 (see defaultAssumeValid)
+        consensus.nMinimumChainWork = uint256S("0x00000000000000000000000000000000000000000000044f3a55ad8aa699012a");
 
         // By default assume that the signatures in ancestors of this block are valid.
-        consensus.defaultAssumeValid = uint256S("0x6a23569de30211b3b633d0ba3fb6fb8e64499b9a9f3d4d350ef077f25c32583b");
+        // Block 3,030,000, taken from a node that validated the whole chain with all script checks.
+        consensus.defaultAssumeValid = uint256S("0x27a0660bf43381e7d367472a74d696873ff69bb36582031f9c2ed2ae1c58bdf1");
 
         // Proof-of-Stake
         consensus.nLastPOWBlock = 1440;
@@ -179,6 +196,11 @@ public:
         consensus.nTokensIPFSDeploymentHeight = 622000;
         consensus.nDisableTimestampCheck = 695000;
         consensus.nGovernanceHeight = 871500;
+        // Soft fork S-05, not scheduled yet. Every mainnet PoS block up to
+        // 3030487 already satisfies it (contrib/aokchain/history_scan.py).
+        consensus.nStakeTimestampMaskHeight = std::numeric_limits<int>::max();
+        consensus.nFutureDriftHeight = std::numeric_limits<int>::max();
+        consensus.nFutureDriftSeconds = 60;
 
         /**
          * The message start string is designed to be unlikely to occur in normal data.
@@ -232,15 +254,21 @@ public:
                 { 750000, uint256S("0x792c26585ef0d5d862093ebd7667a162bd8585c97084b620ba20c6f81c60fa9d")},
                 { 800000, uint256S("0x7e29e84d66d9c0576c27612cced6b2e7145c483b54c7219de82c8fceaab38ea7")},
                 { 860000, uint256S("0xf567c8244dcfe811ba15036d0b6fe7391663074bed12971c93327797bc763b4d")},
+                { 1000000, uint256S("0x164e1a58efa97f33439b63cbb48207aabfcc3f84a0610478d94488f3b7de47a4")},
+                { 1500000, uint256S("0xafb746cb0e83db720a8b8c26dd9e7bd5febe7ce832197da52afca71bbe64be57")},
+                { 2000000, uint256S("0x1b330ad273b0c37fb547c96e1c46416276cd42d3efccbcfe7710d77e8ef225ea")},
+                { 2500000, uint256S("0x3f3f961431a11131c6438d9df9b690d049e1ec3e9e0d66047e3c79dcba3ca903")},
+                { 3000000, uint256S("0x4d1c5c7a18d0224879a141c2283117b0cca1ea484078263c75303a128524bf1a")},
+                { 3030000, uint256S("0x27a0660bf43381e7d367472a74d696873ff69bb36582031f9c2ed2ae1c58bdf1")},
             }
         };
 
         chainTxData = ChainTxData{
-            // Data from RPC: getchaintxstats 4096 f567c8244dcfe811ba15036d0b6fe7391663074bed12971c93327797bc763b4d
-            1647790464,         // * UNIX timestamp of last known number of transactions
-            3386376,            // * total number of transactions between genesis and that timestamp
+            // Data from RPC: getchaintxstats 43200 27a0660bf43381e7d367472a74d696873ff69bb36582031f9c2ed2ae1c58bdf1
+            1794237264,         // * UNIX timestamp of last known number of transactions
+            8223433,            // * total number of transactions between genesis and that timestamp
                                 //   (the tx=... number in the SetBestChain debug.log lines)
-            0.2116489703051164  // * estimated number of transactions per second after that timestamp
+            0.03012824412283564 // * estimated number of transactions per second after that timestamp
         };
 
         /** TOKENS START **/
@@ -256,6 +284,19 @@ public:
         strMasterAddress = "kp5eNwMzDfDgHXMG3XZw73c6rTA6WzFJEx";
 
         nMaxReorganizationDepth = 500; // Around 8 hours
+
+        // The chain state snapshot that this program accepts (see snapshot.h and
+        // doc/aokchain/15-snapshot.md). The values are those of getstatehashes on a node that
+        // validated every block and every script from the genesis block to this height; a
+        // second such node gave the same. A snapshot whose content has other hashes is removed.
+        snapshot.height = 3031432;
+        snapshot.block = uint256S("58a07d1f4dbe68b7fa66d864272ca6351a60de13a409c132b034c9da03af909a");
+        snapshot.utxo = uint256S("abd7798cc33ef739d7afb0824bfe07bd6519f9c9bba872f3d812b2495b308a2a");
+        snapshot.tokens = uint256S("8cc81e204a99e3042eb186aec7859c654c7bf4c1e5e25f2801639e64ca6a0e0a");
+        snapshot.governance = uint256S("93823e7f577c05fcafa2eb7ebb71cc80019bb55d6a4a5b03480a0fc36004e4e5");
+        snapshot.index = uint256S("b37c8739de4a505a0b6b3ea3ae44744d7b9c16ee9ed0aae8bd34050667e4bfa6");
+        // snapshot-03031432.part01 to part06, as published (cat ... | sha256sum)
+        snapshot.archive = "59fb02038659788284d999b210a6f272fa66f4bc3f77401dd11f5cff8c76d8a4";
         /** TOKENS END **/
     }
 };
@@ -301,6 +342,9 @@ public:
         consensus.nTokensIPFSDeploymentHeight = 20;
         consensus.nDisableTimestampCheck = 0;
         consensus.nGovernanceHeight = std::numeric_limits<int>::max();
+        consensus.nStakeTimestampMaskHeight = std::numeric_limits<int>::max();
+        consensus.nFutureDriftHeight = std::numeric_limits<int>::max();
+        consensus.nFutureDriftSeconds = 60;
 
         /**
          * The message start string is designed to be unlikely to occur in normal data.
@@ -404,6 +448,10 @@ public:
         consensus.nTokensP2SHDeploymentHeight = 10;
         consensus.nDisableTimestampCheck = 0;
         consensus.nGovernanceHeight = 10;
+        consensus.nStakeTimestampMask = 0xf; // was left uninitialized on regtest
+        consensus.nStakeTimestampMaskHeight = 0;
+        consensus.nFutureDriftHeight = std::numeric_limits<int>::max(); // (-futuredriftheight)
+        consensus.nFutureDriftSeconds = 60;
 
         pchMessageStart[0] = 0x43;
         pchMessageStart[1] = 0x52;
@@ -493,6 +541,31 @@ void SelectParams(const std::string& network)
 void UpdateVersionBitsParameters(Consensus::DeploymentPos d, int64_t nStartTime, int64_t nTimeout)
 {
     globalChainParams->UpdateVersionBitsParameters(d, nStartTime, nTimeout);
+}
+
+void UpdateLastPOWBlock(int nHeight)
+{
+    globalChainParams->UpdateLastPOWBlock(nHeight);
+}
+
+void UpdateFutureDriftHeight(int nHeight)
+{
+    globalChainParams->UpdateFutureDriftHeight(nHeight);
+}
+
+void UpdateMasterAddress(const std::string& address)
+{
+    globalChainParams->UpdateMasterAddress(address);
+}
+
+void UpdateSnapshotParams(const CChainParams::SnapshotParams& params)
+{
+    globalChainParams->SetSnapshot(params);
+}
+
+void UpdateOldPeerCutoffHeight(int nHeight)
+{
+    globalChainParams->SetOldPeerCutoffHeight(nHeight);
 }
 
 void TurnOffSegwit(){

@@ -53,6 +53,8 @@ Q_SIGNALS:
 
 private:
     QStackedWidget *walletStack;
+    QFrame *encryptBanner;
+    bool bannerDismissed = false;
     AokChainGUI *gui;
     ClientModel *clientModel;
     QMap<QString, WalletView*> mapWalletViews;
@@ -86,8 +88,14 @@ public Q_SLOTS:
     void changePassphrase();
     /** Ask for passphrase to unlock wallet temporarily */
     void unlockWallet();
+    void unlockWalletForStaking();
+    /** Show the warning above the pages while the wallet has no passphrase */
+    void updateEncryptBanner(int status);
+    void lockWalletAfterStaking();
     /** Check if wallet is unlocked */
     bool isWalletUnlocked();
+    /** A wallet is shown (not yet during the start) */
+    bool hasWallet() const;
 
     unsigned long long updateWeight();
 
@@ -105,6 +113,10 @@ public Q_SLOTS:
     void gotoCreateTokensPage();
     void gotoManageTokensPage();
     /** TOKENS END */
+    /** Switch to the explorer page */
+    void gotoExplorerPage(QString query = "");
+    /** Switch to the settings page */
+    void gotoSettingsPage();
 };
 
 #endif // AOKCHAIN_QT_WALLETFRAME_H

@@ -8,6 +8,8 @@ src/aokchain
 src/aokchaind
 src/aokchain-cli
 src/aokchain-tx
+src/aokchain-wallet
+src/aokchain-wallet.exe
 src/test/test_aokchain
 src/test/test_aokchain_fuzzy
 src/test/test_aokchain_hash
