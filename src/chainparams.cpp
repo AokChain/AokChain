@@ -98,6 +98,11 @@ void CChainParams::UpdateLastPOWBlock(int nHeight)
     consensus.nLastPOWBlock = nHeight;
 }
 
+void CChainParams::UpdateFutureDriftHeight(int nHeight)
+{
+    consensus.nFutureDriftHeight = nHeight;
+}
+
 void CChainParams::TurnOffSegwit() {
 	consensus.nSegwitEnabled = false;
 }
@@ -189,6 +194,8 @@ public:
         // Soft fork S-05, not scheduled yet. Every mainnet PoS block up to
         // 3030487 already satisfies it (contrib/aokchain/history_scan.py).
         consensus.nStakeTimestampMaskHeight = std::numeric_limits<int>::max();
+        consensus.nFutureDriftHeight = std::numeric_limits<int>::max();
+        consensus.nFutureDriftSeconds = 60;
 
         /**
          * The message start string is designed to be unlikely to occur in normal data.
@@ -323,6 +330,8 @@ public:
         consensus.nDisableTimestampCheck = 0;
         consensus.nGovernanceHeight = std::numeric_limits<int>::max();
         consensus.nStakeTimestampMaskHeight = std::numeric_limits<int>::max();
+        consensus.nFutureDriftHeight = std::numeric_limits<int>::max();
+        consensus.nFutureDriftSeconds = 60;
 
         /**
          * The message start string is designed to be unlikely to occur in normal data.
@@ -428,6 +437,8 @@ public:
         consensus.nGovernanceHeight = 10;
         consensus.nStakeTimestampMask = 0xf; // was left uninitialized on regtest
         consensus.nStakeTimestampMaskHeight = 0;
+        consensus.nFutureDriftHeight = std::numeric_limits<int>::max(); // (-futuredriftheight)
+        consensus.nFutureDriftSeconds = 60;
 
         pchMessageStart[0] = 0x43;
         pchMessageStart[1] = 0x52;
@@ -522,6 +533,11 @@ void UpdateVersionBitsParameters(Consensus::DeploymentPos d, int64_t nStartTime,
 void UpdateLastPOWBlock(int nHeight)
 {
     globalChainParams->UpdateLastPOWBlock(nHeight);
+}
+
+void UpdateFutureDriftHeight(int nHeight)
+{
+    globalChainParams->UpdateFutureDriftHeight(nHeight);
 }
 
 void UpdateSnapshotParams(const CChainParams::SnapshotParams& params)

@@ -4518,7 +4518,13 @@ static bool ContextualCheckBlockHeader(const CBlock& block, CValidationState& st
 
     // Check proof of work
     const Consensus::Params& consensusParams = params.GetConsensus();
-    if (chainActive.Height() > consensusParams.nLastPOWBlock && nHeight > consensusParams.nLastPOWBlock && block.nBits != GetNextTargetRequired(pindexPrev, &block, true, consensusParams))
+    // The difficulty of a proof-of-stake block follows from the two blocks before it. This was
+    // checked only once the active chain had passed the last proof-of-work block, so not while a
+    // new node received its headers: a peer could then announce headers with any difficulty.
+    // It is checked for every header now. The first two proof-of-stake blocks are left out:
+    // on the main network (1441, 1442) they do not have the value of the formula. Every later
+    // block does (all blocks up to 3,031,432 were compared).
+    if (nHeight > consensusParams.nLastPOWBlock + 2 && block.nBits != GetNextTargetRequired(pindexPrev, &block, true, consensusParams))
         return state.DoS(100, false, REJECT_INVALID, "bad-diffbits", false, "incorrect proof of work");
 
     // Check against checkpoints
@@ -4546,6 +4552,11 @@ static bool ContextualCheckBlockHeader(const CBlock& block, CValidationState& st
     if (nHeight > consensusParams.nLastPOWBlock && !CheckStakeBlockTimestamp(block.GetBlockTime(), nHeight, consensusParams))
         return state.DoS(100, error("%s: incorrect pos block timestamp", __func__),
                          REJECT_INVALID, "bad-pos-time");
+
+    // The smaller allowance for the time of a block, once it is scheduled
+    // (proof-of-stake blocks: their time is the slot in which the stake was found)
+    if (nHeight >= consensusParams.nFutureDriftHeight && nHeight > consensusParams.nLastPOWBlock && block.GetBlockTime() > nAdjustedTime + consensusParams.nFutureDriftSeconds)
+        return state.Invalid(false, REJECT_INVALID, "time-too-new", "block timestamp too far in the future");
 
     // Reject outdated veresion blocks onces tokens are active.
     if (AreTokensDeployed() && block.nVersion < VERSIONBITS_TOP_BITS_TOKENS) {
