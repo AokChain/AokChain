@@ -171,3 +171,9 @@ Fixes after the 4.0.0 release, including the results of the external source revi
 - **Diagnostics.** The duration of the first stake search after a start is logged. `-debug=coinstake` works.
 - **`upgrade.sh`.** Waits for the process ids of a node that does not run under systemd. A new installation can start from the snapshot with `AOK_SNAPSHOT`. The newest three backups are kept.
 - **Recovery words of the AOK mobile wallet.** That wallet makes its 12 words without the BIP39 checksum (the seed is made from the words as BIP39 says), so the restore page refused them: "the words do not fit together". When every word is in the word list and only the checksum is wrong, the page now says so and offers to search without it; `importmnemonic` takes `validate=false` for the same. Unknown words and a wrong number of words are still refused.
+
+## 4.0.2 (2026-11-14)
+
+- **Restoring from recovery words is hidden.** A payment from keys restored from the recovery words of another wallet (the AOK mobile wallet) keeps its change in this wallet's own keys, which that wallet does not see, so its coins look lost there. Until it is decided how recovery words and the keys of this wallet fit together, the settings page does not offer the restore. `-mnemonicrestore` shows it again; the RPCs (`importmnemonic`, `mnemonicfindaddress`, `mnemonictokeys`) stay.
+- **Passphrases in English letters, digits and symbols.** The passphrase fields (setting, unlocking, changing) have no input method, accept printable ASCII only (the space included) and say so when another character is typed ("Check the Korean/English key"). A wallet whose passphrase contains other characters is unlocked with `walletpassphrase` in the console.
+- Nothing changes for nodes: the daemon is the same as in 4.0.1.
