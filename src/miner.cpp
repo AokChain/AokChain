@@ -736,7 +736,16 @@ void ThreadStakeMiner(CWallet *pwallet)
                     pwallet->m_last_coin_stake_search_interval = STAKE_TIMESTAMP_MASK + 1;
                 }
             }
-            if (SignBlock(pblock, *pwallet, nTotalFees, pindexPrev)) {
+            // (how long one search over the wallet's coins takes, once per start: with many coins
+            // and a cold coin cache the first one can take much longer than a 16 second slot)
+            static bool fFirstSearchLogged = false;
+            const int64_t nSearchStart = GetTimeMillis();
+            const bool fSigned = SignBlock(pblock, *pwallet, nTotalFees, pindexPrev);
+            if (!fFirstSearchLogged) {
+                fFirstSearchLogged = true;
+                LogPrintf("Staking: the first search for a stake took %d ms\n", GetTimeMillis() - nSearchStart);
+            }
+            if (fSigned) {
                 // Increase priority so we can build the full PoS block ASAP to ensure the timestamp doesn't expire
                 SetThreadPriority(THREAD_PRIORITY_ABOVE_NORMAL);
 
