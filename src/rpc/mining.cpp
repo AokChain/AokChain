@@ -610,9 +610,16 @@ UniValue getblocktemplate(const JSONRPCRequest& request)
         nStart = GetTime();
         fLastTemplateSupportsSegwit = fSupportsSegwit;
 
+        if (pindexPrevNew->nHeight + 1 > Params().GetConsensus().nLastPOWBlock)
+            throw JSONRPCError(RPC_MISC_ERROR, strprintf("The next block (height %d) is a proof-of-stake block: those are made by the staking of a wallet, there is no template for them", pindexPrevNew->nHeight + 1));
+
         // Create new block
         CScript scriptDummy = CScript() << OP_TRUE;
-        pblocktemplate = BlockAssembler(Params()).CreateNewBlock(scriptDummy, fSupportsSegwit);
+        // (the second argument is fProofOfStake: fSupportsSegwit was passed there, so every
+        // template was assembled as a proof-of-stake one, without the check of the block and
+        // with the difficulty of proof of stake. A template is for proof of work: after the
+        // last proof-of-work block its check fails, and the call returns that error.)
+        pblocktemplate = BlockAssembler(Params()).CreateNewBlock(scriptDummy, false);
         if (!pblocktemplate)
             throw JSONRPCError(RPC_OUT_OF_MEMORY, "Out of memory");
 
