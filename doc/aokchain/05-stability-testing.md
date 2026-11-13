@@ -9,7 +9,7 @@ The suites are run one by one now:
 ```bash
 contrib/aokchain/unit-tests.sh        # each suite on its own, compared with doc/aokchain/unit-baseline.txt
 ```
-Current state: **all 70 suites that have test cases pass** (`miner_tests` is empty: its cases were removed in the code this fork started from). The 70 are the baseline (`unit-baseline.txt`); if one of them fails, that is a regression. (53 passed when this was first looked at, then 59 and 63.)
+Current state: **all 71 suites that have test cases pass** (`governance_tests` added in 4.0.1) (`miner_tests` is empty: its cases were removed in the code this fork started from). The 70 are the baseline (`unit-baseline.txt`); if one of them fails, that is a regression. (53 passed when this was first looked at, then 59 and 63.)
 
 How the last suites were recovered:
 

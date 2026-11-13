@@ -20,6 +20,7 @@ cuckoocache_tests
 dbwrapper_tests
 DoS_tests
 getarg_tests
+governance_tests
 hash_tests
 key_tests
 limitedmap_tests

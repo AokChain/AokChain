@@ -1900,9 +1900,16 @@ int ApplyTxInUndo(Coin&& undo, CCoinsViewCache& view, const COutPoint& out, CTok
 
 /** Undo the effects of this block (with given index) on the UTXO set represented by coins.
  *  When FAILED is returned, view is left in an indeterminate state. */
-static DisconnectResult DisconnectBlock(const CBlock& block, const CBlockIndex* pindex, CCoinsViewCache& view, CTokensCache* tokensCache = nullptr, bool ignoreAddressIndex = false)
+/** Undo the effects of this block (with given index) on the UTXO set represented by coins.
+ *  fApplyGovernance: false leaves the governance state as it is (ReplayBlocks: it was
+ *  changed when the block was disconnected before the interrupted flush). */
+static DisconnectResult DisconnectBlock(const CBlock& block, const CBlockIndex* pindex, CCoinsViewCache& view, CTokensCache* tokensCache = nullptr, bool ignoreAddressIndex = false, bool fApplyGovernance = true)
 {
     bool fClean = true;
+
+    // The governance commands of the block are undone in a level of changes, written only
+    // when the whole block is disconnected (see CGovernance::BeginChanges).
+    CGovernanceChanges governanceChanges(governance);
 
     CBlockUndo blockUndo;
     CDiskBlockPos pos = pindex->GetUndoPos();
@@ -2328,6 +2335,11 @@ static DisconnectResult DisconnectBlock(const CBlock& block, const CBlockIndex* 
         }
     }
 
+    if (fApplyGovernance && !governanceChanges.Commit()) {
+        error("DisconnectBlock(): failed to write the governance database");
+        return DISCONNECT_FAILED;
+    }
+
     return fClean ? DISCONNECT_OK : DISCONNECT_UNCLEAN;
 }
 
@@ -2621,6 +2633,11 @@ static bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockInd
 
     CTxDestination destination = DecodeDestination(Params().GovernanceMasterAddress());
     CScript masterKey = GetScriptForDestination(destination);
+
+    // The governance commands of the block go into a level of changes: later transactions of
+    // the block see them, the database gets them only when the whole block is valid and is
+    // connected (not for fJustCheck). Every early return below discards them.
+    CGovernanceChanges governanceChanges(governance);
 
     for (unsigned int i = 0; i < block.vtx.size(); i++)
     {
@@ -3182,6 +3199,9 @@ static bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockInd
 
     int64_t nTime5 = GetTimeMicros(); nTimeIndex += nTime5 - nTime4;
     LogPrint(BCLog::BENCH, "    - Index writing: %.2fms [%.2fs (%.2fms/blk)]\n", MILLI * (nTime5 - nTime4), nTimeIndex * MICRO, nTimeIndex * MILLI / nBlocksTotal);
+
+    if (!governanceChanges.Commit())
+        return AbortNode(state, "Failed to write to the governance database");
 
     int64_t nTime6 = GetTimeMicros(); nTimeCallbacks += nTime6 - nTime5;
     LogPrint(BCLog::BENCH, "    - Callbacks: %.2fms [%.2fs (%.2fms/blk)]\n", MILLI * (nTime6 - nTime5), nTimeCallbacks * MICRO, nTimeCallbacks * MILLI / nBlocksTotal);
@@ -5492,6 +5512,11 @@ CVerifyDB::~CVerifyDB()
 bool CVerifyDB::VerifyDB(const CChainParams& chainparams, CCoinsView *coinsview, int nCheckLevel, int nCheckDepth)
 {
     LOCK(cs_main);
+    // The blocks are disconnected and connected again on a copy of the coins only. Their
+    // governance commands go into a level of changes that is discarded at the end, so the
+    // check leaves the governance state as it is (it reverted the commands of the checked
+    // blocks before, and only a check at level 4 applied them again).
+    CGovernanceChanges governanceChanges(governance);
     if (chainActive.Tip() == nullptr || chainActive.Tip()->pprev == nullptr)
         return true;
 
@@ -5653,7 +5678,9 @@ bool ReplayBlocks(const CChainParams& params, CCoinsView* view)
                 return error("RollbackBlock(): ReadBlockFromDisk() failed at %d, hash=%s", pindexOld->nHeight, pindexOld->GetBlockHash().ToString());
             }
             LogPrintf("Rolling back %s (%i)\n", pindexOld->GetBlockHash().ToString(), pindexOld->nHeight);
-            DisconnectResult res = DisconnectBlock(block, pindexOld, cache, &tokensCache);
+            // (the governance state already is that of the new tip: it is written when a block is
+            // connected or disconnected, before the coins are flushed)
+            DisconnectResult res = DisconnectBlock(block, pindexOld, cache, &tokensCache, false, false);
             if (res == DISCONNECT_FAILED) {
                 return error("RollbackBlock(): DisconnectBlock failed at %d, hash=%s", pindexOld->nHeight, pindexOld->GetBlockHash().ToString());
             }

@@ -17,11 +17,20 @@ issuing tokens, set the address that the cost is paid to. On regtest
    pays the new cost to the new address
  - commands are undone when their block is disconnected, done again when it
    is reconnected, and survive a restart
+ - a command counts only in a block that is connected: a block that is refused
+   (here: its coinbase pays too much), a block that is only checked (a block
+   proposal of getblocktemplate, checked like a block template) and
+   the check of the last blocks at startup (-checklevel=3, which disconnects
+   them on a copy) leave the governance state as it was. Before, each of them
+   changed it, and the node then refused valid blocks of the network.
 """
 
 import struct
+import time
 from decimal import Decimal
 
+from test_framework.blocktools import create_block, create_coinbase
+from test_framework.mininode import COIN, CTransaction, FromHex, ToHex
 from test_framework.test_framework import AokChainTestFramework
 from test_framework.util import assert_equal, assert_raises_rpc_error, connect_nodes_bi
 
@@ -56,16 +65,42 @@ class GovernanceTest(AokChainTestFramework):
     def script_of(self, address):
         return self.nodes[0].validateaddress(address)["scriptPubKey"]
 
-    def send_command(self, node, from_address, data):
-        """Spend a coin of from_address in a transaction with the given data output."""
+    def sign_command(self, node, from_address, data):
+        """A signed transaction that spends a coin of from_address, with the given data output."""
         coin = [u for u in node.listunspent(1, 9999999, [from_address]) if u["amount"] > 1][0]
         outputs = {"data": data, from_address: coin["amount"] - Decimal("0.01")}
         raw = node.createrawtransaction([{"txid": coin["txid"], "vout": coin["vout"]}], outputs)
         signed = node.signrawtransactionwithwallet(raw)
         assert signed["complete"], signed
-        txid = node.sendrawtransaction(signed["hex"])
+        return signed["hex"]
+
+    def send_command(self, node, from_address, data):
+        """Spend a coin of from_address in a transaction with the given data output."""
+        txid = node.sendrawtransaction(self.sign_command(node, from_address, data))
         self.sync_all()
         return txid
+
+    def block_with(self, node, tx_hex, coinbase_value):
+        """A block on the tip with the transaction and a coinbase that pays coinbase_value."""
+        tx = FromHex(CTransaction(), tx_hex)
+        tip = node.getbestblockhash()
+        header = node.getblockheader(tip)
+        t = max(int(time.time()), header["time"] + 1, tx.nTime)
+        coinbase = create_coinbase(header["height"] + 1)
+        coinbase.nTime = t
+        coinbase.vout[0].nValue = coinbase_value
+        coinbase.rehash()
+        block = create_block(int(tip, 16), coinbase, t)
+        block.nBits = int(header["bits"], 16)
+        block.nVersion = header["version"]
+        block.vtx.append(tx)
+        block.hashMerkleRoot = block.calc_merkle_root()
+        block.solve()
+        return ToHex(block)
+
+    def same_state(self):
+        hashes = [node.getstatehashes()["governance"] for node in self.nodes]
+        assert_equal(len(set(hashes)), 1)
 
     def frozen(self, node):
         return sorted(a for a, is_frozen in node.freezelist()["addresses"].items() if is_frozen)
@@ -101,8 +136,28 @@ class GovernanceTest(AokChainTestFramework):
             assert_equal(self.frozen(node), [])
             assert_equal(node.issuanceinfo(), defaults)
 
-        self.log.info("Freeze")
-        self.send_command(n0, master, script_command(FREEZE, self.script_of(victim)))
+        self.log.info("A refused block with a freeze command leaves the address as it was")
+        freeze = self.sign_command(n0, master, script_command(FREEZE, self.script_of(victim)))
+        tip = n0.getbestblockhash()
+        # (100 AOK: more than the reward of a regtest block)
+        assert_equal(n0.submitblock(self.block_with(n0, freeze, 100 * COIN)), "bad-cb-amount")
+        assert_equal(n0.getbestblockhash(), tip)
+        for node in self.nodes:
+            assert_equal(self.frozen(node), [])
+            assert_equal(node.checkfreeze(victim), False)
+        self.same_state()
+
+        self.log.info("A checked block proposal with the freeze command leaves the address as it was")
+        # (getblocktemplate in proposal mode checks the block as block templates are checked,
+        # with TestBlockValidity, which does not connect it)
+        proposal = self.block_with(n0, freeze, 1 * COIN)
+        assert_equal(n0.getblocktemplate({"mode": "proposal", "data": proposal}), None)
+        assert_equal(n0.checkfreeze(victim), False)
+        self.same_state()
+        n0.sendrawtransaction(freeze)
+        self.sync_all()
+
+        self.log.info("Freeze: the same command in a block that is connected")
         freeze_block = self.mine()
         for node in self.nodes:
             assert_equal(self.frozen(node), [victim])
@@ -123,12 +178,15 @@ class GovernanceTest(AokChainTestFramework):
         n0.reconsiderblock(freeze_block)
         assert_equal(n0.getbestblockhash(), freeze_block)
         assert_equal(self.frozen(n0), [victim])
+        # node0 checks its last blocks at level 3 at the start (it disconnects them on a copy
+        # of the coins, and does not connect them again); node1 at the default level
         self.stop_nodes()
-        self.start_nodes(self.extra_args)
+        self.start_nodes([self.extra_args[0] + ["-checklevel=3", "-checkblocks=10"], self.extra_args[1]])
         connect_nodes_bi(self.nodes, 0, 1)
         n0, n1 = self.nodes
         for node in self.nodes:
             assert_equal(self.frozen(node), [victim])
+        self.same_state()
         assert_raises_rpc_error(-26, "bad-txns-address-frozen", n1.sendrawtransaction, spend)
 
         self.log.info("The master address cannot be frozen")

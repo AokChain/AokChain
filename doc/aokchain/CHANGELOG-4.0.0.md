@@ -162,5 +162,6 @@ Note: some boolean fields of RPC results are printed as `1`/`0`, not `true`/`fal
 Fixes after the 4.0.0 release, including the results of the external source review of 2026-11-13.
 
 - **`walletpassphrase` (SEC-29).** A call that failed because of its arguments left the wallet open for payments; the arguments are checked first now. The mark that takes a wallet back to staking only after a timed unlock is per wallet.
+- **Atomic governance state (SEC-30).** Governance commands were written to the database while a block was being checked, so a block that was then refused, a block that was only checked, and the check of the last blocks at startup could change the freeze list and the issuing cost of a node (which then refused valid blocks). The commands of a block are now collected and written at once when the block is connected. The result of a valid block is the same as before.
 - **Diagnostics.** The duration of the first stake search after a start is logged. `-debug=coinstake` works.
 - **`upgrade.sh`.** Waits for the process ids of a node that does not run under systemd. A new installation can start from the snapshot with `AOK_SNAPSHOT`. The newest three backups are kept.
