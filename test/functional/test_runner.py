@@ -130,6 +130,8 @@ BASE_SCRIPTS= [
     'feature_offline_staking.py',
     'feature_future_drift.py',
     'p2p_orphan_processing.py',
+    'feature_tokens.py',
+    'feature_governance.py',
     'rpc_mnemonic.py',
     'wallet_importmnemonic.py',
     'wallet_multisig_flow.py',

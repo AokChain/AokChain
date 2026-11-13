@@ -103,6 +103,11 @@ void CChainParams::UpdateFutureDriftHeight(int nHeight)
     consensus.nFutureDriftHeight = nHeight;
 }
 
+void CChainParams::UpdateMasterAddress(const std::string& address)
+{
+    strMasterAddress = address;
+}
+
 void CChainParams::TurnOffSegwit() {
 	consensus.nSegwitEnabled = false;
 }
@@ -544,6 +549,11 @@ void UpdateLastPOWBlock(int nHeight)
 void UpdateFutureDriftHeight(int nHeight)
 {
     globalChainParams->UpdateFutureDriftHeight(nHeight);
+}
+
+void UpdateMasterAddress(const std::string& address)
+{
+    globalChainParams->UpdateMasterAddress(address);
 }
 
 void UpdateSnapshotParams(const CChainParams::SnapshotParams& params)

@@ -16,6 +16,7 @@
 #include <snapshot.h>
 #include <amount.h>
 #include <chain.h>
+#include <base58.h>
 #include <chainparams.h>
 #include <checkpoints.h>
 #include <compat/sanity.h>
@@ -502,6 +503,7 @@ std::string HelpMessage(HelpMessageMode mode)
         strUsage += HelpMessageOpt("-limitdescendantcount=<n>", strprintf("Do not accept transactions if any ancestor would have <n> or more in-mempool descendants (default: %u)", DEFAULT_DESCENDANT_LIMIT));
         strUsage += HelpMessageOpt("-limitdescendantsize=<n>", strprintf("Do not accept transactions if any ancestor would have more than <n> kilobytes of in-mempool descendants (default: %u).", DEFAULT_DESCENDANT_SIZE_LIMIT));
         strUsage += HelpMessageOpt("-lastpowblock=<height>", "Height of the last proof-of-work block; later blocks must be proof-of-stake (regtest-only)");
+        strUsage += HelpMessageOpt("-masteraddress=<address>", "Governance master address, to test governance commands with a key of the test (regtest-only)");
         strUsage += HelpMessageOpt("-futuredriftheight=<height>", "Height from which a proof-of-stake block may be at most 60 seconds ahead of the clock (regtest-only)");
         strUsage += HelpMessageOpt("-restorecointime", "Give the coins of a disconnected block their transaction time back; 0 loses it as versions before 4.0 did (regtest-only, default: 1)");
         strUsage += HelpMessageOpt("-snapshotparams=<height:block:utxo:tokens:governance:index>", "The chain state snapshot that is accepted, as getstatehashes prints it (regtest-only)");
@@ -1183,6 +1185,13 @@ bool AppInitParameterInteraction()
         SetRestoreCoinTime(false);
     }
 
+    if (gArgs.IsArgSet("-masteraddress")) {
+        if (!chainparams.MineBlocksOnDemand())
+            return InitError("-masteraddress is for regression testing (-regtest) only");
+        if (!IsValidDestinationString(gArgs.GetArg("-masteraddress", "")))
+            return InitError("Invalid -masteraddress");
+        UpdateMasterAddress(gArgs.GetArg("-masteraddress", ""));
+    }
     if (gArgs.IsArgSet("-futuredriftheight")) {
         if (!chainparams.MineBlocksOnDemand())
             return InitError("-futuredriftheight is for regression testing (-regtest) only");

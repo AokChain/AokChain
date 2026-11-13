@@ -46,3 +46,5 @@ feature_stake_combine.py
 feature_offline_staking.py
 feature_future_drift.py
 p2p_orphan_processing.py
+feature_tokens.py
+feature_governance.py

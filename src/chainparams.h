@@ -101,6 +101,7 @@ public:
 
     void UpdateLastPOWBlock(int nHeight);
     void UpdateFutureDriftHeight(int nHeight);
+    void UpdateMasterAddress(const std::string& address);
     void TurnOffSegwit();
     void TurnOffCSV();
     void TurnOffBIP34();
@@ -195,6 +196,8 @@ void UpdateVersionBitsParameters(Consensus::DeploymentPos d, int64_t nStartTime,
 void UpdateLastPOWBlock(int nHeight);
 /** Regtest only: the height from which the smaller allowance for the time of a block applies. */
 void UpdateFutureDriftHeight(int nHeight);
+/** Regtest only: the governance master address, so that a test can hold its key (-masteraddress). */
+void UpdateMasterAddress(const std::string& address);
 /** Regtest only: the snapshot that is accepted (-snapshotparams). */
 void UpdateSnapshotParams(const CChainParams::SnapshotParams& params);
 /** Regtest only: set the height from which old peers are disconnected (-oldpeercutoffheight). */
