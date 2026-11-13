@@ -544,32 +544,63 @@ BOOST_FIXTURE_TEST_SUITE(coins_tests, BasicTestingSetup)
     {
         BOOST_TEST_MESSAGE("Running cCoins Serialization Test");
 
-        // Good example
-        CDataStream ss1(ParseHex("97f23c835800816115944e077fe7c803cfa57f29b36bf87c1d35"), SER_DISK, CLIENT_VERSION);
-        Coin cc1;
-        ss1 >> cc1;
-        BOOST_CHECK_EQUAL(cc1.fCoinBase, false);
-        BOOST_CHECK_EQUAL(cc1.nHeight, 203998);
-        BOOST_CHECK_EQUAL(cc1.out.nValue, 60000000000ULL);
-        BOOST_CHECK_EQUAL(HexStr(cc1.out.scriptPubKey), HexStr(GetScriptForDestination(CKeyID(uint160(ParseHex("816115944e077fe7c803cfa57f29b36bf87c1d35"))))));
+        // An AokChain coin is: VARINT(height * 4 + coinbase + 2 * coinstake), the compressed output,
+        // and the time of its transaction (4 bytes). The Bitcoin vectors of this test have neither
+        // the coinstake bit nor the time, so the coins are built here and read back.
+        const CScript script1 = GetScriptForDestination(CKeyID(uint160(ParseHex("816115944e077fe7c803cfa57f29b36bf87c1d35"))));
+        const CScript script2 = GetScriptForDestination(CKeyID(uint160(ParseHex("8c988f1a4a4de2161e0f50aac7f17e7f9555caa4"))));
+        struct Example { CAmount value; CScript script; int height; bool coinbase; bool coinstake; unsigned int time; };
+        const std::vector<Example> examples = {
+            {60000000000LL, script1, 203998, false, false, 1600000000},
+            {110397, script2, 120891, true, false, 1500000000},
+            {12500000, script1, 3030000, false, true, 1794000000},
+            {0, CScript(), 0, false, false, 0},
+        };
+        for (const Example& e : examples) {
+            const Coin coin(CTxOut(e.value, e.script), e.height, e.coinbase, e.coinstake, e.time);
+            CDataStream ss(SER_DISK, CLIENT_VERSION);
+            ss << coin;
+            // the code comes first, the time last
+            CDataStream code(SER_DISK, CLIENT_VERSION);
+            code << VARINT((uint32_t)(e.height * 4 + (e.coinbase ? 1 : 0) + (e.coinstake ? 2 : 0)));
+            const std::string hex = HexStr(ss.begin(), ss.end());
+            BOOST_CHECK_EQUAL(hex.substr(0, 2 * code.size()), HexStr(code.begin(), code.end()));
+            CDataStream time(SER_DISK, CLIENT_VERSION);
+            time << e.time;
+            BOOST_CHECK_EQUAL(hex.substr(hex.size() - 8), HexStr(time.begin(), time.end()));
 
-        // Good example
-        CDataStream ss2(ParseHex("8ddf77bbd123008c988f1a4a4de2161e0f50aac7f17e7f9555caa4"), SER_DISK, CLIENT_VERSION);
-        Coin cc2;
-        ss2 >> cc2;
-        BOOST_CHECK_EQUAL(cc2.fCoinBase, true);
-        BOOST_CHECK_EQUAL(cc2.nHeight, 120891);
-        BOOST_CHECK_EQUAL(cc2.out.nValue, 110397);
-        BOOST_CHECK_EQUAL(HexStr(cc2.out.scriptPubKey), HexStr(GetScriptForDestination(CKeyID(uint160(ParseHex("8c988f1a4a4de2161e0f50aac7f17e7f9555caa4"))))));
+            Coin read;
+            ss >> read;
+            BOOST_CHECK(ss.empty());
+            BOOST_CHECK_EQUAL(read.fCoinBase, e.coinbase);
+            BOOST_CHECK_EQUAL(read.fCoinStake, e.coinstake);
+            BOOST_CHECK_EQUAL(read.nHeight, (uint32_t)e.height);
+            BOOST_CHECK_EQUAL(read.nTime, e.time);
+            BOOST_CHECK_EQUAL(read.out.nValue, e.value);
+            BOOST_CHECK_EQUAL(HexStr(read.out.scriptPubKey), HexStr(e.script));
+        }
 
-        // Smallest possible example
-        CDataStream ss3(ParseHex("000006"), SER_DISK, CLIENT_VERSION);
+        // Smallest possible example: no height, no amount, an empty script, time 0
+        CDataStream ss3(ParseHex("00000600000000"), SER_DISK, CLIENT_VERSION);
         Coin cc3;
         ss3 >> cc3;
         BOOST_CHECK_EQUAL(cc3.fCoinBase, false);
+        BOOST_CHECK_EQUAL(cc3.fCoinStake, false);
         BOOST_CHECK_EQUAL(cc3.nHeight, 0);
+        BOOST_CHECK_EQUAL(cc3.nTime, 0);
         BOOST_CHECK_EQUAL(cc3.out.nValue, 0);
         BOOST_CHECK_EQUAL(cc3.out.scriptPubKey.size(), 0);
+
+        // The same without its time: a coin in the Bitcoin format is not a coin here
+        CDataStream ss3b(ParseHex("000006"), SER_DISK, CLIENT_VERSION);
+        try
+        {
+            Coin cc3b;
+            ss3b >> cc3b;
+            BOOST_CHECK_MESSAGE(false, "We should have thrown");
+        } catch (const std::ios_base::failure &e)
+        {
+        }
 
         // scriptPubKey that ends beyond the end of the stream
         CDataStream ss4(ParseHex("000007"), SER_DISK, CLIENT_VERSION);

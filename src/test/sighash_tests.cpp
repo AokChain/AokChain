@@ -80,8 +80,11 @@ uint256 static SignatureHashOld(CScript scriptCode, const CTransaction &txTo, un
     }
 
     // Serialize and hash
+    // An AokChain transaction is signed as: version, time, inputs, outputs, lock time. The message
+    // of a version 2 transaction is NOT part of what is signed (see doc/aokchain/04-security-audit.md,
+    // SEC-27), so the whole transaction cannot be hashed here as the Bitcoin test does.
     CHashWriter ss(SER_GETHASH, SERIALIZE_TRANSACTION_NO_WITNESS);
-    ss << txTmp << nHashType;
+    ss << txTmp.nVersion << txTmp.nTime << txTmp.vin << txTmp.vout << txTmp.nLockTime << nHashType;
     return ss.GetHash();
 }
 
@@ -97,6 +100,11 @@ void static RandomScript(CScript &script)
 void static RandomTransaction(CMutableTransaction &tx, bool fSingle)
 {
     tx.nVersion = InsecureRand32();
+    tx.nTime = InsecureRand32();
+    // (a transaction of version 2 or later carries a message, which is serialized and not signed)
+    tx.nMessage.clear();
+    if (tx.nVersion >= 2 && InsecureRandBool())
+        tx.nMessage = std::string(InsecureRandRange(20), 'm');
     tx.vin.clear();
     tx.vout.clear();
     tx.nLockTime = (InsecureRandBool()) ? InsecureRand32() : 0;

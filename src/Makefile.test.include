@@ -61,6 +61,7 @@ AOKCHAIN_TESTS =\
   test/miner_tests.cpp \
   test/multisig_tests.cpp \
   test/offlinestake_tests.cpp \
+  test/txmessage_tests.cpp \
   test/net_tests.cpp \
   test/netbase_tests.cpp \
   test/pmt_tests.cpp \

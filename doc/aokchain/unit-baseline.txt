@@ -12,6 +12,7 @@ blockencodings_tests
 bswap_tests
 cache_tests
 checkqueue_tests
+coins_tests
 compress_tests
 crypto_tests
 cuckoocache_tests
@@ -42,8 +43,10 @@ script_P2PKH_tests
 script_P2PK_tests
 script_P2SH_tests
 script_standard_tests
+script_tests
 serialization_tests
 serialize_tests
+sighash_tests
 sigopcount_tests
 skiplist_tests
 streams_tests
@@ -52,6 +55,7 @@ token_reissue_tests
 token_tests
 token_tx_tests
 torcontrol_tests
+txmessage_tests
 uint256_tests
 univalue_tests
 util_tests
