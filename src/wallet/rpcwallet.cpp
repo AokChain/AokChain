@@ -4471,7 +4471,7 @@ static const CRPCCommand commands[] =
     { "wallet",             "getwalletinfo",            &getwalletinfo,            {} },
     { "wallet",             "getaddressinfo",           &getaddressinfo,           {"address"} },
     { "wallet",             "getbalances",              &getbalances,              {} },
-    { "wallet",             "importmnemonic",           &importmnemonic,           {"mnemonic","passphrase","address","rescan"} },
+    { "wallet",             "importmnemonic",           &importmnemonic,           {"mnemonic","passphrase","address","rescan","validate"} },
     { "wallet",             "importmulti",              &importmulti,              {"requests","options"} },
     { "wallet",             "importprivkey",            &importprivkey,            {"privkey","label","rescan"} },
     { "wallet",             "importwallet",             &importwallet,             {"filename"} },

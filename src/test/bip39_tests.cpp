@@ -226,6 +226,22 @@ BOOST_AUTO_TEST_CASE(bip39_check)
     BOOST_CHECK(!bip39::CheckMnemonic("", language, error));
 }
 
+BOOST_AUTO_TEST_CASE(bip39_check_words)
+{
+    // words without the BIP39 checksum (as the AOK mobile wallet makes them): accepted, and said so
+    std::string language, error;
+    bool fChecksumOk = true;
+    BOOST_CHECK(bip39::CheckMnemonicWords("abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon", language, error, fChecksumOk));
+    BOOST_CHECK(!fChecksumOk);
+    BOOST_CHECK_EQUAL(language, "english");
+    BOOST_CHECK(bip39::CheckMnemonicWords("abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about", language, error, fChecksumOk));
+    BOOST_CHECK(fChecksumOk);
+    // an unknown word and a wrong number of words are still refused
+    BOOST_CHECK(!bip39::CheckMnemonicWords("abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abouty", language, error, fChecksumOk));
+    BOOST_CHECK(error.find("word 12") != std::string::npos);
+    BOOST_CHECK(!bip39::CheckMnemonicWords("abandon about", language, error, fChecksumOk));
+}
+
 BOOST_AUTO_TEST_CASE(bip39_path)
 {
     std::vector<uint32_t> path;

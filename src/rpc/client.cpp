@@ -105,6 +105,7 @@ static const CRPCConvertParam vRPCConvertParams[] =
     { "walletpassphrase", 1, "timeout" },
     { "walletpassphrase", 2, "stakingonly" },
     { "importmnemonic", 3, "rescan" },
+    { "importmnemonic", 4, "validate" },
     { "getblocktemplate", 0, "template_request" },
     { "listsinceblock", 1, "target_confirmations" },
     { "listsinceblock", 2, "include_watchonly" },

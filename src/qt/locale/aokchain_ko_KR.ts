@@ -8023,6 +8023,18 @@
         <translation>단어들이 서로 맞지 않습니다(체크섬). 잘못 적었거나 빠졌거나 순서가 바뀐 단어가 있습니다.</translation>
     </message>
     <message>
+        <source>Some wallets, such as the AOK mobile wallet, make the words without this checksum. If you copied them exactly, search without it.</source>
+        <translation>AOK 모바일 지갑처럼 이 체크섬 없이 단어를 만드는 지갑도 있습니다. 단어를 정확히 옮겨 적었다면 체크섬 없이 찾으세요.</translation>
+    </message>
+    <message>
+        <source>Search without the checksum</source>
+        <translation>체크섬 없이 찾기</translation>
+    </message>
+    <message numerus="yes">
+        <source>%n words; the checksum is not checked. If no coins are found, check the words again.</source>
+        <translation><numerusform>단어 %n개, 체크섬은 검사하지 않습니다. 코인을 찾지 못하면 단어를 다시 확인하세요.</numerusform></translation>
+    </message>
+    <message>
         <source>The wallet is still synchronizing. Coins in blocks that are not here yet would not be found: restore when the synchronization has finished.</source>
         <translation>지갑이 아직 동기화 중입니다. 아직 받지 못한 블록의 코인은 찾을 수 없으니 동기화가 끝난 뒤 복원하세요.</translation>
     </message>

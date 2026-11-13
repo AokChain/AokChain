@@ -114,6 +114,19 @@ bool Normalize(const std::string& str, bool fWords, std::string& out)
 
 bool CheckMnemonic(const std::string& mnemonic, std::string& language, std::string& error)
 {
+    bool fChecksumOk = false;
+    if (!CheckMnemonicWords(mnemonic, language, error, fChecksumOk))
+        return false;
+    if (!fChecksumOk) {
+        error = "the checksum of the mnemonic is wrong (a word is mistyped, missing or out of order)";
+        return false;
+    }
+    return true;
+}
+
+bool CheckMnemonicWords(const std::string& mnemonic, std::string& language, std::string& error, bool& fChecksumOk)
+{
+    fChecksumOk = false;
     std::vector<std::string> words;
     size_t start = 0;
     while (start <= mnemonic.size()) {
@@ -173,12 +186,9 @@ bool CheckMnemonic(const std::string& mnemonic, std::string& language, std::stri
     unsigned char hash[CSHA256::OUTPUT_SIZE];
     CSHA256().Write(bits.data(), nEntropyBytes).Finalize(hash);
     const unsigned char mask = 0xFF << (8 - nChecksumBits);
-    const bool fOk = (bits[nEntropyBytes] & mask) == (hash[0] & mask);
+    fChecksumOk = (bits[nEntropyBytes] & mask) == (hash[0] & mask);
     memory_cleanse(bits.data(), bits.size());
-    if (!fOk) {
-        error = "the checksum of the mnemonic is wrong (a word is mistyped, missing or out of order)";
-        return false;
-    }
+    memory_cleanse(hash, sizeof(hash));
     return true;
 }
 

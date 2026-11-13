@@ -58,10 +58,11 @@ struct Plan {
 };
 
 /**
- * Check the words (English and Korean word lists, checksum) and make the
- * BIP32 master key. The inputs are not kept.
+ * Check the words (English and Korean word lists, and the checksum unless
+ * fRequireChecksum is false: some wallets, such as the AOK mobile wallet, make
+ * words without it) and make the BIP32 master key. The inputs are not kept.
  */
-bool MasterFromMnemonic(const SecureString& words, const SecureString& passphrase, CExtKey& master, std::string& language, std::string& error);
+bool MasterFromMnemonic(const SecureString& words, const SecureString& passphrase, CExtKey& master, std::string& language, std::string& error, bool fRequireChecksum = true);
 
 /**
  * Find what to import. Looks at the usual layouts (bip39::CandidateLayouts)

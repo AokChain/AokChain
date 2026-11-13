@@ -14,6 +14,7 @@
 
 #include <atomic>
 
+class QCheckBox;
 class QLabel;
 class QLineEdit;
 class QPlainTextEdit;
@@ -97,6 +98,7 @@ private:
     QStackedWidget *stack;
     QPlainTextEdit *words;
     QLabel *wordsStatus;
+    QCheckBox *noChecksum; //!< shown when only the checksum of the words is wrong
     QLineEdit *passphrase;
     QLineEdit *address;
     QLabel *enterError;

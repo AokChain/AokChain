@@ -17,6 +17,8 @@ from test_framework.util import assert_equal, assert_raises_rpc_error, connect_n
 WORDS = "legal winner thank year wave sausage worth useful legal winner thank yellow"
 KOREAN = "가격 가격 가격 가격 가격 가격 가격 가격 가격 가격 가격 가능"
 OTHER = "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about"
+# every word is in the list, but the BIP39 checksum is wrong, as in the words the AOK mobile wallet makes
+NOCHECK = WORDS.replace("yellow", "year")
 
 
 class ImportMnemonicTest(AokChainTestFramework):
@@ -40,13 +42,15 @@ class ImportMnemonicTest(AokChainTestFramework):
             self.address(WORDS, "m/0'/0'", 7): 1,             # not hardened child of m/0'/0'
             self.address(KOREAN, "m/44'/0'/0'/0", 1, "비밀"): 7,
             self.address(OTHER, "m/44'/1999'/0'/0", 3): 4,    # unusual coin type: needs the address
+            node.mnemonictokeys(NOCHECK, "m/44'/0'/0'/0", 1, "", 0, False)["keys"][0]["address"]: 6,
         }
         funder.sendmany("", pay)
         funder.generate(1)
         sync_blocks(self.nodes)
 
         self.log.info("Errors")
-        assert_raises_rpc_error(-8, "checksum", node.importmnemonic, WORDS.replace("yellow", "year"))
+        assert_raises_rpc_error(-8, "checksum", node.importmnemonic, NOCHECK)
+        assert_raises_rpc_error(-8, "pass validate=false", node.importmnemonic, NOCHECK)
         assert_raises_rpc_error(-4, "No coins were found", node.importmnemonic, OTHER)
         assert_raises_rpc_error(-4, "No coins were found", node.importmnemonic, WORDS, "wrong passphrase")
         assert_raises_rpc_error(-5, "pay-to-pubkey-hash", node.importmnemonic, WORDS, "", "nonsense")
@@ -102,6 +106,15 @@ class ImportMnemonicTest(AokChainTestFramework):
         assert_equal(node.getbalance(), before + 4)
         assert node.validateaddress(unused)["ismine"]
         assert_raises_rpc_error(-4, "does not belong", node.importmnemonic, OTHER, "x", unused)
+
+        self.log.info("Words without the BIP39 checksum (the AOK mobile wallet) are restored with validate=false")
+        before = node.getbalance()
+        res = node.importmnemonic(NOCHECK, "", "", True, False)
+        assert_equal(res["language"], "english")
+        assert_equal([(entry["path"], entry["amount"]) for entry in res["found"]], [("m/44'/0'/0'/0/0", 6)])
+        assert_equal(node.getbalance(), before + 6)
+        # the words themselves are still checked
+        assert_raises_rpc_error(-8, "not in the english word list", node.importmnemonic, NOCHECK.replace("wave", "wavy"), "", "", True, False)
 
         self.log.info("An encrypted wallet has to be unlocked, and not for staking only")
         encrypted.node_encrypt_wallet("pass")

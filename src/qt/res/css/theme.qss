@@ -138,6 +138,7 @@ QLabel[role="fieldLabel"] { color: @label; font-size: 13px; font-weight: 600; }
 QLabel[role="tag"] { background-color: @chip; color: @chipText; border: none; border-radius: 4px; padding: 2px 8px; font-size: 11px; font-weight: 600; }
 QLabel[role="ok"] { color: @ok; font-size: 12px; }
 QLabel[role="error"] { color: @error; font-size: 12px; }
+QLabel[role="caution"] { color: @warnText; font-size: 12px; }
 QLabel[role="resultOk"] { background-color: @okSoft; color: @ok; border: none; border-radius: 8px; padding: 8px 16px; font-size: 13px; font-weight: 600; }
 QLabel[role="resultError"] { background-color: @errorSoft; color: @error; border: none; border-radius: 8px; padding: 8px 16px; font-size: 13px; font-weight: 600; }
 QLabel[role="warning"] { background-color: @warnBg; color: @warnText; border: none; border-radius: 8px; padding: 10px 16px; font-size: 12px; }

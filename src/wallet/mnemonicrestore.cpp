@@ -28,7 +28,7 @@ void Plan::Clear()
     knownPath.clear();
 }
 
-bool MasterFromMnemonic(const SecureString& words, const SecureString& passphrase, CExtKey& master, std::string& language, std::string& error)
+bool MasterFromMnemonic(const SecureString& words, const SecureString& passphrase, CExtKey& master, std::string& language, std::string& error, bool fRequireChecksum)
 {
     std::string mnemonic, pass;
     bool fOk = true;
@@ -48,8 +48,13 @@ bool MasterFromMnemonic(const SecureString& words, const SecureString& passphras
         }
         memory_cleanse(&in[0], in.size());
     }
-    if (fOk && !bip39::CheckMnemonic(mnemonic, language, error))
-        fOk = false;
+    if (fOk) {
+        bool fChecksumOk = false;
+        if (fRequireChecksum)
+            fOk = bip39::CheckMnemonic(mnemonic, language, error);
+        else
+            fOk = bip39::CheckMnemonicWords(mnemonic, language, error, fChecksumOk);
+    }
     if (fOk) {
         std::vector<unsigned char> seed = bip39::MnemonicToSeed(mnemonic, pass);
         master.SetSeed(seed.data(), seed.size());

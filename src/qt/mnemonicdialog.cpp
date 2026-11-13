@@ -19,6 +19,7 @@
 #include "support/cleanse.h"
 #include "validation.h"
 
+#include <QCheckBox>
 #include <QHBoxLayout>
 #include <QHeaderView>
 #include <QLabel>
@@ -175,7 +176,13 @@ QWidget *MnemonicDialog::enterPage()
     layout->addWidget(words);
     wordsStatus = new QLabel(page);
     wordsStatus->setProperty("role", "caption");
+    wordsStatus->setWordWrap(true);
     layout->addWidget(wordsStatus);
+    // Some wallets (the AOK mobile wallet) make the words without the BIP39 checksum; the
+    // seed is still made from the words as BIP39 says, so such words restore their keys.
+    noChecksum = new QCheckBox(tr("Search without the checksum"), page);
+    noChecksum->hide();
+    layout->addWidget(noChecksum);
     layout->addSpacing(4);
 
     QLabel *passLabel = new QLabel(tr("Passphrase of the recovery words (optional)"), page);
@@ -219,6 +226,7 @@ QWidget *MnemonicDialog::enterPage()
     connect(validateTimer, SIGNAL(timeout()), this, SLOT(validateWords()));
     connect(cancel, SIGNAL(clicked()), this, SLOT(reject()));
     connect(findButton, SIGNAL(clicked()), this, SLOT(findAddresses()));
+    connect(noChecksum, SIGNAL(toggled(bool)), this, SLOT(validateWords()));
     validateWords();
     return page;
 }
@@ -357,6 +365,7 @@ void MnemonicDialog::validateWords()
     wipe(utf8);
     std::string normalized, language, error;
     bool ok = false;
+    bool checksumOnly = false; // every word is in the list, only the checksum is wrong
     QString status;
     QString role = "caption";
     if (!bip39::Normalize(raw, true, normalized)) {
@@ -376,13 +385,29 @@ void MnemonicDialog::validateWords()
             status = tr("%n words so far. 12, 15, 18, 21 or 24 are needed.", "", count);
         } else {
             QRegExp unknown("word (\\d+) ");
-            if (unknown.indexIn(QString::fromStdString(error)) >= 0)
+            if (unknown.indexIn(QString::fromStdString(error)) >= 0) {
                 status = tr("Word %1 is not in the word list. Check its spelling.").arg(unknown.cap(1));
-            else
-                status = tr("The words do not fit together (checksum). A word is mistyped, missing or out of order.");
-            role = "error";
+                role = "error";
+            } else {
+                checksumOnly = true;
+                if (noChecksum->isChecked()) {
+                    ok = true;
+                    status = tr("%n words; the checksum is not checked. If no coins are found, check the words again.", "", count);
+                    role = "caution";
+                } else {
+                    status = tr("The words do not fit together (checksum). A word is mistyped, missing or out of order.") + " " +
+                             tr("Some wallets, such as the AOK mobile wallet, make the words without this checksum. If you copied them exactly, search without it.");
+                    role = "error";
+                }
+            }
         }
     }
+    if (!checksumOnly && noChecksum->isChecked()) {
+        const bool blocked = noChecksum->blockSignals(true);
+        noChecksum->setChecked(false);
+        noChecksum->blockSignals(blocked);
+    }
+    noChecksum->setVisible(checksumOnly);
     if (!raw.empty())
         memory_cleanse(&raw[0], raw.size());
     if (!normalized.empty())
@@ -452,7 +477,8 @@ void MnemonicDialog::findAddresses()
         SecureString securePass(passUtf8.constData(), passUtf8.size());
         wipe(wordsUtf8);
         wipe(passUtf8);
-        ok = mnemonicrestore::MasterFromMnemonic(secureWords, securePass, worker->master, language, error);
+        // (the box is only checked while the checksum of these words is the only problem)
+        ok = mnemonicrestore::MasterFromMnemonic(secureWords, securePass, worker->master, language, error, !noChecksum->isChecked());
     }
     if (!ok) {
         enterError->setText(errorText(QString::fromStdString(error)));

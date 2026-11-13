@@ -32,6 +32,14 @@ bool Normalize(const std::string& str, bool fWords, std::string& out);
  */
 bool CheckMnemonic(const std::string& mnemonic, std::string& language, std::string& error);
 
+/**
+ * Check the number of words and the words of a normalized mnemonic as
+ * CheckMnemonic does, but accept a wrong checksum: fChecksumOk tells whether it
+ * was right. Some wallets, such as the AOK mobile wallet, make recovery words
+ * without the BIP39 checksum and make the seed from the words as BIP39 says.
+ */
+bool CheckMnemonicWords(const std::string& mnemonic, std::string& language, std::string& error, bool& fChecksumOk);
+
 /** The 64 byte seed: PBKDF2-HMAC-SHA512(mnemonic, "mnemonic" + passphrase, 2048). */
 std::vector<unsigned char> MnemonicToSeed(const std::string& mnemonic, const std::string& passphrase);
 

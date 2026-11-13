@@ -183,9 +183,9 @@ UniValue importmnemonic(const JSONRPCRequest& request)
         return NullUniValue;
     }
 
-    if (request.fHelp || request.params.size() < 1 || request.params.size() > 4)
+    if (request.fHelp || request.params.size() < 1 || request.params.size() > 5)
         throw std::runtime_error(
-            "importmnemonic \"mnemonic\" ( \"passphrase\" \"address\" rescan )\n"
+            "importmnemonic \"mnemonic\" ( \"passphrase\" \"address\" rescan validate )\n"
             "\nAdds the keys of another wallet to this wallet, from its BIP39 mnemonic (recovery words).\n"
             "The usual key paths are searched for addresses that hold coins now (unspent outputs of the\n"
             "chain); the keys of those paths are imported up to 20 places past the last one in use,\n"
@@ -198,6 +198,9 @@ UniValue importmnemonic(const JSONRPCRequest& request)
             "2. \"passphrase\"  (string, optional, default=\"\") The optional BIP39 passphrase (\"25th word\")\n"
             "3. \"address\"     (string, optional, default=\"\") An address of the wallet that created the mnemonic\n"
             "4. rescan        (boolean, optional, default=true) Rescan the chain for the transactions of the imported keys\n"
+            "5. validate      (boolean, optional, default=true) Check the BIP39 checksum of the words. Some wallets, such as the\n"
+            "                 AOK mobile wallet, make words without it: with false a wrong checksum is accepted (the\n"
+            "                 words must still be words of the English or Korean list)\n"
             "\nResult:\n"
             "{\n"
             "  \"language\": \"xxx\",   (string) word list of the mnemonic\n"
@@ -235,8 +238,9 @@ UniValue importmnemonic(const JSONRPCRequest& request)
     {
         const SecureString words(request.params[0].get_str().c_str());
         const SecureString passphrase(request.params[1].isNull() ? "" : request.params[1].get_str().c_str());
-        if (!mnemonicrestore::MasterFromMnemonic(words, passphrase, master, language, error))
-            throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid mnemonic: " + error);
+        const bool fRequireChecksum = request.params[4].isNull() || request.params[4].get_bool();
+        if (!mnemonicrestore::MasterFromMnemonic(words, passphrase, master, language, error, fRequireChecksum))
+            throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid mnemonic: " + error + (fRequireChecksum && error.find("checksum") != std::string::npos ? ". If the words are right, the wallet that made them may not use the BIP39 checksum: pass validate=false" : ""));
     }
 
     mnemonicrestore::Plan plan;
