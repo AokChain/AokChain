@@ -507,7 +507,7 @@ std::string HelpMessage(HelpMessageMode mode)
         strUsage += HelpMessageOpt("-masteraddress=<address>", "Governance master address, to test governance commands with a key of the test (regtest-only)");
         strUsage += HelpMessageOpt("-futuredriftheight=<height>", "Height from which a proof-of-stake block may be at most 60 seconds ahead of the clock (regtest-only)");
         strUsage += HelpMessageOpt("-restorecointime", "Give the coins of a disconnected block their transaction time back; 0 loses it as versions before 4.0 did (regtest-only, default: 1)");
-        strUsage += HelpMessageOpt("-snapshotparams=<height:block:utxo:tokens:governance:index>", "The chain state snapshot that is accepted, as getstatehashes prints it (regtest-only)");
+        strUsage += HelpMessageOpt("-snapshotparams=<height:block:utxo:tokens:governance:index[:archive]>", "The chain state snapshot that is accepted, as getstatehashes prints it, and optionally the SHA-256 of its files (regtest-only)");
         strUsage += HelpMessageOpt("-oldpeercutoffheight=<height>", "Chain height from which peers below the current protocol version are disconnected (regtest-only)");
         strUsage += HelpMessageOpt("-vbparams=deployment:start:end", "Use given start/end times for specified version bits deployment (regtest-only)");
     }
@@ -1221,8 +1221,8 @@ bool AppInitParameterInteraction()
         std::vector<std::string> fields;
         boost::split(fields, gArgs.GetArg("-snapshotparams", ""), boost::is_any_of(":"));
         CChainParams::SnapshotParams snapshot;
-        bool valid = fields.size() == 6 && ParseInt32(fields[0], &snapshot.height) && snapshot.height > 0;
-        for (size_t i = 1; valid && i < 6; ++i)
+        bool valid = (fields.size() == 6 || fields.size() == 7) && ParseInt32(fields[0], &snapshot.height) && snapshot.height > 0;
+        for (size_t i = 1; valid && i < fields.size(); ++i)
             valid = fields[i].size() == 64 && IsHex(fields[i]);
         if (!valid) {
             return InitError("Invalid -snapshotparams");
@@ -1232,6 +1232,11 @@ bool AppInitParameterInteraction()
         snapshot.tokens = uint256S(fields[3]);
         snapshot.governance = uint256S(fields[4]);
         snapshot.index = uint256S(fields[5]);
+        if (fields.size() == 7) {
+            snapshot.archive = fields[6];
+            for (char& c : snapshot.archive)
+                c = (char)tolower((unsigned char)c);
+        }
         UpdateSnapshotParams(snapshot);
         LogPrintf("Setting the accepted snapshot to height %d\n", snapshot.height);
     }

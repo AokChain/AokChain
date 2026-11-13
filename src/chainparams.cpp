@@ -295,6 +295,8 @@ public:
         snapshot.tokens = uint256S("8cc81e204a99e3042eb186aec7859c654c7bf4c1e5e25f2801639e64ca6a0e0a");
         snapshot.governance = uint256S("93823e7f577c05fcafa2eb7ebb71cc80019bb55d6a4a5b03480a0fc36004e4e5");
         snapshot.index = uint256S("b37c8739de4a505a0b6b3ea3ae44744d7b9c16ee9ed0aae8bd34050667e4bfa6");
+        // snapshot-03031432.part01 to part06, as published (cat ... | sha256sum)
+        snapshot.archive = "59fb02038659788284d999b210a6f272fa66f4bc3f77401dd11f5cff8c76d8a4";
         /** TOKENS END **/
     }
 };

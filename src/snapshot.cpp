@@ -9,6 +9,7 @@
 #include "chainparams.h"
 #include "coins.h"
 #include "consensus/merkle.h"
+#include "crypto/sha256.h"
 #include "fs.h"
 #include "governance/governance.h"
 #include "gunzip.h"
@@ -882,6 +883,40 @@ bool InstallSnapshotIfWanted(std::function<void(const std::string&)> status)
         if (!ShutdownRequested())
             fs::remove_all(dir, ec);
         return false;
+    }
+
+    // The program pins the published files: nothing else is unpacked. (The content hashes can
+    // only be compared once the databases are opened, so other files would reach the database
+    // code before that check.)
+    if (!pinned.archive.empty()) {
+        status(_("Fast start: checking the snapshot files..."));
+        CSHA256 hasher;
+        std::vector<unsigned char> buffer(1 << 20);
+        bool readable = true;
+        for (const std::string& path : paths) {
+            FILE* file = fsbridge::fopen(fs::path(path), "rb");
+            if (!file) {
+                readable = false;
+                break;
+            }
+            size_t n;
+            while ((n = fread(buffer.data(), 1, buffer.size(), file)) > 0)
+                hasher.Write(buffer.data(), n);
+            fclose(file);
+        }
+        unsigned char digest[CSHA256::OUTPUT_SIZE];
+        hasher.Finalize(digest);
+        const std::string sha256 = HexStr(digest, digest + CSHA256::OUTPUT_SIZE);
+        if (!readable || sha256 != pinned.archive) {
+            LogPrintf("Snapshot: the files are not the ones that this program accepts (SHA-256 %s, accepted %s). The node synchronizes by validating the blocks.\n",
+                      readable ? sha256 : "unreadable", pinned.archive);
+            for (size_t i = 0; i < paths.size(); ++i) {
+                if (temporary[i])
+                    fs::remove(fs::path(paths[i]), ec);
+            }
+            fs::remove_all(dir, ec);
+            return false;
+        }
     }
 
     // unpack: the parts are one gzip stream

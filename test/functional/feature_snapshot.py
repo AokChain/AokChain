@@ -24,6 +24,7 @@ with the values of getstatehashes as the accepted snapshot (-snapshotparams):
 """
 
 import json
+import hashlib
 import os
 import shutil
 import struct
@@ -69,10 +70,19 @@ class SnapshotTest(AokChainTestFramework):
         with open(os.path.join(self.nodes[i].datadir, "regtest", "debug.log"), errors="replace") as f:
             return f.read()
 
-    def params(self, **changes):
+    def params(self, archive=None, **changes):
         values = dict(self.hashes)
         values.update(changes)
-        return "-snapshotparams=%d:%s" % (values["height"], ":".join(values[k] for k in ("block", "utxo", "tokens", "governance", "index")))
+        value = "-snapshotparams=%d:%s" % (values["height"], ":".join(values[k] for k in ("block", "utxo", "tokens", "governance", "index")))
+        return value + (":" + archive if archive else "")
+
+    def archive_sha256(self, folder, manifest):
+        """SHA-256 of the snapshot files of the manifest, in order, as one stream."""
+        sha = hashlib.sha256()
+        for part in manifest["parts"]:
+            with open(os.path.join(folder, part["file"]), "rb") as f:
+                sha.update(f.read())
+        return sha.hexdigest()
 
     def assert_same_state(self, a, b, index=True, full=True):
         """full=False after a reorganization: the undo data of a block has neither the time nor the
@@ -251,10 +261,18 @@ class SnapshotTest(AokChainTestFramework):
         self.assert_fell_back(3, rejected=False)
         assert "Snapshot: download failed" in self.log_of(3)
 
+        self.log.info("Files that are not the ones the program pins are not unpacked")
+        # (the content would have the accepted hashes, but the program pins the published files)
+        self.fresh(3, ["-bootstrapdir=" + self.archives, self.params(archive="00" * 32)])
+        self.assert_fell_back(3, rejected=False)
+        assert "Snapshot: the files are not the ones that this program accepts" in self.log_of(3)
+        assert "Snapshot: accepted" not in self.log_of(3)
+
         self.log.info("The snapshot is accepted; the download survives a restart")
         self.wipe(2)
         node2 = self.nodes[2]
-        args2 = COMMON + STAKING + [source, self.params()]
+        # (with the files pinned, as on the main network)
+        args2 = COMMON + STAKING + [source, self.params(archive=self.archive_sha256(self.archives, manifest))]
         server.delay = 1
         node2.start(args2)
         download = os.path.join(node2.datadir, "regtest", "snapshot-download")

@@ -83,6 +83,11 @@ public:
         uint256 tokens;
         uint256 governance;
         uint256 index;
+        /** SHA-256 (hex, as sha256sum prints it) of the published snapshot: its parts in order, as
+         *  one stream. Checked before the snapshot is unpacked, so that no other files reach the
+         *  database code, which reads them before the hashes above can be compared. Empty: not
+         *  checked. */
+        std::string archive;
     };
     const SnapshotParams& Snapshot() const { return snapshot; }
     void SetSnapshot(const SnapshotParams& params) { snapshot = params; }
