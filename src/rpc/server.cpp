@@ -39,6 +39,9 @@ static CCriticalSection cs_rpcWarmup;
 /* Timer-creating functions */
 static RPCTimerInterface* timerInterface = nullptr;
 /* Map of name to timer. */
+/* Timers of RPCRunLater(), by name. Guarded by cs_deadlineTimers: RPC calls run in several
+ * threads, and two walletpassphrase calls at once changed the map at the same time. */
+static CCriticalSection cs_deadlineTimers;
 static std::map<std::string, std::unique_ptr<RPCTimerBase> > deadlineTimers;
 
 static struct CRPCSignals
@@ -374,7 +377,10 @@ void InterruptRPC()
 void StopRPC()
 {
     LogPrint(BCLog::RPC, "Stopping RPC\n");
-    deadlineTimers.clear();
+    {
+        LOCK(cs_deadlineTimers);
+        deadlineTimers.clear();
+    }
     DeleteAuthCookie();
     g_rpcSignals.Stopped();
 }
@@ -610,6 +616,7 @@ void RPCRunLater(const std::string& name, std::function<void(void)> func, int64_
 {
     if (!timerInterface)
         throw JSONRPCError(RPC_INTERNAL_ERROR, "No timer handler registered for RPC");
+    LOCK(cs_deadlineTimers);
     deadlineTimers.erase(name);
     LogPrint(BCLog::RPC, "queue run of timer %s in %i seconds (using %s)\n", name, nSeconds, timerInterface->Name());
     deadlineTimers.emplace(name, std::unique_ptr<RPCTimerBase>(timerInterface->NewTimer(func, nSeconds*1000)));
@@ -617,6 +624,7 @@ void RPCRunLater(const std::string& name, std::function<void(void)> func, int64_
 
 void RPCCancelLater(const std::string& name)
 {
+    LOCK(cs_deadlineTimers);
     deadlineTimers.erase(name);
 }
 

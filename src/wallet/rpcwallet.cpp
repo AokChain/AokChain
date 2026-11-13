@@ -2551,9 +2551,13 @@ UniValue keypoolrefill(const JSONRPCRequest& request)
 }
 
 
-static void LockWallet(CWallet* pWallet)
+/** The timer of walletpassphrase. nRelockTime: the time the call set; a later call, walletlock
+ *  or an unlock for staking only changed it, and then this timer has nothing to do. */
+static void LockWallet(CWallet* pWallet, int64_t nRelockTime)
 {
     LOCK(pWallet->cs_wallet);
+    if (pWallet->nRelockTime != nRelockTime)
+        return;
     pWallet->nRelockTime = 0;
     if (pWallet->fRestoreStakingOnlyUnlock && !pWallet->IsLocked()) {
         // The time of walletpassphrase is over: back to what was before it, open for staking only.
@@ -2597,6 +2601,14 @@ UniValue walletpassphrase(const JSONRPCRequest& request)
         );
     }
 
+    // The relock timer is queued or cancelled after the locks are released: replacing a timer
+    // waits for its callback when that runs at the moment, and the callback takes cs_wallet
+    // (upstream PR #18487).
+    const std::string strTimer = strprintf("lockwallet(%s)", pwallet->GetName());
+    bool fCancelTimer = false;
+    int64_t nRelockTime = 0;
+    int64_t nTimerSeconds = 0;
+    {
     LOCK2(cs_main, pwallet->cs_wallet);
 
     if (request.fHelp)
@@ -2643,14 +2655,23 @@ UniValue walletpassphrase(const JSONRPCRequest& request)
         // stakingonly a timeout of 0 locks at once, as before.)
         pwallet->nRelockTime = 0;
         pwallet->fRestoreStakingOnlyUnlock = false;
-        RPCCancelLater(strprintf("lockwallet(%s)", pwallet->GetName()));
+        fCancelTimer = true;
     } else {
         pwallet->nRelockTime = GetTime() + nSleepTime;
-        RPCRunLater(strprintf("lockwallet(%s)", pwallet->GetName()), boost::bind(LockWallet, pwallet), nSleepTime);
+        nRelockTime = pwallet->nRelockTime;
+        nTimerSeconds = nSleepTime;
     }
 
     // ppcoin: if user OS account compromised prevent trivial sendmoney commands
     pwallet->fUnlockStakingOnly = fStakingOnly;
+    }
+
+    if (fCancelTimer) {
+        RPCCancelLater(strTimer);
+    } else {
+        CWallet* const pwalletTimer = pwallet;
+        RPCRunLater(strTimer, [pwalletTimer, nRelockTime]() { LockWallet(pwalletTimer, nRelockTime); }, nTimerSeconds);
+    }
 
     return NullUniValue;
 }
