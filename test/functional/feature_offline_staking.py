@@ -96,6 +96,26 @@ class OfflineStakingTest(AokChainTestFramework):
         assert_equal(staker.scantxoutset("start", ["staking(%s)" % staking_address])["total_amount"], Decimal("8012"))
         assert_raises_rpc_error(-6, "Insufficient funds", staker.sendtoaddress, staker.getnewaddress(), 1)
 
+        self.log.info("A payment of the owner does not take delegated coins on its own")
+        assert owner.getbalance() >= 5000  # (the coins that were staked are immature)
+        assert_raises_rpc_error(-4, "Insufficient funds", owner.sendtoaddress, funder.getnewaddress(), 500)
+        # with ordinary coins in the wallet a payment takes those and leaves the delegated ones
+        funder.sendtoaddress(owner.getnewaddress(), 50)
+        self.sync_all()
+        t += SLOT
+        height = staker.getblockcount()
+        for node in self.nodes:
+            node.setmocktime(t)
+        wait_until(lambda: staker.getblockcount() > height, timeout=60)
+        sync_blocks(self.nodes)
+        delegated = staker.scantxoutset("start", ["staking(%s)" % staking_address])["total_amount"]
+        paid = owner.sendtoaddress(funder.getnewaddress(), 20)
+        for vin in owner.getrawtransaction(paid, True)["vin"]:
+            prev = owner.getrawtransaction(vin["txid"], True)["vout"][vin["vout"]]
+            assert prev["scriptPubKey"]["hex"] != script, "a delegated coin was spent"
+        self.sync_all()
+        assert_equal(staker.scantxoutset("start", ["staking(%s)" % staking_address])["total_amount"], delegated)
+
         self.log.info("The owner has the coins with the rewards and spends them")
         unspent = [u for u in owner.listunspent(0) if u["address"] == offline]
         assert len(unspent) >= 2, unspent

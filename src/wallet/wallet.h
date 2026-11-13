@@ -61,6 +61,8 @@ CWallet* GetWallet(const std::string& name);
 extern CFeeRate payTxFee;
 extern unsigned int nTxConfirmTarget;
 extern bool bSpendZeroConfChange;
+/** -spendofflinestaking: a payment may take coins at an offline staking address on its own */
+extern bool fSpendOfflineStaking;
 extern bool fWalletRbf;
 
 extern CAmount nReserveBalance;
@@ -83,6 +85,7 @@ static const CAmount MIN_CHANGE = CENT;
 static const CAmount MIN_FINAL_CHANGE = MIN_CHANGE/2;
 //! Default for -spendzeroconfchange
 static const bool DEFAULT_SPEND_ZEROCONF_CHANGE = true;
+static const bool DEFAULT_SPEND_OFFLINE_STAKING = false;
 //! Default for -walletrejectlongchains
 static const bool DEFAULT_WALLET_REJECT_LONG_CHAINS = false;
 //! -txconfirmtarget default

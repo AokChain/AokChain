@@ -90,6 +90,7 @@ CWallet* GetWallet(const std::string& name)
 CFeeRate payTxFee(DEFAULT_TRANSACTION_FEE);
 unsigned int nTxConfirmTarget = DEFAULT_TX_CONFIRM_TARGET;
 bool bSpendZeroConfChange = DEFAULT_SPEND_ZEROCONF_CHANGE;
+bool fSpendOfflineStaking = DEFAULT_SPEND_OFFLINE_STAKING;
 bool fWalletRbf = DEFAULT_WALLET_RBF;
 
 const uint32_t BIP32_HARDENED_KEY_LIMIT = 0x80000000;
@@ -4226,6 +4227,14 @@ bool CWallet::CreateTransactionAll(const std::vector<CRecipient>& vecSend, CWall
                 AvailableCoinsWithTokens(vAvailableCoins, mapTokenCoins, true, &coin_control);
             else
                 AvailableCoins(vAvailableCoins, true, &coin_control);
+                // Coins at an offline staking address are delegated to a staker. A payment does not
+                // take them on its own (that would end the delegation unasked); they are spent
+                // when they are selected, with coin control or in a raw transaction.
+                if (!fSpendOfflineStaking) {
+                    vAvailableCoins.erase(std::remove_if(vAvailableCoins.begin(), vAvailableCoins.end(), [&coin_control](const COutput& output) {
+                        return output.tx->tx->vout[output.i].scriptPubKey.IsOfflineStaking() && !coin_control.IsSelected(COutPoint(output.tx->GetHash(), output.i));
+                    }), vAvailableCoins.end());
+                }
             /** TOKENS END */
             // Create change script that will be used if we need change
             // TODO: pass in scriptChange instead of reservekey so
