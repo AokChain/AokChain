@@ -3229,6 +3229,16 @@ UniValue listwallets(const JSONRPCRequest& request)
     return obj;
 }
 
+/** A wallet name must not walk out of the place that it names ("..", "."): a caller that may
+ *  load or create wallets would otherwise reach any folder through a harmless looking name. */
+static void CheckWalletName(const std::string& name)
+{
+    for (const fs::path& part : fs::path(name)) {
+        if (part == ".." || part == ".")
+            throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid wallet name: \".\" and \"..\" are not allowed in it");
+    }
+}
+
 UniValue loadwallet(const JSONRPCRequest& request)
 {
     if (request.fHelp || request.params.size() != 1)
@@ -3249,6 +3259,7 @@ UniValue loadwallet(const JSONRPCRequest& request)
             + HelpExampleRpc("loadwallet", "\"test.dat\"")
         );
     std::string wallet_file = request.params[0].get_str();
+    CheckWalletName(wallet_file);
     std::string error;
 
     fs::path wallet_path = fs::absolute(wallet_file, GetWalletDir());
@@ -3424,6 +3435,7 @@ UniValue createwallet(const JSONRPCRequest& request)
         );
     }
     std::string wallet_name = request.params[0].get_str();
+    CheckWalletName(wallet_name);
     std::string error;
     std::string warning;
 

@@ -96,6 +96,10 @@ class WalletUnloadTest(AokChainTestFramework):
         assert_raises_rpc_error(-4, "of that name already", node.restorewallet, "second", backup)
         assert_raises_rpc_error(-8, "Backup file does not exist", node.restorewallet, "other", backup + ".none")
         assert_raises_rpc_error(-8, "plain name", node.restorewallet, "a/b", backup)
+        # no name that walks out of the wallet directory
+        assert_raises_rpc_error(-8, "Invalid wallet name", node.loadwallet, "../second")
+        assert_raises_rpc_error(-8, "Invalid wallet name", node.createwallet, "x/../../y")
+        assert_raises_rpc_error(-8, "Invalid wallet name", node.createwallet, "./z")
         node.unloadwallet("restored")
 
         self.log.info("The node stops and starts cleanly")
