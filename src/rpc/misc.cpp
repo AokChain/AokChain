@@ -821,31 +821,74 @@ bool getAddressFromIndex(const int &type, const uint160 &hash, std::string &addr
     return true;
 }
 
+/** One address of an address index call: an address, or a username (the address it names). */
+static void addIndexAddress(std::string address, std::vector<std::pair<uint160, int> > &addresses)
+{
+    if (IsUsernameValid(address)) {
+        address = ptokensdb->UsernameAddress(address);
+        if (address == "") {
+            throw JSONRPCError(RPC_INVALID_PARAMETER, "You specified invalid username.");
+        }
+    }
+
+    CAokChainAddress dest(address);
+    uint160 hashBytes;
+    int type = 0;
+    if (!dest.GetIndexKey(hashBytes, type)) {
+        throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Invalid address");
+    }
+
+    // an address given twice would count twice
+    const std::pair<uint160, int> entry = std::make_pair(hashBytes, type);
+    if (std::find(addresses.begin(), addresses.end(), entry) == addresses.end())
+        addresses.push_back(entry);
+}
+
+/**
+ * The addresses of an address index call: one address (or username) as a string, or
+ * {"addresses": ["address", ...], ...} as the help of these calls describes it.
+ */
 static bool getAddressesFromParams(const UniValue& params, std::vector<std::pair<uint160, int> > &addresses)
 {
     if (params[0].isStr()) {
-        std::string address = params[0].get_str();
-
-        if (IsUsernameValid(address)) {
-            address = ptokensdb->UsernameAddress(address);
-            if (address == "") {
-                throw JSONRPCError(RPC_INVALID_PARAMETER, "You specified invalid username.");
+        addIndexAddress(params[0].get_str(), addresses);
+    } else if (params[0].isObject()) {
+        const UniValue list = find_value(params[0].get_obj(), "addresses");
+        if (!list.isArray() || list.empty()) {
+            throw JSONRPCError(RPC_INVALID_PARAMETER, "\"addresses\" is expected to be an array of at least one address");
+        }
+        for (size_t i = 0; i < list.size(); ++i) {
+            if (!list[i].isStr()) {
+                throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Invalid address");
             }
+            addIndexAddress(list[i].get_str(), addresses);
         }
-
-        CAokChainAddress dest(address);
-        uint160 hashBytes;
-        int type = 0;
-        if (!dest.GetIndexKey(hashBytes, type)) {
-            throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Invalid address");
-        }
-
-        addresses.push_back(std::make_pair(hashBytes, type));
     } else {
         throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Invalid address");
     }
 
     return true;
+}
+
+/** Start and end height of an address index call ({"start": n, "end": n}); 0 and 0 when not given. */
+static void getHeightRangeFromParams(const UniValue& params, int& start, int& end)
+{
+    start = 0;
+    end = 0;
+    if (!params[0].isObject())
+        return;
+    const UniValue startValue = find_value(params[0].get_obj(), "start");
+    const UniValue endValue = find_value(params[0].get_obj(), "end");
+    if (startValue.isNum() && endValue.isNum()) {
+        start = startValue.get_int();
+        end = endValue.get_int();
+        if (start <= 0 || end <= 0) {
+            throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Start and end is expected to be greater than zero");
+        }
+        if (end < start) {
+            throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "End value is expected to be greater than start");
+        }
+    }
 }
 
 bool heightSort(std::pair<CAddressUnspentKey, CAddressUnspentValue> a,
@@ -865,6 +908,7 @@ UniValue getaddressmempool(const JSONRPCRequest& request)
             "getaddressmempool\n"
             "\nReturns all mempool deltas for an address (requires addressindex to be enabled).\n"
             "\nArguments:\n"
+            "\"address\"  (string) An address or a username, or the object:\n"
             "{\n"
             "  \"addresses\"\n"
             "    [\n"
@@ -949,54 +993,133 @@ UniValue getaddressmempool(const JSONRPCRequest& request)
     return result;
 }
 
+/** The order of the outputs of getaddressutxos and of its pages: block height, transaction id, output index. */
+static bool unspentOrder(const std::pair<CAddressUnspentKey, CAddressUnspentValue>& a,
+                         const std::pair<CAddressUnspentKey, CAddressUnspentValue>& b)
+{
+    if (a.second.blockHeight != b.second.blockHeight)
+        return a.second.blockHeight < b.second.blockHeight;
+    if (a.first.txhash != b.first.txhash)
+        return a.first.txhash < b.first.txhash;
+    return a.first.index < b.first.index;
+}
+
+/** The place of an output in that order, as the "next" of a page: "height:txid:index" */
+static std::string unspentCursor(const std::pair<CAddressUnspentKey, CAddressUnspentValue>& entry)
+{
+    return strprintf("%d:%s:%u", entry.second.blockHeight, entry.first.txhash.GetHex(), (unsigned int)entry.first.index);
+}
+
 UniValue getaddressutxos(const JSONRPCRequest& request)
 {
     if (request.fHelp || request.params.size() < 1 || request.params.size() > 3)
         throw std::runtime_error(
-            "getaddressutxos\n"
-            "\nReturns all unspent outputs for an address (requires addressindex to be enabled).\n"
+            "getaddressutxos \"address\" ( amount \"tokenName\" )\n"
+            "getaddressutxos {\"addresses\": [\"address\",...], ...}\n"
+            "\nReturns the unspent outputs of addresses that are not time locked any more (requires addressindex to be enabled),\n"
+            "in the order of their block height, then of their transaction id and output index.\n"
             "\nArguments:\n"
+            "1. \"address\"        (string) An address or a username\n"
+            "   or an object:\n"
             "{\n"
-            "  \"addresses\"\n"
-            "    [\n"
-            "      \"address\"  (string) The base58check encoded address\n"
-            "      ,...\n"
-            "    ],\n"
-            "  \"chainInfo\",  (boolean, optional, default false) Include chain info with results\n"
-            "  \"tokenName\"   (string, optional) Get UTXOs for a particular token instead of AOK ('*' for all tokens).\n"
+            "  \"addresses\": [\"address\",...]  (array) The addresses (or usernames)\n"
+            "  \"tokenName\": \"name\"   (string, optional) Outputs of this token instead of AOK ('*' for all tokens)\n"
+            "  \"amount\": n           (numeric, optional) Stop once the listed outputs add up to this amount\n"
+            "  \"chainInfo\": true|false  (boolean, optional, default false) Return an object with the hash and height of the tip as well\n"
+            "  \"limit\": n            (numeric, optional) At most n outputs: the result is an object, its \"next\" leads to the next page\n"
+            "  \"after\": \"next\"       (string, optional) Continue after this output: the \"next\" of the previous page\n"
+            "                         (\"height:txid:index\"), or \"txid:index\" of an output that is still unspent\n"
             "}\n"
+            "2. amount           (numeric, optional) As \"amount\" above, after an address\n"
+            "3. \"tokenName\"      (string, optional) As \"tokenName\" above, after an address\n"
             "\nResult\n"
             "[\n"
             "  {\n"
             "    \"address\"  (string) The address base58check encoded\n"
-            "    \"tokenName\" (string) The token associated with the UTXOs (AOK for AokChain)\n"
+            "    \"token_name\" (string) The token associated with the UTXOs (AOK for AokChain)\n"
             "    \"txid\"  (string) The output txid\n"
-            "    \"height\"  (number) The block height\n"
             "    \"outputIndex\"  (number) The output index\n"
-            "    \"script\"  (strin) The script hex encoded\n"
+            "    \"script\"  (string) The script hex encoded\n"
+            "    \"asm\"  (string) The script\n"
             "    \"satoshis\"  (number) The number of satoshis of the output\n"
+            "    \"height\"  (number) The block height\n"
+            "    \"timelock\"  (number) The lock time of the output (0 when it was not locked)\n"
             "  }\n"
             "]\n"
+            "With \"limit\" or \"chainInfo\":\n"
+            "{\n"
+            "  \"utxos\": [...]     (array) The outputs as above\n"
+            "  \"next\": \"next\"      (string or null) With \"limit\": where the next page starts, null on the last page\n"
+            "  \"hash\": \"hash\"      (string) With \"chainInfo\": the hash of the tip\n"
+            "  \"height\": n        (number) With \"chainInfo\": the height of the tip\n"
+            "}\n"
             "\nExamples:\n"
+            + HelpExampleCli("getaddressutxos", "\"12c6DSiU4Rq3P4ZxziKxzrL5LmMBrzjrJX\"")
             + HelpExampleCli("getaddressutxos", "'{\"addresses\": [\"12c6DSiU4Rq3P4ZxziKxzrL5LmMBrzjrJX\"]}'")
-            + HelpExampleRpc("getaddressutxos", "{\"addresses\": [\"12c6DSiU4Rq3P4ZxziKxzrL5LmMBrzjrJX\"]}")
-            + HelpExampleCli("getaddressutxos", "'{\"addresses\": [\"12c6DSiU4Rq3P4ZxziKxzrL5LmMBrzjrJX\"],\"tokenName\":\"MY_TOKEN\"}'")
+            + HelpExampleCli("getaddressutxos", "'{\"addresses\": [\"12c6DSiU4Rq3P4ZxziKxzrL5LmMBrzjrJX\"], \"limit\": 1000}'")
+            + HelpExampleRpc("getaddressutxos", "{\"addresses\": [\"12c6DSiU4Rq3P4ZxziKxzrL5LmMBrzjrJX\"], \"limit\": 1000, \"after\": \"<next of the last page>\"}")
             + HelpExampleRpc("getaddressutxos", "{\"addresses\": [\"12c6DSiU4Rq3P4ZxziKxzrL5LmMBrzjrJX\"],\"tokenName\":\"MY_TOKEN\"}")
             );
 
+    const UniValue options = request.params[0].isObject() ? request.params[0].get_obj() : UniValue(UniValue::VOBJ);
+
     CAmount requiredAmount = 0;
-    if (!request.params[1].isNull()) {
+    const UniValue amountOption = find_value(options, "amount");
+    if (!amountOption.isNull()) {
+        requiredAmount = AmountFromValue(amountOption);
+    } else if (!request.params[1].isNull()) {
         requiredAmount = AmountFromValue(request.params[1]);
     }
 
     std::string tokenName = AOK;
-    if (!request.params[2].isNull()) {
-        if (request.params[2].isStr()) {
-            if (!AreTokensDeployed()) {
-                throw JSONRPCError(RPC_INVALID_PARAMETER, "Tokens aren't active.  tokenName can't be specified.");
-            }
-            tokenName = request.params[2].get_str();
+    const UniValue tokenOption = find_value(options, "tokenName");
+    const UniValue& tokenValue = tokenOption.isNull() ? request.params[2] : tokenOption;
+    if (tokenValue.isStr()) {
+        if (!AreTokensDeployed()) {
+            throw JSONRPCError(RPC_INVALID_PARAMETER, "Tokens aren't active.  tokenName can't be specified.");
         }
+        tokenName = tokenValue.get_str();
+    }
+
+    const UniValue chainInfoOption = find_value(options, "chainInfo");
+    const bool includeChainInfo = chainInfoOption.isBool() && chainInfoOption.get_bool();
+
+    // pages: at most "limit" outputs, after the output of "after"
+    int64_t limit = 0;
+    const UniValue limitOption = find_value(options, "limit");
+    if (!limitOption.isNull()) {
+        if (!limitOption.isNum() || limitOption.get_int64() <= 0) {
+            throw JSONRPCError(RPC_INVALID_PARAMETER, "\"limit\" is expected to be a number greater than zero");
+        }
+        limit = limitOption.get_int64();
+    }
+    bool hasAfter = false, afterHasHeight = false;
+    int afterHeight = 0;
+    uint256 afterTxid;
+    unsigned int afterIndex = 0;
+    const UniValue afterOption = find_value(options, "after");
+    if (!afterOption.isNull()) {
+        if (!afterOption.isStr()) {
+            throw JSONRPCError(RPC_INVALID_PARAMETER, "\"after\" is expected to be the \"next\" of the previous page");
+        }
+        std::vector<std::string> parts(1);
+        for (const char c : afterOption.get_str()) {
+            if (c == ':')
+                parts.emplace_back();
+            else
+                parts.back() += c;
+        }
+        int32_t height = 0, index = 0;
+        const bool ok = (parts.size() == 3 && ParseInt32(parts[0], &height) && height >= 0 && IsHex(parts[1]) && parts[1].size() == 64 && ParseInt32(parts[2], &index) && index >= 0)
+                     || (parts.size() == 2 && IsHex(parts[0]) && parts[0].size() == 64 && ParseInt32(parts[1], &index) && index >= 0);
+        if (!ok) {
+            throw JSONRPCError(RPC_INVALID_PARAMETER, "\"after\" is expected to be \"height:txid:index\" (the \"next\" of the previous page) or \"txid:index\"");
+        }
+        hasAfter = true;
+        afterHasHeight = parts.size() == 3;
+        afterHeight = height;
+        afterTxid = uint256S(parts[afterHasHeight ? 1 : 0]);
+        afterIndex = (unsigned int)index;
     }
 
     std::vector<std::pair<uint160, int> > addresses;
@@ -1019,15 +1142,51 @@ UniValue getaddressutxos(const JSONRPCRequest& request)
         }
     }
 
-    std::sort(unspentOutputs.begin(), unspentOutputs.end(), heightSort);
+    std::sort(unspentOutputs.begin(), unspentOutputs.end(), unspentOrder);
+
+    int nHeight;
+    int64_t nMedianTime;
+    uint256 tipHash;
+    {
+        LOCK(cs_main);
+        nHeight = chainActive.Height();
+        nMedianTime = chainActive.Tip()->GetMedianTimePast();
+        tipHash = chainActive.Tip()->GetBlockHash();
+    }
+
+    // where the page starts
+    std::vector<std::pair<CAddressUnspentKey, CAddressUnspentValue> >::const_iterator first = unspentOutputs.begin();
+    if (hasAfter) {
+        if (afterHasHeight) {
+            // the first output after that place, also when the output itself was spent since
+            while (first != unspentOutputs.end()) {
+                const int height = first->second.blockHeight;
+                if (height > afterHeight || (height == afterHeight && (afterTxid < first->first.txhash
+                        || (first->first.txhash == afterTxid && first->first.index > afterIndex))))
+                    break;
+                ++first;
+            }
+        } else {
+            while (first != unspentOutputs.end() && !(first->first.txhash == afterTxid && first->first.index == afterIndex))
+                ++first;
+            if (first == unspentOutputs.end()) {
+                throw JSONRPCError(RPC_INVALID_PARAMETER, "The output of \"after\" is not unspent any more: give the \"next\" of the previous page");
+            }
+            ++first;
+        }
+    }
 
     UniValue utxos(UniValue::VARR);
     CAmount total = 0;
+    std::string next;
 
-    int nHeight = chainActive.Height();
-
-    for (std::vector<std::pair<CAddressUnspentKey, CAddressUnspentValue> >::const_iterator it=unspentOutputs.begin(); it!=unspentOutputs.end(); it++) {
+    for (std::vector<std::pair<CAddressUnspentKey, CAddressUnspentValue> >::const_iterator it = first; it != unspentOutputs.end(); it++) {
         if (requiredAmount > 0 && total >= requiredAmount) {
+            break;
+        }
+        if (limit > 0 && (int64_t)utxos.size() >= limit) {
+            // a full page: the next one starts after its last output
+            next = unspentCursor(*(it - 1));
             break;
         }
 
@@ -1047,7 +1206,7 @@ UniValue getaddressutxos(const JSONRPCRequest& request)
         }
 
         int64_t timeLock = (tokenName == "AOK") ? it->first.timeLock : nTokenLockTime;
-        if (timeLock < ((int64_t)timeLock < LOCKTIME_THRESHOLD ? nHeight : (int64_t)chainActive.Tip()->GetMedianTimePast())) {
+        if (timeLock < ((int64_t)timeLock < LOCKTIME_THRESHOLD ? nHeight : nMedianTime)) {
             output.pushKV("address", address);
             output.pushKV("token_name", tokenNameOut);
             output.pushKV("txid", it->first.txhash.GetHex());
@@ -1063,16 +1222,28 @@ UniValue getaddressutxos(const JSONRPCRequest& request)
         }
     }
 
-    return utxos;
+    if (limit <= 0 && !includeChainInfo)
+        return utxos;
+
+    UniValue result(UniValue::VOBJ);
+    result.pushKV("utxos", utxos);
+    if (limit > 0)
+        result.pushKV("next", next.empty() ? NullUniValue : UniValue(next));
+    if (includeChainInfo) {
+        result.pushKV("hash", tipHash.GetHex());
+        result.pushKV("height", nHeight);
+    }
+    return result;
 }
 
 UniValue getaddressdeltas(const JSONRPCRequest& request)
 {
-    if (request.fHelp || request.params.size() != 1 || !request.params[0].isObject())
+    if (request.fHelp || request.params.size() != 1 || !(request.params[0].isObject() || request.params[0].isStr()))
         throw std::runtime_error(
             "getaddressdeltas\n"
             "\nReturns all changes for an address (requires addressindex to be enabled).\n"
             "\nArguments:\n"
+            "\"address\"  (string) An address or a username, or the object:\n"
             "{\n"
             "  \"addresses\"\n"
             "    [\n"
@@ -1103,17 +1274,16 @@ UniValue getaddressdeltas(const JSONRPCRequest& request)
         );
 
 
-    UniValue startValue = find_value(request.params[0].get_obj(), "start");
-    UniValue endValue = find_value(request.params[0].get_obj(), "end");
+    const UniValue options = request.params[0].isObject() ? request.params[0].get_obj() : UniValue(UniValue::VOBJ);
 
-    UniValue chainInfo = find_value(request.params[0].get_obj(), "chainInfo");
+    const UniValue chainInfo = find_value(options, "chainInfo");
     bool includeChainInfo = false;
     if (chainInfo.isBool()) {
         includeChainInfo = chainInfo.get_bool();
     }
 
     std::string tokenName = AOK;
-    UniValue tokenNameParam = find_value(request.params[0].get_obj(), "tokenName");
+    const UniValue tokenNameParam = find_value(options, "tokenName");
     if (tokenNameParam.isStr()) {
         if (!AreTokensDeployed())
             throw JSONRPCError(RPC_INVALID_PARAMETER, "Tokens aren't active.  tokenName can't be specified.");
@@ -1122,17 +1292,7 @@ UniValue getaddressdeltas(const JSONRPCRequest& request)
 
     int start = 0;
     int end = 0;
-
-    if (startValue.isNum() && endValue.isNum()) {
-        start = startValue.get_int();
-        end = endValue.get_int();
-        if (start <= 0 || end <= 0) {
-            throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Start and end is expected to be greater than zero");
-        }
-        if (end < start) {
-            throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "End value is expected to be greater than start");
-        }
-    }
+    getHeightRangeFromParams(request.params, start, end);
 
     std::vector<std::pair<uint160, int> > addresses;
 
@@ -1211,6 +1371,7 @@ UniValue getaddressbalance(const JSONRPCRequest& request)
             "getaddressbalance\n"
             "\nReturns the balance for an address(es) (requires addressindex to be enabled).\n"
             "\nArguments:\n"
+            "\"address\"  (string) An address or a username, or the object:\n"
             "{\n"
             "  \"addresses:\"\n"
             "    [\n"
@@ -1349,6 +1510,7 @@ UniValue getaddresstxids(const JSONRPCRequest& request)
             "getaddresstxids\n"
             "\nReturns the txids for an address(es) (requires addressindex to be enabled).\n"
             "\nArguments:\n"
+            "\"address\"  (string) An address or a username, or the object:\n"
             "{\n"
             "  \"addresses\"\n"
             "    [\n"
@@ -1386,15 +1548,20 @@ UniValue getaddresstxids(const JSONRPCRequest& request)
         if (!AreTokensDeployed())
             throw JSONRPCError(RPC_INVALID_PARAMETER, "Tokens aren't active.  includeTokens can't be true.");
 
+    // the blocks from "start" to "end" only, when the object gives them
+    int start = 0;
+    int end = 0;
+    getHeightRangeFromParams(request.params, start, end);
+
     std::vector<std::pair<CAddressIndexKey, CAmount> > addressIndex;
 
     for (std::vector<std::pair<uint160, int> >::iterator it = addresses.begin(); it != addresses.end(); it++) {
         if (includeTokens) {
-            if (!GetAddressIndex((*it).first, (*it).second, addressIndex)) {
+            if (!GetAddressIndex((*it).first, (*it).second, addressIndex, start, end)) {
                 throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "No information available for address");
             }
         } else {
-            if (!GetAddressIndex((*it).first, (*it).second, AOK, addressIndex)) {
+            if (!GetAddressIndex((*it).first, (*it).second, AOK, addressIndex, start, end)) {
                 throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "No information available for address");
             }
         }
@@ -1602,7 +1769,7 @@ static const CRPCCommand commands[] =
 
     /* Address index */
     { "addressindex",       "getaddressmempool",      &getaddressmempool,      {"addresses","includeTokens"} },
-    { "addressindex",       "getaddressutxos",        &getaddressutxos,        {"addresses"} },
+    { "addressindex",       "getaddressutxos",        &getaddressutxos,        {"addresses","amount","tokenName"} },
     { "addressindex",       "getaddressdeltas",       &getaddressdeltas,       {"addresses"} },
     { "addressindex",       "getaddresstxids",        &getaddresstxids,        {"addresses","includeTokens"} },
     { "addressindex",       "getaddressbalance",      &getaddressbalance,      {"addresses","includeTokens"} },

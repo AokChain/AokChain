@@ -266,6 +266,30 @@ UniValue ParseNonRFCJSONValue(const std::string& strVal)
     return jVal[0];
 }
 
+/**
+ * Arguments that are JSON when they look like a JSON object or array, and a plain string
+ * otherwise: the address index calls take one address, or {"addresses": [...], ...}.
+ */
+static const CRPCConvertParam vRPCConvertIfJson[] =
+{
+    { "getaddressbalance", 0, "addresses" },
+    { "getaddressdeltas", 0, "addresses" },
+    { "getaddressmempool", 0, "addresses" },
+    { "getaddresstxids", 0, "addresses" },
+    { "getaddressutxos", 0, "addresses" },
+};
+
+static bool convertIfJson(const std::string& method, int idx, const std::string& name, const std::string& value)
+{
+    for (const CRPCConvertParam& param : vRPCConvertIfJson) {
+        if (param.methodName == method && ((idx >= 0 && param.paramIdx == idx) || (idx < 0 && param.paramName == name))) {
+            const size_t first = value.find_first_not_of(" \t\r\n");
+            return first != std::string::npos && (value[first] == '{' || value[first] == '[');
+        }
+    }
+    return false;
+}
+
 UniValue RPCConvertValues(const std::string &strMethod, const std::vector<std::string> &strParams)
 {
     UniValue params(UniValue::VARR);
@@ -273,7 +297,7 @@ UniValue RPCConvertValues(const std::string &strMethod, const std::vector<std::s
     for (unsigned int idx = 0; idx < strParams.size(); idx++) {
         const std::string& strVal = strParams[idx];
 
-        if (!rpcCvtTable.convert(strMethod, idx)) {
+        if (!rpcCvtTable.convert(strMethod, idx) && !convertIfJson(strMethod, idx, std::string(), strVal)) {
             // insert string value directly
             params.push_back(strVal);
         } else {
@@ -298,7 +322,7 @@ UniValue RPCConvertNamedValues(const std::string &strMethod, const std::vector<s
         std::string name = s.substr(0, pos);
         std::string value = s.substr(pos+1);
 
-        if (!rpcCvtTable.convert(strMethod, name)) {
+        if (!rpcCvtTable.convert(strMethod, name) && !convertIfJson(strMethod, -1, name, value)) {
             // insert string value directly
             params.pushKV(name, value);
         } else {
