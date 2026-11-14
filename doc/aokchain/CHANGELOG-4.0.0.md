@@ -194,3 +194,10 @@ RPC only; the rules and the data do not change. For the nodes whose address inde
 - **`getaddressutxos` in pages:** `{"limit": n, "after": "<next>"}` returns at most n outputs and `next` for the following page (outputs in the order of block height, transaction id and output index). The object also takes `chainInfo` (hash and height of the tip), `amount` and `tokenName`; the amount and token name after an address stay.
 - **`mediantime`** of `getblock` and `getblockheader` is the median time past; it was the block time. Time locks are measured against the median time past.
 - `rpc_addressindex.py` passes and is in the test baseline (54 tests).
+
+## 4.0.5 (2026-11-14)
+
+The address index only; the rules and the chain state do not change. For the nodes that keep an address index (`addressindex=1`).
+
+- **Stake coins missing from the address index.** When a block was disconnected, the pay-to-pubkey coins it had spent were not given back to the address index: the branch for such inputs was a copy of the one for outputs. Every stake pays to a public key, so each orphaned stake left its input missing from `getaddressutxos` and too low in `getaddressbalance`, although the coin is unspent (`gettxout`). On the explorer node 2,463 outputs (358,205.75 AOK) were missing. The address index of a node that has already disconnected such blocks has to be built again (`-reindex`).
+- `rpc_addressindex.py` spends a pay-to-pubkey output, disconnects the block with `invalidateblock` and checks the unspent index and the balance; it fails without the fix.
