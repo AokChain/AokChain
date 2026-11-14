@@ -139,7 +139,7 @@ UniValue blockheaderToJSON(const CBlockIndex* blockindex)
     result.pushKV("versionHex", strprintf("%08x", blockindex->nVersion));
     result.pushKV("merkleroot", blockindex->hashMerkleRoot.GetHex());
     result.pushKV("time", (int64_t)blockindex->nTime);
-    result.pushKV("mediantime", (int64_t)blockindex->GetPastTimeLimit());
+    result.pushKV("mediantime", (int64_t)blockindex->GetMedianTimePast());
     result.pushKV("nonce", (uint64_t)blockindex->nNonce);
     result.pushKV("bits", strprintf("%08x", blockindex->nBits));
     result.pushKV("difficulty", GetDifficulty(blockindex));
@@ -246,7 +246,7 @@ UniValue blockToDeltasJSON(const CBlock& block, const CBlockIndex* blockindex)
     }
     result.pushKV("deltas", deltas);
     result.pushKV("time", block.GetBlockTime());
-    result.pushKV("mediantime", (int64_t)blockindex->GetPastTimeLimit());
+    result.pushKV("mediantime", (int64_t)blockindex->GetMedianTimePast());
     result.pushKV("nonce", (uint64_t)block.nNonce);
     result.pushKV("bits", strprintf("%08x", block.nBits));
     result.pushKV("difficulty", GetDifficulty(blockindex));
@@ -290,7 +290,7 @@ UniValue blockToJSON(const CBlock& block, const CBlockIndex* blockindex, bool tx
     }
     result.pushKV("tx", txs);
     result.pushKV("time", block.GetBlockTime());
-    result.pushKV("mediantime", (int64_t)blockindex->GetPastTimeLimit());
+    result.pushKV("mediantime", (int64_t)blockindex->GetMedianTimePast());
     result.pushKV("nonce", (uint64_t)block.nNonce);
     result.pushKV("bits", strprintf("%08x", block.nBits));
     result.pushKV("difficulty", GetDifficulty(blockindex));
