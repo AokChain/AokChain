@@ -398,6 +398,41 @@ class AddressIndexTest(AokChainTestFramework):
         assert_raises_rpc_error(-8, "limit", self.nodes[1].getaddressutxos, {"addresses": [page_address], "limit": 0})
         assert_raises_rpc_error(-8, "after", self.nodes[1].getaddressutxos, {"addresses": [page_address], "after": "nonsense"})
 
+        # A pay-to-pubkey output (every stake pays to one) spent in a block that is disconnected again
+        print("Testing pay-to-pubkey outputs and disconnected blocks...")
+        pk_address = self.nodes[0].getnewaddress()
+        pubkey = self.nodes[0].validateaddress(pk_address)["pubkey"]
+        p2pk = CTransaction()
+        p2pk.vout = [CTxOut(int(5 * COIN), CScript([hex_str_to_bytes(pubkey), OP_CHECKSIG]))]
+        funded = self.nodes[0].fundrawtransaction(bytes_to_hex_str(p2pk.serialize()))["hex"]
+        p2pk_txid = self.nodes[0].sendrawtransaction(self.nodes[0].signrawtransaction(funded)["hex"], True)
+        self.nodes[0].generate(1)
+        self.sync_all()
+        p2pk_vout = [o["n"] for o in self.nodes[1].getrawtransaction(p2pk_txid, 1)["vout"] if o["scriptPubKey"]["type"] == "pubkey"][0]
+
+        def has_p2pk_output():
+            return any(u["txid"] == p2pk_txid and u["outputIndex"] == p2pk_vout
+                       for u in self.nodes[1].getaddressutxos({"addresses": [pk_address]}))
+
+        assert(has_p2pk_output())
+        balance_unspent = self.nodes[1].getaddressbalance(pk_address)
+        spend = self.nodes[0].createrawtransaction([{"txid": p2pk_txid, "vout": p2pk_vout}], {self.nodes[0].getnewaddress(): 4.99})
+        self.nodes[0].sendrawtransaction(self.nodes[0].signrawtransaction(spend)["hex"], True)
+        spend_block = self.nodes[0].generate(1)[0]
+        self.sync_all()
+        assert(not has_p2pk_output())
+        balance_spent = self.nodes[1].getaddressbalance(pk_address)
+        assert(balance_spent["balance"] < balance_unspent["balance"])
+        # the block that spent it goes away: the output is unspent again, in the address index as well
+        self.nodes[1].invalidateblock(spend_block)
+        assert(has_p2pk_output())
+        assert_equal(self.nodes[1].getaddressbalance(pk_address), balance_unspent)
+        # and back
+        self.nodes[1].reconsiderblock(spend_block)
+        self.sync_all()
+        assert(not has_p2pk_output())
+        assert_equal(self.nodes[1].getaddressbalance(pk_address), balance_spent)
+
         # mediantime of a block is the median time past, as getblockchaininfo has it for the tip
         print("Testing mediantime...")
         tip = self.nodes[1].getbestblockhash()

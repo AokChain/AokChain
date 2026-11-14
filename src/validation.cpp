@@ -2201,9 +2201,18 @@ static DisconnectResult DisconnectBlock(const CBlock& block, const CBlockIndex* 
                         addressUnspentIndex.push_back(std::make_pair(CAddressUnspentKey(1, uint160(hashBytes), input.prevout.hash, input.prevout.n, timeLock), CAddressUnspentValue(prevout.nValue, prevout.scriptPubKey, undo.nHeight, tx.nTime)));
 
                     } else if (prevout.scriptPubKey.IsPayToPublicKey()) {
+                        // Every stake pays to a public key. This branch was a copy of the one for the
+                        // outputs of the block: it erased the outputs of the disconnected transaction
+                        // instead of giving the spent coin back to the unspent index, and it did not undo
+                        // the spending entry of the address index. Each orphaned stake left its input
+                        // missing from getaddressutxos and too low in getaddressbalance.
                         uint160 hashBytes(Hash160(prevout.scriptPubKey.begin() + 1, prevout.scriptPubKey.end() - 1));
-                        addressIndex.push_back(std::make_pair(CAddressIndexKey(1, hashBytes, pindex->nHeight, i, hash, j, false), prevout.nValue));
-                        addressUnspentIndex.push_back(std::make_pair(CAddressUnspentKey(1, hashBytes, hash, j), CAddressUnspentValue()));
+
+                        // undo spending activity (the key that ConnectBlock wrote for this input)
+                        addressIndex.push_back(std::make_pair(CAddressIndexKey(1, hashBytes, pindex->nHeight, i, hash, j, true), prevout.nValue * -1));
+
+                        // restore unspent index
+                        addressUnspentIndex.push_back(std::make_pair(CAddressUnspentKey(1, hashBytes, input.prevout.hash, input.prevout.n), CAddressUnspentValue(prevout.nValue, prevout.scriptPubKey, undo.nHeight, tx.nTime)));
                     } else {
                         /** TOKENS START */
                         if (AreTokensDeployed()) {
