@@ -185,3 +185,12 @@ Fixes after the 4.0.0 release, including the results of the external source revi
 - **Refresh.** The pages that read data (overview, transactions, tokens, create and manage tokens, explorer, sign) read it again on a click on their light or with F5 (Cmd+R on a Mac); the light shows "Refreshing" meanwhile and the time of the read after it.
 - The sub pages of Sign show the way up in the title ("Sign > Prove my address"). Opening a multisig wallet or a signing request that is gone showed an empty sub page; it now shows the first page of Sign.
 - Nothing changes for nodes: the daemon and `aokchain-cli` are the same as in 4.0.1 and 4.0.2.
+
+## 4.0.4 (2026-11-14)
+
+RPC only; the rules and the data do not change. For the nodes whose address index RPCs are used (the explorer and API node); stakers can stay on 4.0.1.
+
+- **The address index calls take `{"addresses": [...]}`**, as their help says: `getaddressbalance`, `getaddresstxids`, `getaddressutxos`, `getaddressmempool` and `getaddressdeltas` answered any object with "Invalid address" (since 3.0.x), so `getaddressdeltas` could not be used at all. One address (or username) as a string works as before; `aokchain-cli` reads the argument as JSON only when it starts with `{` or `[`. An address given twice counts once. `getaddresstxids` takes `start` and `end` heights in the object.
+- **`getaddressutxos` in pages:** `{"limit": n, "after": "<next>"}` returns at most n outputs and `next` for the following page (outputs in the order of block height, transaction id and output index). The object also takes `chainInfo` (hash and height of the tip), `amount` and `tokenName`; the amount and token name after an address stay.
+- **`mediantime`** of `getblock` and `getblockheader` is the median time past; it was the block time. Time locks are measured against the median time past.
+- `rpc_addressindex.py` passes and is in the test baseline (54 tests).
