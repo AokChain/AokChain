@@ -5,6 +5,7 @@
 #include "tokenspage.h"
 
 #include "guiutil.h"
+#include "pagenav.h"
 #include "pagewidgets.h"
 #include "tokenlists.h"
 #include "platformstyle.h"
@@ -45,7 +46,7 @@ static QLabel *caption(const QString& text, QWidget *parent)
 }
 
 TokensPage::TokensPage(const PlatformStyle *platformStyle, QWidget *parent) :
-    QWidget(parent), model(nullptr), heldTokens(nullptr), columns(0)
+    QWidget(parent), model(nullptr), refreshAsked(false), heldTokens(nullptr), columns(0)
 {
     const GUIUtil::Theme& theme = GUIUtil::theme();
     QVBoxLayout *outer = new QVBoxLayout(this);
@@ -104,7 +105,42 @@ void TokensPage::setModel(WalletModel *_model)
     if (model && model->getTokenTableModel()) {
         heldTokens = HeldTokenIndex::forModel(model->getTokenTableModel());
         connect(heldTokens, SIGNAL(changed()), this, SLOT(scheduleRebuild()));
+        // the balances are read after each block as well: the time in the header follows them
+        connect(model->getTokenTableModel(), SIGNAL(refreshed(bool)), this, SLOT(balancesRead(bool)));
         rebuildHeld();
+    }
+}
+
+void TokensPage::setActivity(PageActivity *_activity)
+{
+    activity = _activity;
+    if (activity)
+        activity->setRefreshable(true);
+}
+
+void TokensPage::refreshPage()
+{
+    if (!model || !model->getTokenTableModel())
+        return;
+    if (activity && !refreshAsked) {
+        refreshAsked = true;
+        activity->begin();
+    }
+    model->getTokenTableModel()->checkBalanceChanged();
+}
+
+void TokensPage::balancesRead(bool ok)
+{
+    if (!activity)
+        return;
+    if (refreshAsked) {
+        refreshAsked = false;
+        if (ok)
+            activity->done();
+        else
+            activity->failed(tr("The token balances could not be read."));
+    } else if (ok) {
+        activity->touch();
     }
 }
 

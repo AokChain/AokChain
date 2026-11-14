@@ -5,6 +5,7 @@
 #ifndef AOKCHAIN_QT_EXPLORERPAGE_H
 #define AOKCHAIN_QT_EXPLORERPAGE_H
 
+#include <QHash>
 #include <QObject>
 #include <QPointer>
 #include <QString>
@@ -18,6 +19,7 @@
 class AmountLabel;
 class StatsStrip;
 class ClientModel;
+class PageActivity;
 class PlatformStyle;
 class UniValue;
 class WalletModel;
@@ -25,6 +27,7 @@ class WalletModel;
 QT_BEGIN_NAMESPACE
 class QLineEdit;
 class QPushButton;
+class QScrollArea;
 class QTimer;
 class QVBoxLayout;
 QT_END_NAMESPACE
@@ -74,17 +77,30 @@ public:
     static void fillChainStats(StatsStrip *strip, const QString& json);
     /** Note shown next to the page title */
     QWidget *headerWidget() const;
+    /** Where the page reports what it is reading */
+    void setActivity(PageActivity *activity);
+
+    /** What the page shows, for going back and forward: the query, empty before the first look-up */
+    QString navState() const { return pendingQuery; }
+    /** Show a query again (going back or forward), where the result was scrolled to; empty: the first view */
+    void restoreNavState(const QString& state);
+    /** A query in a few words ("block 3,035,316", "Kj6i…qVgR") */
+    static QString describeQuery(const QString& query);
 
 public Q_SLOTS:
     /** Put the query into the search field and look it up. */
     void lookup(const QString& query);
     void focusSearch();
+    /** Read the result and the memory pool again */
+    void refreshPage();
 
 Q_SIGNALS:
     void requestLookup(const QString& query);
     void requestRefresh();
     /** The user wants to send to an address shown in the explorer */
     void sendToAddress(const QString& address);
+    /** Another query is shown (or the first view again) */
+    void navStateChanged();
 
 protected:
     void showEvent(QShowEvent *event) override;
@@ -102,10 +118,18 @@ private Q_SLOTS:
 private:
     ClientModel *clientModel;
     WalletModel *walletModel;
+    QPointer<PageActivity> activity;
     QThread thread;
     QTimer *timer;
     bool refreshPending;
     QString pendingQuery;
+    /** The query whose result is on the page, and where the results of earlier queries were scrolled to */
+    QString shownQuery;
+    QHash<QString, int> scrollPositions;
+    /** Where to scroll the next result to; -1: the top */
+    int restoreScroll;
+    /** Where the shown result goes once its rows are laid out (the scroll range grows after the result is built); -1: nowhere */
+    int pendingScroll;
     QString shownId;
     QString shownHex;
 
@@ -115,6 +139,7 @@ private:
     StatsStrip *chainStats;
     QLabel *resultTitle;
     QLabel *resultBadge;
+    QScrollArea *resultScroll;
     QVBoxLayout *resultLayout;
     QWidget *resultButtons;
     QPushButton *hexButton;
@@ -125,6 +150,12 @@ private:
     QLabel *poolFooter;
 
     void clearLayout(QVBoxLayout *layout);
+    /** Look a query up; scroll: where to put the result (-1: the top) */
+    void startLookup(const QString& query, int scroll);
+    /** The first view: what can be looked up */
+    void showIntro();
+    /** Keep where the shown result is scrolled to, before another one replaces it */
+    void rememberScroll();
     void setBadge(const QString& text, bool ok);
     void showMessage(const QString& title, const QString& text, bool notice);
     void showTransaction(const UniValue& result);

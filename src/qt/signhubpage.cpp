@@ -196,8 +196,8 @@ QString ruleText(int required, int total)
 
 } // namespace
 
-SignHubPage::SignHubPage(const PlatformStyle *_platformStyle, QWidget *parent) :
-    QWidget(parent), platformStyle(_platformStyle), walletModel(nullptr), model(nullptr), myNameEdit(nullptr), draftCreated(false)
+SignHubPage::SignHubPage(const PlatformStyle *_platformStyle, const PageChrome& _chrome, QWidget *parent) :
+    QWidget(parent), platformStyle(_platformStyle), chrome(_chrome), walletModel(nullptr), model(nullptr), myNameEdit(nullptr), draftCreated(false)
 {
     setObjectName("pageShell");
     setAttribute(Qt::WA_StyledBackground, true);
@@ -212,6 +212,73 @@ SignHubPage::SignHubPage(const PlatformStyle *_platformStyle, QWidget *parent) :
     stack->addWidget(buildJoin());
     stack->addWidget(buildWallet());
     stack->addWidget(buildRequest());
+    connect(stack, SIGNAL(currentChanged(int)), this, SIGNAL(navStateChanged()));
+    if (chrome.activity)
+        chrome.activity->setRefreshable(true);
+}
+
+QString SignHubPage::navState() const
+{
+    switch (stack->currentIndex()) {
+    case PageProve: return "prove";
+    case PageVerify: return "verify";
+    case PageCreate: return "create";
+    case PageJoin: return "join";
+    case PageWallet: return "wallet:" + currentWallet;
+    case PageRequest: return "request:" + currentRequest;
+    default: return "hub";
+    }
+}
+
+void SignHubPage::restoreNavState(const QString& state)
+{
+    if (state == "prove") {
+        showProve();
+    } else if (state == "verify") {
+        showVerify();
+    } else if (state == "create") {
+        // a draft that is under way stays as it is
+        if (stack->currentIndex() != PageCreate)
+            showCreate();
+    } else if (state == "join") {
+        // keep what was pasted
+        stack->setCurrentIndex(PageJoin);
+    } else if (state.startsWith("wallet:")) {
+        showWallet(state.mid(7));
+    } else if (state.startsWith("request:")) {
+        showRequest(state.mid(8));
+    } else {
+        showHub();
+    }
+}
+
+QString SignHubPage::navStateTitle(const QString& state) const
+{
+    if (state == "prove")
+        return tr("Prove my address");
+    if (state == "verify")
+        return tr("Check a signature");
+    if (state == "create")
+        return tr("Make a multisig wallet");
+    if (state == "join")
+        return tr("Add a multisig wallet I was invited to");
+    if (state.startsWith("wallet:")) {
+        MultisigWallet wallet;
+        if (model && model->wallet(state.mid(7), wallet) && !wallet.name.isEmpty())
+            return wallet.name;
+        return GUIUtil::shortAddress(state.mid(7));
+    }
+    if (state.startsWith("request:"))
+        return tr("Signing request");
+    return QString();
+}
+
+void SignHubPage::refreshPage()
+{
+    if (model)
+        model->refresh();
+    if (chrome.activity)
+        chrome.activity->touch();
 }
 
 void SignHubPage::setModel(WalletModel *_walletModel)
@@ -240,12 +307,20 @@ QLayout *SignHubPage::subHeader(const QString& title, QLabel **titleLabel, QWidg
     QHBoxLayout *header = new QHBoxLayout();
     header->setContentsMargins(0, 0, 0, 0);
     header->setSpacing(14);
-    QPushButton *back = new QPushButton(QString::fromUtf8("‹ ") + tr("Sign"));
-    back->setProperty("look", "link");
-    back->setCursor(Qt::PointingHandCursor);
-    back->setToolTip(tr("Back to the first page of Sign"));
-    connect(back, SIGNAL(clicked()), this, SLOT(showHub()));
-    header->addWidget(back);
+    if (QWidget *nav = chrome.navButtons(this))
+        header->addWidget(nav, 0, Qt::AlignVCenter);
+    // the first page of Sign comes before the title: "Sign › Prove my address"
+    QPushButton *up = new QPushButton(tr("Sign"));
+    up->setProperty("look", "crumb");
+    up->setFont(GUIUtil::appFont(28, QFont::DemiBold));
+    up->setCursor(Qt::PointingHandCursor);
+    up->setToolTip(tr("Back to the first page of Sign"));
+    connect(up, SIGNAL(clicked()), this, SLOT(showHub()));
+    header->addWidget(up);
+    QLabel *separator = new QLabel(QString::fromUtf8("›"));
+    separator->setProperty("role", "crumbSep");
+    separator->setFont(GUIUtil::appFont(28, QFont::DemiBold));
+    header->addWidget(separator);
     QLabel *label = new QLabel(title);
     label->setProperty("role", "pageTitle");
     label->setFont(GUIUtil::appFont(28, QFont::DemiBold));
@@ -253,6 +328,8 @@ QLayout *SignHubPage::subHeader(const QString& title, QLabel **titleLabel, QWidg
     header->addWidget(label);
     if (titleLabel)
         *titleLabel = label;
+    if (QWidget *pill = chrome.statusPill(this))
+        header->addWidget(pill, 0, Qt::AlignVCenter);
     header->addStretch();
     if (right)
         header->addWidget(right, 0, Qt::AlignVCenter);
@@ -270,11 +347,15 @@ QWidget *SignHubPage::buildHub()
 
     QHBoxLayout *header = new QHBoxLayout();
     header->setSpacing(14);
+    if (QWidget *nav = chrome.navButtons(page))
+        header->addWidget(nav, 0, Qt::AlignVCenter);
     QLabel *title = new QLabel(tr("Sign"), page);
     title->setProperty("role", "pageTitle");
     title->setFont(GUIUtil::appFont(28, QFont::DemiBold));
     title->setMinimumHeight(40);
     header->addWidget(title);
+    if (QWidget *pill = chrome.statusPill(page))
+        header->addWidget(pill, 0, Qt::AlignVCenter);
     QLabel *lead = caption(tr("Choose what you want to do and the wallet guides you step by step"), page);
     lead->setWordWrap(false);
     header->addWidget(lead, 0, Qt::AlignBottom);
@@ -1679,6 +1760,12 @@ void SignHubPage::showWallet(const QString& address)
 {
     if (!model)
         return;
+    // a wallet that was removed, as when going back to it: the first page
+    MultisigWallet known;
+    if (!model->wallet(address, known)) {
+        showHub();
+        return;
+    }
     if (currentWallet != address) {
         sendTo->clear();
         sendAmount->clear();
@@ -1690,6 +1777,8 @@ void SignHubPage::showWallet(const QString& address)
     fillWalletPage();
     stack->setCurrentIndex(PageWallet);
     updateSendPreview();
+    // from one multisig wallet to another the sub page stays the same
+    Q_EMIT navStateChanged();
 }
 
 void SignHubPage::fillWalletPage()
@@ -1904,8 +1993,15 @@ QWidget *SignHubPage::buildRequest()
 void SignHubPage::showRequest(const QString& id)
 {
     currentRequest = id;
+    // a request that is gone (sent or cancelled), as when going back to it: the first page
+    MultisigRequest request;
+    if (!model || !model->request(id, request)) {
+        showHub();
+        return;
+    }
     fillRequestPage();
     stack->setCurrentIndex(PageRequest);
+    Q_EMIT navStateChanged();
 }
 
 void SignHubPage::fillRequestPage()

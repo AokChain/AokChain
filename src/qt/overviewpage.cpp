@@ -12,6 +12,7 @@
 #include "guiutil.h"
 #include "optionsmodel.h"
 #include "explorerpage.h"
+#include "pagenav.h"
 #include "pagewidgets.h"
 #include "tokenlists.h"
 #include "platformstyle.h"
@@ -863,6 +864,25 @@ void OverviewPage::chainStatusDone(const QString &json)
 {
     statsPending = false;
     ExplorerPage::fillChainStats(chainStats, json);
+    if (activity)
+        activity->touch();
+}
+
+void OverviewPage::setActivity(PageActivity *_activity)
+{
+    activity = _activity;
+    if (activity)
+        activity->setRefreshable(true);
+}
+
+void OverviewPage::refreshPage()
+{
+    if (walletModel) {
+        // as after a new transaction: balances, confirmations and tokens are read at the next poll
+        walletModel->updateTransaction();
+        walletModel->pollBalanceChanged();
+    }
+    updateChainStrip();
 }
 
 /** The search of the overview is answered by the explorer. */

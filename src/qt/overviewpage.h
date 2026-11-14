@@ -19,6 +19,7 @@
 class AmountLabel;
 class HeldTokenIndex;
 class OverviewRootModel;
+class PageActivity;
 class StatsStrip;
 class ClientModel;
 class TransactionFilterProxy;
@@ -53,8 +54,12 @@ public:
     void showTokens();
     /** The "balances may be wrong while synchronizing" marker, shown next to the page title */
     QWidget *headerWidget() const;
+    /** Where the page reports when it read the chain status */
+    void setActivity(PageActivity *activity);
 
 public Q_SLOTS:
+    /** Read the balances, the confirmations, the tokens and the chain status again */
+    void refreshPage();
     void setBalance(const CAmount& balance, const CAmount& unconfirmedBalance, const CAmount& immatureBalance, const CAmount& stake,
                     const CAmount& watchOnlyBalance, const CAmount& watchUnconfBalance, const CAmount& watchImmatureBalance, const CAmount& watchOnlyStake, const CAmount& lockedBalance);
 
@@ -94,6 +99,7 @@ private:
     CAmount currentLockedBalance;
 
     QPointer<QWidget> syncPill;
+    QPointer<PageActivity> activity;
     QWidget *syncHint;
     QLineEdit *searchEdit;
     StatsStrip *chainStats;

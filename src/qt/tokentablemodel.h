@@ -65,6 +65,10 @@ public:
     /** The balances as they were read last; for lists that group or search them */
     const QList<TokenRecord>& records() const;
 
+Q_SIGNALS:
+    /** A read of the balances has finished (ok: they could be read) */
+    void refreshed(bool ok);
+
 private:
     WalletModel *walletModel;
     QStringList columns;

@@ -21,6 +21,7 @@
 #include "optionsdialog.h"
 #include "optionsmodel.h"
 #include "overviewpage.h"
+#include "pagenav.h"
 #include "pagewidgets.h"
 #include "tokenspage.h"
 #include "platformstyle.h"
@@ -41,7 +42,11 @@
 
 #include <QAction>
 #include <QActionGroup>
+#include <QApplication>
 #include <QFileDialog>
+#include <QMouseEvent>
+#include <QShowEvent>
+#include <QTimer>
 #include <QStringList>
 #include <QRegExp>
 #include <QResizeEvent>
@@ -60,11 +65,25 @@ WalletView::WalletView(const PlatformStyle *_platformStyle, QWidget *parent):
     QStackedWidget(parent),
     clientModel(0),
     walletModel(0),
+    progressDialog(nullptr),
     platformStyle(_platformStyle)
 {
+    // Every page header has back and forward and a status light: the state of the node and
+    // what the page itself is reading
+    history = new NavigationHistory(this);
+    nodeStatus = new NodeStatus(this);
+    for (int i = 0; i < PAGE_COUNT; ++i) {
+        activities[i] = new PageActivity(this);
+        shells[i] = nullptr;
+    }
+    recordTimer = new QTimer(this);
+    recordTimer->setSingleShot(true);
+    recordTimer->setInterval(0);
+    connect(recordTimer, SIGNAL(timeout()), this, SLOT(recordLocation()));
+
     // Create the pages. Each one sits below a header with its title.
     overviewPage = new OverviewPage(platformStyle);
-    overviewShell = addPage(overviewPage, tr("Overview"), overviewPage->headerWidget());
+    overviewShell = addPage(PAGE_OVERVIEW, overviewPage, tr("Overview"), overviewPage->headerWidget());
 
     transactionView = new TransactionView(platformStyle, this);
     QPushButton *exportButton = new QPushButton(tr("Export to CSV"), this);
@@ -73,10 +92,10 @@ WalletView::WalletView(const PlatformStyle *_platformStyle, QWidget *parent):
     exportButton->setIconSize(QSize(15, 15));
     exportButton->setFixedHeight(40);
     exportButton->setCursor(Qt::PointingHandCursor);
-    transactionsPage = addPage(transactionView, tr("Transactions"), exportButton);
+    transactionsPage = addPage(PAGE_TRANSACTIONS, transactionView, tr("Transactions"), exportButton);
 
     receiveCoinsPage = new ReceiveCoinsDialog(platformStyle);
-    receiveShell = addPage(receiveCoinsPage, tr("Receive"));
+    receiveShell = addPage(PAGE_RECEIVE, receiveCoinsPage, tr("Receive"));
     // Send: AOK and tokens are two tabs of one page
     sendCoinsPage = new SendCoinsDialog(platformStyle);
     tokensPage = new TokensDialog(platformStyle);
@@ -89,21 +108,21 @@ WalletView::WalletView(const PlatformStyle *_platformStyle, QWidget *parent):
     sendStack->addWidget(tokensPage);
     sendLayout->addWidget(sendStack, 1);
     connect(sendTabs, SIGNAL(buttonClicked(int)), this, SLOT(showSendTab(int)));
-    sendShell = addPage(sendContainer, tr("Send"), sendCoinsPage->headerWidget());
+    sendShell = addPage(PAGE_SEND, sendContainer, tr("Send"), sendCoinsPage->headerWidget());
 
     /** TOKENS START */
     // Tokens: what the wallet holds, in detail, and the other tokens of the chain
     tokenCardsPage = new TokensPage(platformStyle);
-    tokensShell = addPage(tokenCardsPage, tr("Tokens"));
+    tokensShell = addPage(PAGE_TOKENS, tokenCardsPage, tr("Tokens"));
     connect(tokenCardsPage, SIGNAL(sendToken(QString)), this, SLOT(sendToken(QString)));
     createTokensPage = new CreateTokenDialog(platformStyle);
-    createTokensShell = addPage(createTokensPage, tr("Create Tokens"));
+    createTokensShell = addPage(PAGE_CREATE_TOKENS, createTokensPage, tr("Create Tokens"));
     manageTokensPage = new ReissueTokenDialog(platformStyle);
-    manageTokensShell = addPage(manageTokensPage, tr("Manage Tokens"));
+    manageTokensShell = addPage(PAGE_MANAGE_TOKENS, manageTokensPage, tr("Manage Tokens"));
     /** TOKENS END */
 
     explorerPage = new ExplorerPage(platformStyle);
-    explorerShell = addPage(explorerPage, tr("Explorer"), explorerPage->headerWidget());
+    explorerShell = addPage(PAGE_EXPLORER, explorerPage, tr("Explorer"), explorerPage->headerWidget());
 
     // Address book: the receiving and the sending addresses side by side, both in view at once.
     // In a narrow window the two lists are one above the other.
@@ -136,19 +155,60 @@ WalletView::WalletView(const PlatformStyle *_platformStyle, QWidget *parent):
         addressColumns->addWidget(card, 1);
     }
     addressContainer->installEventFilter(this);
-    addressBookShell = addPage(addressContainer, tr("Address book"));
+    addressBookShell = addPage(PAGE_ADDRESS_BOOK, addressContainer, tr("Address book"));
 
-    // Sign: prove an address, check a signature, multisig wallets
-    signPage = new SignHubPage(platformStyle, this);
+    // Sign: prove an address, check a signature, multisig wallets. Its sub pages have headers
+    // of their own, with the same back, forward and status light.
+    signPage = new SignHubPage(platformStyle, PageChrome(history, nodeStatus, activities[PAGE_SIGN]), this);
     signShell = signPage;
     addWidget(signShell);
+    shells[PAGE_SIGN] = signShell;
+    titles[PAGE_SIGN] = tr("Sign");
     connect(signPage, SIGNAL(explorerRequested(QString)), this, SIGNAL(explorerRequested(QString)));
 
     // Settings: the options, the wallet management and the information of the former menus
     settingsPage = new OptionsDialog(this, true);
     settingsPage->embedAsPage();
     versionLabel = nullptr;
-    settingsShell = addPage(settingsPage, tr("Settings"));
+    settingsShell = addPage(PAGE_SETTINGS, settingsPage, tr("Settings"));
+
+    // Back and forward: the pages, the look-ups of the explorer and the sub pages of Sign.
+    // Alt+Left/Alt+Right (Cmd+[ and Cmd+] on a Mac) and the back and forward buttons of a mouse too.
+    history->setDescriber([this](const PageLocation &location) { return describeLocation(location); });
+    connect(history, &NavigationHistory::restore, this, &WalletView::restoreLocation);
+    connect(this, &QStackedWidget::currentChanged, this, &WalletView::currentPageChanged);
+    connect(explorerPage, &ExplorerPage::navStateChanged, this, &WalletView::scheduleRecord);
+    connect(signPage, &SignHubPage::navStateChanged, this, &WalletView::scheduleRecord);
+    addAction(history->backAction());
+    addAction(history->forwardAction());
+    qApp->installEventFilter(this);
+
+    // F5 (Cmd+R on a Mac), or a click on the status light, reads the page again where that means something
+    refreshAction = new QAction(tr("Refresh"), this);
+    refreshAction->setShortcuts(QKeySequence::Refresh);
+    refreshAction->setShortcutContext(Qt::WindowShortcut);
+    connect(refreshAction, SIGNAL(triggered()), this, SLOT(refreshCurrentPage()));
+    addAction(refreshAction);
+    overviewPage->setActivity(activities[PAGE_OVERVIEW]);
+    connect(activities[PAGE_OVERVIEW], SIGNAL(refreshRequested()), overviewPage, SLOT(refreshPage()));
+    tokenCardsPage->setActivity(activities[PAGE_TOKENS]);
+    connect(activities[PAGE_TOKENS], SIGNAL(refreshRequested()), tokenCardsPage, SLOT(refreshPage()));
+    explorerPage->setActivity(activities[PAGE_EXPLORER]);
+    connect(activities[PAGE_EXPLORER], SIGNAL(refreshRequested()), explorerPage, SLOT(refreshPage()));
+    connect(activities[PAGE_SIGN], SIGNAL(refreshRequested()), signPage, SLOT(refreshPage()));
+    // the transaction list follows the wallet by itself; reading again updates the confirmations at once
+    activities[PAGE_TRANSACTIONS]->setRefreshable(true);
+    connect(activities[PAGE_TRANSACTIONS], &PageActivity::refreshRequested, this, [this] {
+        if (walletModel) {
+            walletModel->updateTransaction();
+            walletModel->pollBalanceChanged();
+        }
+        activities[PAGE_TRANSACTIONS]->touch();
+    });
+    for (int page : {PAGE_CREATE_TOKENS, PAGE_MANAGE_TOKENS}) {
+        activities[page]->setRefreshable(true);
+        connect(activities[page], &PageActivity::refreshRequested, this, [this, page] { readTokenLists(page); });
+    }
 
     // Clicking on a transaction on the overview pre-selects the transaction on the transaction history page
     connect(overviewPage, SIGNAL(transactionClicked(QModelIndex)), transactionView, SLOT(focusTransaction(QModelIndex)));
@@ -179,6 +239,9 @@ WalletView::WalletView(const PlatformStyle *_platformStyle, QWidget *parent):
     // Transactions, addresses and blocks can be looked up in the explorer
     connect(transactionView, SIGNAL(explorerRequested(QString)), this, SIGNAL(explorerRequested(QString)));
     /** RNV END */
+
+    // the first page shown is the first entry of the history
+    scheduleRecord();
 }
 
 WalletView::~WalletView()
@@ -231,7 +294,7 @@ static QPushButton *actionButton(QAction *action, QWidget *parent)
     return button;
 }
 
-QWidget *WalletView::addPage(QWidget *page, const QString &title, QWidget *context)
+QWidget *WalletView::addPage(int id, QWidget *page, const QString &title, QWidget *context)
 {
     QWidget *shell = new QWidget(this);
     shell->setObjectName("pageShell");
@@ -239,14 +302,18 @@ QWidget *WalletView::addPage(QWidget *page, const QString &title, QWidget *conte
     layout->setContentsMargins(36, 26, 36, 28);
     layout->setSpacing(20);
 
+    // [back][forward]  Title  (status light) ........ [context]
     QHBoxLayout *header = new QHBoxLayout();
     header->setContentsMargins(0, 0, 0, 0);
     header->setSpacing(12);
+    header->addWidget(PageNav::makeNavButtons(history, shell), 0, Qt::AlignVCenter);
+    header->addSpacing(2);
     QLabel *titleLabel = new QLabel(title, shell);
     titleLabel->setProperty("role", "pageTitle");
     titleLabel->setFont(GUIUtil::appFont(28, QFont::DemiBold));
     titleLabel->setMinimumHeight(40);
     header->addWidget(titleLabel);
+    header->addWidget(new PageStatusPill(nodeStatus, activities[id], shell), 0, Qt::AlignVCenter);
     header->addStretch();
     if (context)
         header->addWidget(context, 0, Qt::AlignVCenter);
@@ -265,7 +332,100 @@ QWidget *WalletView::addPage(QWidget *page, const QString &title, QWidget *conte
     }
     layout->addWidget(page, 1);
     addWidget(shell);
+    shells[id] = shell;
+    titles[id] = title;
     return shell;
+}
+
+int WalletView::pageOf(QWidget *shell) const
+{
+    for (int i = 0; i < PAGE_COUNT; ++i)
+        if (shell && shells[i] == shell)
+            return i;
+    return -1;
+}
+
+PageLocation WalletView::currentLocation() const
+{
+    const int page = pageOf(currentWidget());
+    if (page == PAGE_EXPLORER)
+        return PageLocation(page, explorerPage->navState());
+    if (page == PAGE_SIGN)
+        return PageLocation(page, signPage->navState());
+    return PageLocation(page);
+}
+
+QString WalletView::describeLocation(const PageLocation &location) const
+{
+    if (location.page < 0 || location.page >= PAGE_COUNT)
+        return QString();
+    QString detail;
+    if (location.page == PAGE_EXPLORER && !location.state.isEmpty())
+        detail = ExplorerPage::describeQuery(location.state);
+    else if (location.page == PAGE_SIGN)
+        detail = signPage->navStateTitle(location.state);
+    return detail.isEmpty() ? titles[location.page] : QString("%1 · %2").arg(titles[location.page], detail);
+}
+
+void WalletView::scheduleRecord()
+{
+    // a page switch and a look-up that come from one click become one entry
+    recordTimer->start();
+}
+
+void WalletView::recordLocation()
+{
+    history->visit(currentLocation());
+}
+
+void WalletView::restoreLocation(const PageLocation &location)
+{
+    if (location.page < 0 || location.page >= PAGE_COUNT || !shells[location.page])
+        return;
+    // what the goto functions do besides switching the page
+    if (location.page == PAGE_CREATE_TOKENS || location.page == PAGE_MANAGE_TOKENS)
+        readTokenLists(location.page);
+    setCurrentWidget(shells[location.page]);
+    if (location.page == PAGE_EXPLORER)
+        explorerPage->restoreNavState(location.state);
+    else if (location.page == PAGE_SIGN)
+        signPage->restoreNavState(location.state);
+    else if (location.page == PAGE_OVERVIEW)
+        Q_EMIT checkTokens();
+    // the entry becomes what is shown now (a sub page that is gone falls back to the first one)
+    recordTimer->stop();
+    history->visit(currentLocation());
+}
+
+void WalletView::currentPageChanged(int index)
+{
+    Q_EMIT pageShown(pageOf(widget(index)));
+    scheduleRecord();
+}
+
+void WalletView::showEvent(QShowEvent *event)
+{
+    QStackedWidget::showEvent(event);
+    // another wallet of the window: the side bar marks the page that this one shows
+    Q_EMIT pageShown(pageOf(currentWidget()));
+}
+
+void WalletView::refreshCurrentPage()
+{
+    const int page = pageOf(currentWidget());
+    if (page >= 0 && activities[page]->refreshable())
+        activities[page]->requestRefresh();
+}
+
+void WalletView::readTokenLists(int page)
+{
+    if (page == PAGE_CREATE_TOKENS)
+        createTokensPage->updateTokenList();
+    else if (page == PAGE_MANAGE_TOKENS)
+        manageTokensPage->updateTokensList();
+    else
+        return;
+    activities[page]->touch();
 }
 
 void WalletView::setAokChainGUI(AokChainGUI *gui)
@@ -285,6 +445,8 @@ void WalletView::setAokChainGUI(AokChainGUI *gui)
 
         // Look something up in the explorer
         connect(this, SIGNAL(explorerRequested(QString)), gui, SLOT(gotoExplorerPage(QString)));
+        // The side bar marks the page that is shown, also after going back or forward
+        connect(this, SIGNAL(pageShown(int)), gui, SLOT(pageShown(int)));
         connect(explorerPage, SIGNAL(sendToAddress(QString)), gui, SLOT(gotoSendCoinsPage(QString)));
 
         // Clicking on a token menu item Send: the token tab of the send page
@@ -392,6 +554,7 @@ void WalletView::setClientModel(ClientModel *_clientModel)
 {
     this->clientModel = _clientModel;
 
+    nodeStatus->setClientModel(_clientModel);
     overviewPage->setClientModel(_clientModel);
     sendCoinsPage->setClientModel(_clientModel);
     explorerPage->setClientModel(_clientModel);
@@ -408,6 +571,7 @@ void WalletView::setWalletModel(WalletModel *_walletModel)
 {
     this->walletModel = _walletModel;
 
+    nodeStatus->setWalletModel(_walletModel);
     // Put transaction list in tabs
     transactionView->setModel(_walletModel);
     overviewPage->setWalletModel(_walletModel);
@@ -489,9 +653,9 @@ void WalletView::processNewTransaction(const QModelIndex& parent, int start, int
     // The lists of the create and manage pages name every owner token of the wallet and are read
     // with a scan of the wallet: they are brought up to date when one of these pages is shown.
     if (currentWidget() == createTokensShell)
-        createTokensPage->updateTokenList();
+        readTokenLists(PAGE_CREATE_TOKENS);
     if (currentWidget() == manageTokensShell)
-        manageTokensPage->updateTokensList();
+        readTokenLists(PAGE_MANAGE_TOKENS);
 
 }
 
@@ -545,6 +709,22 @@ void WalletView::showAddressTab(int tab)
 
 bool WalletView::eventFilter(QObject *object, QEvent *event)
 {
+    // the back and forward buttons of a mouse, anywhere in the window of this wallet
+    if ((event->type() == QEvent::MouseButtonPress || event->type() == QEvent::MouseButtonRelease) && isVisible()) {
+        QMouseEvent *mouse = static_cast<QMouseEvent*>(event);
+        if (mouse->button() == Qt::BackButton || mouse->button() == Qt::ForwardButton) {
+            QWidget *target = qobject_cast<QWidget*>(object);
+            if (target && target->window() == window()) {
+                if (event->type() == QEvent::MouseButtonRelease) {
+                    if (mouse->button() == Qt::BackButton)
+                        history->goBack();
+                    else
+                        history->goForward();
+                }
+                return true;
+            }
+        }
+    }
     if (event->type() == QEvent::Resize && addressColumns && object == addressColumns->parentWidget()) {
         // two lists need room: below this width they are stacked
         const bool narrow = static_cast<QResizeEvent*>(event)->size().width() < 700;
@@ -699,6 +879,7 @@ void WalletView::showProgress(const QString &title, int nProgress)
         {
             progressDialog->close();
             progressDialog->deleteLater();
+            progressDialog = nullptr;
         }
     }
     else if (progressDialog)
@@ -746,13 +927,13 @@ void WalletView::gotoTokensPage()
 
 void WalletView::gotoCreateTokensPage()
 {
-    createTokensPage->updateTokenList();
+    readTokenLists(PAGE_CREATE_TOKENS);
     setCurrentWidget(createTokensShell);
 }
 
 void WalletView::gotoManageTokensPage()
 {
-    manageTokensPage->updateTokensList();
+    readTokenLists(PAGE_MANAGE_TOKENS);
     setCurrentWidget(manageTokensShell);
 }
 

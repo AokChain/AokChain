@@ -270,6 +270,8 @@ private Q_SLOTS:
     void gotoSendingAddressesPage();
     /** Switch to the settings page */
     void gotoSettingsPage();
+    /** A page of the wallet view is shown (also after going back or forward): mark it in the side bar */
+    void pageShown(int page);
     /** Show the state of the block bootstrap in the side bar and in the sync overlay */
     void updateBootstrap();
     void skipBootstrap();

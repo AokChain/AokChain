@@ -439,6 +439,13 @@ QPixmap lineIcon(const QString& name, int size, const QColor& color, qreal strok
         poly({{6, 9}, {12, 15}, {18, 9}});
     } else if (name == "chevron-right") {
         poly({{9, 6}, {15, 12}, {9, 18}});
+    } else if (name == "chevron-left") {
+        poly({{15, 6}, {9, 12}, {15, 18}});
+    } else if (name == "refresh") {
+        // a circle open at the top right that runs into the head of an arrow (clockwise)
+        p.drawArc(QRectF(4.5, 4.5, 15, 15), 45 * 16, 295 * 16);
+        line(17.3, 6.7, 20.5, 10);
+        poly({{20.5, 5}, {20.5, 10}, {15.5, 10}});
     } else if (name == "tag") {
         poly({{3, 4}, {12, 4}, {21, 13}, {13, 21}, {3, 11}, {3, 4}}); p.drawEllipse(QPointF(8, 9), 1.2, 1.2);
     } else if (name == "clock") {

@@ -12,6 +12,7 @@
 #include "addresstablemodel.h"
 #include "clientmodel.h"
 #include "guiutil.h"
+#include "pagenav.h"
 #include "pagewidgets.h"
 #include "platformstyle.h"
 #include "walletmodel.h"
@@ -41,6 +42,7 @@
 #include <QPushButton>
 #include <QRegExp>
 #include <QScrollArea>
+#include <QScrollBar>
 #include <QTimer>
 #include <QUrl>
 #include <QVBoxLayout>
@@ -512,7 +514,9 @@ ExplorerPage::ExplorerPage(const PlatformStyle *platformStyle, QWidget *parent) 
     QWidget(parent),
     clientModel(nullptr),
     walletModel(nullptr),
-    refreshPending(false)
+    refreshPending(false),
+    restoreScroll(-1),
+    pendingScroll(-1)
 {
     const GUIUtil::Theme& theme = GUIUtil::theme();
 
@@ -573,7 +577,7 @@ ExplorerPage::ExplorerPage(const PlatformStyle *platformStyle, QWidget *parent) 
     resultHeader->addStretch();
     resultHeader->addWidget(resultBadge);
     resultOuter->addLayout(resultHeader);
-    QScrollArea *resultScroll = new QScrollArea();
+    resultScroll = new QScrollArea();
     resultScroll->setWidgetResizable(true);
     resultScroll->setFrameShape(QFrame::NoFrame);
     resultScroll->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
@@ -586,6 +590,14 @@ ExplorerPage::ExplorerPage(const PlatformStyle *platformStyle, QWidget *parent) 
     resultScroll->setWidget(resultBody);
     resultScroll->viewport()->setObjectName("explorerResultView");
     resultScroll->viewport()->setStyleSheet("QWidget#explorerResultView { background: transparent; }");
+    // a result shown again goes back to where it was scrolled to as soon as its rows are laid out
+    connect(resultScroll->verticalScrollBar(), &QScrollBar::rangeChanged, this, [this](int, int max) {
+        if (pendingScroll < 0)
+            return;
+        resultScroll->verticalScrollBar()->setValue(qMin(pendingScroll, max));
+        if (max >= pendingScroll)
+            pendingScroll = -1;
+    });
     resultOuter->addWidget(resultScroll, 1);
     resultButtons = new QWidget();
     QHBoxLayout *buttonLayout = new QHBoxLayout(resultButtons);
@@ -660,7 +672,7 @@ ExplorerPage::ExplorerPage(const PlatformStyle *platformStyle, QWidget *parent) 
     cards->addWidget(poolCard, 2);
     pageLayout->addLayout(cards, 1);
 
-    showMessage(tr("Result"), tr("Enter a transaction ID, an address, a block height or a block hash above. Transaction IDs and addresses shown here can be clicked to look them up."), false);
+    showIntro();
 
     // the look-ups run on a worker thread so that the window stays responsive
     ExplorerWorker *worker = new ExplorerWorker();
@@ -699,6 +711,63 @@ void ExplorerPage::setWalletModel(WalletModel *_walletModel)
     walletModel = _walletModel;
 }
 
+void ExplorerPage::setActivity(PageActivity *_activity)
+{
+    activity = _activity;
+    if (activity)
+        activity->setRefreshable(true);
+}
+
+QString ExplorerPage::describeQuery(const QString& query)
+{
+    const QString q = query.trimmed();
+    if (QRegExp("[0-9]{1,9}").exactMatch(q))
+        return tr("block %1").arg(GUIUtil::withThousands(q));
+    if (QRegExp("[0-9a-fA-F]{64}").exactMatch(q))
+        return GUIUtil::shortHash(q, 8, 6);
+    const QString text = GUIUtil::shortAddress(q);
+    return text.length() > 24 ? text.left(12) + QString::fromUtf8("…") + text.right(8) : text;
+}
+
+void ExplorerPage::restoreNavState(const QString& state)
+{
+    if (state.isEmpty()) {
+        if (!pendingQuery.isEmpty() || !shownQuery.isEmpty())
+            showIntro();
+        return;
+    }
+    // the result on the page stays where it is scrolled to; an earlier one goes back to where it was
+    const int scroll = state == shownQuery ? resultScroll->verticalScrollBar()->value() : scrollPositions.value(state, 0);
+    startLookup(state, scroll);
+}
+
+void ExplorerPage::refreshPage()
+{
+    if (!pendingQuery.isEmpty())
+        startLookup(pendingQuery, pendingQuery == shownQuery ? resultScroll->verticalScrollBar()->value() : restoreScroll);
+    refreshNow();
+}
+
+void ExplorerPage::showIntro()
+{
+    rememberScroll();
+    pendingQuery.clear();
+    shownQuery.clear();
+    searchEdit->clear();
+    searchButton->setEnabled(true);
+    showMessage(tr("Result"), tr("Enter a transaction ID, an address, a block height or a block hash above. Transaction IDs and addresses shown here can be clicked to look them up."), false);
+    Q_EMIT navStateChanged();
+}
+
+void ExplorerPage::rememberScroll()
+{
+    if (shownQuery.isEmpty())
+        return;
+    if (scrollPositions.size() > 200)
+        scrollPositions.clear();
+    scrollPositions[shownQuery] = resultScroll->verticalScrollBar()->value();
+}
+
 void ExplorerPage::showEvent(QShowEvent *event)
 {
     QWidget::showEvent(event);
@@ -734,13 +803,24 @@ void ExplorerPage::searchClicked()
 
 void ExplorerPage::lookup(const QString& query)
 {
+    startLookup(query, -1);
+}
+
+void ExplorerPage::startLookup(const QString& query, int scroll)
+{
     const QString q = query.trimmed();
     if (q.isEmpty())
         return;
     searchEdit->setText(q);
+    const bool another = q != pendingQuery;
     pendingQuery = q;
+    restoreScroll = scroll;
     searchButton->setEnabled(false);
+    if (activity)
+        activity->begin(tr("Looking up"));
     Q_EMIT requestLookup(q);
+    if (another)
+        Q_EMIT navStateChanged();
 }
 
 void ExplorerPage::linkActivated(const QString& link)
@@ -1121,13 +1201,34 @@ void ExplorerPage::showAddress(const UniValue& result)
 
 void ExplorerPage::lookupDone(const QString& query, const QString& json)
 {
+    UniValue result;
+    const bool read = result.read(json.toStdString()) && result.isObject();
+    if (activity) {
+        if (read)
+            activity->done();
+        else
+            activity->failed(tr("The look-up failed."));
+    }
     // only the answer to the latest query is shown
     if (query != pendingQuery)
         return;
     searchButton->setEnabled(true);
 
-    UniValue result;
-    if (!result.read(json.toStdString()) || !result.isObject()) {
+    rememberScroll();
+    shownQuery = query;
+    // a new result starts at the top; one shown again goes back to where it was scrolled to,
+    // which the scroll bar allows only when the rows of the result are laid out (see rangeChanged)
+    const int scroll = restoreScroll >= 0 ? restoreScroll : 0;
+    restoreScroll = -1;
+    resultScroll->verticalScrollBar()->setValue(qMin(scroll, resultScroll->verticalScrollBar()->maximum()));
+    pendingScroll = scroll > resultScroll->verticalScrollBar()->maximum() ? scroll : -1;
+    // stop waiting for it after a moment (a shorter result than before)
+    if (pendingScroll >= 0) {
+        const int target = pendingScroll;
+        QTimer::singleShot(1000, this, [this, target] { if (pendingScroll == target) pendingScroll = -1; });
+    }
+
+    if (!read) {
         showMessage(tr("Result"), tr("The look-up failed."), false);
         return;
     }
@@ -1170,6 +1271,9 @@ void ExplorerPage::refreshDone(const QString& json)
     UniValue result;
     if (!result.read(json.toStdString()) || !result.isObject())
         return;
+    // the memory pool is read every few seconds: the time in the header says the page is live
+    if (activity)
+        activity->touch();
     const GUIUtil::Theme& t = GUIUtil::theme();
 
     fillChainStats(chainStats, json);

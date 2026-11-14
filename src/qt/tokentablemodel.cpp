@@ -206,6 +206,8 @@ void TokenTableModel::applyBalances(const QList<TokenRecord>& fresh, bool ok)
     if (refreshPending) {
         refreshPending = false;
         checkBalanceChanged();
+    } else {
+        Q_EMIT refreshed(ok);
     }
 }
 

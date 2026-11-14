@@ -61,6 +61,15 @@ QPushButton[look="icon"]:hover, QToolButton[look="icon"]:hover { background-colo
 QToolButton { background-color: @surfaceAlt; border: 1px solid @borderStrong; border-radius: 8px; padding: 6px; }
 QToolButton:hover { border-color: @accent; background-color: @accentSoft; }
 QToolButton:pressed { background-color: @chip; }
+/* Back and forward in the page headers */
+QToolButton[look="nav"] { background-color: @surface; border: 1px solid @border; border-radius: 8px; padding: 0; }
+QToolButton[look="nav"]:hover { border-color: @accent; background-color: @accentSoft; }
+QToolButton[look="nav"]:pressed { background-color: @chip; }
+QToolButton[look="nav"]:disabled { background-color: transparent; border-color: @line; }
+/* The page above the current one in a page title ("Sign › Prove my address") */
+QPushButton[look="crumb"] { background: transparent; border: none; color: @textSecondary; padding: 0; min-height: 40px; font-size: 28px; font-weight: 600; }
+QPushButton[look="crumb"]:hover { color: @accent; }
+QLabel[role="crumbSep"] { color: @textDisabled; }
 QDialogButtonBox QPushButton { min-width: 72px; }
 QDialogButtonBox { dialogbuttonbox-buttons-have-icons: 0; }
 QMessageBox { background-color: @surface; }

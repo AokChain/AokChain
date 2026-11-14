@@ -6,12 +6,14 @@
 #define AOKCHAIN_QT_TOKENSPAGE_H
 
 #include <QObject>
+#include <QPointer>
 #include <QSet>
 #include <QString>
 #include <QThread>
 #include <QWidget>
 
 class HeldTokenIndex;
+class PageActivity;
 class PlatformStyle;
 class WalletModel;
 
@@ -37,6 +39,12 @@ public:
     ~TokensPage();
 
     void setModel(WalletModel *model);
+    /** Where the page reports when it read the token balances */
+    void setActivity(PageActivity *activity);
+
+public Q_SLOTS:
+    /** Read the token balances of the wallet again */
+    void refreshPage();
 
 Q_SIGNALS:
     /** Go to the token tab of the send page with this token chosen */
@@ -49,9 +57,13 @@ protected:
 private Q_SLOTS:
     void scheduleRebuild();
     void rebuildHeld();
+    void balancesRead(bool ok);
 
 private:
     WalletModel *model;
+    QPointer<PageActivity> activity;
+    /** A read the user asked for is under way */
+    bool refreshAsked;
     QTimer *rebuildTimer;
     QList<QWidget*> cards;
     int columns;

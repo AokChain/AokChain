@@ -32,6 +32,7 @@
 #include "walletframe.h"
 #include "sidebar.h"
 #include "walletmodel.h"
+#include "walletview.h"
 #endif // ENABLE_WALLET
 
 #ifdef Q_OS_MAC
@@ -995,6 +996,28 @@ void AokChainGUI::gotoExplorerPage(QString query)
     if (walletFrame) walletFrame->gotoExplorerPage(query);
 }
 /** TOKENS END */
+
+void AokChainGUI::pageShown(int page)
+{
+    QAction *action = nullptr;
+    switch (page) {
+    case WalletView::PAGE_OVERVIEW: action = overviewAction; break;
+    case WalletView::PAGE_SEND: action = sendCoinsAction; break;
+    case WalletView::PAGE_RECEIVE: action = receiveCoinsAction; break;
+    case WalletView::PAGE_TRANSACTIONS: action = historyAction; break;
+    case WalletView::PAGE_TOKENS: action = transferTokenAction; break;
+    case WalletView::PAGE_CREATE_TOKENS: action = createTokenAction; break;
+    case WalletView::PAGE_MANAGE_TOKENS: action = manageTokenAction; break;
+    case WalletView::PAGE_EXPLORER: action = explorerAction; break;
+    case WalletView::PAGE_ADDRESS_BOOK: action = addressBookAction; break;
+    case WalletView::PAGE_SIGN: action = signPageAction; break;
+    case WalletView::PAGE_SETTINGS: action = settingsPageAction; break;
+    default: break;
+    }
+    // checking does not trigger the action: no page switch follows
+    if (action && !action->isChecked())
+        action->setChecked(true);
+}
 #endif // ENABLE_WALLET
 
 void AokChainGUI::updateNetworkState()

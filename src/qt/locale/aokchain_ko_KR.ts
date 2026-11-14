@@ -4929,6 +4929,10 @@
         <source>Backup</source>
         <translation>백업</translation>
     </message>
+    <message>
+        <source>Refresh</source>
+        <translation>새로 고침</translation>
+    </message>
 </context>
 <context>
     <name>aokchain-core</name>
@@ -6182,6 +6186,14 @@
         <source>Looking up a transaction from before the snapshot</source>
         <translation>스냅샷 이전 거래 조회</translation>
     </message>
+    <message>
+        <source>block %1</source>
+        <translation>블록 %1</translation>
+    </message>
+    <message>
+        <source>Looking up</source>
+        <translation>조회 중</translation>
+    </message>
 </context>
 <context>
     <name>TokenViewDelegate</name>
@@ -6372,6 +6384,10 @@
     <message>
         <source>%1 kinds, the first %2 shown</source>
         <translation>%1종 중 처음 %2종 표시</translation>
+    </message>
+    <message>
+        <source>The token balances could not be read.</source>
+        <translation>토큰 잔액을 읽지 못했습니다.</translation>
     </message>
 </context>
 <context>
@@ -8359,6 +8375,130 @@
     <message>
         <source>This wallet started from a snapshot of the chain state at block %1 and has downloaded the blocks before it. After the next start it passes the whole chain on to other nodes.</source>
         <translation>이 지갑은 블록 %1 시점의 체인 상태 스냅샷에서 시작했고 그 이전 블록도 받아 두었습니다. 다음에 시작하면 다른 노드에 전체 체인을 전달합니다.</translation>
+    </message>
+</context>
+<context>
+    <name>NavigationHistory</name>
+    <message>
+        <source>Back</source>
+        <translation>뒤로</translation>
+    </message>
+    <message>
+        <source>Forward</source>
+        <translation>앞으로</translation>
+    </message>
+    <message>
+        <source>Back to %1</source>
+        <translation>뒤로: %1</translation>
+    </message>
+    <message>
+        <source>Forward to %1</source>
+        <translation>앞으로: %1</translation>
+    </message>
+</context>
+<context>
+    <name>NodeStatus</name>
+    <message>
+        <source>Starting</source>
+        <translation>시작 중</translation>
+    </message>
+    <message>
+        <source>The node is starting.</source>
+        <translation>노드를 시작하고 있습니다.</translation>
+    </message>
+    <message>
+        <source>Connected peers: %1</source>
+        <translation>연결된 피어: %1</translation>
+    </message>
+    <message>
+        <source>Rescanning %1%</source>
+        <translation>재검색 중 %1%</translation>
+    </message>
+    <message>
+        <source>The wallet is reading the blocks again for its transactions. Balances and transactions are complete when it is done.</source>
+        <translation>지갑이 자기 거래를 찾으려고 블록을 다시 읽고 있습니다. 이 작업이 끝나야 잔액과 거래 내역이 완전해집니다.</translation>
+    </message>
+    <message>
+        <source>Network off</source>
+        <translation>네트워크 꺼짐</translation>
+    </message>
+    <message>
+        <source>The network activity of this wallet is turned off: new blocks and payments do not arrive, and payments are not sent out.</source>
+        <translation>이 지갑의 네트워크 활동이 꺼져 있습니다. 새 블록과 입금이 들어오지 않고, 송금도 나가지 않습니다.</translation>
+    </message>
+    <message>
+        <source>Reindexing</source>
+        <translation>재색인 중</translation>
+    </message>
+    <message>
+        <source>Importing blocks</source>
+        <translation>블록 가져오는 중</translation>
+    </message>
+    <message>
+        <source>The node is processing the blocks on the disk. Balances and transactions are complete when it is done.</source>
+        <translation>노드가 디스크의 블록을 처리하고 있습니다. 이 작업이 끝나야 잔액과 거래 내역이 완전해집니다.</translation>
+    </message>
+    <message>
+        <source>Synchronizing</source>
+        <translation>동기화 중</translation>
+    </message>
+    <message>
+        <source>No connection</source>
+        <translation>연결 없음</translation>
+    </message>
+    <message>
+        <source>The last block of this node is %1 old. Until the wallet has caught up with the network, balances and transactions may be incomplete.</source>
+        <translation>이 노드의 마지막 블록은 %1 전 것입니다. 네트워크를 따라잡을 때까지 잔액과 거래 내역이 빠져 있을 수 있습니다.</translation>
+    </message>
+    <message>
+        <source>Not connected to any peer: new blocks and payments do not arrive, and payments are not sent out.</source>
+        <translation>연결된 피어가 없습니다. 새 블록과 입금이 들어오지 않고, 송금도 나가지 않습니다.</translation>
+    </message>
+    <message>
+        <source>Up to date</source>
+        <translation>최신</translation>
+    </message>
+    <message>
+        <source>Block %1, %2 ago.</source>
+        <translation>블록 %1, %2 전.</translation>
+    </message>
+</context>
+<context>
+    <name>PageActivity</name>
+    <message>
+        <source>Refreshing</source>
+        <translation>새로 고침 중</translation>
+    </message>
+</context>
+<context>
+    <name>PageStatusPill</name>
+    <message>
+        <source>Loading</source>
+        <translation>불러오는 중</translation>
+    </message>
+    <message>
+        <source>This page is reading its contents.</source>
+        <translation>이 페이지가 내용을 읽고 있습니다.</translation>
+    </message>
+    <message>
+        <source>Error</source>
+        <translation>오류</translation>
+    </message>
+    <message>
+        <source>This page could not read its contents: %1</source>
+        <translation>이 페이지가 내용을 읽지 못했습니다: %1</translation>
+    </message>
+    <message>
+        <source>This page was read at %1.</source>
+        <translation>이 페이지를 %1에 읽었습니다.</translation>
+    </message>
+    <message>
+        <source>Click to read it again (%1).</source>
+        <translation>누르면 다시 읽습니다(%1).</translation>
+    </message>
+    <message>
+        <source>Starting</source>
+        <translation>시작 중</translation>
     </message>
 </context>
 </TS>

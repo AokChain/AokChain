@@ -6,6 +6,7 @@
 #define AOKCHAIN_QT_SIGNHUBPAGE_H
 
 #include "multisigmodel.h"
+#include "pagenav.h"
 
 #include <QWidget>
 
@@ -42,11 +43,21 @@ class SignHubPage : public QWidget
     Q_OBJECT
 
 public:
-    explicit SignHubPage(const PlatformStyle *platformStyle, QWidget *parent = nullptr);
+    /** chrome: back and forward, and the status pill, for the headers of the sub pages */
+    explicit SignHubPage(const PlatformStyle *platformStyle, const PageChrome& chrome = PageChrome(), QWidget *parent = nullptr);
 
     void setModel(WalletModel *walletModel);
 
+    /** The sub page that is shown, for going back and forward ("hub", "prove", "wallet:<address>", ...) */
+    QString navState() const;
+    /** Show a sub page again; one that is gone gives the first page */
+    void restoreNavState(const QString& state);
+    /** The title of a sub page, for the tool tips of back and forward; empty for the first page */
+    QString navStateTitle(const QString& state) const;
+
 public Q_SLOTS:
+    /** Read the multisig wallets and their coins again */
+    void refreshPage();
     /** The first page: the tasks and the multisig wallets */
     void showHub();
     void showProve(const QString& address = QString());
@@ -62,6 +73,8 @@ Q_SIGNALS:
     /** Look a transaction up in the explorer */
     void explorerRequested(const QString& query);
     void message(const QString& title, const QString& message, unsigned int style);
+    /** Another sub page is shown */
+    void navStateChanged();
 
 private Q_SLOTS:
     void modelChanged();
@@ -96,6 +109,7 @@ private Q_SLOTS:
 
 private:
     const PlatformStyle *platformStyle;
+    PageChrome chrome;
     WalletModel *walletModel;
     MultisigModel *model;
     QStackedWidget *stack;

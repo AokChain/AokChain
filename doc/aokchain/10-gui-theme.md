@@ -116,6 +116,22 @@ Logos are not on the chain. 13 of them (ARTL, CCA, CCL, DHTB, DZTB, GND, MEC, NM
 
 The context menu entry "View in the explorer" of the transaction history looks up that transaction directly. Transaction IDs, addresses and blocks inside the explorer can be clicked to continue the lookup.
 
+## Page header: back, forward and the status light (4.0.3)
+
+`src/qt/pagenav.{h,cpp}`. Every page header is `[‹][›] Title (● status) ……… [widget on the right]`. `WalletView::addPage()` builds it; the Sign page, whose sub pages have headers of their own, gets a `PageChrome` and adds the same parts.
+
+- **History (`NavigationHistory`):** remembers what was shown, as a web browser does. A place is a `PageLocation` (page number and a state string). The state of the explorer is the query, that of the Sign page its sub page (`hub`, `prove`, `verify`, `create`, `join`, `wallet:<address>`, `request:<id>`); other pages have none.
+  - Recording: when `WalletView` sees a page switch (`currentChanged`) or a page's `navStateChanged()`, it records once from a 0 ms timer, so that one "View in the explorer" (page switch and look-up) is one entry. The same place as the current entry adds nothing; going somewhere new drops the entries ahead. At most 100 entries.
+  - Restoring: back and forward emit `restore(PageLocation)`; `WalletView::restoreLocation()` switches the page, restores its state and then corrects the entry to what is really shown (the first Sign page when a multisig wallet is gone).
+  - The explorer keeps the scroll position of each query's result and, going back or forward, scrolls there again once the rows of the result are laid out (when the scroll range grows).
+  - Keys: Alt+Left and Alt+Right (Cmd+[ and Cmd+] on a Mac) and the back and forward buttons of a mouse (an application event filter). The shortcuts apply to the whole window (`Qt::WindowShortcut`); Qt does not apply the shortcuts of a hidden wallet view, so each wallet has its own history. The side bar follows through `pageShown(int)`.
+- **Status light (`PageStatusPill`):** combines the state of the node (`NodeStatus`) and what the page reads (`PageActivity`).
+  - Green "Up to date": peers and a last block of the last 90 minutes (the same rule as the side bar), with the time the page last read its contents when it reports one.
+  - Amber: synchronizing, reindexing, importing blocks or rescanning the wallet, or the page is reading (shown only after 300 ms, so that quick reads do not blink).
+  - Red: no peers, the network turned off, or the page could not read its contents.
+  - The tip comes from the node's notifications (height, block time); every 15 seconds only the age of the block is computed again. The GUI thread does not wait for the main lock.
+- **Refresh:** pages with something to read (overview, transactions, tokens, create and manage tokens, explorer, sign) set `PageActivity::setRefreshable(true)`. A click on the light or F5 (Cmd+R on a Mac) emits `refreshRequested()`, and the light shows "Refreshing" for at least 0.6 s. A page reports `begin()` when it starts reading, `done()` or `failed()` when it is done, and `touch()` for periodic reads.
+
 ## Font files and licences
 
 They are in `src/qt/res/fonts/`. All are under the SIL Open Font License 1.1, and the full licence texts are in the same folder (`OFL-NotoSans.txt`, `OFL-NotoSansKR.txt`, `OFL-NotoSansMono.txt`).

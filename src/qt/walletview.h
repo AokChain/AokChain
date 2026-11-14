@@ -28,13 +28,19 @@ class CreateTokenDialog;
 class TokensPage;
 class ExplorerPage;
 class ReissueTokenDialog;
+class NavigationHistory;
+class NodeStatus;
+class PageActivity;
+struct PageLocation;
 
 QT_BEGIN_NAMESPACE
+class QAction;
 class QBoxLayout;
 class QButtonGroup;
 class QLabel;
 class QModelIndex;
 class QProgressDialog;
+class QTimer;
 QT_END_NAMESPACE
 
 /*
@@ -50,6 +56,12 @@ class WalletView : public QStackedWidget
 public:
     explicit WalletView(const PlatformStyle *platformStyle, QWidget *parent);
     ~WalletView();
+
+    /** The pages, in the order of the side bar */
+    enum Page {
+        PAGE_OVERVIEW, PAGE_SEND, PAGE_RECEIVE, PAGE_TRANSACTIONS, PAGE_TOKENS, PAGE_CREATE_TOKENS,
+        PAGE_MANAGE_TOKENS, PAGE_EXPLORER, PAGE_ADDRESS_BOOK, PAGE_SIGN, PAGE_SETTINGS, PAGE_COUNT
+    };
 
     void setAokChainGUI(AokChainGUI *gui);
     /** Set the client model.
@@ -68,10 +80,21 @@ public:
 
 protected:
     bool eventFilter(QObject *object, QEvent *event) override;
+    void showEvent(QShowEvent *event) override;
 
 private:
     ClientModel *clientModel;
     WalletModel *walletModel;
+
+    /** Back and forward through what was shown; the state of the node and what each page is doing */
+    NavigationHistory *history;
+    NodeStatus *nodeStatus;
+    PageActivity *activities[PAGE_COUNT];
+    QWidget *shells[PAGE_COUNT];
+    QString titles[PAGE_COUNT];
+    /** Where the view is is written down once the event that moved it is over */
+    QTimer *recordTimer;
+    QAction *refreshAction;
 
     OverviewPage *overviewPage;
     QWidget *transactionsPage;
@@ -120,8 +143,22 @@ private:
     /** A row of tab buttons as the send page has them */
     QWidget *makeTabs(const QStringList &names, QButtonGroup **group, QWidget *parent);
 
-    /** Put a page below a header with its title and, optionally, a context widget on the right */
-    QWidget *addPage(QWidget *page, const QString &title, QWidget *context = nullptr);
+    /** Put a page below a header with back and forward, its title, its status and, optionally, a context widget on the right */
+    QWidget *addPage(int id, QWidget *page, const QString &title, QWidget *context = nullptr);
+    /** The page of a shell, -1 for none */
+    int pageOf(QWidget *shell) const;
+    PageLocation currentLocation() const;
+    QString describeLocation(const PageLocation &location) const;
+    /** The lists of the create and manage pages are read when the page is shown */
+    void readTokenLists(int page);
+
+private Q_SLOTS:
+    void scheduleRecord();
+    void recordLocation();
+    void restoreLocation(const PageLocation &location);
+    void currentPageChanged(int index);
+    /** F5: read the shown page again */
+    void refreshCurrentPage();
 
 public Q_SLOTS:
     /** Switch to overview (home) page */
@@ -213,6 +250,8 @@ Q_SIGNALS:
     void sendPageRequested();
     /** Look up a transaction id, address or block in the explorer */
     void explorerRequested(const QString &query);
+    /** A page is shown (also when going back or forward): the side bar marks it */
+    void pageShown(int page);
 };
 
 #endif // AOKCHAIN_QT_WALLETVIEW_H
