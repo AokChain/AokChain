@@ -311,13 +311,14 @@ static UniValue CallRPC(BaseRequestHandler *rh, const std::string& strMethod, co
 
     // Get credentials
     std::string strRPCUserColonPass;
+    // A node that is starting has no cookie yet: the request goes out without credentials, so
+    // that the server not being there yet is a connection failure (which -rpcwait waits out),
+    // and a server that is there answers "unauthorized" (as in later Bitcoin Core versions)
+    bool failedToGetAuthCookie = false;
     if (gArgs.GetArg("-rpcpassword", "") == "") {
         // Try fall back to cookie-based authentication if no password is provided
         if (!GetAuthCookie(&strRPCUserColonPass)) {
-            throw std::runtime_error(strprintf(
-                _("Could not locate RPC credentials. No authentication cookie could be found, and RPC password is not set.  See -rpcpassword and -stdinrpcpass.  Configuration file: (%s)"),
-                    GetConfigFile(gArgs.GetArg("-conf", AOKCHAIN_CONF_FILENAME)).string().c_str()));
-
+            failedToGetAuthCookie = true;
         }
     } else {
         strRPCUserColonPass = gArgs.GetArg("-rpcuser", "") + ":" + gArgs.GetArg("-rpcpassword", "");
@@ -358,8 +359,18 @@ static UniValue CallRPC(BaseRequestHandler *rh, const std::string& strMethod, co
 
     if (response.status == 0)
         throw CConnectionFailed(strprintf("couldn't connect to server: %s (code %d)\n(make sure server is running and you are connecting to the correct RPC port)", http_errorstring(response.error), response.error));
-    else if (response.status == HTTP_UNAUTHORIZED)
+    else if (response.status == HTTP_UNAUTHORIZED) {
+        if (failedToGetAuthCookie) {
+            // The node opens its RPC port a moment before it writes the cookie: when the cookie is
+            // there now, -rpcwait tries again with it
+            if (gArgs.GetBoolArg("-rpcwait", false) && GetAuthCookie(&strRPCUserColonPass))
+                throw CConnectionFailed("the authentication cookie was written meanwhile");
+            throw std::runtime_error(strprintf(
+                _("Could not locate RPC credentials. No authentication cookie could be found, and RPC password is not set.  See -rpcpassword and -stdinrpcpass.  Configuration file: (%s)"),
+                    GetConfigFile(gArgs.GetArg("-conf", AOKCHAIN_CONF_FILENAME)).string().c_str()));
+        }
         throw std::runtime_error("incorrect rpcuser or rpcpassword (authorization failed)");
+    }
     else if (response.status >= 400 && response.status != HTTP_BAD_REQUEST && response.status != HTTP_NOT_FOUND && response.status != HTTP_INTERNAL_SERVER_ERROR)
         throw std::runtime_error(strprintf("server returned HTTP error %d", response.status));
     else if (response.body.empty())

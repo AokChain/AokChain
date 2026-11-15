@@ -53,3 +53,4 @@ feature_governance_mempool.py
 wallet_staking_unlock.py
 rpc_addressindex.py
 wallet_send_arguments.py
+interface_cli_rpcwait.py
