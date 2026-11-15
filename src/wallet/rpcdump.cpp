@@ -427,15 +427,17 @@ UniValue removeaddress(const JSONRPCRequest& request)
 
     if (request.fHelp || request.params.size() < 1 || request.params.size() > 4)
         throw std::runtime_error(
-            "importaddress \"address\" ( \"label\" rescan p2sh )\n"
-            "\nRemove a script (in hex) or address that can be watched as if it were in your wallet but cannot be used to spend.\n"
+            "removeaddress \"address\"\n"
+            "\nStop watching an address that was added with importaddress: the wallet no longer takes it as\n"
+            "its own (watch-only). Then the wallet is rescanned, as far as the node has the past blocks.\n"
             "\nArguments:\n"
-            "1. \"script\"           (string, required) The hex-encoded script (or address)\n"
-            "\nNote: This call can take minutes to complete if rescan is true.\n"
-            "If you have the full public key, you should call importpubkey instead of this.\n"
+            "1. \"address\"          (string, required) The address to stop watching\n"
+            "\nNote: This call can take minutes to complete, for the rescan.\n"
             "\nExamples:\n"
-            "\nRemove a script with rescan\n"
-            + HelpExampleCli("removeaddress", "\"myscript\"")
+            "\nStop watching an address\n"
+            + HelpExampleCli("removeaddress", "\"myaddress\"") +
+            "\nAs a JSON-RPC call\n"
+            + HelpExampleRpc("removeaddress", "\"myaddress\"")
         );
 
     bool fRescan = true;
