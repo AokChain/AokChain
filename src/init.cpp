@@ -1557,6 +1557,9 @@ bool AppInitMain(boost::thread_group& threadGroup, CScheduler& scheduler)
     while (!fLoaded && !fRequestShutdown) {
         bool fReset = fReindex;
         std::string strLoadError;
+        // An index that is turned on or off is rebuilt by -reindex only: -reindex-chainstate keeps
+        // the block index database, where the flags of the indexes are kept.
+        bool fOnlyReindexHelps = false;
 
         uiInterface.InitMessage(_("Loading block index..."));
 
@@ -1635,30 +1638,35 @@ bool AppInitMain(boost::thread_group& threadGroup, CScheduler& scheduler)
                 // Check for changed -txindex state
                 if (fTxIndex != gArgs.GetBoolArg("-txindex", DEFAULT_TXINDEX)) {
                     strLoadError = _("You need to rebuild the database using -reindex to change -txindex");
+                    fOnlyReindexHelps = true;
                     break;
                 }
 
                 // Check for changed -tokenindex state
                 if (fTokenIndex != gArgs.GetBoolArg("-tokenindex", DEFAULT_TOKENINDEX)) {
-                    strLoadError = _("You need to rebuild the database using -reindex to change -tokenIndex");
+                    strLoadError = _("You need to rebuild the database using -reindex to change -tokenindex");
+                    fOnlyReindexHelps = true;
                     break;
                 }
 
                 // Check for changed -addressindex state
                 if (fAddressIndex != gArgs.GetBoolArg("-addressindex", DEFAULT_ADDRESSINDEX)) {
-                    strLoadError = _("You need to rebuild the database using -reindex-chainstate to change -addressindex");
+                    strLoadError = _("You need to rebuild the database using -reindex to change -addressindex");
+                    fOnlyReindexHelps = true;
                     break;
                 }
 
                 // Check for changed -spentindex state
                 if (fSpentIndex != gArgs.GetBoolArg("-spentindex", DEFAULT_SPENTINDEX)) {
-                    strLoadError = _("You need to rebuild the database using -reindex-chainstate to change -spentindex");
+                    strLoadError = _("You need to rebuild the database using -reindex to change -spentindex");
+                    fOnlyReindexHelps = true;
                     break;
                 }
 
                 // Check for changed -timestampindex state
                 if (fTimestampIndex != gArgs.GetBoolArg("-timestampindex", DEFAULT_TIMESTAMPINDEX)) {
-                    strLoadError = _("You need to rebuild the database using -reindex-chainstate to change -timestampindex");
+                    strLoadError = _("You need to rebuild the database using -reindex to change -timestampindex");
+                    fOnlyReindexHelps = true;
                     break;
                 }
 
@@ -1666,6 +1674,7 @@ bool AppInitMain(boost::thread_group& threadGroup, CScheduler& scheduler)
                 // in the past, but is now trying to run unpruned.
                 if (fHavePruned && !fPruneMode) {
                     strLoadError = _("You need to rebuild the database using -reindex to go back to unpruned mode.  This will redownload the entire blockchain");
+                    fOnlyReindexHelps = true;
                     break;
                 }
 
@@ -1792,7 +1801,7 @@ bool AppInitMain(boost::thread_group& threadGroup, CScheduler& scheduler)
             if (!fReset) {
                 bool fRet = uiInterface.ThreadSafeQuestion(
                     strLoadError + ".\n\n" + _("Do you want to rebuild the block database now?"),
-                    strLoadError + ".\nPlease restart with -reindex or -reindex-chainstate to recover.",
+                    strLoadError + (fOnlyReindexHelps ? ".\nPlease restart with -reindex to recover." : ".\nPlease restart with -reindex or -reindex-chainstate to recover."),
                     "", CClientUIInterface::MSG_ERROR | CClientUIInterface::BTN_ABORT);
                 if (fRet) {
                     fReindex = true;
