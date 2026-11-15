@@ -429,7 +429,8 @@ UniValue removeaddress(const JSONRPCRequest& request)
         throw std::runtime_error(
             "removeaddress \"address\"\n"
             "\nStop watching an address that was added with importaddress: the wallet no longer takes it as\n"
-            "its own (watch-only). Then the wallet is rescanned, as far as the node has the past blocks.\n"
+            "its own (watch-only). Then the wallet is rescanned, unless the node does not have the past\n"
+            "blocks (pruning, or a chain state snapshot without them).\n"
             "\nArguments:\n"
             "1. \"address\"          (string, required) The address to stop watching\n"
             "\nNote: This call can take minutes to complete, for the rescan.\n"
@@ -440,10 +441,10 @@ UniValue removeaddress(const JSONRPCRequest& request)
             + HelpExampleRpc("removeaddress", "\"myaddress\"")
         );
 
-    bool fRescan = true;
-    if (fPruneMode) {
-        bool fRescan = false;
-    }
+    // A pruned node does not have the blocks to rescan: the address is removed without a rescan,
+    // as on a snapshot node without the past blocks (below). (importaddress refuses its rescan in
+    // pruned mode instead; there the caller can turn the rescan off, here there is no such argument.)
+    bool fRescan = !fPruneMode;
 
     LOCK2(cs_main, pwallet->cs_wallet);
 

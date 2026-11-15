@@ -133,6 +133,7 @@ BASE_SCRIPTS= [
     'feature_tokens.py',
     'wallet_send_arguments.py',
     'interface_cli_rpcwait.py',
+    'wallet_removeaddress.py',
     'feature_governance.py',
     'feature_governance_mempool.py',
     'wallet_staking_unlock.py',

@@ -54,3 +54,4 @@ wallet_staking_unlock.py
 rpc_addressindex.py
 wallet_send_arguments.py
 interface_cli_rpcwait.py
+wallet_removeaddress.py
