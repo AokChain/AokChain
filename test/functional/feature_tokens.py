@@ -9,7 +9,7 @@
    the issued amount
  - only the holder of the owner token reissues; a token that is not
    reissuable is not reissued
- - unique tokens are issued below a root
+ - unique tokens are issued below a root and below a sub token
  - amounts finer than the units of the token, more than the balance, a name
    that exists and a protected name are refused
  - the token state survives a restart
@@ -120,6 +120,18 @@ class TokensTest(AokChainTestFramework):
         assert_equal(n1.listmytokens("TESTCOIN#*"), {"TESTCOIN#one": 1})
         assert_raises_rpc_error(None, None, n0.issueunique, "TESTCOIN", ["one"])   # exists
         assert_raises_rpc_error(None, None, n1.issueunique, "TESTCOIN", ["three"]) # no owner token
+
+        self.log.info("Unique tokens below a sub token, with the owner token of the sub token")
+        n0.issue("TESTCOIN/SUB", 10, address0)
+        self.mine()
+        n0.issueunique("TESTCOIN/SUB", ["alpha", "beta"])
+        self.mine()
+        assert_equal(n0.listmytokens("TESTCOIN/SUB#*"), {"TESTCOIN/SUB#alpha": 1, "TESTCOIN/SUB#beta": 1})
+        assert_equal(n0.listmytokens("TESTCOIN/SUB!"), {"TESTCOIN/SUB!": 1})  # the owner token stays
+        assert_equal(n1.gettokendata("TESTCOIN/SUB#alpha")["amount"], 1)
+        assert_raises_rpc_error(-32600, "Wallet doesn't have token: TESTCOIN/SUB!", n1.issueunique, "TESTCOIN/SUB", ["gamma"])
+        assert_raises_rpc_error(-8, "Name is greater than max length of 31", n0.issueunique, "TESTCOIN/SUB", ["x" * 20])
+        assert_raises_rpc_error(-8, "Root token must be a regular top-level or sub-token", n0.issueunique, "TESTCOIN/SUB#alpha", ["x"])
 
         self.log.info("The owner token can be handed over")
         n0.transfer("TESTCOIN!", 1, address1)

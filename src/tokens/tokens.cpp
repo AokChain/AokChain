@@ -259,7 +259,9 @@ std::string GetParentName(const std::string& name)
 
 std::string GetUniqueTokenName(const std::string& parent, const std::string& tag)
 {
-    if (!IsRootNameValid(parent))
+    // A unique token is issued below a root token or below a sub token (see the UNIQUE case of
+    // IsTypeCheckNameValid)
+    if (!IsNameValidBeforeTag(parent))
         return "";
 
     if (!IsUniqueTagValid(tag))
