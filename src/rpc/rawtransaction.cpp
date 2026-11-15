@@ -353,7 +353,7 @@ UniValue createrawtransaction(const JSONRPCRequest& request)
 {
     if (request.fHelp || request.params.size() < 2 || request.params.size() > 3)
         throw std::runtime_error(
-            "createrawtransaction [{\"txid\":\"id\",\"vout\":n},...] {\"address\":(amount or object),\"data\":\"hex\",...} ( locktime ) ( replaceable )\n"
+            "createrawtransaction [{\"txid\":\"id\",\"vout\":n},...] {\"address\":(amount or object),\"data\":\"hex\",...} ( locktime )\n"
             "\nCreate a transaction spending the given inputs and creating new outputs.\n"
             "Outputs are addresses (paired with a AOK amount, data or object specifying an token operation) or data.\n"
             "Returns hex-encoded raw transaction.\n"
@@ -361,11 +361,9 @@ UniValue createrawtransaction(const JSONRPCRequest& request)
             "it is not stored in the wallet or transmitted to the network.\n"
 
             "\nPaying for Token Operations:\n"
-            "  Some operations require an amount of AOK to be sent to a burn address:\n"
-            "    transfer:       0\n"
-            "    issue:        500 to Issue Burn Address\n"
-            "    issue_unique    5 to Issue Unique Burn Address\n"
-            "    reissue:      100 to Reissue Burn Address\n"
+            "  issue, issue_unique and reissue pay a fee in AOK, in an output to the token fee address.\n"
+            "  The fees and the address are set by governance: issuanceinfo shows them. A transfer pays\n"
+            "  no such fee.\n"
 
             "\nOwnership:\n"
             "  These operations require an ownership token input for the token being operated upon:\n"
@@ -374,7 +372,7 @@ UniValue createrawtransaction(const JSONRPCRequest& request)
 
             "\nOutput Ordering:\n"
             "  Token operations require the following:\n"
-            "    1) All coin outputs come first (including the burn output).\n"
+            "    1) All coin outputs come first (including the fee output).\n"
             "    2) The owner token change output comes next (if required).\n"
             "    3) An issue, issue_unique, reissue or any number of transfers comes last\n"
             "       (different types can't be mixed in a single transaction).\n"
@@ -398,7 +396,7 @@ UniValue createrawtransaction(const JSONRPCRequest& request)
             "           \"transfer\":\n"
             "             {\n"
             "               \"token-name\":               (string, required) token name\n"
-            "               token-quantity              (numeric, required) the number of raw units to transfer\n"
+            "               token-quantity              (numeric, required) the quantity of the token to transfer\n"
             "               ,...\n"
             "             }\n"
             "         }\n"
@@ -407,8 +405,8 @@ UniValue createrawtransaction(const JSONRPCRequest& request)
             "           \"issue\":\n"
             "             {\n"
             "               \"token_name\":\"token-name\",  (string, required) new token name\n"
-            "               \"token_quantity\":n,         (number, required) the number of raw units to issue\n"
-            "               \"units\":[1-8],              (number, required) display units, between 1 (integral) to 8 (max precision)\n"
+            "               \"token_quantity\":n,         (number, required) the quantity to issue\n"
+            "               \"units\":[0-8],              (number, required) display units, between 0 (whole units) and 8 (max precision)\n"
             "               \"reissuable\":[0-1],         (number, required) 1=reissuable token\n"
             "               \"has_ipfs\":[0-1],           (number, required) 1=passing ipfs_hash\n"
             "               \"ipfs_hash\":\"hash\"          (string, optional) an ipfs hash for discovering token metadata\n"
@@ -428,11 +426,9 @@ UniValue createrawtransaction(const JSONRPCRequest& request)
             "           \"reissue\":\n"
             "             {\n"
             "               \"token_name\":\"token-name\",  (string, required) name of token to be reissued\n"
-            "               \"token_quantity\":n,         (number, required) the number of raw units to issue\n"
+            "               \"token_quantity\":n,         (number, required) the quantity to add\n"
             "               \"reissuable\":[0-1],         (number, optional) default is 1, 1=reissuable token\n"
-            "               \"ipfs_hashes\":[\"hash\", ...],     (array, optional) ipfs hashes corresponding to each supplied tag (should be same size as \"token_tags\")\n"
-            "             }\n"
-            "         }\n"
+            "               \"ipfs_hash\":\"hash\"          (string, optional) a new ipfs hash for the token\n"
             "             }\n"
             "         }\n"
             "         or\n"
@@ -449,10 +445,10 @@ UniValue createrawtransaction(const JSONRPCRequest& request)
             "\nExamples:\n"
             + HelpExampleCli("createrawtransaction", "\"[{\\\"txid\\\":\\\"mycoin\\\",\\\"vout\\\":0}]\" \"{\\\"address\\\":0.01}\"")
             + HelpExampleCli("createrawtransaction", "\"[{\\\"txid\\\":\\\"mycoin\\\",\\\"vout\\\":0}]\" \"{\\\"data\\\":\\\"00010203\\\"}\"")
-            + HelpExampleCli("createrawtransaction", "\"[{\\\"txid\\\":\\\"mycoin\\\",\\\"vout\\\":0}]\" \"{\\\"RXissueTokenXXXXXXXXXXXXXXXXXhhZGt\\\":500,\\\"change_address\\\":change_amount,\\\"issuer_address\\\":{\\\"issue\\\":{\\\"token_name\\\":\\\"MYTOKEN\\\",\\\"token_quantity\\\":1000000,\\\"units\\\":1,\\\"reissuable\\\":0\\\"}}}\"")
-            + HelpExampleCli("createrawtransaction", "\"[{\\\"txid\\\":\\\"mycoin\\\",\\\"vout\\\":0}]\" \"{\\\"RXissueUniqueTokenXXXXXXXXXXWEAe58\\\":20,\\\"change_address\\\":change_amount,\\\"issuer_address\\\":{\\\"issue_unique\\\":{\\\"root_name\\\":\\\"MYTOKEN\\\",\\\"token_tags\\\":[\\\"AOKHA\\\",\\\"BETA\\\"],\\\"]}}}\"")
+            + HelpExampleCli("createrawtransaction", "\"[{\\\"txid\\\":\\\"mycoin\\\",\\\"vout\\\":0}]\" \"{\\\"KdZFAFeKV8C5JzdEdgcPYDZku92KkD3fHy\\\":10000,\\\"change_address\\\":change_amount,\\\"issuer_address\\\":{\\\"issue\\\":{\\\"token_name\\\":\\\"MYTOKEN\\\",\\\"token_quantity\\\":1000000,\\\"units\\\":1,\\\"reissuable\\\":0,\\\"has_ipfs\\\":0}}}\"")
+            + HelpExampleCli("createrawtransaction", "\"[{\\\"txid\\\":\\\"mycoin\\\",\\\"vout\\\":0},{\\\"txid\\\":\\\"myownership\\\",\\\"vout\\\":0}]\" \"{\\\"KdZFAFeKV8C5JzdEdgcPYDZku92KkD3fHy\\\":200,\\\"change_address\\\":change_amount,\\\"issuer_address\\\":{\\\"issue_unique\\\":{\\\"root_name\\\":\\\"MYTOKEN\\\",\\\"token_tags\\\":[\\\"ALPHA\\\",\\\"BETA\\\"]}}}\"")
             + HelpExampleCli("createrawtransaction", "\"[{\\\"txid\\\":\\\"mycoin\\\",\\\"vout\\\":0},{\\\"txid\\\":\\\"mytoken\\\",\\\"vout\\\":0}]\" \"{\\\"address\\\":{\\\"transfer\\\":{\\\"MYTOKEN\\\":50}}}\"")
-            + HelpExampleCli("createrawtransaction", "\"[{\\\"txid\\\":\\\"mycoin\\\",\\\"vout\\\":0},{\\\"txid\\\":\\\"myownership\\\",\\\"vout\\\":0}]\" \"{\\\"issuer_address\\\":{\\\"reissue\\\":{\\\"token_name\\\":\\\"MYTOKEN\\\",\\\"token_quantity\\\":2000000}}}\"")
+            + HelpExampleCli("createrawtransaction", "\"[{\\\"txid\\\":\\\"mycoin\\\",\\\"vout\\\":0},{\\\"txid\\\":\\\"myownership\\\",\\\"vout\\\":0}]\" \"{\\\"KdZFAFeKV8C5JzdEdgcPYDZku92KkD3fHy\\\":10000,\\\"change_address\\\":change_amount,\\\"issuer_address\\\":{\\\"reissue\\\":{\\\"token_name\\\":\\\"MYTOKEN\\\",\\\"token_quantity\\\":2000000}}}\"")
             + HelpExampleRpc("createrawtransaction", "\"[{\\\"txid\\\":\\\"mycoin\\\",\\\"vout\\\":0}]\", \"{\\\"data\\\":\\\"00010203\\\"}\"")
         );
 

@@ -18,9 +18,13 @@
    the punctuation stands is not checked), and the error of registerusername
    says so
  - the token state survives a restart
+ - the token examples in the help of createrawtransaction are AOK examples
+   that parse
 """
 
 from decimal import Decimal
+import json
+import shlex
 
 from test_framework.test_framework import AokChainTestFramework
 from test_framework.util import assert_equal, assert_raises_rpc_error
@@ -193,6 +197,17 @@ class TokensTest(AokChainTestFramework):
         for name in before:
             assert_equal(n1.gettokendata(name), before[name])
             assert_equal(n0.listaddressesbytoken(name), n1.listaddressesbytoken(name))
+
+        self.log.info("The examples of createrawtransaction are AOK examples, and their JSON parses")
+        help_text = n0.help("createrawtransaction")
+        assert "RXissue" not in help_text and "burn address" not in help_text.lower()
+        examples = [shlex.split(line)[3:] for line in help_text.splitlines() if line.startswith("> aokchain-cli createrawtransaction ")]
+        assert_equal(len(examples), 6)
+        for inputs, outputs in examples:
+            json.loads(inputs)
+            outputs = json.loads(outputs.replace("change_amount", "1"))  # (a placeholder for an amount)
+            for destination in outputs:
+                assert destination in ("address", "data", "change_address", "issuer_address") or destination.startswith("K"), destination
 
         self.log.info("The coin change of a token issue still goes to an offline staking address")
         # (last: the wallet does not spend its coins there unasked, and the change is most of them)
