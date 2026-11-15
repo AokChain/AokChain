@@ -7027,8 +7027,8 @@
         <translation>무엇을 백업하나요</translation>
     </message>
     <message>
-        <source>Every participant backs up &lt;b&gt;their own wallet&lt;/b&gt; (Settings → Wallet management → Backup), and keeps the &lt;b&gt;multisig information file&lt;/b&gt; that is saved when the multisig wallet is made. With a wallet backup and that file, the multisig wallet can be set up again on another computer.</source>
-        <translation>참여자마다 &lt;b&gt;자기 지갑을 백업&lt;/b&gt;하고(설정 → 지갑 관리 → 백업), 멀티시그 지갑을 만들 때 저장하는 &lt;b&gt;멀티시그 정보 파일&lt;/b&gt;을 보관합니다. 지갑 백업과 이 파일이 있으면 다른 컴퓨터에서도 멀티시그 지갑을 다시 쓸 수 있습니다.</translation>
+        <source>Every participant backs up &lt;b&gt;their own wallet&lt;/b&gt; (Settings → Wallet security → Backup Wallet), and keeps the &lt;b&gt;multisig information file&lt;/b&gt; that is saved when the multisig wallet is made. With a wallet backup and that file, the multisig wallet can be set up again on another computer.</source>
+        <translation>참여자마다 &lt;b&gt;자기 지갑을 백업&lt;/b&gt;하고(설정 → 지갑 보안 → 지갑 백업), 멀티시그 지갑을 만들 때 저장하는 &lt;b&gt;멀티시그 정보 파일&lt;/b&gt;을 보관합니다. 지갑 백업과 이 파일이 있으면 다른 컴퓨터에서도 멀티시그 지갑을 다시 쓸 수 있습니다.</translation>
     </message>
     <message>
         <source>The risk: if so many participants lose their keys that fewer than M are left, nobody can take the coins out any more. Not the developers either. Decide M and N with that in mind.</source>

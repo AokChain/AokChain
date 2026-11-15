@@ -872,7 +872,7 @@ void SignHubPage::showHelp()
     }
     layout->addLayout(steps);
     section(tr("What to back up"), {
-        tr("Every participant backs up <b>their own wallet</b> (Settings → Wallet management → Backup), and keeps the <b>multisig information file</b> that is saved when the multisig wallet is made. With a wallet backup and that file, the multisig wallet can be set up again on another computer."),
+        tr("Every participant backs up <b>their own wallet</b> (Settings → Wallet security → Backup Wallet), and keeps the <b>multisig information file</b> that is saved when the multisig wallet is made. With a wallet backup and that file, the multisig wallet can be set up again on another computer."),
     });
     layout->addWidget(noteBox(tr("The risk: if so many participants lose their keys that fewer than M are left, nobody can take the coins out any more. Not the developers either. Decide M and N with that in mind."), "warning", body));
     layout->addStretch(1);
