@@ -39,6 +39,15 @@
 #include <QSortFilterProxyModel>
 #include <QCompleter>
 
+#include <cmath>
+
+/** The quantity of the spin box in the amount unit. The spin box has no decimals; a double times
+ *  COIN would lose the last digits of the quantities near the maximum (above 2^53). */
+static CAmount QuantityFromSpinBox(const QDoubleSpinBox *box)
+{
+    return static_cast<CAmount>(std::llround(box->value())) * COIN;
+}
+
 CreateTokenDialog::CreateTokenDialog(const PlatformStyle *_platformStyle, QWidget *parent) :
         QDialog(parent, Qt::WindowTitleHint | Qt::CustomizeWindowHint | Qt::WindowCloseButtonHint | Qt::WindowMaximizeButtonHint),
         ui(new Ui::CreateTokenDialog),
@@ -47,6 +56,8 @@ CreateTokenDialog::CreateTokenDialog(const PlatformStyle *_platformStyle, QWidge
     ui->setupUi(this);
     ui->createTokenButton->setProperty("primary", true);
     setWindowTitle("Create Tokens");
+    // the largest quantity of a token that consensus accepts
+    ui->quantitySpinBox->setMaximum(static_cast<double>(MAX_MONEY_TOKENS / COIN));
     connect(ui->ipfsBox, SIGNAL(clicked()), this, SLOT(ipfsStateChanged()));
     connect(ui->availabilityButton, SIGNAL(clicked()), this, SLOT(checkAvailabilityClicked()));
     connect(ui->nameText, SIGNAL(textChanged(QString)), this, SLOT(onNameChanged(QString)));
@@ -637,7 +648,7 @@ void CreateTokenDialog::onCreateTokenClicked()
     }
 
     QString name = GetTokenName();
-    CAmount quantity = ui->quantitySpinBox->value() * COIN;
+    CAmount quantity = QuantityFromSpinBox(ui->quantitySpinBox);
     int units = ui->unitBox->value();
     bool reissuable = ui->reissuableBox->isChecked();
     bool hasIPFS = ui->ipfsBox->isChecked() && !ui->ipfsText->text().isEmpty();

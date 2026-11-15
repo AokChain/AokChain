@@ -41,6 +41,14 @@
 #include <QSortFilterProxyModel>
 #include <QCompleter>
 
+#include <cmath>
+
+/** The quantity of the spin box in the amount unit. The spin box has no decimals; a double times
+ *  COIN would lose the last digits of the quantities near the maximum (above 2^53). */
+static CAmount QuantityFromSpinBox(const QDoubleSpinBox *box)
+{
+    return static_cast<CAmount>(std::llround(box->value())) * COIN;
+}
 
 ReissueTokenDialog::ReissueTokenDialog(const PlatformStyle *_platformStyle, QWidget *parent) :
         QDialog(parent),
@@ -448,9 +456,10 @@ void ReissueTokenDialog::CheckFormState()
         return;
     }
 
-    // If the quantity is too large
-    if (token->nAmount + ui->quantitySpinBox->value() * COIN > MAX_MONEY) {
-        showMessage(tr("Quantity is too large. Max is 21,000,000,000"));
+    // If the quantity is too large: the total of a token is limited by consensus
+    if (QuantityFromSpinBox(ui->quantitySpinBox) > MAX_MONEY_TOKENS - token->nAmount) {
+        showMessage(tr("Quantity is too large. Max is %1").arg(
+            AokChainUnits::format(AokChainUnits::AOK, MAX_MONEY_TOKENS / COIN, false, AokChainUnits::separatorAlways, 0)));
         return;
     }
 
@@ -498,23 +507,17 @@ void ReissueTokenDialog::enableDataEntry()
 
 void ReissueTokenDialog::buildUpdatedData()
 {
-    // Get the display value for the token quantity
-    auto value = ValueFromAmount(token->nAmount, token->units);
-
-    double newValue = value.get_real() + ui->quantitySpinBox->value();
-
-    std::stringstream ss;
-    ss.precision(token->units);
-    ss << std::fixed << newValue;
+    // The total after the reissue, in the units of the token (exactly: a double has too few digits)
+    const std::string newValue = ValueFromAmountString(token->nAmount + QuantityFromSpinBox(ui->quantitySpinBox), token->units);
 
     QString reissuable = ui->reissuableBox->isChecked() ? tr("Yes") : tr("No");
     QString name = formatBlack.arg(tr("Name"), ":", QString::fromStdString(token->strName)) + "\n";
 
     QString quantity;
     if (ui->quantitySpinBox->value() > 0)
-        quantity = formatGreen.arg(tr("Total Quantity"), ":", QString::fromStdString(ss.str())) + "\n";
+        quantity = formatGreen.arg(tr("Total Quantity"), ":", QString::fromStdString(newValue)) + "\n";
     else
-        quantity = formatBlack.arg(tr("Total Quantity"), ":", QString::fromStdString(ss.str())) + "\n";
+        quantity = formatBlack.arg(tr("Total Quantity"), ":", QString::fromStdString(newValue)) + "\n";
 
     QString units;
     if (ui->unitSpinBox->value() != token->units)
@@ -575,20 +578,18 @@ void ReissueTokenDialog::onTokenSelected(int index)
         }
 
         // Get the display value for the token quantity
-        auto value = ValueFromAmount(token->nAmount, token->units);
-        std::stringstream ss;
-        ss.precision(token->units);
-        ss << std::fixed << value.get_real();
+        const std::string value = ValueFromAmountString(token->nAmount, token->units);
 
         ui->unitSpinBox->setValue(token->units);
         ui->unitSpinBox->setMinimum(token->units);
 
-        ui->quantitySpinBox->setMaximum(21000000000 - value.get_real());
+        // Consensus limits the total of a token: the whole quantity that can still be added
+        ui->quantitySpinBox->setMaximum(static_cast<double>((MAX_MONEY_TOKENS - token->nAmount) / COIN));
 
         ui->currentTokenData->clear();
         // Create the QString to display to the user
         QString name = formatBlack.arg(tr("Name"), ":", QString::fromStdString(token->strName)) + "\n";
-        QString quantity = formatBlack.arg(tr("Current Quantity"), ":", QString::fromStdString(ss.str())) + "\n";
+        QString quantity = formatBlack.arg(tr("Current Quantity"), ":", QString::fromStdString(value)) + "\n";
         QString units = formatBlack.arg(tr("Current Units"), ":", QString::number(ui->unitSpinBox->value()));
         QString reissue = formatBlack.arg(tr("Can Reissue"), ":", tr("Yes")) + "\n";
         QString ipfs;
@@ -705,7 +706,7 @@ void ReissueTokenDialog::onReissueTokenClicked()
     }
 
     QString name = ui->comboBox->currentText();
-    CAmount quantity = ui->quantitySpinBox->value() * COIN;
+    CAmount quantity = QuantityFromSpinBox(ui->quantitySpinBox);
     bool reissuable = ui->reissuableBox->isChecked();
     bool hasIPFS = ui->ipfsBox->isChecked() && !ui->ipfsText->text().isEmpty();
 
