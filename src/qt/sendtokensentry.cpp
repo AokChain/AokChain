@@ -104,7 +104,7 @@ SendTokensEntry::SendTokensEntry(const PlatformStyle *_platformStyle, const QStr
     completer->setCaseSensitivity(Qt::CaseInsensitive);
     ui->tokenSelectionBox->setCompleter(completer);
 
-    ui->tokenSelectionBox->lineEdit()->setPlaceholderText(tr("Select an token to transfer"));
+    ui->tokenSelectionBox->lineEdit()->setPlaceholderText(tr("Select a token to transfer"));
     ui->tokenSelectionBox->setMinimumWidth(32);
 
     /** Setup the amount box */
@@ -810,7 +810,7 @@ void SendTokensEntry::switchAdministratorList(bool fSwitchStatus)
             if (!chosen.isEmpty() && !IsTokenNameAnOwner(chosen.toStdString()))
                 list << chosen;
             stringModel->setStringList(list);
-            ui->tokenSelectionBox->lineEdit()->setPlaceholderText(tr("Select an token to transfer"));
+            ui->tokenSelectionBox->lineEdit()->setPlaceholderText(tr("Select a token to transfer"));
             ui->payTokenAmount->clear();
             ui->payTokenAmount->setUnit(MAX_UNIT);
             ui->payTokenAmount->setDisabled(false);

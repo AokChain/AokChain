@@ -667,7 +667,7 @@
             <item>
              <widget class="QPushButton" name="availabilityButton">
               <property name="text">
-               <string>Check Availabilty</string>
+               <string>Check Availability</string>
               </property>
              </widget>
             </item>
@@ -734,7 +734,7 @@
               <item>
                <widget class="QSpinBox" name="unitBox">
                 <property name="toolTip">
-                 <string>How divisble the tokens will be (e.g. 8 = 1.00000000, 2 = 1.00)</string>
+                 <string>How divisible the tokens will be (e.g. 8 = 1.00000000, 2 = 1.00)</string>
                 </property>
                 <property name="maximum">
                  <number>8</number>

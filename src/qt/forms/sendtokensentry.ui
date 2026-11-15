@@ -21,7 +21,7 @@
   </property>
   <widget class="QFrame" name="SendCoins">
    <property name="toolTip">
-    <string>This is an token payment</string>
+    <string>This is a token payment</string>
    </property>
    <property name="frameShape">
     <enum>QFrame::NoFrame</enum>

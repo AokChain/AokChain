@@ -129,7 +129,7 @@ ReissueTokenDialog::ReissueTokenDialog(const PlatformStyle *_platformStyle, QWid
 
     ui->comboBox->setModel(proxy);
     ui->comboBox->setEditable(true);
-    ui->comboBox->lineEdit()->setPlaceholderText("Select an token");
+    ui->comboBox->lineEdit()->setPlaceholderText("Select a token");
 
     completer = new QCompleter(proxy,this);
     completer->setCompletionMode(QCompleter::PopupCompletion);
@@ -448,9 +448,9 @@ void ReissueTokenDialog::CheckFormState()
         return;
     }
 
-    // If the quantity is to large
+    // If the quantity is too large
     if (token->nAmount + ui->quantitySpinBox->value() * COIN > MAX_MONEY) {
-        showMessage(tr("Quantity is to large. Max is 21,000,000,000"));
+        showMessage(tr("Quantity is too large. Max is 21,000,000,000"));
         return;
     }
 
@@ -524,9 +524,9 @@ void ReissueTokenDialog::buildUpdatedData()
 
     QString reissue;
     if (ui->reissuableBox->isChecked())
-        reissue = formatBlack.arg(tr("Can Reisssue"), ":", reissuable) + "\n";
+        reissue = formatBlack.arg(tr("Can Reissue"), ":", reissuable) + "\n";
     else
-        reissue = formatGreen.arg(tr("Can Reisssue"), ":", reissuable) + "\n";
+        reissue = formatGreen.arg(tr("Can Reissue"), ":", reissuable) + "\n";
 
     QString ipfs;
     if (token->nHasIPFS && (!ui->ipfsBox->isChecked() || (ui->ipfsBox->isChecked() && ui->ipfsText->text().isEmpty())))
@@ -549,8 +549,8 @@ void ReissueTokenDialog::setDisplayedDataToNone()
 {
     ui->currentTokenData->clear();
     ui->updatedTokenData->clear();
-    ui->currentTokenData->setText(tr("Please select a token from the menu to display the tokens current settings"));
-    ui->updatedTokenData->setText(tr("Please select a token from the menu to display the tokens updated settings"));
+    ui->currentTokenData->setText(tr("Please select a token from the menu to display the token's current settings"));
+    ui->updatedTokenData->setText(tr("Please select a token from the menu to display the token's updated settings"));
 }
 
 /** SLOTS */
@@ -832,7 +832,7 @@ void ReissueTokenDialog::onReissueTokenClicked()
 void ReissueTokenDialog::onReissueBoxChanged()
 {
     if (!ui->reissuableBox->isChecked()) {
-        ui->reissueWarningLabel->setText("Warning: Once this token is reissued with the reissuable flag set to false. It won't be able to be reissued in the future");
+        ui->reissueWarningLabel->setText("Warning: Once this token is reissued with the reissuable flag set to false, it won't be able to be reissued in the future");
         ui->reissueWarningLabel->setStyleSheet("color: red");
         ui->reissueWarningLabel->show();
     } else {

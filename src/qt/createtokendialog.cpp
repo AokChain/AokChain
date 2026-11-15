@@ -124,7 +124,7 @@ CreateTokenDialog::CreateTokenDialog(const PlatformStyle *_platformStyle, QWidge
 
     ui->tokenList->setModel(proxy);
     ui->tokenList->setEditable(true);
-    ui->tokenList->lineEdit()->setPlaceholderText("Select an token");
+    ui->tokenList->lineEdit()->setPlaceholderText("Select a token");
 
     completer = new QCompleter(proxy,this);
     completer->setCompletionMode(QCompleter::PopupCompletion);

@@ -601,7 +601,7 @@
             <item>
              <widget class="QLabel" name="tokenNameLabel">
               <property name="text">
-               <string>Select an token to reissue:</string>
+               <string>Select a token to reissue:</string>
               </property>
              </widget>
             </item>

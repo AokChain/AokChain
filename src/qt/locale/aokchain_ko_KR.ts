@@ -1202,7 +1202,7 @@
         <translation>전송</translation>
     </message>
     <message>
-        <source>Select an token to transfer</source>
+        <source>Select a token to transfer</source>
         <translation>전송할 토큰을 선택해주세요</translation>
     </message>
     <message>
