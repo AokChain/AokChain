@@ -1577,12 +1577,11 @@ bool AppInitMain(boost::thread_group& threadGroup, CScheduler& scheduler)
                 delete ptokensCache;
                 delete governance;
 
-                // The token and governance databases are derived from the
-                // connected blocks, like the chainstate, so they must be wiped
-                // on -reindex-chainstate too. Otherwise reconnecting the chain
-                // fails at the first token issuance ("token_name ... has
-                // already been used") and marks a valid block invalid.
-                ptokensdb = new CTokensDB(nBlockTreeDBCache, false, fReset || fReindexChainState);
+                // Wiped here on -reindex only. -reindex-chainstate wipes the token database
+                // below, with the chainstate and the governance database, after the checks of
+                // the block index: a start that stops at those checks (an index turned on or
+                // off) leaves the tokens as they are.
+                ptokensdb = new CTokensDB(nBlockTreeDBCache, false, fReset);
                 ptokens = new CTokensCache();
                 ptokensCache = new CLRUCache<std::string, CDatabasedTokenData>(MAX_CACHE_TOKENS_SIZE);
 
@@ -1689,6 +1688,26 @@ bool AppInitMain(boost::thread_group& threadGroup, CScheduler& scheduler)
 
                 // At this point we're either in reindex or we've loaded a useful
                 // block tree into mapBlockIndex!
+
+                // The token and governance databases are derived from the connected blocks like
+                // the chainstate, so -reindex-chainstate wipes them with it; otherwise
+                // reconnecting the chain fails at the first token issuance ("token_name ... has
+                // already been used") and marks a valid block invalid. (-reindex wiped the token
+                // database when it was opened above.) Nothing has used the tokens since they were
+                // loaded there: they are loaded again, from the empty database.
+                if (fReindexChainState && !fReset) {
+                    delete ptokens;
+                    delete ptokensdb;
+                    delete ptokensCache;
+                    ptokensdb = new CTokensDB(nBlockTreeDBCache, false, true);
+                    ptokens = new CTokensCache();
+                    ptokensCache = new CLRUCache<std::string, CDatabasedTokenData>(MAX_CACHE_TOKENS_SIZE);
+                    if (!ptokensdb->LoadTokens()) {
+                        strLoadError = _("Failed to load Tokens Database");
+                        break;
+                    }
+                    ptokensdb->ReadReissuedMempoolState(); // (there is none: this empties it)
+                }
 
                 pcoinsdbview.reset(new CCoinsViewDB(nCoinDBCache, false, fReset || fReindexChainState));
                 pcoinscatcher.reset(new CCoinsViewErrorCatcher(pcoinsdbview.get()));
