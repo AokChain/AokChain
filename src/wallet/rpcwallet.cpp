@@ -485,15 +485,15 @@ UniValue sendtoaddress(const JSONRPCRequest& request)
 
     if (request.fHelp || request.params.size() < 2 || request.params.size() > 8)
         throw std::runtime_error(
-            "sendtoaddress \"address\" amount ( \"message\" \"comment_to\" subtractfeefromamount replaceable conf_target \"estimate_mode\")\n"
+            "sendtoaddress \"address\" amount ( lock_time \"message\" \"comment_to\" subtractfeefromamount conf_target \"estimate_mode\" )\n"
             "\nSend an amount to a given address.\n"
             + HelpRequiringPassphrase(pwallet) +
             "\nArguments:\n"
             "1. \"address\"            (string, required) The aokchain address to send to.\n"
             "2. \"amount\"             (numeric or string, required) The amount in " + CURRENCY_UNIT + " to send. eg 0.1\n"
-            "3. \"lock_time\"          (integer, optional, default=0) Locktime for transaction, could be height or timestamp\n"
-            "5. \"message\"            (string, optional, default="") Message attached to transaction.\n"
-            "                             This is not part of the transaction, just kept in your wallet.\n"
+            "3. lock_time            (integer, optional, default=0) Locktime for transaction, could be height or timestamp\n"
+            "4. \"message\"            (string, optional, default=\"\") A message written into the transaction, at most " + std::to_string(MAX_MESSAGE_LEN) + " bytes;\n"
+            "                             a transaction with a message has version 2. Anyone can read it in the block chain.\n"
             "5. \"comment_to\"         (string, optional) A comment to store the name of the person or organization \n"
             "                             to which you're sending the transaction. This is not part of the \n"
             "                             transaction, just kept in your wallet.\n"
@@ -507,10 +507,11 @@ UniValue sendtoaddress(const JSONRPCRequest& request)
             "\nResult:\n"
             "\"txid\"                  (string) The transaction id.\n"
             "\nExamples:\n"
-            + HelpExampleCli("sendtoaddress", "\"1M72Sfpbz1BPpXFHz9m3CdqATR44Jvaydd\" 0.1")
-            + HelpExampleCli("sendtoaddress", "\"1M72Sfpbz1BPpXFHz9m3CdqATR44Jvaydd\" 0.1 \"donation\" \"seans outpost\"")
-            + HelpExampleCli("sendtoaddress", "\"1M72Sfpbz1BPpXFHz9m3CdqATR44Jvaydd\" 0.1 \"\" \"\" true")
-            + HelpExampleRpc("sendtoaddress", "\"1M72Sfpbz1BPpXFHz9m3CdqATR44Jvaydd\", 0.1, \"donation\", \"seans outpost\"")
+            + HelpExampleCli("sendtoaddress", "\"Kb9ma4bw6aRcB6CrbE67VPzGH8VUyafTrh\" 0.1")
+            + HelpExampleCli("sendtoaddress", "\"Kb9ma4bw6aRcB6CrbE67VPzGH8VUyafTrh\" 0.1 0 \"donation\" \"seans outpost\"")
+            + HelpExampleCli("sendtoaddress", "\"Kb9ma4bw6aRcB6CrbE67VPzGH8VUyafTrh\" 0.1 0 \"\" \"\" true")
+            + "> aokchain-cli -named sendtoaddress address=\"Kb9ma4bw6aRcB6CrbE67VPzGH8VUyafTrh\" amount=0.1 conf_target=6 estimate_mode=ECONOMICAL\n"
+            + HelpExampleRpc("sendtoaddress", "\"Kb9ma4bw6aRcB6CrbE67VPzGH8VUyafTrh\", 0.1, 0, \"donation\", \"seans outpost\"")
         );
 
     ObserveSafeMode();
@@ -571,11 +572,11 @@ UniValue sendtoaddress(const JSONRPCRequest& request)
 
     CCoinControl coin_control;
     if (!request.params[6].isNull()) {
-        coin_control.m_confirm_target = ParseConfirmTarget(request.params[7]);
+        coin_control.m_confirm_target = ParseConfirmTarget(request.params[6]);
     }
 
     if (!request.params[7].isNull()) {
-        if (!FeeModeFromString(request.params[8].get_str(), coin_control.m_fee_mode)) {
+        if (!FeeModeFromString(request.params[7].get_str(), coin_control.m_fee_mode)) {
             throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid estimate_mode parameter");
         }
     }
@@ -1102,7 +1103,7 @@ UniValue sendmany(const JSONRPCRequest& request)
 
     if (request.fHelp || request.params.size() < 2 || request.params.size() > 8)
         throw std::runtime_error(
-            "sendmany \"fromaccount\" {\"address\":amount,...} ( minconf \"message\" [\"address\",...] replaceable conf_target \"estimate_mode\")\n"
+            "sendmany \"fromaccount\" {\"address\":amount,...} ( minconf \"message\" [\"address\",...] conf_target \"estimate_mode\" )\n"
             "\nSend multiple times. Amounts are double-precision floating point numbers."
             + HelpRequiringPassphrase(pwallet) + "\n"
             "\nArguments:\n"
@@ -1113,7 +1114,8 @@ UniValue sendmany(const JSONRPCRequest& request)
             "      ,...\n"
             "    }\n"
             "3. minconf                 (numeric, optional, default=1) Only use the balance confirmed at least this many times.\n"
-            "4. \"message\"             (string, optional, default="") Message attached to transaction.\n"
+            "4. \"message\"             (string, optional, default=\"\") A message written into the transaction, at most " + std::to_string(MAX_MESSAGE_LEN) + " bytes;\n"
+            "                           a transaction with a message has version 2. Anyone can read it in the block chain.\n"
             "5. subtractfeefrom         (array, optional) A json array with addresses.\n"
             "                           The fee will be equally deducted from the amount of each selected address.\n"
             "                           Those recipients will receive less aokchains than you enter in their corresponding amount field.\n"
@@ -1181,11 +1183,11 @@ UniValue sendmany(const JSONRPCRequest& request)
 
     CCoinControl coin_control;
     if (!request.params[5].isNull()) {
-        coin_control.m_confirm_target = ParseConfirmTarget(request.params[6]);
+        coin_control.m_confirm_target = ParseConfirmTarget(request.params[5]);
     }
 
     if (!request.params[6].isNull()) {
-        if (!FeeModeFromString(request.params[7].get_str(), coin_control.m_fee_mode)) {
+        if (!FeeModeFromString(request.params[6].get_str(), coin_control.m_fee_mode)) {
             throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid estimate_mode parameter");
         }
     }

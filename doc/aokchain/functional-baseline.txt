@@ -52,3 +52,4 @@ feature_stake_variants.py
 feature_governance_mempool.py
 wallet_staking_unlock.py
 rpc_addressindex.py
+wallet_send_arguments.py

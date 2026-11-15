@@ -131,6 +131,7 @@ BASE_SCRIPTS= [
     'feature_future_drift.py',
     'p2p_orphan_processing.py',
     'feature_tokens.py',
+    'wallet_send_arguments.py',
     'feature_governance.py',
     'feature_governance_mempool.py',
     'wallet_staking_unlock.py',
