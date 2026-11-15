@@ -433,6 +433,33 @@ UniValue getaddressesbyaccount(const JSONRPCRequest& request)
     return ret;
 }
 
+/** The help of the lock_time argument of sendtoaddress and sendfrom. */
+static std::string LockTimeHelp(int number)
+{
+    return strprintf(
+        "%d. lock_time            (integer, optional, default=0) 0 for no lock, or a block height, or a time in seconds since\n"
+        "                             1970 (the values from %d on), until which the coins that are sent cannot be spent.\n"
+        "                             Values from 1 to %d and negative values are refused: they would make no lock.\n",
+        number, LOCKTIME_THRESHOLD, MIN_SCRIPT_LOCK_TIME - 1);
+}
+
+/**
+ * The lock_time argument of sendtoaddress and sendfrom: 0 (no lock), or a block height or a
+ * time from which on the coins that are sent can be spent. GetScriptForDestination() makes no
+ * lock below MIN_SCRIPT_LOCK_TIME; such a value is refused instead of being dropped unnoticed.
+ */
+static int64_t LockTimeFromValue(const UniValue& value)
+{
+    if (value.isNull())
+        return 0;
+    const int64_t lockTime = value.get_int();
+    if (lockTime != 0 && lockTime < MIN_SCRIPT_LOCK_TIME) {
+        throw JSONRPCError(RPC_INVALID_PARAMETER, strprintf(
+            "Invalid lock_time %d: use 0 for no lock, or a block height or a time of at least %d", lockTime, MIN_SCRIPT_LOCK_TIME));
+    }
+    return lockTime;
+}
+
 static void SendMoney(CWallet * const pwallet, const CTxDestination &address, CAmount nValue, bool fSubtractFeeFromAmount, CWalletTx& wtxNew, const CCoinControl& coin_control, int64_t lockTime = 0, std::string message = "")
 {
     CAmount curBalance = pwallet->GetBalance();
@@ -491,7 +518,7 @@ UniValue sendtoaddress(const JSONRPCRequest& request)
             "\nArguments:\n"
             "1. \"address\"            (string, required) The aokchain address to send to.\n"
             "2. \"amount\"             (numeric or string, required) The amount in " + CURRENCY_UNIT + " to send. eg 0.1\n"
-            "3. lock_time            (integer, optional, default=0) Locktime for transaction, could be height or timestamp\n"
+            + LockTimeHelp(3) +
             "4. \"message\"            (string, optional, default=\"\") A message written into the transaction, at most " + std::to_string(MAX_MESSAGE_LEN) + " bytes;\n"
             "                             a transaction with a message has version 2. Anyone can read it in the block chain.\n"
             "5. \"comment_to\"         (string, optional) A comment to store the name of the person or organization \n"
@@ -510,6 +537,7 @@ UniValue sendtoaddress(const JSONRPCRequest& request)
             + HelpExampleCli("sendtoaddress", "\"Kb9ma4bw6aRcB6CrbE67VPzGH8VUyafTrh\" 0.1")
             + HelpExampleCli("sendtoaddress", "\"Kb9ma4bw6aRcB6CrbE67VPzGH8VUyafTrh\" 0.1 0 \"donation\" \"seans outpost\"")
             + HelpExampleCli("sendtoaddress", "\"Kb9ma4bw6aRcB6CrbE67VPzGH8VUyafTrh\" 0.1 0 \"\" \"\" true")
+            + HelpExampleCli("sendtoaddress", "\"Kb9ma4bw6aRcB6CrbE67VPzGH8VUyafTrh\" 0.1 1000000")
             + "> aokchain-cli -named sendtoaddress address=\"Kb9ma4bw6aRcB6CrbE67VPzGH8VUyafTrh\" amount=0.1 conf_target=6 estimate_mode=ECONOMICAL\n"
             + HelpExampleRpc("sendtoaddress", "\"Kb9ma4bw6aRcB6CrbE67VPzGH8VUyafTrh\", 0.1, 0, \"donation\", \"seans outpost\"")
         );
@@ -542,10 +570,7 @@ UniValue sendtoaddress(const JSONRPCRequest& request)
         throw JSONRPCError(RPC_TYPE_ERROR, "Invalid amount for send");
 
     // Lock time
-    int lockTime = 0;
-    if (!request.params[2].isNull()) {
-        lockTime = request.params[2].get_int();
-    }
+    const int64_t lockTime = LockTimeFromValue(request.params[2]);
 
     // Wallet comments
     CWalletTx wtx;
@@ -1012,7 +1037,7 @@ UniValue sendfrom(const JSONRPCRequest& request)
 
     if (request.fHelp || request.params.size() < 3 || request.params.size() > 8)
         throw std::runtime_error(
-            "sendfrom \"fromaccount\" \"toaddress\" amount ( minconf \"comment\" \"comment_to\" )\n"
+            "sendfrom \"fromaccount\" \"toaddress\" amount ( lock_time minconf \"comment\" \"comment_to\" subtractfeefromamount )\n"
             "\nDEPRECATED (use sendtoaddress). Sent an amount from an account to a aokchain address."
             + HelpRequiringPassphrase(pwallet) + "\n"
             "\nArguments:\n"
@@ -1022,7 +1047,7 @@ UniValue sendfrom(const JSONRPCRequest& request)
             "                       the spend.\n"
             "2. \"toaddress\"         (string, required) The aokchain address to send funds to.\n"
             "3. amount                (numeric or string, required) The amount in " + CURRENCY_UNIT + " (transaction fee is added on top).\n"
-            "4. \"lock_time\"          (integer, optional, default=0) Locktime for transaction, could be height or timestamp\n"
+            + LockTimeHelp(4) +
             "5. minconf               (numeric, optional, default=1) Only use funds with at least this many confirmations.\n"
             "6. \"comment\"           (string, optional) A comment used to store what the transaction is for. \n"
             "                                     This is not part of the transaction, just kept in your wallet.\n"
@@ -1034,11 +1059,13 @@ UniValue sendfrom(const JSONRPCRequest& request)
             "\"txid\"                 (string) The transaction id.\n"
             "\nExamples:\n"
             "\nSend 0.01 " + CURRENCY_UNIT + " from the default account to the address, must have at least 1 confirmation\n"
-            + HelpExampleCli("sendfrom", "\"\" \"1M72Sfpbz1BPpXFHz9m3CdqATR44Jvaydd\" 0.01") +
+            + HelpExampleCli("sendfrom", "\"\" \"Kb9ma4bw6aRcB6CrbE67VPzGH8VUyafTrh\" 0.01") +
             "\nSend 0.01 from the tabby account to the given address, funds must have at least 6 confirmations\n"
-            + HelpExampleCli("sendfrom", "\"tabby\" \"1M72Sfpbz1BPpXFHz9m3CdqATR44Jvaydd\" 0.01 6 \"donation\" \"seans outpost\"") +
+            + HelpExampleCli("sendfrom", "\"tabby\" \"Kb9ma4bw6aRcB6CrbE67VPzGH8VUyafTrh\" 0.01 0 6 \"donation\" \"seans outpost\"") +
+            "\nSend 0.01 that is locked until block 1000000\n"
+            + HelpExampleCli("sendfrom", "\"\" \"Kb9ma4bw6aRcB6CrbE67VPzGH8VUyafTrh\" 0.01 1000000") +
             "\nAs a json rpc call\n"
-            + HelpExampleRpc("sendfrom", "\"tabby\", \"1M72Sfpbz1BPpXFHz9m3CdqATR44Jvaydd\", 0.01, 6, \"donation\", \"seans outpost\"")
+            + HelpExampleRpc("sendfrom", "\"tabby\", \"Kb9ma4bw6aRcB6CrbE67VPzGH8VUyafTrh\", 0.01, 0, 6, \"donation\", \"seans outpost\"")
         );
 
     ObserveSafeMode();
@@ -1059,10 +1086,7 @@ UniValue sendfrom(const JSONRPCRequest& request)
         throw JSONRPCError(RPC_TYPE_ERROR, "Invalid amount for send");
 
     // Lock time
-    int lockTime = 0;
-    if (!request.params[3].isNull()) {
-        lockTime = request.params[3].get_int();
-    }
+    const int64_t lockTime = LockTimeFromValue(request.params[3]);
 
     int nMinDepth = 1;
     if (!request.params[4].isNull())

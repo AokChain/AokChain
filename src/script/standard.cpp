@@ -379,7 +379,7 @@ CScript GetScriptForDestination(const CTxDestination& dest, const int64_t lockTi
     CScript scriptDest;
     boost::apply_visitor(CScriptVisitor(&scriptDest), dest);
 
-    if (lockTime > 255) {
+    if (lockTime >= MIN_SCRIPT_LOCK_TIME) {
         CScript cltvScript = CScript() << lockTime << OP_CHECKLOCKTIMEVERIFY << OP_DROP;
         script = cltvScript + scriptDest;
     } else {

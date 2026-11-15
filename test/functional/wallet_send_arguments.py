@@ -2,15 +2,19 @@
 # Copyright (c) 2026 The AokChain Core developers
 # Distributed under the MIT software license, see the accompanying
 # file COPYING or http://www.opensource.org/licenses/mit-license.php.
-"""Test the optional arguments of sendtoaddress and sendmany.
+"""Test the optional arguments of sendtoaddress, sendfrom and sendmany.
 
  - conf_target and estimate_mode are taken from the place that the help and
    the table of the commands give them, by position and by name
  - the message is written into the transaction (a version 2 transaction), at
    most 120 bytes
+ - lock_time 0 makes no lock and from 256 on a lock (CHECKLOCKTIMEVERIFY);
+   the values from 1 to 255 and negative values, which would make no lock,
+   are refused
  - the help numbers the arguments in order
 """
 
+from decimal import Decimal
 import re
 
 from test_framework.test_framework import AokChainTestFramework
@@ -26,6 +30,12 @@ class SendArgumentsTest(AokChainTestFramework):
         """The numbers and names of the arguments in the help of a command."""
         found = re.findall(r'^(\d+)\. +"?([a-z_]+)"?', self.nodes[0].help(command), re.M)
         return [(int(number), name) for number, name in found]
+
+    def output_script(self, txid, amount):
+        """The script (asm) of the output of a transaction that pays this amount."""
+        outputs = [out for out in self.nodes[0].getrawtransaction(txid, True)["vout"] if out["value"] == amount]
+        assert_equal(len(outputs), 1)
+        return outputs[0]["scriptPubKey"]["asm"]
 
     def run_test(self):
         n0, n1 = self.nodes
@@ -72,15 +82,44 @@ class SendArgumentsTest(AokChainTestFramework):
         txid = n0.sendtoaddress(to, 1)
         assert_equal(n0.getrawtransaction(txid, True)["version"], 1)
 
+        self.log.info("lock_time: 0 makes no lock; 1 to 255 and negative values are refused")
+        n0.generate(1)
+        mempool = n0.getrawmempool()
+        for lock in (1, 16, 100, 255, -1, -500000000):
+            message = "Invalid lock_time %d: use 0 for no lock, or a block height or a time of at least 256" % lock
+            assert_raises_rpc_error(-8, message, n0.sendtoaddress, to, 1, lock)
+            assert_raises_rpc_error(-8, message, n0.sendtoaddress, address=to, amount=1, lock_time=lock)
+            assert_raises_rpc_error(-8, message, n0.sendfrom, "", to, 1, lock)
+            assert_raises_rpc_error(-8, message, n0.sendfrom, fromaccount="", toaddress=to, amount=1, lock_time=lock)
+        assert_equal(n0.getrawmempool(), mempool)  # nothing was sent
+        for lock_time in (0, None):
+            txid = n0.sendtoaddress(to, Decimal("1.1"), lock_time) if lock_time is not None else n0.sendtoaddress(to, Decimal("1.1"))
+            assert self.output_script(txid, Decimal("1.1")).startswith("OP_DUP OP_HASH160 ")
+            txid = n0.sendfrom("", to, Decimal("1.2"), lock_time) if lock_time is not None else n0.sendfrom("", to, Decimal("1.2"))
+            assert self.output_script(txid, Decimal("1.2")).startswith("OP_DUP OP_HASH160 ")
+
+        self.log.info("lock_time: from 256 on, a block height or a time, the output is locked")
+        for lock in (256, 1000000, 1900000000):
+            txid = n0.sendtoaddress(to, Decimal("1.3"), lock)
+            assert self.output_script(txid, Decimal("1.3")).startswith("%d OP_CHECKLOCKTIMEVERIFY OP_DROP OP_DUP OP_HASH160 " % lock)
+            txid = n0.sendfrom("", to, Decimal("1.4"), lock)
+            assert self.output_script(txid, Decimal("1.4")).startswith("%d OP_CHECKLOCKTIMEVERIFY OP_DROP OP_DUP OP_HASH160 " % lock)
+            n0.generate(1)
+        for command in ("sendtoaddress", "sendfrom"):
+            assert "Values from 1 to 255 and negative values are refused" in n0.help(command)
+
         self.log.info("The help numbers the arguments in the order of the table")
         assert_equal(self.help_arguments("sendtoaddress"), list(enumerate(
             ["address", "amount", "lock_time", "message", "comment_to", "subtractfeefromamount", "conf_target", "estimate_mode"], 1)))
         assert_equal(self.help_arguments("sendmany"), list(enumerate(
             ["fromaccount", "amounts", "minconf", "message", "subtractfeefrom", "conf_target", "estimate_mode"], 1)))
+        assert_equal(self.help_arguments("sendfrom"), list(enumerate(
+            ["fromaccount", "toaddress", "amount", "lock_time", "minconf", "comment", "comment_to", "subtractfeefromamount"], 1)))
         for command in ("sendtoaddress", "sendmany"):
             usage = n0.help(command).split("\n")[0]
             assert "replaceable" not in usage, usage
         assert n0.help("sendtoaddress").startswith('sendtoaddress "address" amount ( lock_time "message" ')
+        assert n0.help("sendfrom").startswith('sendfrom "fromaccount" "toaddress" amount ( lock_time minconf ')
         n0.generate(1)
 
 

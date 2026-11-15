@@ -134,9 +134,17 @@ bool ExtractDestination(const CScript& scriptPubKey, CTxDestination& addressRet)
 bool ExtractDestinations(const CScript& scriptPubKey, txnouttype& typeRet, txnouttype& scriptType, std::vector<CTxDestination>& addressRet, int& nRequiredRet);
 
 /**
+ * The smallest lock time that GetScriptForDestination() puts into the script (as
+ * <lockTime> OP_CHECKLOCKTIMEVERIFY OP_DROP in front of it). A smaller lock time
+ * makes no lock.
+ */
+static const int64_t MIN_SCRIPT_LOCK_TIME = 256;
+
+/**
  * Generate a AokChain scriptPubKey for the given CTxDestination. Returns a P2PKH
  * script for a CKeyID destination, a P2SH script for a CScriptID, and an empty
- * script for CNoDestination.
+ * script for CNoDestination. With a lock time of at least MIN_SCRIPT_LOCK_TIME
+ * the output cannot be spent before that block height or time.
  */
 CScript GetScriptForDestination(const CTxDestination& dest, const int64_t lockTime = 0);
 
