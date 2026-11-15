@@ -12,6 +12,8 @@
  - unique tokens are issued below a root and below a sub token
  - amounts finer than the units of the token, more than the balance, a name
    that exists and a protected name are refused
+ - tokens are not sent to an offline staking address, with an error that
+   says so
  - the token state survives a restart
 """
 
@@ -85,6 +87,28 @@ class TokensTest(AokChainTestFramework):
         self.mine()
         assert_equal(self.holders_sum(n0, "TESTCOIN"), Decimal("1000"))
 
+        self.log.info("Tokens do not go to an offline staking address, and the error says so")
+        # (its script takes no token data; consensus refuses such an output)
+        offline = n0.getofflinestakingaddress(n1.getnewaddress(), n0.getnewaddress())
+        refused = "Tokens cannot be sent to an offline staking address: " + offline
+        assert_raises_rpc_error(-5, refused, n0.transfer, "TESTCOIN", 1, offline)
+        holder = [a for a in n0.listaddressesbytoken("TESTCOIN") if n0.validateaddress(a)["ismine"]][0]
+        assert_raises_rpc_error(-5, refused, n0.transferfromaddress, holder, "TESTCOIN", 1, offline)
+        assert_raises_rpc_error(-5, refused, n0.transfermany, "TESTCOIN", {offline: 1})
+        assert_raises_rpc_error(-5, refused, n0.transfermanyoutputs, [{"address": offline, "token_name": "TESTCOIN", "amount": 1, "locktime": 0}])
+        assert_raises_rpc_error(-5, refused, n0.issue, "OFFLINECOIN", 10, offline)
+        assert_raises_rpc_error(-5, refused, n0.issueunique, "TESTCOIN", ["offline"], None, offline)
+        assert_raises_rpc_error(-5, refused, n0.reissue, "TESTCOIN", 10, offline)
+        assert_raises_rpc_error(-5, refused, n0.registerusername, "@OFFLINEUSER", offline)
+        assert_raises_rpc_error(-5, refused, n0.createrawtransaction, [], {offline: {"transfer": {"TESTCOIN": 1}}})
+        # the owner token of a sub token, a unique token and a reissue comes back to the change address
+        assert_raises_rpc_error(-5, refused + " (the change address, which receives the owner token)", n0.issue, "TESTCOIN/OFFLINE", 1, address0, offline)
+        assert_raises_rpc_error(-5, refused + " (the change address, which receives the owner token)", n0.reissue, "TESTCOIN", 10, address0, offline)
+        assert_equal(n0.getrawmempool(), [])
+        n0.sendtoaddress(offline, 10)  # coins still go there
+        self.mine()
+        assert_equal(self.holders_sum(n0, "TESTCOIN"), Decimal("1000"))
+
         self.log.info("Reissue: only with the owner token")
         assert_raises_rpc_error(None, None, n1.reissue, "TESTCOIN", 500, n1.getnewaddress())
         n0.reissue("TESTCOIN", 500, address0)
@@ -153,6 +177,14 @@ class TokensTest(AokChainTestFramework):
         for name in before:
             assert_equal(n1.gettokendata(name), before[name])
             assert_equal(n0.listaddressesbytoken(name), n1.listaddressesbytoken(name))
+
+        self.log.info("The coin change of a token issue still goes to an offline staking address")
+        # (last: the wallet does not spend its coins there unasked, and the change is most of them)
+        txid = n0.issue("CHANGECOIN", 10, address0, offline)[0]
+        n0.generate(1)  # (node 0 is not connected again after its restart)
+        assert_equal(n0.gettokendata("CHANGECOIN")["amount"], 10)
+        offline_script = n0.validateaddress(offline)["scriptPubKey"]
+        assert offline_script in [out["scriptPubKey"]["hex"] for out in n0.getrawtransaction(txid, True)["vout"]]
 
 
 if __name__ == '__main__':

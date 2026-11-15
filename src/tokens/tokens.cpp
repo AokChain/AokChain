@@ -257,6 +257,13 @@ std::string GetParentName(const std::string& name)
     return name;
 }
 
+bool CanHoldTokens(const std::string& address)
+{
+    // CScript::IsTokenScript() finds token data behind a P2PKH or a P2SH script only
+    const CTxDestination dest = DecodeDestination(address);
+    return boost::get<std::pair<CKeyID, CKeyID>>(&dest) == nullptr;
+}
+
 std::string GetUniqueTokenName(const std::string& parent, const std::string& tag)
 {
     // A unique token is issued below a root token or below a sub token (see the UNIQUE case of
@@ -2760,6 +2767,11 @@ bool CreateTokenTransaction(CWallet* pwallet, CCoinControl& coinControl, const s
         }
     }
 
+    if (!CanHoldTokens(address)) {
+        error = std::make_pair(RPC_INVALID_ADDRESS_OR_KEY, std::string("Tokens cannot be sent to an offline staking address: ") + address);
+        return false;
+    }
+
     if (!change_address.empty()) {
         CTxDestination destination = DecodeDestination(change_address);
         if (!IsValidDestination(destination)) {
@@ -2784,6 +2796,11 @@ bool CreateTokenTransaction(CWallet* pwallet, CCoinControl& coinControl, const s
     for (auto token : tokens) {
         if (!IsTokenNameValid(token.strName, tokenType)) {
             error = std::make_pair(RPC_INVALID_PARAMETER, "Token name not valid");
+            return false;
+        }
+        // the owner token of the parent of a sub token or a unique token comes back to the change address
+        if ((tokenType == KnownTokenType::SUB || tokenType == KnownTokenType::UNIQUE) && !CanHoldTokens(change_address)) {
+            error = std::make_pair(RPC_INVALID_ADDRESS_OR_KEY, std::string("Tokens cannot be sent to an offline staking address: ") + change_address + " (the change address, which receives the owner token)");
             return false;
         }
         if (tokens.size() > 1 && tokenType != KnownTokenType::UNIQUE) {
@@ -2870,11 +2887,20 @@ bool CreateReissueTokenTransaction(CWallet* pwallet, CCoinControl& coinControl, 
         error = std::make_pair(RPC_INVALID_ADDRESS_OR_KEY, std::string("Invalid AokChain address: ") + address);
         return false;
     }
+    if (!CanHoldTokens(address)) {
+        error = std::make_pair(RPC_INVALID_ADDRESS_OR_KEY, std::string("Tokens cannot be sent to an offline staking address: ") + address);
+        return false;
+    }
 
     if (!change_address.empty()) {
         CTxDestination destination = DecodeDestination(change_address);
         if (!IsValidDestination(destination)) {
             error = std::make_pair(RPC_INVALID_ADDRESS_OR_KEY, std::string("Invalid AokChain address: ") + change_address);
+            return false;
+        }
+        // the owner token comes back to the change address
+        if (!CanHoldTokens(change_address)) {
+            error = std::make_pair(RPC_INVALID_ADDRESS_OR_KEY, std::string("Tokens cannot be sent to an offline staking address: ") + change_address + " (the change address, which receives the owner token)");
             return false;
         }
     } else {
@@ -3002,6 +3028,11 @@ bool CreateTransferTokenTransaction(CWallet* pwallet, const CCoinControl& coinCo
 
         if (!IsValidDestinationString(address)) {
             error = std::make_pair(RPC_INVALID_ADDRESS_OR_KEY, std::string("Invalid AokChain address: ") + address);
+            return false;
+        }
+        // (the wallet would otherwise find the output without tokens "too small")
+        if (!CanHoldTokens(address)) {
+            error = std::make_pair(RPC_INVALID_ADDRESS_OR_KEY, std::string("Tokens cannot be sent to an offline staking address: ") + address);
             return false;
         }
         auto currentActiveTokenCache = GetCurrentTokenCache();

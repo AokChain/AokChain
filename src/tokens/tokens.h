@@ -268,6 +268,11 @@ std::string GetUniqueTokenName(const std::string& parent, const std::string& tag
 
 bool IsTypeCheckNameValid(const KnownTokenType type, const std::string& name, std::string& error);
 
+/** Whether tokens can be sent to this address. They cannot go to an offline staking address: its
+ *  script takes no token data, and consensus refuses a transaction with such an output
+ *  (bad-txns-bad-token-script). */
+bool CanHoldTokens(const std::string& address);
+
 bool IsTokenUnitsValid(const CAmount& units);
 
 bool TokenFromTransaction(const CTransaction& tx, CNewToken& token, std::string& strAddress);

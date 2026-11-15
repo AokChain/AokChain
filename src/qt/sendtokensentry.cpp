@@ -335,7 +335,10 @@ void SendTokensEntry::updateAddressHint(const QString &address)
         addressHint->setText(QString());
         return;
     }
-    if (model->validateAddress(text)) {
+    if (model->validateAddress(text) && !CanHoldTokens(text.toStdString())) {
+        addressHint->setProperty("role", "error");
+        addressHint->setText(tr("Tokens cannot be sent to an offline staking address"));
+    } else if (model->validateAddress(text)) {
         addressHint->setProperty("role", "ok");
         addressHint->setText(tr("This is a valid AokChain address"));
     } else if (IsUsernameValid(text.toStdString())) {
@@ -422,6 +425,8 @@ bool SendTokensEntry::isComplete() const
         return false;
     const QString address = ui->payTo->text().trimmed();
     if (!model->validateAddress(address) && !IsUsernameValid(address.toStdString()))
+        return false;
+    if (!CanHoldTokens(address.toStdString()))
         return false;
     return ui->payTokenAmount->value() > 0;
 }
@@ -513,6 +518,12 @@ bool SendTokensEntry::validate()
 
     if (!model->validateAddress(ui->payTo->text()) && !IsUsernameValid(ui->payTo->text().toStdString()))
     {
+        ui->payTo->setValid(false);
+        retval = false;
+    }
+    else if (!CanHoldTokens(ui->payTo->text().toStdString()))
+    {
+        // an offline staking address: its script takes no tokens (the hint under the field says so)
         ui->payTo->setValid(false);
         retval = false;
     }

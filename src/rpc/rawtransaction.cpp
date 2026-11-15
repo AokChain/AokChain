@@ -553,6 +553,9 @@ UniValue createrawtransaction(const JSONRPCRequest& request)
             }
             /** AOK COIN START **/
             else if (sendTo[name_].type() == UniValue::VOBJ) {
+                if (!CanHoldTokens(name_))
+                    throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, std::string("Tokens cannot be sent to an offline staking address: ") + name_);
+
                 auto token_ = sendTo[name_].get_obj();
                 auto tokenKey_ = token_.getKeys()[0];
 

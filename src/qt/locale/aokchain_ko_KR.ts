@@ -1290,6 +1290,10 @@
         <translation>유효한 AokChain 주소가 아닙니다</translation>
     </message>
     <message>
+        <source>Tokens cannot be sent to an offline staking address</source>
+        <translation>오프라인 스테이킹 주소로는 토큰을 보낼 수 없습니다</translation>
+    </message>
+    <message>
         <source>Failed to get token metadata for: </source>
         <translation>토큰 정보를 가져오지 못했습니다: </translation>
     </message>
