@@ -204,7 +204,8 @@ bool IsTypeCheckNameValid(const KnownTokenType type, const std::string& name, st
 
         bool valid = IsUsernameValid(name);
         if (!valid) {
-            error = "Username contains invalid characters (Valid characters are: A-Z 0-9 _ .) (special characters can't be the first or last characters)";
+            // what USERNAME_CHARACTERS takes: '.' and '_' anywhere after the '@', also side by side
+            error = "A username is @ followed by at least 4 characters (valid characters are: A-Z 0-9 _ .)";
             return false;
         }
 

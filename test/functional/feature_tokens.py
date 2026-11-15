@@ -14,6 +14,9 @@
    that exists and a protected name are refused
  - tokens are not sent to an offline staking address, with an error that
    says so
+ - a username is @ followed by at least 4 characters of A-Z 0-9 _ . (where
+   the punctuation stands is not checked), and the error of registerusername
+   says so
  - the token state survives a restart
 """
 
@@ -156,6 +159,19 @@ class TokensTest(AokChainTestFramework):
         assert_raises_rpc_error(-32600, "Wallet doesn't have token: TESTCOIN/SUB!", n1.issueunique, "TESTCOIN/SUB", ["gamma"])
         assert_raises_rpc_error(-8, "Name is greater than max length of 31", n0.issueunique, "TESTCOIN/SUB", ["x" * 20])
         assert_raises_rpc_error(-8, "Root token must be a regular top-level or sub-token", n0.issueunique, "TESTCOIN/SUB#alpha", ["x"])
+
+        self.log.info("Usernames: @ followed by at least 4 characters of A-Z 0-9 _ .")
+        rules = "A username is @ followed by at least 4 characters (valid characters are: A-Z 0-9 _ .)"
+        for name in ("@abcd", "@ABC", "@AB-CD", "ABCDE", "TESTCOIN"):
+            assert_raises_rpc_error(-8, "Invalid username: %s\nError: %s" % (name, rules), n0.registerusername, name)
+        assert_raises_rpc_error(-8, "Name is greater than max length of 31", n0.registerusername, "@" + "A" * 31)
+        # where a dot or an underscore stands is not checked (consensus): these are usernames
+        usernames = ["@AB..CD", "@.ABCD", "@ABCD_", "@" + "A" * 30]
+        for name in usernames:
+            n0.registerusername(name)
+        self.mine()
+        for name in usernames:
+            assert_equal(n1.gettokendata(name)["amount"], 1)
 
         self.log.info("The owner token can be handed over")
         n0.transfer("TESTCOIN!", 1, address1)
