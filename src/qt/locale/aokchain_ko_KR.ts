@@ -359,6 +359,14 @@
         <source>The wallet needs a passphrase before it can be used. Quit %1?</source>
         <translation>지갑을 쓰려면 먼저 암호를 정해야 합니다. 프로그램을 끝낼까요?</translation>
     </message>
+    <message>
+        <source>%1 is encrypted. It is closed and opened again now to finish.</source>
+        <translation>%1 지갑을 암호화했습니다. 마무리를 위해 지금 지갑을 닫았다가 다시 엽니다.</translation>
+    </message>
+    <message>
+        <source>Backups of the wallet file made before today are not encrypted: replace them with a new backup.</source>
+        <translation>전에 만든 지갑 파일 백업은 암호화되어 있지 않습니다. 새 백업으로 바꾸세요.</translation>
+    </message>
 </context>
 <context>
     <name>BanTableModel</name>
@@ -1022,6 +1030,80 @@
     <message>
         <source>The download of the past blocks stopped: %1</source>
         <translation>과거 블록 내려받기가 중단되었습니다: %1</translation>
+    </message>
+    <message>
+        <source>&amp;Create Wallet...</source>
+        <translation>지갑 만들기(&amp;C)...</translation>
+    </message>
+    <message>
+        <source>Create a new wallet next to the open ones</source>
+        <translation>열려 있는 지갑 옆에 새 지갑을 만듭니다</translation>
+    </message>
+    <message>
+        <source>&amp;Open Wallet...</source>
+        <translation>지갑 열기(&amp;O)...</translation>
+    </message>
+    <message>
+        <source>Open another wallet of the wallet folder, or restore one from a backup file</source>
+        <translation>지갑 폴더에 있는 다른 지갑을 열거나 백업 파일에서 지갑을 복원합니다</translation>
+    </message>
+    <message>
+        <source>&amp;Restore Wallet...</source>
+        <translation>지갑 복원(&amp;R)...</translation>
+    </message>
+    <message>
+        <source>Restore a backup file as a wallet of its own</source>
+        <translation>백업 파일을 별도의 지갑으로 복원합니다</translation>
+    </message>
+    <message>
+        <source>C&amp;lose Wallet</source>
+        <translation>지갑 닫기(&amp;L)</translation>
+    </message>
+    <message>
+        <source>Close the wallet that is shown; its file stays in the wallet folder</source>
+        <translation>지금 보이는 지갑을 닫습니다. 지갑 파일은 지갑 폴더에 그대로 남습니다</translation>
+    </message>
+    <message>
+        <source>Open Wallet</source>
+        <translation>지갑 열기</translation>
+    </message>
+    <message>
+        <source>The first wallet of the node stays open. The others can be closed.</source>
+        <translation>노드의 첫 지갑은 항상 열려 있습니다. 다른 지갑은 닫을 수 있습니다.</translation>
+    </message>
+    <message>
+        <source>Every wallet of the wallet folder is open</source>
+        <translation>지갑 폴더의 지갑이 모두 열려 있습니다</translation>
+    </message>
+    <message>
+        <source>Close wallet</source>
+        <translation>지갑 닫기</translation>
+    </message>
+    <message>
+        <source>Close %1?</source>
+        <translation>%1 지갑을 닫을까요?</translation>
+    </message>
+    <message>
+        <source>Its coins and tokens stay in its file. Staking and notifications of this wallet stop until it is opened again with Open Wallet.</source>
+        <translation>코인과 토큰은 지갑 파일에 그대로 있습니다. 지갑 열기로 다시 열 때까지 이 지갑의 스테이킹과 알림이 멈춥니다.</translation>
+    </message>
+    <message>
+        <source>Wallet: %1
+</source>
+        <translation>지갑: %1
+</translation>
+    </message>
+    <message numerus="yes">
+        <source>%n other wallet(s) staking</source>
+        <translation><numerusform>다른 지갑 %n개 스테이킹 중</numerusform></translation>
+    </message>
+    <message>
+        <source>Also staking: %1</source>
+        <translation>스테이킹 중인 다른 지갑: %1</translation>
+    </message>
+    <message>
+        <source>The switch is for %1: every wallet stakes on its own.</source>
+        <translation>이 스위치는 %1 지갑의 것입니다. 지갑마다 따로 스테이킹합니다.</translation>
     </message>
 </context>
 <context>
@@ -2473,9 +2555,9 @@
         <source>Watch-only: available %1 · pending %2 · immature %3 · total %4</source>
         <translation>조회 전용: 사용 가능 %1 · 미확정 %2 · 미성숙 %3 · 합계 %4</translation>
     </message>
-    <message>
-        <source>%1 kinds</source>
-        <translation>%1종</translation>
+    <message numerus="yes">
+        <source>%n kind(s)</source>
+        <translation><numerusform>%n종</numerusform></translation>
     </message>
     <message>
         <source>State of the chain and of the memory pool. Click to open the explorer.</source>
@@ -3066,6 +3148,14 @@
     <message>
         <source>Unknown</source>
         <translation>알수없음</translation>
+    </message>
+    <message>
+        <source>Wallet</source>
+        <translation>지갑</translation>
+    </message>
+    <message>
+        <source>The wallet that the wallet commands of the console use</source>
+        <translation>콘솔의 지갑 명령이 사용하는 지갑</translation>
     </message>
 </context>
 <context>
@@ -4937,6 +5027,22 @@
         <source>Refresh</source>
         <translation>새로 고침</translation>
     </message>
+    <message>
+        <source>Your wallets</source>
+        <translation>내 지갑들</translation>
+    </message>
+    <message>
+        <source>Every wallet has its own keys, addresses and passphrase, and stakes on its own. Owner tokens (NAME!) are safest in a wallet of their own, apart from the one used every day.</source>
+        <translation>지갑마다 키, 주소, 암호가 따로 있고 스테이킹도 따로 합니다. 소유자 토큰(이름!)은 평소에 쓰는 지갑과 분리한 별도의 지갑에 두는 것이 가장 안전합니다.</translation>
+    </message>
+    <message>
+        <source>This wallet: &lt;b&gt;%1&lt;/b&gt;</source>
+        <translation>지금 지갑: &lt;b&gt;%1&lt;/b&gt;</translation>
+    </message>
+    <message>
+        <source>the first wallet of this node, it stays open</source>
+        <translation>이 노드의 첫 지갑이며 항상 열려 있습니다</translation>
+    </message>
 </context>
 <context>
     <name>aokchain-core</name>
@@ -5891,6 +5997,22 @@
         <source>Version of this program</source>
         <translation>이 프로그램의 버전</translation>
     </message>
+    <message>
+        <source>The wallet shown. Click to switch to another wallet, or to create, open or close one.</source>
+        <translation>지금 보이는 지갑입니다. 눌러서 다른 지갑으로 바꾸거나 지갑을 만들고, 열고, 닫을 수 있습니다.</translation>
+    </message>
+    <message>
+        <source>Not encrypted</source>
+        <translation>암호화 안 됨</translation>
+    </message>
+    <message>
+        <source>This wallet has no passphrase.</source>
+        <translation>이 지갑에는 암호가 없습니다.</translation>
+    </message>
+    <message>
+        <source>Click to switch to another wallet, or to create, open or close one.</source>
+        <translation>눌러서 다른 지갑으로 바꾸거나 지갑을 만들고, 열고, 닫을 수 있습니다.</translation>
+    </message>
 </context>
 <context>
     <name>ExplorerPage</name>
@@ -6357,9 +6479,9 @@
         <source>Receive</source>
         <translation>받기</translation>
     </message>
-    <message>
-        <source>%1 kinds</source>
-        <translation>%1종</translation>
+    <message numerus="yes">
+        <source>%n kind(s)</source>
+        <translation><numerusform>%n종</numerusform></translation>
     </message>
     <message>
         <source>loading...</source>
@@ -6385,9 +6507,9 @@
         <source>Show the sub tokens and unique tokens of this token that the wallet holds</source>
         <translation>지갑이 가진 이 토큰의 하위 토큰과 고유 토큰을 봅니다</translation>
     </message>
-    <message>
-        <source>%1 kinds, the first %2 shown</source>
-        <translation>%1종 중 처음 %2종 표시</translation>
+    <message numerus="yes">
+        <source>%n kind(s), the first %1 shown</source>
+        <translation><numerusform>%n종 중 처음 %1종 표시</numerusform></translation>
     </message>
     <message>
         <source>The token balances could not be read.</source>
@@ -7455,8 +7577,8 @@
         <translation>수수료 2배</translation>
     </message>
     <message>
-        <source>Only AOK can be sent from a multisig address for now. Sending tokens from multisig is in preparation.</source>
-        <translation>지금은 멀티시그 주소에서 AOK만 보낼 수 있습니다. 토큰 보내기는 준비 중입니다.</translation>
+        <source>Only AOK can be sent from a multisig address. Tokens cannot be sent from one.</source>
+        <translation>멀티시그 주소에서는 AOK만 보낼 수 있습니다. 토큰은 보낼 수 없습니다.</translation>
     </message>
     <message>
         <source>Make the send request</source>
@@ -8503,6 +8625,233 @@
     <message>
         <source>Starting</source>
         <translation>시작 중</translation>
+    </message>
+</context>
+<context>
+    <name>WalletSwitcher</name>
+    <message>
+        <source>Wallet: %1</source>
+        <translation>지갑: %1</translation>
+    </message>
+</context>
+<context>
+    <name>WalletController</name>
+    <message>
+        <source>Main wallet</source>
+        <translation>기본 지갑</translation>
+    </message>
+    <message>
+        <source>Give the wallet a name.</source>
+        <translation>지갑 이름을 입력하세요.</translation>
+    </message>
+    <message>
+        <source>The name is too long: at most 40 characters.</source>
+        <translation>이름이 너무 깁니다. 40자까지 쓸 수 있습니다.</translation>
+    </message>
+    <message>
+        <source>Use letters, digits, spaces, &quot;-&quot;, &quot;_&quot; and &quot;.&quot;, starting with a letter or a digit.</source>
+        <translation>영문자, 숫자, 공백, &quot;-&quot;, &quot;_&quot;, &quot;.&quot;만 쓸 수 있고, 영문자나 숫자로 시작해야 합니다.</translation>
+    </message>
+    <message>
+        <source>This name is used by the wallet files themselves.</source>
+        <translation>지갑 파일 자체가 쓰는 이름입니다.</translation>
+    </message>
+    <message>
+        <source>There is a wallet or a file of this name in the wallet folder already.</source>
+        <translation>지갑 폴더에 같은 이름의 지갑이나 파일이 이미 있습니다.</translation>
+    </message>
+    <message>
+        <source>Wallets</source>
+        <translation>지갑</translation>
+    </message>
+    <message>
+        <source>Opening %1 …</source>
+        <translation>%1 여는 중…</translation>
+    </message>
+    <message>
+        <source>Open wallet</source>
+        <translation>지갑 열기</translation>
+    </message>
+    <message>
+        <source>%1 was not opened: %2</source>
+        <translation>%1 지갑을 열지 못했습니다: %2</translation>
+    </message>
+    <message>
+        <source>Creating %1 …</source>
+        <translation>%1 만드는 중…</translation>
+    </message>
+    <message>
+        <source>Create wallet</source>
+        <translation>지갑 만들기</translation>
+    </message>
+    <message>
+        <source>%1 was not created: %2</source>
+        <translation>%1 지갑을 만들지 못했습니다: %2</translation>
+    </message>
+    <message>
+        <source>Restoring %1 …</source>
+        <translation>%1 복원하는 중…</translation>
+    </message>
+    <message>
+        <source>Restore wallet</source>
+        <translation>지갑 복원</translation>
+    </message>
+    <message>
+        <source>%1 was not restored: %2</source>
+        <translation>%1 지갑을 복원하지 못했습니다: %2</translation>
+    </message>
+    <message>
+        <source>Closing %1 …</source>
+        <translation>%1 닫는 중…</translation>
+    </message>
+    <message>
+        <source>The wallet is being rescanned. Try again when the rescan is over.</source>
+        <translation>지갑이 블록을 다시 훑는 중입니다. 끝난 뒤 다시 시도하세요.</translation>
+    </message>
+    <message>
+        <source>This wallet stays open.</source>
+        <translation>이 지갑은 항상 열려 있습니다.</translation>
+    </message>
+    <message>
+        <source>Close wallet</source>
+        <translation>지갑 닫기</translation>
+    </message>
+    <message>
+        <source>The wallet is closed, but its file is still in use by a running command. It is released when the program ends; do not copy or move it before.</source>
+        <translation>지갑은 닫혔지만 실행 중인 명령이 지갑 파일을 아직 쓰고 있습니다. 프로그램을 끝내면 풀립니다. 그 전에는 파일을 복사하거나 옮기지 마세요.</translation>
+    </message>
+    <message>
+        <source>Finishing the encryption of %1 …</source>
+        <translation>%1 암호화를 마무리하는 중…</translation>
+    </message>
+    <message>
+        <source>Encrypt wallet</source>
+        <translation>지갑 암호화</translation>
+    </message>
+    <message>
+        <source>%1 is encrypted. It could not be closed and opened again now; that happens when the program ends.</source>
+        <translation>%1 지갑을 암호화했습니다. 지금은 닫았다가 다시 열 수 없어서, 프로그램을 끝낼 때 마무리됩니다.</translation>
+    </message>
+    <message>
+        <source>%1 is encrypted, but it was not opened again: %2</source>
+        <translation>%1 지갑을 암호화했지만 다시 열지 못했습니다: %2</translation>
+    </message>
+    <message>
+        <source>%1 was open when the program ended, but it was not opened now: %2. It is no longer opened at the start; open it again with Open wallet.</source>
+        <translation>%1 지갑은 지난번 종료 때 열려 있었지만 이번에는 열지 못했습니다: %2. 앞으로는 시작할 때 열지 않습니다. 지갑 열기로 다시 여세요.</translation>
+    </message>
+</context>
+<context>
+    <name>CreateWalletDialog</name>
+    <message>
+        <source>Create wallet</source>
+        <translation>지갑 만들기</translation>
+    </message>
+    <message>
+        <source>A new wallet</source>
+        <translation>새 지갑</translation>
+    </message>
+    <message>
+        <source>New keys, addresses and a passphrase of its own, next to the wallets that are open. Switch between them at the top of the side bar.</source>
+        <translation>열려 있는 지갑 옆에 새 키와 주소, 자체 암호를 가진 지갑을 만듭니다. 지갑은 사이드바 맨 위에서 바꿉니다.</translation>
+    </message>
+    <message>
+        <source>Name</source>
+        <translation>이름</translation>
+    </message>
+    <message>
+        <source>For example: Savings, Issuer</source>
+        <translation>예: Savings, Issuer</translation>
+    </message>
+    <message>
+        <source>Protect it with a passphrase (asked for next)</source>
+        <translation>암호로 보호 (다음 단계에서 입력)</translation>
+    </message>
+    <message>
+        <source>Without a passphrase, anyone who copies the wallet file or uses this computer can send its coins and tokens.</source>
+        <translation>암호가 없으면 지갑 파일을 복사해 가거나 이 컴퓨터를 쓰는 사람은 누구나 코인과 토큰을 보낼 수 있습니다.</translation>
+    </message>
+    <message>
+        <source>Cancel</source>
+        <translation>취소</translation>
+    </message>
+    <message>
+        <source>Create</source>
+        <translation>만들기</translation>
+    </message>
+</context>
+<context>
+    <name>OpenWalletDialog</name>
+    <message>
+        <source>Open wallet</source>
+        <translation>지갑 열기</translation>
+    </message>
+    <message>
+        <source>Open a wallet</source>
+        <translation>지갑 열기</translation>
+    </message>
+    <message>
+        <source>Every wallet of the wallet folder is open. A wallet from a backup file can be restored as a wallet of its own.</source>
+        <translation>지갑 폴더의 지갑이 모두 열려 있습니다. 백업 파일의 지갑은 별도의 지갑으로 복원할 수 있습니다.</translation>
+    </message>
+    <message>
+        <source>The wallets of the wallet folder that are not open. An open wallet is shown next to the others and can be closed again.</source>
+        <translation>지갑 폴더에 있지만 열려 있지 않은 지갑입니다. 연 지갑은 다른 지갑과 함께 표시되고 다시 닫을 수 있습니다.</translation>
+    </message>
+    <message>
+        <source>Restore Wallet...</source>
+        <translation>지갑 복원...</translation>
+    </message>
+    <message>
+        <source>Cancel</source>
+        <translation>취소</translation>
+    </message>
+    <message>
+        <source>Open</source>
+        <translation>열기</translation>
+    </message>
+</context>
+<context>
+    <name>RestoreWalletDialog</name>
+    <message>
+        <source>Restore wallet</source>
+        <translation>지갑 복원</translation>
+    </message>
+    <message>
+        <source>Restore a backup</source>
+        <translation>백업 복원</translation>
+    </message>
+    <message>
+        <source>A backup file of a wallet (Backup Wallet, or a copy of a wallet.dat) becomes a wallet of its own, next to the open ones. The backup file itself is not changed.</source>
+        <translation>지갑 백업 파일(지갑 백업으로 만든 파일이나 wallet.dat 사본)을 열려 있는 지갑 옆에 별도의 지갑으로 만듭니다. 백업 파일 자체는 바뀌지 않습니다.</translation>
+    </message>
+    <message>
+        <source>Backup file</source>
+        <translation>백업 파일</translation>
+    </message>
+    <message>
+        <source>Choose...</source>
+        <translation>선택...</translation>
+    </message>
+    <message>
+        <source>Name of the restored wallet</source>
+        <translation>복원할 지갑의 이름</translation>
+    </message>
+    <message>
+        <source>Cancel</source>
+        <translation>취소</translation>
+    </message>
+    <message>
+        <source>Restore</source>
+        <translation>복원</translation>
+    </message>
+    <message>
+        <source>Backup file of a wallet</source>
+        <translation>지갑 백업 파일</translation>
+    </message>
+    <message>
+        <source>Wallet Data (*.dat);;All files (*)</source>
+        <translation>지갑 데이터 (*.dat);;모든 파일 (*)</translation>
     </message>
 </context>
 </TS>

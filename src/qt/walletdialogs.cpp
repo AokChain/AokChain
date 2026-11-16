@@ -21,8 +21,9 @@ namespace {
 /** Title and one line below it, as the dialogs of the program start */
 void addHeader(QVBoxLayout *layout, const QString &title, const QString &subtitle, QWidget *parent)
 {
+    // (the heading of a dialog, as "Check before sending" and the passphrase dialog have it)
     QLabel *head = new QLabel(title, parent);
-    head->setFont(GUIUtil::appFont(20, QFont::DemiBold));
+    head->setProperty("role", "title");
     layout->addWidget(head);
     QLabel *sub = new QLabel(subtitle, parent);
     sub->setProperty("role", "secondary");
@@ -37,7 +38,7 @@ QPushButton *makeButton(const QString &text, bool primary, QWidget *parent)
     button->setCursor(Qt::PointingHandCursor);
     if (primary) {
         button->setProperty("primary", true);
-        button->setMinimumWidth(130);
+        button->setMinimumWidth(120);
     }
     button->setAutoDefault(false);
     return button;
@@ -74,7 +75,7 @@ CreateWalletDialog::CreateWalletDialog(QWidget *parent) : QDialog(parent)
     problem->hide();
     layout->addWidget(problem);
 
-    layout->addSpacing(6);
+    layout->addSpacing(8);
     encryptBox = new QCheckBox(tr("Protect it with a passphrase (asked for next)"), this);
     encryptBox->setChecked(true);
     layout->addWidget(encryptBox);
@@ -157,7 +158,7 @@ OpenWalletDialog::OpenWalletDialog(const QStringList &closedWallets, QWidget *pa
 
     layout->addSpacing(12);
     QHBoxLayout *buttons = new QHBoxLayout();
-    QPushButton *restoreFile = makeButton(tr("Restore from a backup file..."), false, this);
+    QPushButton *restoreFile = makeButton(tr("Restore Wallet..."), false, this);
     buttons->addWidget(restoreFile);
     buttons->addStretch();
     QPushButton *cancel = makeButton(tr("Cancel"), false, this);
@@ -255,7 +256,7 @@ void RestoreWalletDialog::chooseFile()
         // a name from the file name, which the user may change
         QString base = QFileInfo(file).completeBaseName();
         if (base.compare("wallet", Qt::CaseInsensitive) == 0)
-            base = tr("Restored");
+            base = "Restored"; // (not translated: a wallet name is made of ASCII letters)
         base.replace(QRegExp("[^A-Za-z0-9 _.-]"), " ");
         nameEdit->setText(base.simplified().left(40));
     }

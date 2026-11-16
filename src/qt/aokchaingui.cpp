@@ -969,12 +969,13 @@ void AokChainGUI::closeWalletClicked()
     if (!model || WalletController::isFirstWallet(model))
         return;
     const QString name = walletController->displayName(model);
+    // (the file stays: closing is undone with Open Wallet, so it is the default answer)
     QMessageBox box(QMessageBox::Question, tr("Close wallet"),
         "<qt>" + tr("Close %1?").arg(name.toHtmlEscaped()) + "<br><br>" +
-        tr("Its coins and tokens stay in its file, %1. It stops staking and its notifications stop until it is opened again with Open Wallet.").arg(WalletController::walletPath(QString::fromStdString(model->getWallet()->GetName())).toHtmlEscaped()) + "</qt>",
+        tr("Its coins and tokens stay in its file. Staking and notifications of this wallet stop until it is opened again with Open Wallet.") + "</qt>",
         QMessageBox::Cancel, this);
     QPushButton *closeButton = box.addButton(tr("Close wallet"), QMessageBox::AcceptRole);
-    box.setDefaultButton(QMessageBox::Cancel);
+    box.setDefaultButton(closeButton);
     box.exec();
     if (box.clickedButton() == closeButton)
         walletController->closeWallet(model);

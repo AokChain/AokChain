@@ -550,13 +550,18 @@ void WalletView::setAokChainGUI(AokChainGUI *gui)
         // Settings page: what the menus of the window offered
         QVBoxLayout *body = nullptr;
         // the wallets of the window: which one this is, where its file is; create, open, close
-        QFrame *walletsCard = OptionsDialog::makeCard(tr("Wallets"), settingsPage, &body);
+        QFrame *walletsCard = OptionsDialog::makeCard(tr("Your wallets"), settingsPage, &body);
         walletInfoLabel = new QLabel(walletsCard);
-        walletInfoLabel->setProperty("role", "secondary");
         walletInfoLabel->setWordWrap(true);
-        walletInfoLabel->setTextInteractionFlags(Qt::TextSelectableByMouse);
         body->addWidget(walletInfoLabel);
-        QLabel *walletsNote = new QLabel(tr("Each wallet has its own keys, coins, tokens, addresses and passphrase, and stakes on its own. A separate wallet is a good place for owner tokens (NAME!): the wallet used every day then cannot reissue or create tokens by mistake."), walletsCard);
+        // where its file is: fixed width, to select and copy
+        walletPathLabel = new QLabel(walletsCard);
+        walletPathLabel->setFont(GUIUtil::monoFont(12));
+        walletPathLabel->setProperty("role", "secondary");
+        walletPathLabel->setWordWrap(true);
+        walletPathLabel->setTextInteractionFlags(Qt::TextSelectableByMouse);
+        body->addWidget(walletPathLabel);
+        QLabel *walletsNote = new QLabel(tr("Every wallet has its own keys, addresses and passphrase, and stakes on its own. Owner tokens (NAME!) are safest in a wallet of their own, apart from the one used every day."), walletsCard);
         walletsNote->setProperty("role", "secondary");
         walletsNote->setWordWrap(true);
         body->addWidget(walletsNote);
@@ -1042,8 +1047,9 @@ void WalletView::updateWalletInfo()
     if (!walletInfoLabel || !walletModel || !walletModel->getWallet())
         return;
     const QString name = QString::fromStdString(walletModel->getWallet()->GetName());
-    QString text = tr("This is <b>%1</b>. Its file: %2").arg(WalletController::displayName(name).toHtmlEscaped(), WalletController::walletPath(name).toHtmlEscaped());
+    QString text = tr("This wallet: <b>%1</b>").arg(WalletController::displayName(name).toHtmlEscaped());
     if (IsDefaultWallet(walletModel->getWallet()))
-        text += "<br>" + tr("It is the first wallet of this node and stays open.");
+        text += QString::fromUtf8(" \u00b7 ") + tr("the first wallet of this node, it stays open");
     walletInfoLabel->setText(text);
+    walletPathLabel->setText(WalletController::walletPath(name));
 }

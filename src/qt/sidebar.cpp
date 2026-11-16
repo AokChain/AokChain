@@ -158,32 +158,35 @@ void WalletSwitcher::paintEvent(QPaintEvent*)
     QPainter p(this);
     p.setRenderHint(QPainter::Antialiasing, true);
     const QRectF frame = QRectF(rect()).adjusted(0.5, 0.5, -0.5, -0.5);
-    p.setPen(QPen(t.sideCard, 1));
-    p.setBrush((hovered || isDown() || hasFocus()) ? t.sideOnBg : Qt::transparent);
+    // a hairline box; hovered or pressed it takes the fill of the active page, and the keyboard
+    // focus shows as a brighter line, as on the staking switch
+    p.setPen(QPen(hasFocus() ? t.sideStrong : t.sideCard, 1));
+    p.setBrush((hovered || isDown()) ? t.sideOnBg : Qt::transparent);
     p.drawRoundedRect(frame, 10, 10);
 
-    // the mark: the first letters of the name in a rounded square
-    const QRectF mark(10, (height() - 34) / 2.0, 34, 34);
+    // the mark: the first letters of the name in a rounded square (tokens have round ones)
+    const QRectF mark(12, (height() - 32) / 2.0, 32, 32);
     p.setPen(Qt::NoPen);
     p.setBrush(t.sideCard);
-    p.drawRoundedRect(mark, 8, 8);
+    p.drawRoundedRect(mark, 6, 6);
     p.setPen(t.sideStrong);
     p.setFont(GUIUtil::appFont(13, QFont::DemiBold));
     p.drawText(mark, Qt::AlignCenter, walletInitials(name));
 
-    const int left = 54;
-    const int right = width() - 30;
+    // name and state on two lines of 18, centered in the 56 of the box
+    const int left = 56;
+    const int right = width() - 36;
     const QFont nameFont = GUIUtil::appFont(14, QFont::DemiBold);
     const QFont stateFont = GUIUtil::appFont(12, QFont::Medium);
     p.setFont(nameFont);
     p.setPen(t.sideStrong);
-    p.drawText(QRect(left, 9, right - left, 20), Qt::AlignLeft | Qt::AlignVCenter,
+    p.drawText(QRect(left, 10, right - left, 18), Qt::AlignLeft | Qt::AlignVCenter,
                QFontMetrics(nameFont).elidedText(name, Qt::ElideRight, right - left));
     p.setFont(stateFont);
     p.setPen(t.sideText);
-    p.drawText(QRect(left, 29, right - left, 18), Qt::AlignLeft | Qt::AlignVCenter,
+    p.drawText(QRect(left, 28, right - left, 18), Qt::AlignLeft | Qt::AlignVCenter,
                QFontMetrics(stateFont).elidedText(state, Qt::ElideRight, right - left));
-    p.drawPixmap(width() - 24, (height() - 14) / 2, GUIUtil::lineIcon("chevron", 14, t.sideText));
+    p.drawPixmap(width() - 28, (height() - 16) / 2, GUIUtil::lineIcon("chevron", 16, t.sideText));
 }
 
 SideProgress::SideProgress(QWidget* parent) : QWidget(parent), value(0)
@@ -260,7 +263,7 @@ Sidebar::Sidebar(QWidget* parent) : QWidget(parent), walletCount(0)
     walletSwitcher = new WalletSwitcher(this);
     walletSwitcher->setToolTip(tr("The wallet shown. Click to switch to another wallet, or to create, open or close one."));
     layout->addWidget(walletSwitcher);
-    layout->addSpacing(18);
+    layout->addSpacing(16);
     connect(walletSwitcher, SIGNAL(clicked()), this, SIGNAL(walletClicked()));
 
     // the pages; the list scrolls when the window is too low for all of them

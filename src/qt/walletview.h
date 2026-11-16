@@ -126,6 +126,7 @@ private:
     bool firstTokenSendVisit = true;
     /** The card of the settings page that names this wallet and its file */
     QLabel *walletInfoLabel = nullptr;
+    QLabel *walletPathLabel = nullptr;
 
 
     /** TOKENS START */

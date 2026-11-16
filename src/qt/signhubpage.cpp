@@ -1727,7 +1727,7 @@ QWidget *SignHubPage::buildWallet()
     sendError->hide();
     body->addWidget(sendError);
     body->addStretch(1);
-    body->addWidget(caption(tr("Only AOK can be sent from a multisig address for now. Sending tokens from multisig is in preparation."), form));
+    body->addWidget(caption(tr("Only AOK can be sent from a multisig address. Tokens cannot be sent from one."), form));
     sendButton = button(tr("Make the send request"), true, form, 46);
     connect(sendButton, SIGNAL(clicked()), this, SLOT(makeRequest()));
     body->addWidget(sendButton);
