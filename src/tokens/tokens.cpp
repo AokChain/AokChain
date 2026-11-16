@@ -2687,11 +2687,12 @@ bool GetAllMyTokenBalancesWallet(CWallet* pwallet, std::map<std::string, std::ve
 //! sets _balances_ with the total quantity of each owned token
 bool GetAllMyTokenBalances(std::map<std::string, std::vector<COutput> >& outputs, std::map<std::string, CAmount>& amounts, const std::string& prefix) {
 
-    // Return false if no wallet was found to compute token balances
-    if (!vpwallets.size())
+    // The first wallet. Return false if no wallet was found to compute token balances
+    CWallet* const pwallet = GetDefaultWallet();
+    if (!pwallet)
         return false;
 
-    return GetAllMyTokenBalancesWallet(vpwallets[0], outputs, amounts, prefix);
+    return GetAllMyTokenBalancesWallet(pwallet, outputs, amounts, prefix);
 }
 
 bool GetAllMyLockedTokenBalancesWallet(CWallet* pwallet, std::map<std::string, std::vector<COutput> >& outputs, std::map<std::string, CAmount>& amounts, const std::string& prefix) {
@@ -2720,11 +2721,12 @@ bool GetAllMyLockedTokenBalancesWallet(CWallet* pwallet, std::map<std::string, s
 //! sets _balances_ with the total quantity of each owned locked token
 bool GetAllMyLockedTokenBalances(std::map<std::string, std::vector<COutput> >& outputs, std::map<std::string, CAmount>& amounts, const std::string& prefix) {
 
-    // Return false if no wallet was found to compute token balances
-    if (!vpwallets.size())
+    // The first wallet. Return false if no wallet was found to compute token balances
+    CWallet* const pwallet = GetDefaultWallet();
+    if (!pwallet)
         return false;
 
-    return GetAllMyLockedTokenBalancesWallet(vpwallets[0], outputs, amounts, prefix);
+    return GetAllMyLockedTokenBalancesWallet(pwallet, outputs, amounts, prefix);
 }
 
 // 46 char base58 --> 34 char KAW compatible

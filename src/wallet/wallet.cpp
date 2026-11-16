@@ -49,10 +49,12 @@
 
 std::vector<CWallet*> vpwallets;
 std::vector<CWallet*> vpwalletsUnloaded;
+CCriticalSection cs_wallets;
 
 bool AddWallet(CWallet* wallet)
 {
     assert(wallet);
+    LOCK(cs_wallets);
     std::vector<CWallet*>::const_iterator i = std::find(vpwallets.begin(), vpwallets.end(), wallet);
     if (i != vpwallets.end()) return false;
     vpwallets.push_back(wallet);
@@ -62,6 +64,7 @@ bool AddWallet(CWallet* wallet)
 bool RemoveWallet(CWallet* wallet)
 {
     assert(wallet);
+    LOCK(cs_wallets);
     std::vector<CWallet*>::iterator i = std::find(vpwallets.begin(), vpwallets.end(), wallet);
     if (i == vpwallets.end()) return false;
     vpwallets.erase(i);
@@ -70,20 +73,196 @@ bool RemoveWallet(CWallet* wallet)
 
 bool HasWallets()
 {
+    LOCK(cs_wallets);
     return !vpwallets.empty();
 }
 
 std::vector<CWallet*> GetWallets()
 {
+    LOCK(cs_wallets);
     return vpwallets;
 }
 
 CWallet* GetWallet(const std::string& name)
 {
+    LOCK(cs_wallets);
     for (CWallet* wallet : vpwallets) {
         if (wallet->GetName() == name) return wallet;
     }
     return nullptr;
+}
+
+CWallet* GetDefaultWallet()
+{
+    LOCK(cs_wallets);
+    return vpwallets.empty() ? nullptr : vpwallets[0];
+}
+
+bool IsDefaultWallet(const CWallet* wallet)
+{
+    LOCK(cs_wallets);
+    return wallet && !vpwallets.empty() && vpwallets[0] == wallet;
+}
+
+bool IsSafeWalletName(const std::string& name)
+{
+    for (const fs::path& part : fs::path(name)) {
+        if (part == ".." || part == ".")
+            return false;
+    }
+    return true;
+}
+
+/** The part of loadwallet and createwallet after the checks of the name: verify, open, add. */
+static CWallet* OpenWalletByName(const std::string& name, bool fCreate, WalletLoadResult& result, std::string& error, std::string& warning)
+{
+    // CWallet::Verify() refuses a name that clashes with a loaded wallet, and checks the file
+    if (!CWallet::Verify(name, false, error, warning)) {
+        result = WalletLoadResult::VERIFY_FAILED;
+        error = "Wallet file verification failed: " + error;
+        return nullptr;
+    }
+    CWallet* const wallet = CWallet::CreateWalletFromFile(name, fs::absolute(name, GetWalletDir()));
+    if (!wallet) {
+        result = WalletLoadResult::LOAD_FAILED;
+        error = fCreate ? "Wallet creation failed." : "Wallet loading failed.";
+        return nullptr;
+    }
+    {
+        // (under cs_main as unloadwallet removes wallets: the GUI and RPC may do both at once)
+        LOCK(cs_main);
+        AddWallet(wallet);
+    }
+    wallet->postInitProcess();
+    // as the wallets of the start: they stake when -staking is on
+    if (gArgs.GetBoolArg("-staking", DEFAULT_STAKE))
+        wallet->StartStake();
+    result = WalletLoadResult::OK;
+    return wallet;
+}
+
+CWallet* LoadWalletByName(const std::string& name, WalletLoadResult& result, std::string& error, std::string& warning)
+{
+    error.clear();
+    warning.clear();
+    if (!IsSafeWalletName(name)) {
+        result = WalletLoadResult::INVALID_NAME;
+        error = "Invalid wallet name: \".\" and \"..\" are not allowed in it";
+        return nullptr;
+    }
+    const fs::path wallet_path = fs::absolute(name, GetWalletDir());
+    if (fs::symlink_status(wallet_path).type() == fs::file_not_found) {
+        result = WalletLoadResult::NOT_FOUND;
+        error = "Wallet " + name + " not found.";
+        return nullptr;
+    } else if (fs::is_directory(wallet_path)) {
+        // The given filename is a directory. Check that there's a wallet.dat file.
+        if (fs::symlink_status(wallet_path / "wallet.dat").type() == fs::file_not_found) {
+            result = WalletLoadResult::NOT_FOUND;
+            error = "Directory " + name + " does not contain a wallet.dat file.";
+            return nullptr;
+        }
+    }
+    if (GetWallet(name)) {
+        result = WalletLoadResult::ALREADY_LOADED;
+        error = "Wallet " + name + " is already loaded.";
+        return nullptr;
+    }
+    return OpenWalletByName(name, false, result, error, warning);
+}
+
+CWallet* CreateWalletByName(const std::string& name, WalletLoadResult& result, std::string& error, std::string& warning)
+{
+    error.clear();
+    warning.clear();
+    if (!IsSafeWalletName(name)) {
+        result = WalletLoadResult::INVALID_NAME;
+        error = "Invalid wallet name: \".\" and \"..\" are not allowed in it";
+        return nullptr;
+    }
+    const fs::path wallet_path = fs::absolute(name, GetWalletDir());
+    if (fs::symlink_status(wallet_path).type() != fs::file_not_found) {
+        result = WalletLoadResult::ALREADY_EXISTS;
+        error = "Wallet " + name + " already exists.";
+        return nullptr;
+    }
+    return OpenWalletByName(name, true, result, error, warning);
+}
+
+CWallet* RestoreWalletFromBackup(const std::string& name, const std::string& backup_file, WalletLoadResult& result, std::string& error, std::string& warning)
+{
+    error.clear();
+    warning.clear();
+    const fs::path backup = fs::absolute(backup_file);
+    if (name.empty() || fs::path(name).filename().string() != name || !IsSafeWalletName(name)) {
+        result = WalletLoadResult::INVALID_NAME;
+        error = "The wallet name must be a plain name without a path";
+        return nullptr;
+    }
+    if (!fs::exists(backup) || !fs::is_regular_file(backup)) {
+        result = WalletLoadResult::INVALID_BACKUP;
+        error = "Backup file does not exist";
+        return nullptr;
+    }
+    if (GetWallet(name)) {
+        result = WalletLoadResult::ALREADY_LOADED;
+        error = "Wallet " + name + " is already loaded.";
+        return nullptr;
+    }
+    const fs::path folder = fs::absolute(name, GetWalletDir());
+    if (fs::exists(folder)) {
+        result = WalletLoadResult::ALREADY_EXISTS;
+        error = "There is a wallet or a file of that name already: " + folder.string();
+        return nullptr;
+    }
+
+    boost::system::error_code ec;
+    fs::create_directories(folder, ec);
+    if (!ec)
+        fs::copy_file(backup, folder / "wallet.dat", ec);
+    if (ec) {
+        fs::remove_all(folder, ec);
+        result = WalletLoadResult::LOAD_FAILED;
+        error = "Cannot copy the backup to " + folder.string();
+        return nullptr;
+    }
+    CWallet* const wallet = LoadWalletByName(name, result, error, warning);
+    // nothing of a failed restore is left behind
+    if (!wallet && !GetWallet(name))
+        fs::remove_all(folder, ec);
+    return wallet;
+}
+
+WalletUnloadResult UnloadWallet(CWallet* pwallet, bool& closed)
+{
+    closed = false;
+    {
+        LOCK(cs_main);
+        if (!pwallet || !GetWallet(pwallet->GetName()) || GetWallet(pwallet->GetName()) != pwallet)
+            return WalletUnloadResult::NOT_LOADED;
+        if (IsDefaultWallet(pwallet))
+            return WalletUnloadResult::DEFAULT_WALLET;
+        if (pwallet->IsScanning())
+            return WalletUnloadResult::SCANNING;
+        // no more blocks and transactions for it, and no more requests
+        UnregisterValidationInterface(pwallet);
+        RemoveWallet(pwallet);
+        LOCK(cs_wallets);
+        vpwalletsUnloaded.push_back(pwallet);
+    }
+    pwallet->StopStake();
+    pwallet->Flush(false);
+    // close its file, so that it can be copied, moved or loaded again
+    for (int i = 0; i < 100 && !closed; i++) {
+        std::vector<CWalletDBWrapper*> loaded;
+        for (CWallet* other : GetWallets())
+            loaded.push_back(&other->GetDBHandle());
+        closed = CDB::CloseForUnload(pwallet->GetDBHandle(), loaded);
+        if (!closed)
+            MilliSleep(100);
+    }
+    LogPrintf("unloadwallet: %s unloaded%s\n", pwallet->GetName(), closed ? "" : " (its file is still in use and is closed at shutdown)");
+    return WalletUnloadResult::OK;
 }
 
 /** Transaction fee set by the user */

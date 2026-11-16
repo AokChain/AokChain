@@ -723,8 +723,11 @@ bool CDB::CloseForUnload(CWalletDBWrapper& dbw, const std::vector<CWalletDBWrapp
     }
     if (!env->mapFileUseCount.empty() || env->IsMock())
         return true;
-    // nobody else uses this environment: close it and let go of the directory
+    // nobody else uses this environment: close it and let go of the directory. As at shutdown,
+    // the log files go: the wallet file holds everything, and the logs could still hold keys from
+    // before the wallet was encrypted (the GUI closes and opens a wallet that it encrypted).
     const fs::path directory = env->Directory();
+    env->Flush(true);
     env->Close();
     env->Reset();
     UnlockDirectory(directory, ".walletlock");

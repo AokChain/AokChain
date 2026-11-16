@@ -48,12 +48,65 @@ extern std::vector<CWallet*> vpwallets;
 /** Wallets that unloadwallet took out of vpwallets. They are deleted at shutdown only: another
  *  thread may still hold a pointer to one of them. */
 extern std::vector<CWallet*> vpwalletsUnloaded;
+/** Guards vpwallets and vpwalletsUnloaded: wallets are loaded and unloaded while the node runs
+ *  (RPC, GUI), and other threads walk the list. A leaf lock: nothing else is taken while it is
+ *  held, so it may be taken under cs_main and cs_wallet. Read the list with GetWallets(). */
+extern CCriticalSection cs_wallets;
 
 bool AddWallet(CWallet* wallet);
 bool RemoveWallet(CWallet* wallet);
 bool HasWallets();
+/** A copy of the list of loaded wallets, the first wallet first. */
 std::vector<CWallet*> GetWallets();
 CWallet* GetWallet(const std::string& name);
+/** The first wallet (the one of the first -wallet option, wallet.dat by default), or nullptr.
+ *  It cannot be unloaded: the solo miner and the token calls without a wallet argument use it. */
+CWallet* GetDefaultWallet();
+/** Whether this is the first wallet, see GetDefaultWallet() */
+bool IsDefaultWallet(const CWallet* wallet);
+
+/** Why a wallet could not be loaded or created by name (see LoadWalletByName()) */
+enum class WalletLoadResult {
+    OK,
+    INVALID_NAME,   //!< "." or ".." in the name; restoring: not a plain name
+    INVALID_BACKUP, //!< restoring: the backup file does not exist
+    NOT_FOUND,      //!< no such wallet in the wallet directory
+    ALREADY_LOADED,
+    ALREADY_EXISTS, //!< creating: there is a wallet or a file of that name
+    VERIFY_FAILED,  //!< the file or its environment did not pass CWallet::Verify()
+    LOAD_FAILED,
+};
+/** A wallet name must not walk out of the place that it names ("." and ".." parts): a caller that
+ *  may load or create wallets would otherwise reach any folder through a harmless looking name. */
+bool IsSafeWalletName(const std::string& name);
+/**
+ * Load the wallet `name` of the wallet directory and add it to the loaded wallets, as loadwallet
+ * does: a folder with a wallet.dat, or a wallet file. The wallet stakes when -staking is on, as
+ * the wallets loaded at the start do. Returns nullptr, with the reason in `error`, if it fails.
+ */
+CWallet* LoadWalletByName(const std::string& name, WalletLoadResult& result, std::string& error, std::string& warning);
+/** Create the wallet `name` (a folder with a new wallet.dat in the wallet directory) and load it,
+ *  as createwallet does. */
+CWallet* CreateWalletByName(const std::string& name, WalletLoadResult& result, std::string& error, std::string& warning);
+
+/** Copy a backup file (of backupwallet, or a copy of a wallet.dat) to the folder `name` of the wallet
+ *  directory and load it, as restorewallet does. `name` is a plain name without a path. The backup
+ *  is not changed, and nothing is left behind when loading fails. */
+CWallet* RestoreWalletFromBackup(const std::string& name, const std::string& backup_file, WalletLoadResult& result, std::string& error, std::string& warning);
+
+enum class WalletUnloadResult {
+    OK,
+    DEFAULT_WALLET, //!< the first wallet is never unloaded
+    SCANNING,       //!< a rescan is running
+    NOT_LOADED,
+};
+/**
+ * Take a loaded wallet out of the node, as unloadwallet does: no more blocks, transactions and
+ * requests reach it, staking stops, its file is flushed and closed so that it can be copied,
+ * moved or loaded again. `closed` is false when a running request still had the file open; it is
+ * then closed at shutdown. The wallet object is kept until shutdown (vpwalletsUnloaded).
+ */
+WalletUnloadResult UnloadWallet(CWallet* wallet, bool& closed);
 
 /**
  * Settings
@@ -1358,6 +1411,10 @@ public:
 
     /* Stop staking coins */
     void StopStake() { StakeCoins(false); }
+
+    /** Whether the staking thread of this wallet runs (StartStake() and no StopStake() since).
+     *  A locked wallet's thread runs but waits; see m_last_coin_stake_search_interval. */
+    bool IsStaking() const { return stakeThread != nullptr; }
 
     //! Block time of the staking thread's last kernel search, and its distance
     //! to the search before it; the interval is 0 while the thread is not

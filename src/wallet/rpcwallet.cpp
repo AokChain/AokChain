@@ -74,7 +74,7 @@ bool EnsureWalletIsAvailable(CWallet * const pwallet, bool avoidException)
 {
     if (pwallet) return true;
     if (avoidException) return false;
-    if (::vpwallets.empty()) {
+    if (!HasWallets()) {
         // Note: It isn't currently possible to trigger this error because
         // wallet RPC methods aren't registered unless a wallet is loaded. But
         // this error is being kept as a precaution, because it's possible in
@@ -3262,7 +3262,7 @@ UniValue listwallets(const JSONRPCRequest& request)
 
     UniValue obj(UniValue::VARR);
 
-    for (CWallet* pwallet : vpwallets) {
+    for (CWallet* pwallet : GetWallets()) {
 
         if (!EnsureWalletIsAvailable(pwallet, request.fHelp)) {
             return NullUniValue;
@@ -3276,13 +3276,14 @@ UniValue listwallets(const JSONRPCRequest& request)
     return obj;
 }
 
-/** A wallet name must not walk out of the place that it names ("..", "."): a caller that may
- *  load or create wallets would otherwise reach any folder through a harmless looking name. */
-static void CheckWalletName(const std::string& name)
+/** The RPC error of a wallet that LoadWalletByName() or CreateWalletByName() did not load */
+static UniValue WalletLoadError(WalletLoadResult result, const std::string& error)
 {
-    for (const fs::path& part : fs::path(name)) {
-        if (part == ".." || part == ".")
-            throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid wallet name: \".\" and \"..\" are not allowed in it");
+    switch (result) {
+    case WalletLoadResult::INVALID_NAME:
+    case WalletLoadResult::INVALID_BACKUP: return JSONRPCError(RPC_INVALID_PARAMETER, error);
+    case WalletLoadResult::NOT_FOUND: return JSONRPCError(RPC_WALLET_NOT_FOUND, error);
+    default: return JSONRPCError(RPC_WALLET_ERROR, error);
     }
 }
 
@@ -3292,8 +3293,9 @@ UniValue loadwallet(const JSONRPCRequest& request)
         throw std::runtime_error(
             "loadwallet \"filename\"\n"
             "\nLoads a wallet from a wallet file or directory."
-            "\nNote that all wallet command-line options used when starting bitcoind will be"
-            "\napplied to the new wallet (eg -zapwallettxes, upgradewallet, rescan, etc).\n"
+            "\nNote that all wallet command-line options used when starting aokchaind will be"
+            "\napplied to the new wallet (eg -zapwallettxes, upgradewallet, rescan, etc)."
+            "\nThe wallet stakes when the node runs with -staking, as the wallets of the start do.\n"
             "\nArguments:\n"
             "1. \"filename\"    (string, required) The wallet directory or .dat file.\n"
             "\nResult:\n"
@@ -3305,36 +3307,12 @@ UniValue loadwallet(const JSONRPCRequest& request)
             + HelpExampleCli("loadwallet", "\"test.dat\"")
             + HelpExampleRpc("loadwallet", "\"test.dat\"")
         );
-    std::string wallet_file = request.params[0].get_str();
-    CheckWalletName(wallet_file);
-    std::string error;
-
-    fs::path wallet_path = fs::absolute(wallet_file, GetWalletDir());
-    if (fs::symlink_status(wallet_path).type() == fs::file_not_found) {
-        throw JSONRPCError(RPC_WALLET_NOT_FOUND, "Wallet " + wallet_file + " not found.");
-    } else if (fs::is_directory(wallet_path)) {
-        // The given filename is a directory. Check that there's a wallet.dat file.
-        fs::path wallet_dat_file = wallet_path / "wallet.dat";
-        if (fs::symlink_status(wallet_dat_file).type() == fs::file_not_found) {
-            throw JSONRPCError(RPC_WALLET_NOT_FOUND, "Directory " + wallet_file + " does not contain a wallet.dat file.");
-        }
-    }
-
-    if (GetWallet(wallet_file))
-        throw JSONRPCError(RPC_WALLET_ERROR, "Wallet " + wallet_file + " is already loaded.");
-
-    std::string warning;
-    if (!CWallet::Verify(wallet_file, false, error, warning)) {
-        throw JSONRPCError(RPC_WALLET_ERROR, "Wallet file verification failed: " + error);
-    }
-
-    CWallet * const wallet = CWallet::CreateWalletFromFile(wallet_file, fs::absolute(wallet_file, GetWalletDir()));
-    if (!wallet) {
-        throw JSONRPCError(RPC_WALLET_ERROR, "Wallet loading failed.");
-    }
-    vpwallets.push_back(wallet);
-
-    wallet->postInitProcess();
+    const std::string wallet_file = request.params[0].get_str();
+    WalletLoadResult result;
+    std::string error, warning;
+    CWallet* const wallet = LoadWalletByName(wallet_file, result, error, warning);
+    if (!wallet)
+        throw WalletLoadError(result, error);
 
     UniValue obj(UniValue::VOBJ);
     obj.pushKV("name", wallet->GetName());
@@ -3366,37 +3344,16 @@ UniValue restorewallet(const JSONRPCRequest& request)
         );
 
     const std::string name = request.params[0].get_str();
-    const fs::path backup = fs::absolute(request.params[1].get_str());
-    if (name.empty() || fs::path(name).filename().string() != name)
-        throw JSONRPCError(RPC_INVALID_PARAMETER, "The wallet name must be a plain name without a path");
-    if (!fs::exists(backup) || !fs::is_regular_file(backup))
-        throw JSONRPCError(RPC_INVALID_PARAMETER, "Backup file does not exist");
-    if (GetWallet(name))
-        throw JSONRPCError(RPC_WALLET_ERROR, "Wallet " + name + " is already loaded.");
-    const fs::path folder = fs::absolute(name, GetWalletDir());
-    if (fs::exists(folder))
-        throw JSONRPCError(RPC_WALLET_ERROR, "There is a wallet or a file of that name already: " + folder.string());
+    WalletLoadResult result;
+    std::string error, warning;
+    CWallet* const wallet = RestoreWalletFromBackup(name, request.params[1].get_str(), result, error, warning);
+    if (!wallet)
+        throw WalletLoadError(result, error);
 
-    boost::system::error_code ec;
-    fs::create_directories(folder, ec);
-    if (!ec)
-        fs::copy_file(backup, folder / "wallet.dat", ec);
-    if (ec) {
-        fs::remove_all(folder, ec);
-        throw JSONRPCError(RPC_WALLET_ERROR, "Cannot copy the backup to " + folder.string());
-    }
-
-    JSONRPCRequest inner(request);
-    inner.params = UniValue(UniValue::VARR);
-    inner.params.push_back(name);
-    try {
-        return loadwallet(inner);
-    } catch (...) {
-        // nothing of a failed restore is left behind
-        if (!GetWallet(name))
-            fs::remove_all(folder, ec);
-        throw;
-    }
+    UniValue obj(UniValue::VOBJ);
+    obj.pushKV("name", wallet->GetName());
+    obj.pushKV("warning", warning);
+    return obj;
 }
 
 UniValue unloadwallet(const JSONRPCRequest& request)
@@ -3429,33 +3386,17 @@ UniValue unloadwallet(const JSONRPCRequest& request)
             throw JSONRPCError(RPC_WALLET_NOT_FOUND, "Requested wallet does not exist or is not loaded");
     }
 
-    {
-        LOCK(cs_main);
-        if (vpwallets.empty() || pwallet == vpwallets[0])
-            throw JSONRPCError(RPC_MISC_ERROR, "The first wallet cannot be unloaded (it stakes, and the GUI shows it). Restart the node with another -wallet option to run without it.");
-        if (pwallet->IsScanning())
-            throw JSONRPCError(RPC_WALLET_ERROR, "The wallet is being rescanned. Wait for the rescan or stop it with abortrescan.");
-        // no more blocks and transactions for it, and no more requests
-        UnregisterValidationInterface(pwallet);
-        RemoveWallet(pwallet);
-        vpwalletsUnloaded.push_back(pwallet);
-    }
-    pwallet->StopStake();
-    pwallet->Flush(false);
-    // close its file, so that it can be copied, moved or loaded again
     bool closed = false;
-    for (int i = 0; i < 100 && !closed; i++) {
-        std::vector<CWalletDBWrapper*> loaded;
-        {
-            LOCK(cs_main);
-            for (CWallet* other : vpwallets)
-                loaded.push_back(&other->GetDBHandle());
-        }
-        closed = CDB::CloseForUnload(pwallet->GetDBHandle(), loaded);
-        if (!closed)
-            MilliSleep(100);
+    switch (UnloadWallet(pwallet, closed)) {
+    case WalletUnloadResult::OK:
+        break;
+    case WalletUnloadResult::DEFAULT_WALLET:
+        throw JSONRPCError(RPC_MISC_ERROR, "The first wallet cannot be unloaded (it stakes, and the GUI shows it). Restart the node with another -wallet option to run without it.");
+    case WalletUnloadResult::SCANNING:
+        throw JSONRPCError(RPC_WALLET_ERROR, "The wallet is being rescanned. Wait for the rescan or stop it with abortrescan.");
+    case WalletUnloadResult::NOT_LOADED:
+        throw JSONRPCError(RPC_WALLET_NOT_FOUND, "Requested wallet does not exist or is not loaded");
     }
-    LogPrintf("unloadwallet: %s unloaded%s\n", pwallet->GetName(), closed ? "" : " (its file is still in use and is closed at shutdown)");
 
     UniValue obj(UniValue::VOBJ);
     obj.pushKV("name", pwallet->GetName());
@@ -3468,7 +3409,8 @@ UniValue createwallet(const JSONRPCRequest& request)
     if (request.fHelp || request.params.size() != 1) {
         throw std::runtime_error(
             "createwallet \"wallet_name\"\n"
-            "\nCreates and loads a new wallet.\n"
+            "\nCreates and loads a new wallet. It is not encrypted (see encryptwallet).\n"
+            "The wallet stakes when the node runs with -staking, as the wallets of the start do.\n"
             "\nArguments:\n"
             "1. \"wallet_name\"    (string, required) The name for the new wallet. If this is a path, the wallet will be created at the path location.\n"
             "\nResult:\n"
@@ -3481,28 +3423,12 @@ UniValue createwallet(const JSONRPCRequest& request)
             + HelpExampleRpc("createwallet", "\"testwallet\"")
         );
     }
-    std::string wallet_name = request.params[0].get_str();
-    CheckWalletName(wallet_name);
-    std::string error;
-    std::string warning;
-
-    fs::path wallet_path = fs::absolute(wallet_name, GetWalletDir());
-    if (fs::symlink_status(wallet_path).type() != fs::file_not_found) {
-        throw JSONRPCError(RPC_WALLET_ERROR, "Wallet " + wallet_name + " already exists.");
-    }
-
-    // Wallet::Verify will check if we're trying to create a wallet with a duplication name.
-    if (!CWallet::Verify(wallet_name, false, error, warning)) {
-        throw JSONRPCError(RPC_WALLET_ERROR, "Wallet file verification failed: " + error);
-    }
-
-    CWallet * const wallet = CWallet::CreateWalletFromFile(wallet_name, fs::absolute(wallet_name, GetWalletDir()));
-    if (!wallet) {
-        throw JSONRPCError(RPC_WALLET_ERROR, "Wallet creation failed.");
-    }
-    AddWallet(wallet);
-
-    wallet->postInitProcess();
+    const std::string wallet_name = request.params[0].get_str();
+    WalletLoadResult result;
+    std::string error, warning;
+    CWallet* const wallet = CreateWalletByName(wallet_name, result, error, warning);
+    if (!wallet)
+        throw WalletLoadError(result, error);
 
     UniValue obj(UniValue::VOBJ);
     obj.pushKV("name", wallet->GetName());

@@ -44,7 +44,6 @@
 #include <boost/thread.hpp>
 
 
-extern std::vector<CWallet*> vpwallets;
 
 //
 // Unconfirmed transactions in the memory pool often depend on other
@@ -893,14 +892,10 @@ void StakeCoins(bool fStake, CWallet *pwallet, boost::thread_group*& stakeThread
 }
 
 CWallet *GetFirstWallet() {
-    while(vpwallets.size() == 0){
+    CWallet* pwallet = nullptr;
+    while (!(pwallet = GetDefaultWallet()))
         MilliSleep(100);
-
-    }
-    if (vpwallets.size() == 0)
-        return(NULL);
-
-    return(vpwallets[0]);
+    return pwallet;
 }
 
 static bool ProcessBlockFound(const std::shared_ptr<const CBlock> &pblock, const CChainParams& chainparams, const uint256& hash)

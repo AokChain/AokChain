@@ -318,7 +318,7 @@ bool WalletInit::Open()
         if (!pwallet) {
             return false;
         }
-        vpwallets.push_back(pwallet);
+        AddWallet(pwallet);
     }
 
     // A node that started from a chain state snapshot: wallets that wait for the past blocks.
@@ -337,10 +337,10 @@ bool WalletInit::Open()
                     break;
                 pindexStop = chainActive[std::min(height + step - 1, chainActive.Height())];
             }
-            for (CWallet* pwallet : vpwallets)
+            for (CWallet* pwallet : GetWallets())
                 pwallet->ScanForWalletTransactions(pindexStart, pindexStop, true, true);
         }
-        for (CWallet* pwallet : vpwallets)
+        for (CWallet* pwallet : GetWallets())
             pwallet->ReacceptWalletTransactions();
     });
 
@@ -349,7 +349,7 @@ bool WalletInit::Open()
 
 void WalletInit::Start(CScheduler& scheduler)
 {
-    for (CWallet* pwallet : vpwallets) {
+    for (CWallet* pwallet : GetWallets()) {
         pwallet->postInitProcess();
     }
 
@@ -360,7 +360,7 @@ void WalletInit::Start(CScheduler& scheduler)
     if (!gArgs.GetBoolArg("-staking", DEFAULT_STAKE)) {
         LogPrintf("Staking disabled\n");
     } else {
-        for (CWallet* pwallet : vpwallets) {
+        for (CWallet* pwallet : GetWallets()) {
             pwallet->StartStake();
         }
     }
@@ -368,7 +368,7 @@ void WalletInit::Start(CScheduler& scheduler)
 
 void WalletInit::Flush()
 {
-    for (CWallet* pwallet : vpwallets) {
+    for (CWallet* pwallet : GetWallets()) {
         pwallet->StopStake();
         pwallet->Flush(false);
     }
@@ -376,19 +376,21 @@ void WalletInit::Flush()
 
 void WalletInit::Stop()
 {
-    for (CWallet* pwallet : vpwallets) {
+    for (CWallet* pwallet : GetWallets()) {
         pwallet->Flush(true);
     }
 }
 
 void WalletInit::Close()
 {
-    for (CWallet* pwallet : vpwallets) {
+    std::vector<CWallet*> wallets;
+    {
+        LOCK(cs_wallets);
+        wallets.swap(vpwallets);
+        wallets.insert(wallets.end(), vpwalletsUnloaded.begin(), vpwalletsUnloaded.end());
+        vpwalletsUnloaded.clear();
+    }
+    for (CWallet* pwallet : wallets) {
         delete pwallet;
     }
-    vpwallets.clear();
-    for (CWallet* pwallet : vpwalletsUnloaded) {
-        delete pwallet;
-    }
-    vpwalletsUnloaded.clear();
 }
