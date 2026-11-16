@@ -928,7 +928,7 @@ void OverviewPage::updateTokenCount()
 {
     if (!rootModel)
         return;
-    tokenCount->setText(tr("%1 kinds").arg(rootModel->rowCount()));
+    tokenCount->setText(tr("%n kind(s)", "", rootModel->rowCount()));
 }
 
 /** Show as many recent transactions as fit into the card. */

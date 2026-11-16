@@ -273,8 +273,8 @@ void TokensPage::rebuildHeld()
         layout->addLayout(buttons);
         cards << card;
     }
-    heldCount->setText(roots.size() > cards.size() ? tr("%1 kinds, the first %2 shown").arg(roots.size()).arg(cards.size())
-                                                    : tr("%1 kinds").arg(roots.size()));
+    heldCount->setText(roots.size() > cards.size() ? tr("%n kind(s), the first %1 shown", "", roots.size()).arg(cards.size())
+                                                    : tr("%n kind(s)", "", roots.size()));
     heldEmpty->setVisible(cards.isEmpty());
     columns = 0;
     reflow();
