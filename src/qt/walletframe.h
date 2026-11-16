@@ -9,6 +9,7 @@
 
 #include <QFrame>
 #include <QMap>
+#include <QSet>
 
 class AokChainGUI;
 class ClientModel;
@@ -38,10 +39,16 @@ public:
 
     void setClientModel(ClientModel *clientModel);
 
+    /** A view for a loaded wallet, under the wallet's name */
     bool addWallet(const QString& name, WalletModel *walletModel);
+    /** Show this wallet: the new view shows the page that the window showed */
     bool setCurrentWallet(const QString& name);
+    /** Take the view of a wallet away (and delete it). Show another wallet first. */
     bool removeWallet(const QString &name);
     void removeAllWallets();
+    /** The model of the wallet that is shown, nullptr before there is one */
+    WalletModel *currentWalletModel();
+    int walletCount() const { return mapWalletViews.size(); }
 
     bool handlePaymentRequest(const SendCoinsRecipient& recipient);
 
@@ -54,16 +61,22 @@ Q_SIGNALS:
 private:
     QStackedWidget *walletStack;
     QFrame *encryptBanner;
-    bool bannerDismissed = false;
+    /** wallets whose warning about the missing passphrase was closed (until the next start) */
+    QSet<QString> bannerDismissed;
     AokChainGUI *gui;
     ClientModel *clientModel;
     QMap<QString, WalletView*> mapWalletViews;
 
-    bool bOutOfSync;
+    bool bOutOfSync = false;
 
     const PlatformStyle *platformStyle;
 
     WalletView *currentWalletView();
+
+private Q_SLOTS:
+    /** The state of a wallet changed: the window shows it if it is the wallet that is shown */
+    void viewEncryptionStatusChanged(int status);
+    void viewHDStatusChanged(int hdEnabled);
 
 public Q_SLOTS:
     /** Switch to overview (home) page */

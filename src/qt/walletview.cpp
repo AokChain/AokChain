@@ -36,7 +36,11 @@
 #include "createtokendialog.h"
 #include "explorerpage.h"
 #include "reissuetokendialog.h"
+#include "coincontroldialog.h"
+#include "tokencontroldialog.h"
+#include "walletcontroller.h"
 #include <validation.h>
+#include <wallet/wallet.h>
 
 #include "ui_interface.h"
 
@@ -59,7 +63,20 @@
 #include <QVBoxLayout>
 
 
-static bool fFirstVisit = true;
+namespace {
+/** The selections of the send forms before a wallet view takes over: the forms read the pointers
+ *  of CoinControlDialog and TokenControlDialog, which point to the wallet that is shown */
+CCoinControl *originalCoinControl()
+{
+    static CCoinControl *const original = CoinControlDialog::coinControl;
+    return original;
+}
+CCoinControl *originalTokenControl()
+{
+    static CCoinControl *const original = TokenControlDialog::tokenControl;
+    return original;
+}
+} // namespace
 
 WalletView::WalletView(const PlatformStyle *_platformStyle, QWidget *parent):
     QStackedWidget(parent),
@@ -68,6 +85,9 @@ WalletView::WalletView(const PlatformStyle *_platformStyle, QWidget *parent):
     progressDialog(nullptr),
     platformStyle(_platformStyle)
 {
+    originalCoinControl();
+    originalTokenControl();
+
     // Every page header has back and forward and a status light: the state of the node and
     // what the page itself is reading
     history = new NavigationHistory(this);
@@ -246,6 +266,54 @@ WalletView::WalletView(const PlatformStyle *_platformStyle, QWidget *parent):
 
 WalletView::~WalletView()
 {
+    deactivate();
+}
+
+int WalletView::currentPage() const
+{
+    return pageOf(currentWidget());
+}
+
+void WalletView::showPage(int page)
+{
+    switch (page) {
+    case PAGE_SEND: gotoSendCoinsPage(); break;
+    case PAGE_RECEIVE: gotoReceiveCoinsPage(); break;
+    case PAGE_TRANSACTIONS: gotoHistoryPage(); break;
+    case PAGE_TOKENS: gotoTokensPage(); break;
+    case PAGE_CREATE_TOKENS: gotoCreateTokensPage(); break;
+    case PAGE_MANAGE_TOKENS: gotoManageTokensPage(); break;
+    case PAGE_EXPLORER: setCurrentWidget(explorerShell); break;
+    case PAGE_ADDRESS_BOOK: usedReceivingAddresses(); break;
+    case PAGE_SIGN: gotoSignMessageTab(); break;
+    case PAGE_SETTINGS: gotoSettingsPage(); break;
+    default: gotoOverviewPage(); break;
+    }
+}
+
+void WalletView::activate()
+{
+    CoinControlDialog::coinControl = &coinControl;
+    TokenControlDialog::tokenControl = &tokenControl;
+    // what the forms say about the selection is that of this wallet now
+    QMetaObject::invokeMethod(sendCoinsPage, "coinControlUpdateLabels");
+    QMetaObject::invokeMethod(tokensPage, "tokenControlUpdateLabels");
+    QMetaObject::invokeMethod(createTokensPage, "coinControlUpdateLabels");
+    QMetaObject::invokeMethod(manageTokensPage, "coinControlUpdateLabels");
+}
+
+void WalletView::deactivate()
+{
+    if (CoinControlDialog::coinControl == &coinControl)
+        CoinControlDialog::coinControl = originalCoinControl();
+    if (TokenControlDialog::tokenControl == &tokenControl)
+        TokenControlDialog::tokenControl = originalTokenControl();
+}
+
+void WalletView::updateHDStatus()
+{
+    if (walletModel)
+        Q_EMIT hdEnabledStatusChanged(walletModel->hdEnabled());
 }
 
 QWidget *WalletView::makeTabs(const QStringList &names, QButtonGroup **group, QWidget *parent)
@@ -466,14 +534,12 @@ void WalletView::setAokChainGUI(AokChainGUI *gui)
         // Receive and report messages
         connect(this, SIGNAL(message(QString,QString,unsigned int)), gui, SLOT(message(QString,QString,unsigned int)));
 
-        // Pass through encryption status changed signals
-        connect(this, SIGNAL(encryptionStatusChanged(int)), gui, SLOT(setEncryptionStatus(int)));
+        // (the encryption and HD status reach the window through the wallet frame: only those of
+        // the wallet that is shown)
 
         // Pass through transaction notifications
         connect(this, SIGNAL(incomingTransaction(QString,int,CAmount,QString,QString,QString,QString)), gui, SLOT(incomingTransaction(QString,int,CAmount,QString,QString,QString,QString)));
 
-        // Connect HD enabled state signal 
-        connect(this, SIGNAL(hdEnabledStatusChanged(int)), gui, SLOT(setHDStatus(int)));
 
         // Pass through checkTokens calls to the GUI
         connect(this, SIGNAL(checkTokens()), gui, SLOT(checkTokens()));
@@ -483,6 +549,28 @@ void WalletView::setAokChainGUI(AokChainGUI *gui)
 
         // Settings page: what the menus of the window offered
         QVBoxLayout *body = nullptr;
+        // the wallets of the window: which one this is, where its file is; create, open, close
+        QFrame *walletsCard = OptionsDialog::makeCard(tr("Wallets"), settingsPage, &body);
+        walletInfoLabel = new QLabel(walletsCard);
+        walletInfoLabel->setProperty("role", "secondary");
+        walletInfoLabel->setWordWrap(true);
+        walletInfoLabel->setTextInteractionFlags(Qt::TextSelectableByMouse);
+        body->addWidget(walletInfoLabel);
+        QLabel *walletsNote = new QLabel(tr("Each wallet has its own keys, coins, tokens, addresses and passphrase, and stakes on its own. A separate wallet is a good place for owner tokens (NAME!): the wallet used every day then cannot reissue or create tokens by mistake."), walletsCard);
+        walletsNote->setProperty("role", "secondary");
+        walletsNote->setWordWrap(true);
+        body->addWidget(walletsNote);
+        QGridLayout *walletsButtons = new QGridLayout();
+        walletsButtons->setSpacing(8);
+        int w = 0;
+        for (QAction *action : gui->walletActions()) {
+            walletsButtons->addWidget(actionButton(action, walletsCard), w / 3, w % 3);
+            ++w;
+        }
+        body->addLayout(walletsButtons);
+        settingsPage->addCard(walletsCard);
+        updateWalletInfo();
+
         QFrame *walletCard = OptionsDialog::makeCard(tr("Wallet security"), settingsPage, &body);
         // Restoring from the recovery words of another wallet is hidden until it is decided how the
         // keys of such a wallet and the keys of this one fit together: a payment from those keys
@@ -587,6 +675,8 @@ void WalletView::setWalletModel(WalletModel *_walletModel)
     tokenCardsPage->setModel(_walletModel);
     createTokensPage->setModel(_walletModel);
     manageTokensPage->setModel(_walletModel);
+
+    updateWalletInfo();
 
     if (_walletModel)
     {
@@ -893,8 +983,8 @@ void WalletView::requestedSyncWarningInfo()
 
 void WalletView::showSendTab(int tab)
 {
-    if (tab == 1 && fFirstVisit) {
-        fFirstVisit = false;
+    if (tab == 1 && firstTokenSendVisit) {
+        firstTokenSendVisit = false;
         tokensPage->handleFirstSelection();
     }
     sendStack->setCurrentIndex(tab);
@@ -946,3 +1036,14 @@ void WalletView::gotoExplorerPage(QString query)
         explorerPage->focusSearch();
 }
 /** TOKENS END */
+
+void WalletView::updateWalletInfo()
+{
+    if (!walletInfoLabel || !walletModel || !walletModel->getWallet())
+        return;
+    const QString name = QString::fromStdString(walletModel->getWallet()->GetName());
+    QString text = tr("This is <b>%1</b>. Its file: %2").arg(WalletController::displayName(name).toHtmlEscaped(), WalletController::walletPath(name).toHtmlEscaped());
+    if (IsDefaultWallet(walletModel->getWallet()))
+        text += "<br>" + tr("It is the first wallet of this node and stays open.");
+    walletInfoLabel->setText(text);
+}

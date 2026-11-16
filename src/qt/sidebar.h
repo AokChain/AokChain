@@ -48,6 +48,27 @@ private:
     bool hovered;
 };
 
+/** The wallet that is shown, at the top of the side bar: a click opens the wallet menu. */
+class WalletSwitcher : public QAbstractButton
+{
+    Q_OBJECT
+
+public:
+    explicit WalletSwitcher(QWidget* parent = nullptr);
+    QSize sizeHint() const override { return QSize(208, 56); }
+    void setWallet(const QString& name, const QString& state);
+
+protected:
+    void paintEvent(QPaintEvent* event) override;
+    void enterEvent(QEvent* event) override;
+    void leaveEvent(QEvent* event) override;
+
+private:
+    QString name;
+    QString state;
+    bool hovered;
+};
+
 /** The thin progress bar of the side bar. */
 class SideProgress : public QWidget
 {
@@ -85,11 +106,17 @@ public:
     void setSyncState(const QString& status, const QString& remaining, double progress, bool showProgress, const QString& toolTip);
     void setNetworkState(const QString& text, const QString& toolTip);
     void setWalletState(const QString& text, const QString& toolTip);
+    /** The name of the wallet that is shown; count: how many wallets are open */
+    void setWalletName(const QString& name, int count);
+    /** Where the wallet menu opens */
+    QPoint walletMenuPosition() const;
     void setStakingVisible(bool visible);
     /** A warning of the node, shown small below the peers line */
     void setNotice(const QString& text, const QString& toolTip, bool warning);
 
 Q_SIGNALS:
+    /** The wallet at the top was clicked: the wallet menu */
+    void walletClicked();
     void stakingToggled();
     void syncClicked();
     void networkClicked();
@@ -100,6 +127,10 @@ protected:
 
 private:
     QVBoxLayout* navLayout;
+    WalletSwitcher* walletSwitcher;
+    QString walletName;
+    QString walletStateText;
+    int walletCount;
     QWidget* stakingCard;
     ToggleSwitch* stakingSwitch;
     QLabel* stakingDetail;

@@ -62,7 +62,11 @@ WalletFrame::WalletFrame(const PlatformStyle *_platformStyle, AokChainGUI *_gui)
     encryptBanner->hide();
     walletFrameLayout->addWidget(encryptBanner);
     connect(bannerEncrypt, &QPushButton::clicked, this, [this] { encryptWallet(true); });
-    connect(bannerClose, &QPushButton::clicked, this, [this] { bannerDismissed = true; encryptBanner->hide(); });
+    connect(bannerClose, &QPushButton::clicked, this, [this] {
+        if (WalletView *view = currentWalletView())
+            bannerDismissed.insert(mapWalletViews.key(view));
+        encryptBanner->hide();
+    });
 
     walletStack = new QStackedWidget(this);
     walletFrameLayout->addWidget(walletStack, 1);
@@ -92,8 +96,12 @@ bool WalletFrame::addWallet(const QString& name, WalletModel *walletModel)
     walletView->setWalletModel(walletModel);
     walletView->showOutOfSyncWarning(bOutOfSync);
 
-     /* TODO we should goto the currently selected page once dynamically adding wallets is supported */
-    walletView->gotoOverviewPage();
+    // a wallet opened later starts on the page that the window shows
+    WalletView *shown = currentWalletView();
+    if (shown)
+        walletView->showPage(shown->currentPage());
+    else
+        walletView->gotoOverviewPage();
     walletStack->addWidget(walletView);
     mapWalletViews[name] = walletView;
 
@@ -101,8 +109,9 @@ bool WalletFrame::addWallet(const QString& name, WalletModel *walletModel)
     connect(walletView, SIGNAL(showNormalIfMinimized()), gui, SLOT(showNormalIfMinimized()));
 
     connect(walletView, SIGNAL(outOfSyncWarningClicked()), this, SLOT(outOfSyncWarningClicked()));
-    connect(walletView, SIGNAL(encryptionStatusChanged(int)), this, SLOT(updateEncryptBanner(int)));
-    updateEncryptBanner(walletModel->getEncryptionStatus());
+    // the side bar and the banner show the state of the wallet that is shown, not of every wallet
+    connect(walletView, SIGNAL(encryptionStatusChanged(int)), this, SLOT(viewEncryptionStatusChanged(int)));
+    connect(walletView, SIGNAL(hdEnabledStatusChanged(int)), this, SLOT(viewHDStatusChanged(int)));
 
     return true;
 }
@@ -113,9 +122,15 @@ bool WalletFrame::setCurrentWallet(const QString& name)
         return false;
 
     WalletView *walletView = mapWalletViews.value(name);
-    walletStack->setCurrentWidget(walletView);
     assert(walletView);
+    WalletView *previous = currentWalletView();
+    if (previous && previous != walletView)
+        walletView->showPage(previous->currentPage());
+    walletStack->setCurrentWidget(walletView);
+    // the forms of the send pages keep their coin selection per wallet
+    walletView->activate();
     walletView->updateEncryptionStatus();
+    walletView->updateHDStatus();
     return true;
 }
 
@@ -125,16 +140,45 @@ bool WalletFrame::removeWallet(const QString &name)
         return false;
 
     WalletView *walletView = mapWalletViews.take(name);
+    walletView->deactivate();
     walletStack->removeWidget(walletView);
+    walletView->deleteLater();
+    bannerDismissed.remove(name);
+    if (WalletView *shown = currentWalletView())
+        shown->updateEncryptionStatus();
     return true;
 }
 
 void WalletFrame::removeAllWallets()
 {
     QMap<QString, WalletView*>::const_iterator i;
-    for (i = mapWalletViews.constBegin(); i != mapWalletViews.constEnd(); ++i)
+    for (i = mapWalletViews.constBegin(); i != mapWalletViews.constEnd(); ++i) {
+        i.value()->deactivate();
         walletStack->removeWidget(i.value());
+        delete i.value();
+    }
     mapWalletViews.clear();
+}
+
+WalletModel *WalletFrame::currentWalletModel()
+{
+    WalletView *walletView = currentWalletView();
+    return walletView ? walletView->getWalletModel() : nullptr;
+}
+
+void WalletFrame::viewEncryptionStatusChanged(int status)
+{
+    if (sender() != currentWalletView())
+        return;
+    updateEncryptBanner(status);
+    if (gui)
+        gui->setEncryptionStatus(status);
+}
+
+void WalletFrame::viewHDStatusChanged(int hdEnabled)
+{
+    if (sender() == currentWalletView() && gui)
+        gui->setHDStatus(hdEnabled);
 }
 
 bool WalletFrame::handlePaymentRequest(const SendCoinsRecipient &recipient)
@@ -156,30 +200,29 @@ void WalletFrame::showOutOfSyncWarning(bool fShow)
 
 void WalletFrame::gotoOverviewPage()
 {
-    QMap<QString, WalletView*>::const_iterator i;
-    for (i = mapWalletViews.constBegin(); i != mapWalletViews.constEnd(); ++i)
-        i.value()->gotoOverviewPage();
+    // the other wallets follow when they are shown (setCurrentWallet)
+    if (WalletView *walletView = currentWalletView())
+        walletView->gotoOverviewPage();
 }
 
 void WalletFrame::gotoHistoryPage()
 {
-    QMap<QString, WalletView*>::const_iterator i;
-    for (i = mapWalletViews.constBegin(); i != mapWalletViews.constEnd(); ++i)
-        i.value()->gotoHistoryPage();
+    // the other wallets follow when they are shown (setCurrentWallet)
+    if (WalletView *walletView = currentWalletView())
+        walletView->gotoHistoryPage();
 }
 
 void WalletFrame::gotoReceiveCoinsPage()
 {
-    QMap<QString, WalletView*>::const_iterator i;
-    for (i = mapWalletViews.constBegin(); i != mapWalletViews.constEnd(); ++i)
-        i.value()->gotoReceiveCoinsPage();
+    // the other wallets follow when they are shown (setCurrentWallet)
+    if (WalletView *walletView = currentWalletView())
+        walletView->gotoReceiveCoinsPage();
 }
 
 void WalletFrame::gotoSendCoinsPage(QString addr)
 {
-    QMap<QString, WalletView*>::const_iterator i;
-    for (i = mapWalletViews.constBegin(); i != mapWalletViews.constEnd(); ++i)
-        i.value()->gotoSendCoinsPage(addr);
+    if (WalletView *walletView = currentWalletView())
+        walletView->gotoSendCoinsPage(addr);
 }
 
 void WalletFrame::gotoSignMessageTab(QString addr)
@@ -227,7 +270,9 @@ void WalletFrame::unlockWallet()
 void WalletFrame::updateEncryptBanner(int status)
 {
     // (-skipencryptprompt: tests and scripts that drive the window)
-    encryptBanner->setVisible(status == WalletModel::Unencrypted && !bannerDismissed && !gArgs.GetBoolArg("-skipencryptprompt", false));
+    WalletView *walletView = currentWalletView();
+    const bool dismissed = walletView && bannerDismissed.contains(mapWalletViews.key(walletView));
+    encryptBanner->setVisible(walletView && status == WalletModel::Unencrypted && !dismissed && !gArgs.GetBoolArg("-skipencryptprompt", false));
 }
 
 void WalletFrame::unlockWalletForStaking()
@@ -292,35 +337,34 @@ void WalletFrame::outOfSyncWarningClicked()
 /** TOKENS START */
 void WalletFrame::gotoTokensPage()
 {
-    QMap<QString, WalletView*>::const_iterator i;
-    for (i = mapWalletViews.constBegin(); i != mapWalletViews.constEnd(); ++i)
-        i.value()->gotoTokensPage();
+    // the other wallets follow when they are shown (setCurrentWallet)
+    if (WalletView *walletView = currentWalletView())
+        walletView->gotoTokensPage();
 }
 
 void WalletFrame::gotoCreateTokensPage()
 {
-    QMap<QString, WalletView*>::const_iterator i;
-    for (i = mapWalletViews.constBegin(); i != mapWalletViews.constEnd(); ++i)
-        i.value()->gotoCreateTokensPage();
+    // the other wallets follow when they are shown (setCurrentWallet)
+    if (WalletView *walletView = currentWalletView())
+        walletView->gotoCreateTokensPage();
 }
 
 void WalletFrame::gotoManageTokensPage()
 {
-    QMap<QString, WalletView*>::const_iterator i;
-    for (i = mapWalletViews.constBegin(); i != mapWalletViews.constEnd(); ++i)
-        i.value()->gotoManageTokensPage();
+    // the other wallets follow when they are shown (setCurrentWallet)
+    if (WalletView *walletView = currentWalletView())
+        walletView->gotoManageTokensPage();
 }
 
 void WalletFrame::gotoSettingsPage()
 {
-    QMap<QString, WalletView*>::const_iterator i;
-    for (i = mapWalletViews.constBegin(); i != mapWalletViews.constEnd(); ++i)
-        i.value()->gotoSettingsPage();
+    // the other wallets follow when they are shown (setCurrentWallet)
+    if (WalletView *walletView = currentWalletView())
+        walletView->gotoSettingsPage();
 }
 
 void WalletFrame::gotoExplorerPage(QString query)
 {
-    QMap<QString, WalletView*>::const_iterator i;
-    for (i = mapWalletViews.constBegin(); i != mapWalletViews.constEnd(); ++i)
-        i.value()->gotoExplorerPage(query);
+    if (WalletView *walletView = currentWalletView())
+        walletView->gotoExplorerPage(query);
 }

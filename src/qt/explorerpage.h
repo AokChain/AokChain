@@ -34,8 +34,11 @@ QT_END_NAMESPACE
 
 namespace NodeRPC
 {
-    /** Call an RPC handler of this node, as the console does. Returns false when it reports an error. */
+    /** Call an RPC handler of this node, as the console does. Returns false when it reports an error.
+     *  The wallet calls go to the first wallet; see callWallet(). */
     bool call(const std::string& method, const std::vector<std::string>& args, UniValue& result, std::string *error = nullptr);
+    /** The same, for the wallet `walletName` (its /wallet/<name> endpoint) */
+    bool callWallet(const std::string& walletName, const std::string& method, const std::vector<std::string>& args, UniValue& result, std::string *error = nullptr);
 }
 
 /**
@@ -46,6 +49,12 @@ namespace NodeRPC
 class ExplorerWorker : public QObject
 {
     Q_OBJECT
+
+public:
+    /** The wallet whose transactions the look-ups mark as "mine" (the wallet of the page).
+     *  Only touched on the thread of the worker. */
+    std::string walletName;
+    bool walletKnown = false;
 
 public Q_SLOTS:
     /** Look up a transaction id, an address, a block height or a block hash. */
@@ -120,6 +129,7 @@ private:
     WalletModel *walletModel;
     QPointer<PageActivity> activity;
     QThread thread;
+    ExplorerWorker *worker;
     QTimer *timer;
     bool refreshPending;
     QString pendingQuery;

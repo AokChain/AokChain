@@ -156,6 +156,8 @@ public:
     bool wallet(const QString& address, MultisigWallet& wallet) const;
     /** Watch the address and remember the wallet. Runs on a worker thread; walletAdded() follows. */
     void addWallet(const MultisigWallet& wallet, bool rescan);
+    /** The wallet of this model, for the wallet calls of the node (its /wallet/<name> endpoint) */
+    std::string rpcWalletName() const;
     /** Forget the multisig wallet and its requests. The address stays watched. */
     void removeWallet(const QString& address);
 

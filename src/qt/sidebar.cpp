@@ -110,6 +110,82 @@ void SideNavButton::paintEvent(QPaintEvent*)
     p.drawText(QRect(42, 0, width() - 50, height()), Qt::AlignLeft | Qt::AlignVCenter, plainActionText(action));
 }
 
+WalletSwitcher::WalletSwitcher(QWidget* parent) : QAbstractButton(parent), hovered(false)
+{
+    setCursor(Qt::PointingHandCursor);
+    setFixedHeight(56);
+    setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
+    setFocusPolicy(Qt::TabFocus);
+}
+
+void WalletSwitcher::setWallet(const QString& _name, const QString& _state)
+{
+    name = _name;
+    state = _state;
+    setAccessibleName(tr("Wallet: %1").arg(name));
+    update();
+}
+
+void WalletSwitcher::enterEvent(QEvent* event)
+{
+    hovered = true;
+    update();
+    QAbstractButton::enterEvent(event);
+}
+
+void WalletSwitcher::leaveEvent(QEvent* event)
+{
+    hovered = false;
+    update();
+    QAbstractButton::leaveEvent(event);
+}
+
+/** One or two letters of a wallet name, for its mark */
+static QString walletInitials(const QString& name)
+{
+    const QStringList words = name.split(' ', QString::SkipEmptyParts);
+    QString letters;
+    if (words.size() >= 2)
+        letters = QString(words[0].at(0)) + words[1].at(0);
+    else if (!words.isEmpty())
+        letters = words[0].left(1);
+    return letters.toUpper();
+}
+
+void WalletSwitcher::paintEvent(QPaintEvent*)
+{
+    const GUIUtil::Theme& t = GUIUtil::theme();
+    QPainter p(this);
+    p.setRenderHint(QPainter::Antialiasing, true);
+    const QRectF frame = QRectF(rect()).adjusted(0.5, 0.5, -0.5, -0.5);
+    p.setPen(QPen(t.sideCard, 1));
+    p.setBrush((hovered || isDown() || hasFocus()) ? t.sideOnBg : Qt::transparent);
+    p.drawRoundedRect(frame, 10, 10);
+
+    // the mark: the first letters of the name in a rounded square
+    const QRectF mark(10, (height() - 34) / 2.0, 34, 34);
+    p.setPen(Qt::NoPen);
+    p.setBrush(t.sideCard);
+    p.drawRoundedRect(mark, 8, 8);
+    p.setPen(t.sideStrong);
+    p.setFont(GUIUtil::appFont(13, QFont::DemiBold));
+    p.drawText(mark, Qt::AlignCenter, walletInitials(name));
+
+    const int left = 54;
+    const int right = width() - 30;
+    const QFont nameFont = GUIUtil::appFont(14, QFont::DemiBold);
+    const QFont stateFont = GUIUtil::appFont(12, QFont::Medium);
+    p.setFont(nameFont);
+    p.setPen(t.sideStrong);
+    p.drawText(QRect(left, 9, right - left, 20), Qt::AlignLeft | Qt::AlignVCenter,
+               QFontMetrics(nameFont).elidedText(name, Qt::ElideRight, right - left));
+    p.setFont(stateFont);
+    p.setPen(t.sideText);
+    p.drawText(QRect(left, 29, right - left, 18), Qt::AlignLeft | Qt::AlignVCenter,
+               QFontMetrics(stateFont).elidedText(state, Qt::ElideRight, right - left));
+    p.drawPixmap(width() - 24, (height() - 14) / 2, GUIUtil::lineIcon("chevron", 14, t.sideText));
+}
+
 SideProgress::SideProgress(QWidget* parent) : QWidget(parent), value(0)
 {
     setFixedHeight(4);
@@ -143,7 +219,7 @@ static QLabel* sideLabel(const QString& text, const QColor& color, int px, int w
     return label;
 }
 
-Sidebar::Sidebar(QWidget* parent) : QWidget(parent)
+Sidebar::Sidebar(QWidget* parent) : QWidget(parent), walletCount(0)
 {
     const GUIUtil::Theme& t = GUIUtil::theme();
     setObjectName("sidebar");
@@ -178,7 +254,14 @@ Sidebar::Sidebar(QWidget* parent) : QWidget(parent)
     brand->addWidget(sideLabel("AokChain", t.sideStrong, 17, QFont::DemiBold));
     brand->addStretch();
     layout->addLayout(brand);
-    layout->addSpacing(28);
+    layout->addSpacing(20);
+
+    // the wallet that is shown; the menu switches, creates, opens and closes wallets
+    walletSwitcher = new WalletSwitcher(this);
+    walletSwitcher->setToolTip(tr("The wallet shown. Click to switch to another wallet, or to create, open or close one."));
+    layout->addWidget(walletSwitcher);
+    layout->addSpacing(18);
+    connect(walletSwitcher, SIGNAL(clicked()), this, SIGNAL(walletClicked()));
 
     // the pages; the list scrolls when the window is too low for all of them
     QWidget* navBody = new QWidget();
@@ -319,9 +402,24 @@ void Sidebar::setNetworkState(const QString& text, const QString& toolTip)
 
 void Sidebar::setWalletState(const QString& text, const QString& toolTip)
 {
-    walletLabel->setText(text);
-    walletLabel->setToolTip(toolTip);
-    walletLabel->setVisible(!text.isEmpty());
+    // the state of the wallet is the second line of the wallet at the top
+    walletStateText = text.isEmpty() ? tr("Not encrypted") : text;
+    walletLabel->hide();
+    walletSwitcher->setWallet(walletName, walletStateText);
+    walletSwitcher->setToolTip((toolTip.isEmpty() ? tr("This wallet has no passphrase.") : toolTip) + "<br><br>" +
+        tr("Click to switch to another wallet, or to create, open or close one."));
+}
+
+void Sidebar::setWalletName(const QString& name, int count)
+{
+    walletName = name;
+    walletCount = count;
+    walletSwitcher->setWallet(walletName, walletStateText);
+}
+
+QPoint Sidebar::walletMenuPosition() const
+{
+    return walletSwitcher->mapToGlobal(QPoint(0, walletSwitcher->height() + 4));
 }
 
 void Sidebar::setNotice(const QString& text, const QString& toolTip, bool warning)

@@ -27,6 +27,8 @@
 #include <QRegularExpression>
 #include <QRegularExpressionValidator>
 #include <QStyle>
+#include "walletcontroller.h"
+
 #include <QVBoxLayout>
 #include <QMessageBox>
 #include <QPushButton>
@@ -223,6 +225,21 @@ void AskPassphraseDialog::accept()
         secureClearPassFields();
         if(model->setWalletEncrypted(true, newpass1))
         {
+            WalletController *controller = WalletController::instance();
+            if (controller && !WalletController::isFirstWallet(model)) {
+                // Another wallet than the first one: it is closed and opened again, which starts its
+                // database without the old logs (what the restart does for the first wallet), and
+                // then the backup is offered.
+                QMessageBox::information(this, tr("Wallet encrypted"),
+                                     "<qt>" +
+                                     tr("%1 is encrypted. It is closed and opened again now to finish.").arg(controller->displayName(model).toHtmlEscaped()) +
+                                     "<br><br>" +
+                                     tr("Backups of the wallet file made before today are not encrypted: replace them with a new backup.") +
+                                     "</qt>");
+                controller->reopenWallet(model);
+                QDialog::accept(); // Success
+                break;
+            }
             // The wallet file is rewritten when the program ends; it starts again by itself
             // and then offers the backup.
             QMessageBox::information(this, tr("Wallet encrypted"),

@@ -640,6 +640,7 @@ void MultisigModel::addWallet(const MultisigWallet& item, bool wantRescan)
     const std::string json = QJsonDocument(walletJson(item)).toJson(QJsonDocument::Compact).toStdString();
     const QString address = item.address;
     CWallet *wallet = walletModel->getWallet();
+    const std::string walletName = wallet->GetName();
     const MultisigWallet copy = item;
     runAsync(this, [=]() -> QString {
         // Watch the address: the wallet then knows the redeem script, shows the coins of the address
@@ -647,7 +648,8 @@ void MultisigModel::addWallet(const MultisigWallet& item, bool wantRescan)
         // <rescan> true".
         UniValue result;
         std::string error;
-        if (!NodeRPC::call("importaddress", {redeemScript, label, rescan ? "true" : "false", "true"}, result, &error)) {
+        // (into this wallet: another wallet of the window has its own multisig wallets)
+        if (!NodeRPC::callWallet(walletName, "importaddress", {redeemScript, label, rescan ? "true" : "false", "true"}, result, &error)) {
             // a wallet that has all the keys itself cannot watch what it can spend: it only needs the script
             const CScript script = scriptOf(QString::fromStdString(redeemScript));
             LOCK2(cs_main, wallet->cs_wallet);
@@ -703,7 +705,7 @@ void MultisigModel::refresh()
         bool anyChange = false;
         for (const QString& address : addresses) {
             UniValue coins;
-            if (!NodeRPC::call("listunspent", {"1", "9999999", "[\"" + address.toStdString() + "\"]"}, coins) || !coins.isArray())
+            if (!NodeRPC::callWallet(wallet->GetName(), "listunspent", {"1", "9999999", "[\"" + address.toStdString() + "\"]"}, coins) || !coins.isArray())
                 continue;
             CAmount balance = 0;
             for (size_t i = 0; i < coins.size(); ++i)
@@ -751,11 +753,11 @@ struct Coin_ {
 };
 
 /** The confirmed coins of the address that no open request uses: largest first, then by txid and output. */
-QList<Coin_> spendableCoins(const QString& address, const std::set<std::pair<QString, int>>& reserved)
+QList<Coin_> spendableCoins(const std::string& walletName, const QString& address, const std::set<std::pair<QString, int>>& reserved)
 {
     QList<Coin_> list;
     UniValue coins;
-    if (!NodeRPC::call("listunspent", {"1", "9999999", "[\"" + address.toStdString() + "\"]"}, coins) || !coins.isArray())
+    if (!NodeRPC::callWallet(walletName, "listunspent", {"1", "9999999", "[\"" + address.toStdString() + "\"]"}, coins) || !coins.isArray())
         return list;
     for (size_t i = 0; i < coins.size(); ++i) {
         Coin_ coin;
@@ -789,7 +791,7 @@ static bool chooseCoins(const MultisigModel *model, const MultisigWallet& item, 
         for (const MultisigPrevout& prevout : request.prevouts)
             reserved.insert(std::make_pair(prevout.txid, prevout.vout));
     }
-    const QList<Coin_> coins = spendableCoins(item.address, reserved);
+    const QList<Coin_> coins = spendableCoins(model->rpcWalletName(), item.address, reserved);
     CAmount available = 0;
     for (const Coin_& coin : coins)
         available += coin.amount;
@@ -1208,7 +1210,7 @@ bool MultisigModel::signRequest(const QString& id, QString& error)
     }
     UniValue result;
     std::string rpcError;
-    if (!NodeRPC::call("signrawtransaction", {item.txHex.toStdString(), prevtxs.write()}, result, &rpcError) || !result.isObject()) {
+    if (!NodeRPC::callWallet(rpcWalletName(), "signrawtransaction", {item.txHex.toStdString(), prevtxs.write()}, result, &rpcError) || !result.isObject()) {
         error = tr("Signing failed: %1").arg(QString::fromStdString(rpcError));
         return false;
     }
@@ -1265,4 +1267,9 @@ void MultisigModel::removeRequest(const QString& id)
         wallet->EraseDestData(DecodeDestination(item.address.toStdString()), DATA_REQUEST + item.id.left(16).toStdString());
     }
     Q_EMIT changed();
+}
+
+std::string MultisigModel::rpcWalletName() const
+{
+    return walletModel && walletModel->getWallet() ? walletModel->getWallet()->GetName() : std::string();
 }

@@ -29,6 +29,7 @@
 #ifdef ENABLE_WALLET
 #include <askpassphrasedialog.h>
 #include <paymentserver.h>
+#include <walletcontroller.h>
 #include <walletmodel.h>
 #endif
 
@@ -267,7 +268,9 @@ private:
     QTimer *pollShutdownTimer;
 #ifdef ENABLE_WALLET
     PaymentServer* paymentServer;
+    /** The first wallet (the first start asks for its passphrase); the controller owns the models */
     WalletModel *walletModel;
+    WalletController *walletController;
 #endif
     int returnValue;
     const PlatformStyle *platformStyle;
@@ -351,6 +354,7 @@ AokChainApplication::AokChainApplication(int &argc, char **argv):
 #ifdef ENABLE_WALLET
     paymentServer(0),
     walletModel(0),
+    walletController(0),
 #endif
     returnValue(0)
 {
@@ -471,7 +475,11 @@ void AokChainApplication::requestShutdown()
 
 #ifdef ENABLE_WALLET
     window->removeAllWallets();
-    delete walletModel;
+    // (an operation of the controller that still runs, such as the rescan of a wallet that is being
+    // opened, stops at the shutdown request and is waited for)
+    StartShutdown();
+    delete walletController;
+    walletController = 0;
     walletModel = 0;
 #endif
     delete clientModel;
@@ -501,16 +509,16 @@ void AokChainApplication::initializeResult(bool success)
         window->setClientModel(clientModel);
 
 #ifdef ENABLE_WALLET
-        // TODO: Expose secondary wallets
-        if (!vpwallets.empty())
-        {
-            walletModel = new WalletModel(platformStyle, vpwallets[0], optionsModel);
-
-            window->addWallet(AokChainGUI::DEFAULT_WALLET, walletModel);
-            window->setCurrentWallet(AokChainGUI::DEFAULT_WALLET);
-
-            connect(walletModel, SIGNAL(coinsSent(CWallet*,SendCoinsRecipient,QByteArray)),
-                             paymentServer, SLOT(fetchPaymentACK(CWallet*,const SendCoinsRecipient&,QByteArray)));
+        // every wallet of the node gets a view; the controller opens, creates and closes more
+        if (WalletModel::isWalletEnabled()) {
+            walletController = new WalletController(platformStyle, optionsModel, this);
+            connect(walletController, &WalletController::walletAdded, this, [this](WalletModel *model) {
+                connect(model, SIGNAL(coinsSent(CWallet*,SendCoinsRecipient,QByteArray)),
+                        paymentServer, SLOT(fetchPaymentACK(CWallet*,const SendCoinsRecipient&,QByteArray)));
+            });
+            window->setWalletController(walletController);
+            walletController->addStartupWallets();
+            walletModel = walletController->models().value(0);
         }
 #endif
 
@@ -552,6 +560,9 @@ void AokChainApplication::initializeResult(bool success)
         connect(paymentServer, SIGNAL(message(QString,QString,unsigned int)),
                          window, SLOT(message(QString,QString,unsigned int)));
         QTimer::singleShot(100, paymentServer, SLOT(uiReady()));
+        // the wallets that were open when the program ended last (unless -wallet says which)
+        if (walletController)
+            QTimer::singleShot(200, walletController, [this] { walletController->openRememberedWallets(); });
         // the start after the wallet was encrypted: the last step is the backup
         if (walletModel && gArgs.GetBoolArg("-backupprompt", false) && walletModel->getEncryptionStatus() != WalletModel::Unencrypted) {
             QTimer::singleShot(300, window, [this] {
@@ -707,6 +718,12 @@ int main(int argc, char *argv[])
 #ifdef ENABLE_WALLET
     // Parse URIs on command line -- this can affect Params()
     PaymentServer::ipcParseCommandLine(argc, argv);
+#endif
+
+#ifdef ENABLE_WALLET
+    // -wallet in the configuration or on the command line: exactly those wallets, nothing remembered
+    // (later the node sets -wallet itself, to wallet.dat, when none is given)
+    WalletController::setExplicitWallets(gArgs.IsArgSet("-wallet"));
 #endif
 
     QScopedPointer<const NetworkStyle> networkStyle(NetworkStyle::instantiate(QString::fromStdString(Params().NetworkIDString())));

@@ -9,6 +9,7 @@
 #endif
 
 #include "rpcconsole.h"
+#include "walletcontroller.h"
 #include "ui_debugwindow.h"
 
 #include "bantablemodel.h"
@@ -28,9 +29,13 @@
 #ifdef ENABLE_WALLET
 #include <db_cxx.h>
 #include <wallet/wallet.h>
+#include "walletmodel.h"
 #endif
 
+#include <QComboBox>
 #include <QDesktopWidget>
+#include <QHBoxLayout>
+#include <QLabel>
 #include <QKeyEvent>
 #include <QMenu>
 #include <QMessageBox>
@@ -90,7 +95,7 @@ class RPCExecutor : public QObject
     Q_OBJECT
 
 public Q_SLOTS:
-    void request(const QString &command);
+    void request(const QString &command, const QString &walletID, bool useWallet);
 
 Q_SIGNALS:
     void reply(int category, const QString &command);
@@ -151,7 +156,7 @@ public:
  * @param[out]   pstrFilteredOut  Command line, filtered to remove any sensitive data
  */
 
-bool RPCConsole::RPCParseCommandLine(std::string &strResult, const std::string &strCommand, const bool fExecute, std::string * const pstrFilteredOut)
+bool RPCConsole::RPCParseCommandLine(std::string &strResult, const std::string &strCommand, const bool fExecute, std::string * const pstrFilteredOut, const std::string *walletID)
 {
     std::vector< std::vector<std::string> > stack;
     stack.push_back(std::vector<std::string>());
@@ -309,10 +314,10 @@ bool RPCConsole::RPCParseCommandLine(std::string &strResult, const std::string &
                             req.params = RPCConvertValues(stack.back()[0], std::vector<std::string>(stack.back().begin() + 1, stack.back().end()));
                             req.strMethod = stack.back()[0];
 #ifdef ENABLE_WALLET
-                            // TODO: Move this logic to WalletModel
-                            if (!vpwallets.empty()) {
-                                // in Qt, use always the wallet with index 0 when running with multiple wallets
-                                QByteArray encodedName = QUrl::toPercentEncoding(QString::fromStdString(vpwallets[0]->GetName()));
+                            // the wallet chosen in the console, the first wallet otherwise
+                            CWallet *first = walletID ? nullptr : GetDefaultWallet();
+                            if (walletID || first) {
+                                QByteArray encodedName = QUrl::toPercentEncoding(QString::fromStdString(walletID ? *walletID : first->GetName()));
                                 req.URI = "/wallet/"+std::string(encodedName.constData(), encodedName.length());
                             }
 #endif
@@ -391,13 +396,14 @@ bool RPCConsole::RPCParseCommandLine(std::string &strResult, const std::string &
     }
 }
 
-void RPCExecutor::request(const QString &command)
+void RPCExecutor::request(const QString &command, const QString &walletID, bool useWallet)
 {
     try
     {
         std::string result;
         std::string executableCommand = command.toStdString() + "\n";
-        if(!RPCConsole::RPCExecuteCommandLine(result, executableCommand))
+        const std::string wallet = walletID.toStdString();
+        if(!RPCConsole::RPCExecuteCommandLine(result, executableCommand, nullptr, useWallet ? &wallet : nullptr))
         {
             Q_EMIT reply(RPCConsole::CMD_ERROR, QString("Parse error: unbalanced ' or \""));
             return;
@@ -853,7 +859,8 @@ void RPCConsole::on_lineEdit_returnPressed()
         cmdBeforeBrowsing = QString();
 
         message(CMD_REQUEST, QString::fromStdString(strFilteredCmd));
-        Q_EMIT cmdRequest(cmd);
+        const bool useWallet = walletSelector && walletSelector->count() > 0;
+        Q_EMIT cmdRequest(cmd, useWallet ? walletSelector->currentData().toString() : QString(), useWallet);
 
         cmd = QString::fromStdString(strFilteredCmd);
 
@@ -901,7 +908,7 @@ void RPCConsole::startExecutor()
     // Replies from executor object must go to this object
     connect(executor, SIGNAL(reply(int,QString)), this, SLOT(message(int,QString)));
     // Requests from this object must go to executor
-    connect(this, SIGNAL(cmdRequest(QString)), executor, SLOT(request(QString)));
+    connect(this, SIGNAL(cmdRequest(QString,QString,bool)), executor, SLOT(request(QString,QString,bool)));
 
     // On stopExecutor signal
     // - quit the Qt event loop in the execution thread
@@ -1206,4 +1213,64 @@ void RPCConsole::showOrHideBanTableIfRequired()
 void RPCConsole::setTabFocus(enum TabTypes tabType)
 {
     ui->tabWidget->setCurrentIndex(tabType);
+}
+
+void RPCConsole::setWalletController(WalletController *controller)
+{
+#ifdef ENABLE_WALLET
+    walletController = controller;
+    if (!controller)
+        return;
+    if (!walletSelector) {
+        // "Wallet: [name]" in front of the command line
+        QHBoxLayout *row = nullptr;
+        for (QHBoxLayout *layout : ui->tab_console->findChildren<QHBoxLayout*>())
+            if (layout->indexOf(ui->lineEdit) >= 0)
+                row = layout;
+        walletSelectorLabel = new QLabel(tr("Wallet"), ui->tab_console);
+        walletSelectorLabel->setProperty("role", "fieldLabel");
+        walletSelector = new QComboBox(ui->tab_console);
+        walletSelector->setMinimumWidth(160);
+        walletSelector->setToolTip(tr("The wallet that the wallet commands of the console use"));
+        if (row) {
+            row->insertWidget(0, walletSelector);
+            row->insertWidget(0, walletSelectorLabel);
+        }
+    }
+    connect(controller, &WalletController::walletsChanged, this, &RPCConsole::fillWalletSelector);
+    // the console follows the wallet shown in the window; another can be chosen here
+    connect(controller, &WalletController::currentChanged, this, [this](WalletModel *model) {
+        if (!walletSelector || !model)
+            return;
+        const int index = walletSelector->findData(QString::fromStdString(model->getWallet()->GetName()));
+        if (index >= 0)
+            walletSelector->setCurrentIndex(index);
+    });
+    fillWalletSelector();
+#endif
+}
+
+void RPCConsole::fillWalletSelector()
+{
+#ifdef ENABLE_WALLET
+    if (!walletSelector || !walletController)
+        return;
+    const QString chosen = walletSelector->currentData().toString();
+    const bool hadChoice = walletSelector->count() > 0;
+    walletSelector->blockSignals(true);
+    walletSelector->clear();
+    for (WalletModel *model : walletController->models()) {
+        const QString name = QString::fromStdString(model->getWallet()->GetName());
+        walletSelector->addItem(WalletController::displayName(name), name);
+    }
+    int index = hadChoice ? walletSelector->findData(chosen) : -1;
+    if (index < 0 && walletController->current())
+        index = walletSelector->findData(QString::fromStdString(walletController->current()->getWallet()->GetName()));
+    walletSelector->setCurrentIndex(qMax(0, index));
+    walletSelector->blockSignals(false);
+    // one wallet: nothing to choose
+    const bool several = walletSelector->count() > 1;
+    walletSelector->setVisible(several);
+    walletSelectorLabel->setVisible(several);
+#endif
 }

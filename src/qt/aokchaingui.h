@@ -34,6 +34,7 @@ class WalletModel;
 class HelpMessageDialog;
 class ModalOverlay;
 class Sidebar;
+class WalletController;
 
 QT_BEGIN_NAMESPACE
 class QAction;
@@ -59,6 +60,8 @@ public:
     /** The actions of the former menus for the cards of the settings page:
         wallet management (0) or information (1) */
     QList<QAction*> settingsActions(int group) const;
+    /** The actions that create, open and close wallets, for the cards of the settings page */
+    QList<QAction*> walletActions() const;
     ~AokChainGUI();
 
     /** Set the client model.
@@ -73,7 +76,10 @@ public:
     */
     bool addWallet(const QString& name, WalletModel *walletModel);
     bool setCurrentWallet(const QString& name);
+    void removeWallet(const QString& name);
     void removeAllWallets();
+    /** The wallets of the window: they are added, removed and chosen through the controller */
+    void setWalletController(WalletController *controller);
 #endif // ENABLE_WALLET
     bool enableWallet;
 
@@ -120,6 +126,15 @@ private:
     QAction *openRPCConsoleAction;
     QAction *openAction;
     QAction *showHelpMessageAction;
+    QAction *createWalletAction;
+    QAction *openWalletAction;
+    QAction *restoreWalletAction;
+    QAction *closeWalletAction;
+    /** The wallets of the wallet folder that are not open (File menu and the wallet menu) */
+    QMenu *openWalletMenu;
+    WalletController *walletController;
+    /** The title of the window without the name of the wallet */
+    QString baseWindowTitle;
 
     /** TOKENS START */
     QAction *transferTokenAction;
@@ -163,7 +178,6 @@ private:
     int spinnerFrame;
 
     uint64_t nWeight;
-    bool nStaking;
     /** The chain tip is behind: the synchronization overlay may be opened */
     bool fSyncing;
 
@@ -239,6 +253,18 @@ public Q_SLOTS:
 #endif // ENABLE_WALLET
 
 private Q_SLOTS:
+#ifdef ENABLE_WALLET
+    /** The menu of the wallet at the top of the side bar */
+    void showWalletMenu();
+    void createWalletClicked();
+    void openWalletClicked();
+    void restoreWalletClicked();
+    void closeWalletClicked();
+    /** The wallets, the wallet shown or the work of the controller changed */
+    void walletsChanged();
+    void fillOpenWalletMenu();
+#endif
+
 #ifdef ENABLE_WALLET
     /** Switch to overview (home) page */
     void gotoOverviewPage();

@@ -44,7 +44,7 @@ public:
      * it is done on a worker thread, see TokenTableModel::checkBalanceChanged().
      * Returns false when the balances could not be read.
      */
-    static bool compute(QList<TokenRecord>& out) {
+    static bool compute(CWallet* wallet, QList<TokenRecord>& out) {
         qDebug() << "TokenTablePriv::refreshWallet";
         GUIUtil::LogTimer timer("token table refresh (wallet scan and meta data)");
         out.clear();
@@ -57,12 +57,13 @@ public:
                 std::map<std::string, std::vector<COutput> > outputs;
                 std::map<std::string, std::vector<COutput> > outputs_locked;
 
-                if (!GetAllMyTokenBalances(outputs, balances)) {
+                // the tokens of this model's wallet (another wallet of the window has its own model)
+                if (!wallet || !GetAllMyTokenBalancesWallet(wallet, outputs, balances)) {
                     qWarning("TokenTablePriv::refreshWallet: Error retrieving token balances");
                     return false;
                 }
 
-                if (!GetAllMyLockedTokenBalances(outputs_locked, locked_balances)) {
+                if (!GetAllMyLockedTokenBalancesWallet(wallet, outputs_locked, locked_balances)) {
                     qWarning("TokenTablePriv::refreshWallet: Error retrieving locked token balances");
                     return false;
                 }
@@ -120,9 +121,9 @@ public:
     }
 
     // loads all current balances into cache
-    void refreshWallet() {
+    void refreshWallet(CWallet* wallet) {
         QList<TokenRecord> fresh;
-        compute(fresh);
+        compute(wallet, fresh);
         cachedBalances = fresh;
     }
 
@@ -148,7 +149,7 @@ TokenTableModel::TokenTableModel(WalletModel *parent) :
 {
     columns << tr("Name") << tr("Quantity");
 
-    priv->refreshWallet();
+    priv->refreshWallet(walletModel ? walletModel->getWallet() : nullptr);
 };
 
 TokenTableModel::~TokenTableModel()
@@ -184,9 +185,11 @@ void TokenTableModel::checkBalanceChanged() {
         return;
     }
     refreshRunning = true;
-    refreshThread = QThread::create([this] {
+    // (a wallet object lives until the shutdown, also when its wallet is closed)
+    CWallet* const wallet = walletModel ? walletModel->getWallet() : nullptr;
+    refreshThread = QThread::create([this, wallet] {
         QList<TokenRecord> fresh;
-        const bool ok = TokenTablePriv::compute(fresh);
+        const bool ok = TokenTablePriv::compute(wallet, fresh);
         // back on the thread of the model; dropped when the model is gone
         QMetaObject::invokeMethod(this, [this, fresh, ok] { applyBalances(fresh, ok); }, Qt::QueuedConnection);
     });

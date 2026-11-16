@@ -57,17 +57,33 @@ const int MAX_BLOCK_TXS = 200;
 const int MAX_POOL_ROWS = 30;
 const int MAX_ADDRESS_TXS = 50;
 
+/** The wallet that the calls of this thread go to: the wallet of the explorer page whose worker
+ *  runs on it (see ExplorerWorker). Unset: the first wallet. */
+thread_local std::string t_rpcWallet;
+thread_local bool t_rpcWalletSet = false;
+
 /** Call an RPC handler of this node. Returns false when it reports an error. */
-bool callRPC(const std::string& method, const std::vector<std::string>& args, UniValue& result, std::string *error = nullptr)
+bool callRPC(const std::string& method, const std::vector<std::string>& args, UniValue& result, std::string *error = nullptr, const std::string *wallet = nullptr)
 {
     try {
         JSONRPCRequest req;
         req.params = RPCConvertValues(method, args);
         req.strMethod = method;
 #ifdef ENABLE_WALLET
-        if (!vpwallets.empty()) {
-            // as the console does: the first wallet
-            QByteArray encodedName = QUrl::toPercentEncoding(QString::fromStdString(vpwallets[0]->GetName()));
+        std::string name;
+        bool haveName = false;
+        if (wallet) {
+            name = *wallet;
+            haveName = true;
+        } else if (t_rpcWalletSet) {
+            name = t_rpcWallet;
+            haveName = true;
+        } else if (CWallet *first = GetDefaultWallet()) {
+            name = first->GetName();
+            haveName = true;
+        }
+        if (haveName) {
+            QByteArray encodedName = QUrl::toPercentEncoding(QString::fromStdString(name));
             req.URI = "/wallet/" + std::string(encodedName.constData(), encodedName.length());
         }
 #endif
@@ -182,7 +198,7 @@ bool fetchTransaction(const std::string& txid, UniValue& tx, bool *inWallet = nu
 #ifdef ENABLE_WALLET
     if (!found || inWallet) {
         UniValue wtx;
-        if (!vpwallets.empty() && callRPC("gettransaction", {txid}, wtx) && wtx.isObject()) {
+        if (HasWallets() && callRPC("gettransaction", {txid}, wtx) && wtx.isObject()) {
             if (inWallet)
                 *inWallet = true;
             if (!found) {
@@ -367,8 +383,17 @@ bool NodeRPC::call(const std::string& method, const std::vector<std::string>& ar
     return callRPC(method, args, result, error);
 }
 
+bool NodeRPC::callWallet(const std::string& walletName, const std::string& method, const std::vector<std::string>& args, UniValue& result, std::string *error)
+{
+    return callRPC(method, args, result, error, &walletName);
+}
+
+/** The calls of a slot of the worker go to the wallet of its page */
+#define EXPLORER_USE_WALLET() do { t_rpcWallet = walletName; t_rpcWalletSet = walletKnown; } while (0)
+
 void ExplorerWorker::lookup(const QString& query)
 {
+    EXPLORER_USE_WALLET();
     const QString q = query.trimmed();
     UniValue result;
     bool found = false;
@@ -416,6 +441,7 @@ static UniValue readChainStatus()
 
 void ExplorerWorker::chainStatus()
 {
+    EXPLORER_USE_WALLET();
     Q_EMIT statusDone(QString::fromStdString(readChainStatus().write()));
 }
 
@@ -438,6 +464,7 @@ void ExplorerPage::fillChainStats(StatsStrip *strip, const QString& json)
 
 void ExplorerWorker::refresh()
 {
+    EXPLORER_USE_WALLET();
     UniValue result = readChainStatus();
     UniValue value;
     if (callRPC("getnetworkinfo", {}, value) && value.isObject())
@@ -470,7 +497,7 @@ void ExplorerWorker::refresh()
             bool mine = false;
 #ifdef ENABLE_WALLET
             UniValue wtx;
-            mine = !vpwallets.empty() && callRPC("gettransaction", {txid}, wtx);
+            mine = HasWallets() && callRPC("gettransaction", {txid}, wtx);
 #endif
             entry.pushKV("mine", mine);
             entries.push_back(entry);
@@ -675,7 +702,7 @@ ExplorerPage::ExplorerPage(const PlatformStyle *platformStyle, QWidget *parent) 
     showIntro();
 
     // the look-ups run on a worker thread so that the window stays responsive
-    ExplorerWorker *worker = new ExplorerWorker();
+    worker = new ExplorerWorker();
     worker->moveToThread(&thread);
     connect(&thread, SIGNAL(finished()), worker, SLOT(deleteLater()));
     connect(this, SIGNAL(requestLookup(QString)), worker, SLOT(lookup(QString)));
@@ -709,6 +736,15 @@ void ExplorerPage::setClientModel(ClientModel *_clientModel)
 void ExplorerPage::setWalletModel(WalletModel *_walletModel)
 {
     walletModel = _walletModel;
+    // "mine" in the look-ups: the transactions of this page's wallet
+    if (walletModel && walletModel->getWallet()) {
+        const std::string name = walletModel->getWallet()->GetName();
+        ExplorerWorker *target = worker;
+        QMetaObject::invokeMethod(worker, [target, name] {
+            target->walletName = name;
+            target->walletKnown = true;
+        }, Qt::QueuedConnection);
+    }
 }
 
 void ExplorerPage::setActivity(PageActivity *_activity)

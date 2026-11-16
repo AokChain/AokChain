@@ -31,6 +31,9 @@
 #ifdef ENABLE_WALLET
 #include "walletframe.h"
 #include "sidebar.h"
+#include "askpassphrasedialog.h"
+#include "walletcontroller.h"
+#include "walletdialogs.h"
 #include "walletmodel.h"
 #include "walletview.h"
 #endif // ENABLE_WALLET
@@ -56,6 +59,7 @@
 #include <QPainter>
 #include <QWidgetAction>
 #include <QAction>
+#include <QActionGroup>
 #include <QFileDialog>
 #include <QApplication>
 #include <QDateTime>
@@ -65,6 +69,7 @@
 #include <QMenuBar>
 #include <QMessageBox>
 #include <QMimeData>
+#include <QPointer>
 #include <QProgressDialog>
 #include <QSettings>
 #include <QShortcut>
@@ -137,6 +142,12 @@ AokChainGUI::AokChainGUI(const PlatformStyle *_platformStyle, const NetworkStyle
     openRPCConsoleAction(0),
     openAction(0),
     showHelpMessageAction(0),
+    createWalletAction(0),
+    openWalletAction(0),
+    restoreWalletAction(0),
+    closeWalletAction(0),
+    openWalletMenu(0),
+    walletController(0),
     transferTokenAction(0),
     createTokenAction(0),
     manageTokenAction(0),
@@ -154,7 +165,6 @@ AokChainGUI::AokChainGUI(const PlatformStyle *_platformStyle, const NetworkStyle
     prevBlocks(0),
     spinnerFrame(0),
     nWeight(0),
-    nStaking(false),
     fSyncing(false),
     platformStyle(_platformStyle)
 
@@ -176,6 +186,7 @@ AokChainGUI::AokChainGUI(const PlatformStyle *_platformStyle, const NetworkStyle
         windowTitle += tr("Node");
     }
     windowTitle += " " + networkStyle->getTitleAddText();
+    baseWindowTitle = windowTitle;
 #ifndef Q_OS_MAC
     QApplication::setWindowIcon(networkStyle->getTrayAndWindowIcon());
     setWindowIcon(networkStyle->getTrayAndWindowIcon());
@@ -254,7 +265,6 @@ AokChainGUI::AokChainGUI(const PlatformStyle *_platformStyle, const NetworkStyle
     QTimer *timerStakingIcon = new QTimer(labelStakingIcon);
     connect(timerStakingIcon, SIGNAL(timeout()), this, SLOT(updateStakingIcon()));
     timerStakingIcon->start(30 * 1000);
-    this->nStaking = gArgs.GetBoolArg("-staking", false);
     updateStakingIcon();
 
     if(enableWallet)
@@ -523,6 +533,18 @@ void AokChainGUI::createActions()
     openAction = new QAction(platformStyle->TextColorIcon(":/icons/open"), tr("Open &URI..."), this);
     openAction->setStatusTip(tr("Open a aokchain: URI or payment request"));
 
+    createWalletAction = new QAction(tr("&Create Wallet..."), this);
+    createWalletAction->setStatusTip(tr("Create a new wallet next to the open ones"));
+    openWalletAction = new QAction(tr("&Open Wallet..."), this);
+    openWalletAction->setStatusTip(tr("Open another wallet of the wallet folder, or restore one from a backup file"));
+    restoreWalletAction = new QAction(tr("&Restore Wallet..."), this);
+    restoreWalletAction->setStatusTip(tr("Restore a backup file as a wallet of its own"));
+    closeWalletAction = new QAction(tr("C&lose Wallet"), this);
+    closeWalletAction->setStatusTip(tr("Close the wallet that is shown; its file stays in the wallet folder"));
+    openWalletMenu = new QMenu(tr("Open Wallet"), this);
+    for (QAction *action : {createWalletAction, openWalletAction, restoreWalletAction, closeWalletAction})
+        action->setEnabled(false);
+
     showHelpMessageAction = new QAction(platformStyle->TextColorIcon(":/icons/info"), tr("&Command-line options"), this);
     showHelpMessageAction->setMenuRole(QAction::NoRole);
     showHelpMessageAction->setStatusTip(tr("Show the %1 help message to get a list with possible AokChain command-line options").arg(tr(PACKAGE_NAME)));
@@ -550,6 +572,11 @@ void AokChainGUI::createActions()
         connect(usedSendingAddressesAction, SIGNAL(triggered()), this, SLOT(gotoSendingAddressesPage()));
         connect(usedReceivingAddressesAction, SIGNAL(triggered()), this, SLOT(gotoAddressBookPage()));
         connect(openAction, SIGNAL(triggered()), this, SLOT(openClicked()));
+        connect(createWalletAction, SIGNAL(triggered()), this, SLOT(createWalletClicked()));
+        connect(openWalletAction, SIGNAL(triggered()), this, SLOT(openWalletClicked()));
+        connect(restoreWalletAction, SIGNAL(triggered()), this, SLOT(restoreWalletClicked()));
+        connect(closeWalletAction, SIGNAL(triggered()), this, SLOT(closeWalletClicked()));
+        connect(openWalletMenu, SIGNAL(aboutToShow()), this, SLOT(fillOpenWalletMenu()));
     }
 #endif // ENABLE_WALLET
 
@@ -571,6 +598,10 @@ void AokChainGUI::createMenuBar()
     QMenu *file = appMenuBar->addMenu(tr("&File"));
     if(walletFrame)
     {
+        file->addAction(createWalletAction);
+        file->addMenu(openWalletMenu);
+        file->addAction(closeWalletAction);
+        file->addSeparator();
         file->addAction(openAction);
         file->addAction(signMessageAction);
         file->addAction(verifyMessageAction);
@@ -611,6 +642,11 @@ void AokChainGUI::createMenuBar()
             addActions(menu->actions());
     }
 #endif
+}
+
+QList<QAction*> AokChainGUI::walletActions() const
+{
+    return {createWalletAction, openWalletAction, closeWalletAction};
 }
 
 QList<QAction*> AokChainGUI::settingsActions(int group) const
@@ -660,6 +696,7 @@ void AokChainGUI::createToolBars()
 
         overviewAction->setChecked(true);
 
+        connect(sidebar, SIGNAL(walletClicked()), this, SLOT(showWalletMenu()));
         connect(sidebar, SIGNAL(stakingToggled()), this, SLOT(toggleStakingActive()));
         connect(sidebar, SIGNAL(networkClicked()), this, SLOT(toggleNetworkActive()));
         connect(sidebar, SIGNAL(syncClicked()), this, SLOT(showModalOverlay()));
@@ -760,7 +797,19 @@ bool AokChainGUI::setCurrentWallet(const QString& name)
 {
     if(!walletFrame)
         return false;
-    return walletFrame->setCurrentWallet(name);
+    const bool ok = walletFrame->setCurrentWallet(name);
+    walletsChanged();
+    updateStakingIcon();
+    return ok;
+}
+
+void AokChainGUI::removeWallet(const QString& name)
+{
+    if(!walletFrame)
+        return;
+    walletFrame->removeWallet(name);
+    if (walletFrame->walletCount() == 0)
+        setWalletActionsEnabled(false);
 }
 
 void AokChainGUI::removeAllWallets()
@@ -769,6 +818,166 @@ void AokChainGUI::removeAllWallets()
         return;
     setWalletActionsEnabled(false);
     walletFrame->removeAllWallets();
+}
+
+void AokChainGUI::setWalletController(WalletController *controller)
+{
+    walletController = controller;
+    if (!controller)
+        return;
+    controller->setParentWindow(this);
+    rpcConsole->setWalletController(controller);
+    connect(controller, &WalletController::walletAdded, this, [this](WalletModel *model) {
+        addWallet(QString::fromStdString(model->getWallet()->GetName()), model);
+    });
+    connect(controller, &WalletController::walletRemoved, this, [this](WalletModel *model) {
+        removeWallet(QString::fromStdString(model->getWallet()->GetName()));
+    });
+    connect(controller, &WalletController::currentChanged, this, [this](WalletModel *model) {
+        if (model)
+            setCurrentWallet(QString::fromStdString(model->getWallet()->GetName()));
+    });
+    connect(controller, &WalletController::walletsChanged, this, &AokChainGUI::walletsChanged);
+    connect(controller, &WalletController::message, this, [this](const QString &title, const QString &text, unsigned int style) {
+        message(title, text, style);
+    });
+    connect(controller, &WalletController::encryptionWanted, this, [this](WalletModel *model) {
+        // the passphrase of a new wallet: the dialog that encrypts every wallet
+        AskPassphraseDialog dialog(AskPassphraseDialog::Encrypt, this);
+        dialog.setModel(model);
+        dialog.exec();
+    });
+    connect(controller, &WalletController::backupWanted, this, [this](WalletModel *model) {
+        BackupPromptDialog *dialog = new BackupPromptDialog(model, this);
+        dialog->setAttribute(Qt::WA_DeleteOnClose);
+        dialog->setWindowModality(Qt::ApplicationModal);
+        dialog->show();
+    });
+    walletsChanged();
+}
+
+void AokChainGUI::walletsChanged()
+{
+    if (!walletController)
+        return;
+    WalletModel *current = walletController->current();
+    const int count = walletController->models().size();
+    const bool busy = walletController->isBusy();
+    createWalletAction->setEnabled(!busy);
+    openWalletAction->setEnabled(!busy);
+    restoreWalletAction->setEnabled(!busy);
+    openWalletMenu->setEnabled(!busy);
+    const bool closable = current && !WalletController::isFirstWallet(current);
+    closeWalletAction->setEnabled(!busy && closable);
+    closeWalletAction->setToolTip(closable ? closeWalletAction->statusTip()
+                                           : tr("The first wallet of the node stays open. The others can be closed."));
+    if (current) {
+        const QString name = walletController->displayName(current);
+        if (sidebar)
+            sidebar->setWalletName(name, count);
+        // with several wallets the title says which one is shown
+        setWindowTitle(count > 1 ? baseWindowTitle + QString::fromUtf8(" · ") + name : baseWindowTitle);
+    }
+}
+
+void AokChainGUI::fillOpenWalletMenu()
+{
+    openWalletMenu->clear();
+    if (!walletController)
+        return;
+    const QStringList closed = walletController->closedWallets();
+    for (const QString &name : closed) {
+        QAction *action = openWalletMenu->addAction(WalletController::displayName(name));
+        action->setToolTip(WalletController::walletPath(name));
+        connect(action, &QAction::triggered, this, [this, name] {
+            if (walletController)
+                walletController->openWallet(name);
+        });
+    }
+    if (closed.isEmpty()) {
+        QAction *none = openWalletMenu->addAction(tr("Every wallet of the wallet folder is open"));
+        none->setEnabled(false);
+    }
+    openWalletMenu->addSeparator();
+    openWalletMenu->addAction(restoreWalletAction);
+}
+
+void AokChainGUI::showWalletMenu()
+{
+    if (!walletController || !sidebar)
+        return;
+    QMenu menu(this);
+    const QList<WalletModel*> models = walletController->models();
+    if (models.size() > 1) {
+        QActionGroup *group = new QActionGroup(&menu);
+        for (WalletModel *model : models) {
+            QAction *action = menu.addAction(walletController->displayName(model));
+            action->setCheckable(true);
+            action->setChecked(model == walletController->current());
+            action->setEnabled(!walletController->isBusy());
+            group->addAction(action);
+            QPointer<WalletModel> guard(model);
+            connect(action, &QAction::triggered, this, [this, guard] {
+                if (guard && walletController)
+                    walletController->setCurrent(guard);
+            });
+        }
+        menu.addSeparator();
+    }
+    menu.addAction(createWalletAction);
+    menu.addMenu(openWalletMenu);
+    menu.addAction(closeWalletAction);
+    menu.exec(sidebar->walletMenuPosition());
+}
+
+void AokChainGUI::createWalletClicked()
+{
+    if (!walletController || walletController->isBusy())
+        return;
+    CreateWalletDialog dialog(this);
+    if (dialog.exec() == QDialog::Accepted)
+        walletController->createWallet(dialog.walletName(), dialog.encrypt());
+}
+
+void AokChainGUI::openWalletClicked()
+{
+    if (!walletController || walletController->isBusy())
+        return;
+    OpenWalletDialog dialog(walletController->closedWallets(), this);
+    if (dialog.exec() != QDialog::Accepted)
+        return;
+    if (dialog.restoreRequested())
+        restoreWalletClicked();
+    else if (!dialog.chosenWallet().isNull())
+        walletController->openWallet(dialog.chosenWallet());
+}
+
+void AokChainGUI::restoreWalletClicked()
+{
+    if (!walletController || walletController->isBusy())
+        return;
+    RestoreWalletDialog dialog(this);
+    if (dialog.exec() == QDialog::Accepted)
+        walletController->restoreWallet(dialog.walletName(), dialog.backupFile());
+}
+
+void AokChainGUI::closeWalletClicked()
+{
+    if (!walletController || walletController->isBusy())
+        return;
+    WalletModel *model = walletController->current();
+    if (!model || WalletController::isFirstWallet(model))
+        return;
+    const QString name = walletController->displayName(model);
+    QMessageBox box(QMessageBox::Question, tr("Close wallet"),
+        "<qt>" + tr("Close %1?").arg(name.toHtmlEscaped()) + "<br><br>" +
+        tr("Its coins and tokens stay in its file, %1. It stops staking and its notifications stop until it is opened again with Open Wallet.").arg(WalletController::walletPath(QString::fromStdString(model->getWallet()->GetName())).toHtmlEscaped()) + "</qt>",
+        QMessageBox::Cancel, this);
+    QPushButton *closeButton = box.addButton(tr("Close wallet"), QMessageBox::AcceptRole);
+    box.setDefaultButton(QMessageBox::Cancel);
+    box.exec();
+    if (box.clickedButton() == closeButton)
+        walletController->closeWallet(model);
 }
 #endif // ENABLE_WALLET
 
@@ -1497,7 +1706,14 @@ void AokChainGUI::showEvent(QShowEvent *event)
 void AokChainGUI::incomingTransaction(const QString& date, int unit, const CAmount& amount, const QString& type, const QString& address, const QString& label, const QString& tokenName)
 {
     // On new transaction, make an info balloon
-    QString msg = tr("Date: %1\n").arg(date);
+    QString msg;
+    // with several wallets: which one it is
+    if (walletController && walletController->models().size() > 1) {
+        WalletView *view = qobject_cast<WalletView*>(sender());
+        if (view && view->getWalletModel())
+            msg += tr("Wallet: %1\n").arg(walletController->displayName(view->getWalletModel()));
+    }
+    msg += tr("Date: %1\n").arg(date);
     if (tokenName == "AOK")
         msg += tr("Amount: %1\n").arg(AokChainUnits::formatWithUnit(unit, amount, true));
     else
@@ -1663,21 +1879,35 @@ void AokChainGUI::toggleHidden()
 
 void AokChainGUI::updateStakingIcon()
 {
+    // Every wallet stakes on its own (a thread per wallet); the side bar shows and switches the
+    // staking of the wallet that is shown, and names the others that stake.
+    WalletModel *current = walletFrame ? walletFrame->currentWalletModel() : nullptr;
+    CWallet *wallet = current ? current->getWallet() : nullptr;
     if (walletFrame) {
         nWeight = walletFrame->updateWeight();
     }
-    // The wallet was locked from elsewhere (walletlock, or the time of walletpassphrase ran out):
-    // nothing is staked any more, and the switch says so.
-    // (not before the wallet is shown: during the start there is none to ask, and staking that
-    // -staking=1 switched on would be shown as off while the wallet stakes)
-    if (this->nStaking && walletFrame && walletFrame->hasWallet() && !walletFrame->isWalletUnlocked()) {
-        this->nStaking = false;
-        for (CWallet* pwallet : vpwallets)
-            pwallet->StopStake();
+    // A wallet that was locked from elsewhere (walletlock, or the time of walletpassphrase ran out)
+    // stakes no more, and its switch says so. (Only wallets that the window shows: during the start
+    // there is none to ask yet, and staking that -staking=1 switched on is not taken back early.)
+    QStringList othersStaking;
+    if (walletController) {
+        for (WalletModel *model : walletController->models()) {
+            CWallet *other = model->getWallet();
+            if (other->IsStaking() && model->getEncryptionStatus() == WalletModel::Locked)
+                other->StopStake();
+            if (model != current && other->IsStaking())
+                othersStaking << walletController->displayName(model);
+        }
+    }
+    const bool staking = wallet && wallet->IsStaking();
+    QString othersLine, othersTip;
+    if (!othersStaking.isEmpty()) {
+        othersLine = tr("%n other wallet(s) staking", "", othersStaking.size());
+        othersTip = tr("Also staking: %1").arg(othersStaking.join(", ").toHtmlEscaped());
     }
 
     QString detail;
-    if (this->nStaking && nWeight) {
+    if (staking && nWeight) {
         uint64_t nWeight = this->nWeight;
         uint64_t nNetworkWeight = 1.1429 * GetPoSKernelPS();
         unsigned nEstimateTime = 1.0455 * 64 * nNetworkWeight / nWeight;
@@ -1701,13 +1931,13 @@ void AokChainGUI::updateStakingIcon()
         if (stakingButton)
             stakingButton->setText(tr("Stop Staking"));
         detail = tr("On · a reward about every %1").arg(text);
-        // the last 24 hours, when the wallet can be asked without waiting
-        if (!vpwallets.empty()) {
+        // the last 24 hours of this wallet, when it can be asked without waiting
+        {
             TRY_LOCK(cs_main, lockMain);
             if (lockMain) {
-                TRY_LOCK(vpwallets[0]->cs_wallet, lockWallet);
+                TRY_LOCK(wallet->cs_wallet, lockWallet);
                 if (lockWallet) {
-                    const CWallet::StakeStats stats = vpwallets[0]->GetStakeStats(GetTime() - 24 * 60 * 60);
+                    const CWallet::StakeStats stats = wallet->GetStakeStats(GetTime() - 24 * 60 * 60);
                     stakeStatsLine.clear();
                     if (stats.nStakes > 0 || stats.nOrphaned > 0) {
                         // (a short amount: the line is narrow)
@@ -1730,11 +1960,12 @@ void AokChainGUI::updateStakingIcon()
             labelStakingIcon->setToolTip(labelStakingIcon->toolTip() + "<br><br>" + stakeStatsTip);
         }
     } else {
+        stakeStatsLine.clear();
         labelStakingIcon->setPixmap(platformStyle->SingleColorIcon(":/icons/staking_off").pixmap(STATUSBAR_ICONSIZE, STATUSBAR_ICONSIZE));
-        const QString state = this->nStaking ? tr("On") : tr("Off");
+        const QString state = staking ? tr("On") : tr("Off");
         if (IsInitialBlockDownload()) {
             labelStakingIcon->setToolTip(tr("Not staking because wallet is syncing"));
-            detail = this->nStaking ? tr("On · waiting for the synchronization to finish") : tr("Off · staking is possible once synchronized");
+            detail = staking ? tr("On · waiting for the synchronization to finish") : tr("Off · staking is possible once synchronized");
         } else if (walletFrame && !walletFrame->isWalletUnlocked()) {
             labelStakingIcon->setToolTip(tr("Not staking because wallet is locked"));
             detail = tr("%1 · the wallet is locked").arg(state);
@@ -1748,8 +1979,16 @@ void AokChainGUI::updateStakingIcon()
         if (stakingButton)
             stakingButton->setText(tr("Start Staking"));
     }
-    if (sidebar)
-        sidebar->setStaking(this->nStaking, detail, labelStakingIcon->toolTip());
+    if (!othersLine.isEmpty()) {
+        detail += "\n" + othersLine;
+        labelStakingIcon->setToolTip(labelStakingIcon->toolTip() + "<br><br>" + othersTip);
+    }
+    if (sidebar) {
+        QString tip = labelStakingIcon->toolTip();
+        if (walletController && walletController->models().size() > 1 && current)
+            tip = tr("The switch is for %1: every wallet stakes on its own.").arg(walletController->displayName(current).toHtmlEscaped()) + "<br><br>" + tip;
+        sidebar->setStaking(staking, detail, tip);
+    }
 }
 
 void AokChainGUI::detectShutdown()
@@ -1839,28 +2078,21 @@ void AokChainGUI::toggleNetworkActive()
 
 void AokChainGUI::toggleStakingActive()
 {
-    if (!walletFrame)
+    // the staking of the wallet that is shown; the others keep theirs
+    WalletModel *current = walletFrame ? walletFrame->currentWalletModel() : nullptr;
+    if (!current)
         return;
-    this->nStaking = !this->nStaking;
-
-    if (this->nStaking) {
+    CWallet *wallet = current->getWallet();
+    if (!wallet->IsStaking()) {
         walletFrame->unlockWalletForStaking();
-        if (walletFrame->isWalletUnlocked()) {
-            for (CWallet* pwallet : vpwallets) {
-                pwallet->StartStake();
-            }
-        } else {
-            // the passphrase dialog was cancelled: staking was not started
-            this->nStaking = false;
-        }
-        updateStakingIcon();
+        // (the passphrase dialog was cancelled: staking is not started)
+        if (walletFrame->isWalletUnlocked())
+            wallet->StartStake();
     } else {
-        for (CWallet* pwallet : vpwallets) {
-            pwallet->StopStake();
-        }
+        wallet->StopStake();
         walletFrame->lockWalletAfterStaking();
-        updateStakingIcon();
     }
+    updateStakingIcon();
 }
 
 UnitDisplayStatusBarControl::UnitDisplayStatusBarControl(const PlatformStyle *platformStyle) :

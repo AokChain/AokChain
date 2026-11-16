@@ -8,6 +8,7 @@
 #define AOKCHAIN_QT_WALLETVIEW_H
 
 #include "amount.h"
+#include "wallet/coincontrol.h"
 
 #include <QStackedWidget>
 
@@ -78,6 +79,16 @@ public:
 
     void showOutOfSyncWarning(bool fShow);
 
+    WalletModel *getWalletModel() const { return walletModel; }
+    /** The page shown (Page), and showing a page as the side bar does: another wallet follows the window */
+    int currentPage() const;
+    void showPage(int page);
+    /** This wallet is the one shown: the send forms use its coin selection. deactivate(): it no longer is. */
+    void activate();
+    void deactivate();
+    /** Re-emit the HD status signal */
+    void updateHDStatus();
+
 protected:
     bool eventFilter(QObject *object, QEvent *event) override;
     void showEvent(QShowEvent *event) override;
@@ -107,6 +118,14 @@ private:
 
     QProgressDialog *progressDialog;
     const PlatformStyle *platformStyle;
+    /** The coins and tokens chosen by hand on the send forms of this wallet (the forms read the
+     *  selection of the wallet that is shown, see activate()) */
+    CCoinControl coinControl;
+    CCoinControl tokenControl;
+    /** The token tab of the send page is set up when it is shown the first time */
+    bool firstTokenSendVisit = true;
+    /** The card of the settings page that names this wallet and its file */
+    QLabel *walletInfoLabel = nullptr;
 
 
     /** TOKENS START */
@@ -151,6 +170,8 @@ private:
     QString describeLocation(const PageLocation &location) const;
     /** The lists of the create and manage pages are read when the page is shown */
     void readTokenLists(int page);
+    /** The name and file of the wallet on the settings page */
+    void updateWalletInfo();
 
 private Q_SLOTS:
     void scheduleRecord();

@@ -30,6 +30,13 @@ class QItemSelection;
 QT_END_NAMESPACE
 
 /** Local AokChain RPC console. */
+class WalletController;
+
+QT_BEGIN_NAMESPACE
+class QComboBox;
+class QLabel;
+QT_END_NAMESPACE
+
 class RPCConsole: public QWidget
 {
     Q_OBJECT
@@ -38,12 +45,15 @@ public:
     explicit RPCConsole(const PlatformStyle *platformStyle, QWidget *parent);
     ~RPCConsole();
 
-    static bool RPCParseCommandLine(std::string &strResult, const std::string &strCommand, bool fExecute, std::string * const pstrFilteredOut = nullptr);
-    static bool RPCExecuteCommandLine(std::string &strResult, const std::string &strCommand, std::string * const pstrFilteredOut = nullptr) {
-        return RPCParseCommandLine(strResult, strCommand, true, pstrFilteredOut);
+    /** walletID: the wallet that wallet calls go to (its /wallet/<name> endpoint); nullptr: the first wallet */
+    static bool RPCParseCommandLine(std::string &strResult, const std::string &strCommand, bool fExecute, std::string * const pstrFilteredOut = nullptr, const std::string *walletID = nullptr);
+    static bool RPCExecuteCommandLine(std::string &strResult, const std::string &strCommand, std::string * const pstrFilteredOut = nullptr, const std::string *walletID = nullptr) {
+        return RPCParseCommandLine(strResult, strCommand, true, pstrFilteredOut, walletID);
     }
 
     void setClientModel(ClientModel *model);
+    /** The wallets for the selector of the console (shown with two or more wallets) */
+    void setWalletController(WalletController *controller);
 
     enum MessageClass {
         MC_ERROR,
@@ -122,10 +132,15 @@ public Q_SLOTS:
 Q_SIGNALS:
     // For RPC command executor
     void stopExecutor();
-    void cmdRequest(const QString &command);
+    void cmdRequest(const QString &command, const QString &walletID, bool useWallet);
 
 private:
     void startExecutor();
+    /** The wallets of the selector, the wallet shown in the window chosen */
+    void fillWalletSelector();
+    QComboBox *walletSelector = nullptr;
+    QLabel *walletSelectorLabel = nullptr;
+    WalletController *walletController = nullptr;
     void setTrafficGraphRange(int mins);
     /** show detailed information on ui about selected node */
     void updateNodeDetail(const CNodeCombinedStats *stats);
