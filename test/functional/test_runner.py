@@ -137,6 +137,7 @@ BASE_SCRIPTS= [
     'feature_governance.py',
     'feature_governance_mempool.py',
     'wallet_staking_unlock.py',
+    'feature_staking_multiwallet.py',
     'feature_stake_variants.py',
     'rpc_mnemonic.py',
     'wallet_importmnemonic.py',
