@@ -75,6 +75,7 @@ enum class WalletLoadResult {
     ALREADY_EXISTS, //!< creating: there is a wallet or a file of that name
     VERIFY_FAILED,  //!< the file or its environment did not pass CWallet::Verify()
     LOAD_FAILED,
+    DATABASE_ERROR, //!< the database layer threw; `error` is its message
 };
 /** A wallet name must not walk out of the place that it names ("." and ".." parts): a caller that
  *  may load or create wallets would otherwise reach any folder through a harmless looking name. */
@@ -929,6 +930,9 @@ private:
     std::map<COutPoint, CStakeCache> stakeCache;
 
     boost::thread_group* stakeThread = nullptr;
+    /** StartStake() and StopStake() come from several threads: the start, wallet commands, the GUI */
+    CCriticalSection cs_stake_control;
+    std::atomic<bool> m_staking_started{false};
     void StakeCoins(bool fStake);
 
 public:
@@ -1414,7 +1418,11 @@ public:
 
     /** Whether the staking thread of this wallet runs (StartStake() and no StopStake() since).
      *  A locked wallet's thread runs but waits; see m_last_coin_stake_search_interval. */
-    bool IsStaking() const { return stakeThread != nullptr; }
+    bool IsStaking() const { return m_staking_started; }
+
+    //! Staking threads of this wallet that have not ended yet. A stopped thread ends at its
+    //! next sleep, after the search that it is in; unloading the wallet waits for that.
+    std::atomic<int> m_stake_threads_running{0};
 
     //! Block time of the staking thread's last kernel search, and its distance
     //! to the search before it; the interval is 0 while the thread is not

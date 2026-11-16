@@ -3283,6 +3283,8 @@ static UniValue WalletLoadError(WalletLoadResult result, const std::string& erro
     case WalletLoadResult::INVALID_NAME:
     case WalletLoadResult::INVALID_BACKUP: return JSONRPCError(RPC_INVALID_PARAMETER, error);
     case WalletLoadResult::NOT_FOUND: return JSONRPCError(RPC_WALLET_NOT_FOUND, error);
+    // (what an exception that left the command always became)
+    case WalletLoadResult::DATABASE_ERROR: return JSONRPCError(RPC_MISC_ERROR, error);
     default: return JSONRPCError(RPC_WALLET_ERROR, error);
     }
 }

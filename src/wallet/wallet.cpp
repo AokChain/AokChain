@@ -116,13 +116,22 @@ bool IsSafeWalletName(const std::string& name)
 /** The part of loadwallet and createwallet after the checks of the name: verify, open, add. */
 static CWallet* OpenWalletByName(const std::string& name, bool fCreate, WalletLoadResult& result, std::string& error, std::string& warning)
 {
-    // CWallet::Verify() refuses a name that clashes with a loaded wallet, and checks the file
-    if (!CWallet::Verify(name, false, error, warning)) {
-        result = WalletLoadResult::VERIFY_FAILED;
-        error = "Wallet file verification failed: " + error;
+    CWallet* wallet = nullptr;
+    try {
+        // CWallet::Verify() refuses a name that clashes with a loaded wallet, and checks the file
+        if (!CWallet::Verify(name, false, error, warning)) {
+            result = WalletLoadResult::VERIFY_FAILED;
+            error = "Wallet file verification failed: " + error;
+            return nullptr;
+        }
+        wallet = CWallet::CreateWalletFromFile(name, fs::absolute(name, GetWalletDir()));
+    } catch (const std::exception& e) {
+        // the database layer reports some files this way, such as a copy of a wallet that is loaded
+        // ("duplicates fileid"): the caller gets the reason, not an exception
+        result = WalletLoadResult::DATABASE_ERROR;
+        error = e.what();
         return nullptr;
     }
-    CWallet* const wallet = CWallet::CreateWalletFromFile(name, fs::absolute(name, GetWalletDir()));
     if (!wallet) {
         result = WalletLoadResult::LOAD_FAILED;
         error = fCreate ? "Wallet creation failed." : "Wallet loading failed.";
@@ -251,6 +260,10 @@ WalletUnloadResult UnloadWallet(CWallet* pwallet, bool& closed)
         vpwalletsUnloaded.push_back(pwallet);
     }
     pwallet->StopStake();
+    // Its staking thread ends at its next sleep. A search that is running is waited for: a stake
+    // found now would otherwise be written to a wallet file that is being closed.
+    for (int i = 0; i < 600 && pwallet->m_stake_threads_running > 0; i++)
+        MilliSleep(100);
     pwallet->Flush(false);
     // close its file, so that it can be copied, moved or loaded again
     for (int i = 0; i < 100 && !closed; i++) {
@@ -6151,5 +6164,9 @@ bool CWalletTx::AcceptToMemoryPool(const CAmount& nAbsurdFee, CValidationState& 
 
 void CWallet::StakeCoins(bool fStake)
 {
+    LOCK(cs_stake_control);
+    if (fStake)
+        ++m_stake_threads_running; // the thread gives it back when it ends, see ThreadStakeMiner()
     ::StakeCoins(fStake, this, stakeThread);
+    m_staking_started = fStake;
 }

@@ -717,9 +717,17 @@ void ThreadStakeMiner(CWallet *pwallet)
     }
     RenameThread(threadName.c_str());
 
+    // (counted by CWallet::StakeCoins() before this thread was made)
+    struct ThreadEnded {
+        CWallet* wallet;
+        ~ThreadEnded() { --wallet->m_stake_threads_running; }
+    } threadEnded{pwallet};
+
     CReserveKey reservekey(pwallet);
 
     bool fTryToSync = true;
+    // Every loaded wallet has a staking thread of its own: what this thread keeps is its own
+    bool fFirstSearchLogged = false;
 
     // Tip and (masked) block time of the last kernel search that found
     // nothing. Searching again before one of them changes would hash the same
@@ -809,7 +817,6 @@ void ThreadStakeMiner(CWallet *pwallet)
             }
             // (how long one search over the wallet's coins takes, once per start: with many coins
             // and a cold coin cache the first one can take much longer than a 16 second slot)
-            static bool fFirstSearchLogged = false;
             const int64_t nSearchStart = GetTimeMillis();
             const bool fSigned = SignBlock(pblock, *pwallet, nTotalFees, pindexPrev);
             if (!fFirstSearchLogged) {
