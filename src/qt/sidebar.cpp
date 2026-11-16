@@ -10,6 +10,7 @@
 
 #include <QAction>
 #include <QEvent>
+#include <QFocusEvent>
 #include <QHBoxLayout>
 #include <QLabel>
 #include <QPainter>
@@ -110,7 +111,7 @@ void SideNavButton::paintEvent(QPaintEvent*)
     p.drawText(QRect(42, 0, width() - 50, height()), Qt::AlignLeft | Qt::AlignVCenter, plainActionText(action));
 }
 
-WalletSwitcher::WalletSwitcher(QWidget* parent) : QAbstractButton(parent), hovered(false)
+WalletSwitcher::WalletSwitcher(QWidget* parent) : QAbstractButton(parent), hovered(false), keyFocus(false)
 {
     setCursor(Qt::PointingHandCursor);
     setFixedHeight(56);
@@ -140,6 +141,21 @@ void WalletSwitcher::leaveEvent(QEvent* event)
     QAbstractButton::leaveEvent(event);
 }
 
+void WalletSwitcher::focusInEvent(QFocusEvent* event)
+{
+    // It is the first control of the window, so the window gives it the focus when it opens:
+    // that is not a choice of the user and is not drawn.
+    keyFocus = event->reason() == Qt::TabFocusReason || event->reason() == Qt::BacktabFocusReason
+               || event->reason() == Qt::ShortcutFocusReason;
+    QAbstractButton::focusInEvent(event);
+}
+
+void WalletSwitcher::focusOutEvent(QFocusEvent* event)
+{
+    keyFocus = false;
+    QAbstractButton::focusOutEvent(event);
+}
+
 /** One or two letters of a wallet name, for its mark */
 static QString walletInitials(const QString& name)
 {
@@ -160,7 +176,7 @@ void WalletSwitcher::paintEvent(QPaintEvent*)
     const QRectF frame = QRectF(rect()).adjusted(0.5, 0.5, -0.5, -0.5);
     // a hairline box; hovered or pressed it takes the fill of the active page, and the keyboard
     // focus shows as a brighter line, as on the staking switch
-    p.setPen(QPen(hasFocus() ? t.sideStrong : t.sideCard, 1));
+    p.setPen(QPen(hasFocus() && keyFocus ? t.sideStrong : t.sideCard, 1));
     p.setBrush((hovered || isDown()) ? t.sideOnBg : Qt::transparent);
     p.drawRoundedRect(frame, 10, 10);
 
@@ -423,6 +439,11 @@ void Sidebar::setWalletName(const QString& name, int count)
 QPoint Sidebar::walletMenuPosition() const
 {
     return walletSwitcher->mapToGlobal(QPoint(0, walletSwitcher->height() + 4));
+}
+
+int Sidebar::walletMenuWidth() const
+{
+    return walletSwitcher->width();
 }
 
 void Sidebar::setNotice(const QString& text, const QString& toolTip, bool warning)

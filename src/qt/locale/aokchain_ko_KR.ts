@@ -1008,8 +1008,8 @@
         <translation>이 폴더에 manifest.json이 없습니다. manifest.json과 blocks-... 파일이 들어 있는 폴더를 고르세요.</translation>
     </message>
     <message>
-        <source>Unlocked for staking only</source>
-        <translation>스테이킹 전용 잠금 해제</translation>
+        <source>Staking only</source>
+        <translation>스테이킹 전용</translation>
     </message>
     <message>
         <source>Wallet is &lt;b&gt;encrypted&lt;/b&gt; and currently &lt;b&gt;unlocked for staking only&lt;/b&gt;</source>

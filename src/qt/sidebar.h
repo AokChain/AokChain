@@ -62,11 +62,15 @@ protected:
     void paintEvent(QPaintEvent* event) override;
     void enterEvent(QEvent* event) override;
     void leaveEvent(QEvent* event) override;
+    void focusInEvent(QFocusEvent* event) override;
+    void focusOutEvent(QFocusEvent* event) override;
 
 private:
     QString name;
     QString state;
     bool hovered;
+    /** The focus came by the keyboard: only then is it drawn (not at the start of the program) */
+    bool keyFocus;
 };
 
 /** The thin progress bar of the side bar. */
@@ -110,6 +114,8 @@ public:
     void setWalletName(const QString& name, int count);
     /** Where the wallet menu opens */
     QPoint walletMenuPosition() const;
+    /** The menu is as wide as the box that it opens from */
+    int walletMenuWidth() const;
     void setStakingVisible(bool visible);
     /** A warning of the node, shown small below the peers line */
     void setNotice(const QString& text, const QString& toolTip, bool warning);

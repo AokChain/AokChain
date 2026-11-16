@@ -694,6 +694,20 @@
         <source>A fatal error occurred. AokChain can no longer continue safely and will quit.</source>
         <translation type="unfinished"></translation>
     </message>
+    <message numerus="yes">
+        <source>24 h: %n reward(s)</source>
+        <translation>
+            <numerusform>24 h: %n reward</numerusform>
+            <numerusform>24 h: %n rewards</numerusform>
+        </translation>
+    </message>
+    <message numerus="yes">
+        <source>%n other wallet(s) staking</source>
+        <translation>
+            <numerusform>%n other wallet staking</numerusform>
+            <numerusform>%n other wallets staking</numerusform>
+        </translation>
+    </message>
 </context>
 <context>
     <name>CoinControlDialog</name>
@@ -1661,6 +1675,13 @@
         <location line="+128"/>
         <source>Current total balance in watch-only addresses</source>
         <translation type="unfinished"></translation>
+    </message>
+    <message numerus="yes">
+        <source>%n kind(s)</source>
+        <translation>
+            <numerusform>%n kind</numerusform>
+            <numerusform>%n kinds</numerusform>
+        </translation>
     </message>
 </context>
 <context>
@@ -5218,6 +5239,23 @@
         <location line="+19"/>
         <source>Error</source>
         <translation>Error</translation>
+    </message>
+</context>
+<context>
+    <name>TokensPage</name>
+    <message numerus="yes">
+        <source>%n kind(s)</source>
+        <translation>
+            <numerusform>%n kind</numerusform>
+            <numerusform>%n kinds</numerusform>
+        </translation>
+    </message>
+    <message numerus="yes">
+        <source>%n kind(s), the first %1 shown</source>
+        <translation>
+            <numerusform>%n kind, the first %1 shown</numerusform>
+            <numerusform>%n kinds, the first %1 shown</numerusform>
+        </translation>
     </message>
 </context>
 </TS>

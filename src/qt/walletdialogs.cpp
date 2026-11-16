@@ -84,6 +84,8 @@ CreateWalletDialog::CreateWalletDialog(QWidget *parent) : QDialog(parent)
     encryptNote->setWordWrap(true);
     layout->addWidget(encryptNote);
 
+    // (spare height goes here, so that the form stays where it is when a line appears)
+    layout->addStretch(1);
     layout->addSpacing(12);
     QHBoxLayout *buttons = new QHBoxLayout();
     buttons->addStretch();
@@ -222,6 +224,7 @@ RestoreWalletDialog::RestoreWalletDialog(QWidget *parent) : QDialog(parent)
     problem->hide();
     layout->addWidget(problem);
 
+    layout->addStretch(1);
     layout->addSpacing(12);
     QHBoxLayout *buttons = new QHBoxLayout();
     buttons->addStretch();
@@ -243,6 +246,8 @@ RestoreWalletDialog::RestoreWalletDialog(QWidget *parent) : QDialog(parent)
         else
             check();
     });
+    // the file comes first, and its field only shows what was chosen
+    choose->setFocus();
 }
 
 void RestoreWalletDialog::chooseFile()

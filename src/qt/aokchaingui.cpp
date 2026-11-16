@@ -927,6 +927,7 @@ void AokChainGUI::showWalletMenu()
     menu.addAction(createWalletAction);
     menu.addMenu(openWalletMenu);
     menu.addAction(closeWalletAction);
+    menu.setMinimumWidth(sidebar->walletMenuWidth());
     menu.exec(sidebar->walletMenuPosition());
 }
 
@@ -1829,7 +1830,8 @@ void AokChainGUI::setEncryptionStatus(int status)
         labelWalletEncryptionIcon->setPixmap(platformStyle->SingleColorIcon(":/icons/lock_open").pixmap(STATUSBAR_ICONSIZE,STATUSBAR_ICONSIZE));
         labelWalletEncryptionIcon->setToolTip(tr("Wallet is <b>encrypted</b> and currently <b>unlocked for staking only</b>"));
         if (sidebar)
-            sidebar->setWalletState(tr("Unlocked for staking only"), labelWalletEncryptionIcon->toolTip());
+            // (two words: the line under the wallet name is short; the tool tip has the sentence)
+            sidebar->setWalletState(tr("Staking only"), labelWalletEncryptionIcon->toolTip());
         encryptWalletAction->setChecked(true);
         changePassphraseAction->setEnabled(true);
         encryptWalletAction->setEnabled(false);
