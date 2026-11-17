@@ -59,3 +59,4 @@ wallet_multiwallet.py
 feature_staking_multiwallet.py
 feature_tokens_undo.py
 feature_activation_heights.py
+rpc_tokens_concurrent.py
