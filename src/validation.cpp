@@ -2115,6 +2115,20 @@ static DisconnectResult DisconnectBlock(const CBlock& block, const CBlockIndex* 
                             }
                         }
                     }
+                } else if (tx.IsNewUsername()) {
+                    // Remove the username that this transaction registered
+                    CNewToken token;
+                    std::string strAddress;
+                    if (!UsernameFromTransaction(tx, token, strAddress)) {
+                        error("%s : Failed to get username from transaction. TXID : %s", __func__, tx.GetHash().GetHex());
+                        return DISCONNECT_FAILED;
+                    }
+                    if (tokensCache->ContainsToken(token)) {
+                        if (!tokensCache->RemoveNewToken(token, strAddress)) {
+                            error("%s : Failed to Remove Username. Name : %s", __func__, token.strName);
+                            return DISCONNECT_FAILED;
+                        }
+                    }
                 }
 
                 for (auto index : vTokenTxIndex) {
