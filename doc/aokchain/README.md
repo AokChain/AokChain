@@ -24,7 +24,7 @@ The upstream Bitcoin Core documentation is in the parent `doc/` directory; this 
 | [17-upstream-features.md](17-upstream-features.md) | Features taken over from later Bitcoin Core versions: the plan in four phases, and phase 1 — `unloadwallet`, `scantxoutset`, `testmempoolaccept`, the fee rate limit of `sendrawtransaction`, `getaddressinfo`, `getbalances`, `-rpcwhitelist`, `-daemonwait`, the log rate limit and others |
 | [18-offline-staking.md](18-offline-staking.md) | Offline staking: coins that one wallet owns and another stakes; how to use it; the validation defect that let the staking key take or destroy delegated coins and the rule that closes it; limits |
 | [19-upgrade-guide.md](19-upgrade-guide.md) | Upgrading a node from 3.0.x to 4.0: steps, checks and going back; what a staking node, an exchange node and an explorer need to know; encrypting a staking wallet and the staking-only unlock |
-| [release-notes-4.0.0.md](release-notes-4.0.0.md) | Release notes of 4.0.0 (candidate) |
+| [release-notes-4.0.0.md](release-notes-4.0.0.md) | Release notes of 4.0.0 |
 | [CHANGELOG-4.0.0.md](CHANGELOG-4.0.0.md) | Changes compared with 3.0.5 |
 | [functional-baseline.txt](functional-baseline.txt) | List of functional tests that currently pass (for regression checks) |
 

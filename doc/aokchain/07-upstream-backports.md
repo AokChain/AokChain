@@ -41,7 +41,7 @@
 | U-16 | Undo file 4GiB position overflow | advisory id unverified [source] | [V] 32-bit `nUndoPos` | P3 | S | ⏳ |
 | U-17 | Urgent TCP data lets a peer push data past the receive limit while its receiving is paused | CVE-2026-117350, 32.1/31.2/30.4/29.5 | [V] applies (select() is used on every OS) → **fixed** (rc8) | P1 | S | ✅ |
 | U-18 | Unbounded announcement queue of paused pre-BIP31 peers | CVE-2026-117349 | [V] does not apply: the lowest accepted protocol version is past BIP31, so the ping timeout holds for every peer | — | — | n/a |
-| U-19 | Ravencoin 4.7/4.8 asset transfer quantity overflow (2^64 units from one) | Ravencoin PR #1287, 2026-08 | [V] 4.0 has the same checks already (SEC-02, `87eae21`). **3.0.x nodes are vulnerable** | P0 | — | ✅ |
+| U-19 | Ravencoin 4.7/4.8 asset transfer quantity overflow (2^64 units from one) | Ravencoin PR #1287, 2026-08 | [V] 4.0 has the same checks already (SEC-02, `a016189`). **3.0.x nodes are vulnerable** | P0 | — | ✅ |
 
 ### A-2. PoS-specific defences (BlackCoin / PIVX / Qtum / Particl)
 

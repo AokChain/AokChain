@@ -24,7 +24,7 @@ Web interface: repository → Releases → "Draft a new release" → enter `boot
 Command line (`gh`):
 
 ```
-gh release create bootstrap-mainnet --repo <owner>/<repository> --prerelease \
+gh release create bootstrap-mainnet --repo <owner>/<repository> \
   --title "Mainnet block archives" \
   --notes "Block archives for the fast first synchronization of the wallet. The wallet validates every block."
 ```

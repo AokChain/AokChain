@@ -1,7 +1,6 @@
 # 01. Current status and change history
 
-- Working branch: `modernize` (original `master` = `5d1fd3d` "Updated version", 2022-09-24)
-- Repository: branch `4.0`. Its history continues from `master` of `AokChain/AokChain` at `5d1fd3d`
+- Branch: `4.0`. Its history continues from `master` of `AokChain/AokChain` at `5d1fd3d` ("Updated version", 2022-09-24)
 - Client version: **4.0.7** (`_CLIENT_VERSION_IS_RELEASE=true`). The changes of every version are in `CHANGELOG-4.0.0.md`; the release notes of 4.0.0 are in `release-notes-4.0.0.md`
 
 ## Current release (2026-11-17): 4.0.7
@@ -37,14 +36,14 @@
 
 Mainnet `defaultAssumeValid` = block 3,030,000 `27a0660bf43381e7d367472a74d696873ff69bb36582031f9c2ed2ae1c58bdf1`, `nMinimumChainWork` = `…044f3a55ad8aa699012a`, `chainTxData` = (1794237264, 8,223,433 transactions, 0.0301 per second). Read with `getblockhash`, `getblockheader` and `getchaintxstats 43200` on the full revalidation node of the table above (tip 3,032,417) (commit `13222ef`). Update it the same way with every release. The checkpoints were not touched.
 
-## Mainnet staking test (started 2026-11-11, in progress)
+## Mainnet staking test (2026-11-11)
 - **Node:** `<verify-dir>/` (4.0.0 candidate `15a5694`, with `staking=1` and `checkwalletlive=1` in `aokchain.conf`). The wallet backup is in `<verify-dir>/backup/`.
 - **Funds:** 200 AOK of test coins. 100 AOK was split into 10 outputs (`4396386e…`) and 100 AOK was left as it was.
 - **Status (block 3,031,938):** `getstakinginfo` → `staking: 1`, `search-interval: 16`, weight 190 AOK, network weight about 1.85 million AOK, expected time about 620,000 seconds (7.2 days). The staking thread used 0.01 seconds of CPU in 64 seconds.
 - **How to check:** `grep "Successfully signed block" <verify-dir>/data/debug.log`, `aokchain-cli -datadir=<verify-dir>/data listtransactions "*" 20`. When a block is produced, check whether 3.0.x peers accepted it (the confirmation count in `getblock` increases) and how the wallet handles it if it becomes an orphan.
 - **Stopping:** remove `staking=1` from `aokchain.conf` and restart.
 
-## Commit history (`modernize`, since the original)
+## Commit history (since 3.0.5)
 
 | Commit | Contents |
 |---|---|
@@ -89,18 +88,11 @@ Mainnet `defaultAssumeValid` = block 3,030,000 `27a0660bf43381e7d367472a74d69687
 - There are **rule tightenings that take effect immediately, without an activation height**: SEC-01 (signature verification), SEC-02 (token amount range), SEC-05 (governance signature). Normal use is not affected; the verdict differs from 3.0.x only when an attack block is created. For the cautions about the order of deployment, see the release notes and document 04.
 - **Prepared but not activated:** the stake timestamp mask (S-05). On mainnet and testnet, `nStakeTimestampMaskHeight = INT_MAX`.
 
-## To be checked by the operators
+## Notes for operators (2026-11-11)
 1. **Compare the governance state:** mainnet has about 99,600 frozen addresses, the token costs are root 1,000,000 / reissue 1,000,000 / sub 100,000 / unique 1 / username 1 AOK, and the fee address is `Kjd5rfNJ17gi3rFpRnZoaUq3XnULxMbSFg` (`freezelist`, `issuanceinfo`). In 3.0.x, governance changes were possible without the master key, so check that this state is what was intended.
 2. **Source of the invalid PoS blocks:** PoS blocks whose kernel hash exceeds the target keep being broadcast on mainnet (about 50 in 4 hours). Find out whether this is a staker with a wrong clock or an attack attempt.
-3. **Seed nodes:** the DNS seed `dns.aok.network` does not resolve, and only 3 of the 11 fixed seeds respond.
-4. **Deployment plan:** upgrade schedule of the major stakers and exchanges, testnet observation period, activation height of S-05.
-5. **Remote repository:** the work is kept in the private repository `AokChain/AokChain4`. Publishing to the public repository waits for the coordinated rollout (see `13-old-version-cutoff.md`).
-6. **Whether to turn the BIP37 (bloom) default off:** decide after checking whether mobile and SPV wallets depend on it.
+3. **Whether to turn the BIP37 (bloom) default off:** decide after checking whether mobile and SPV wallets depend on it.
 
-## Next steps (in order of priority)
-1. Deploy the 4.0.0 candidate on testnet (or a private test network) and observe it, including staking
-2. SEC-06 phase 2 (block budget for deep forks, header spam), the rest of SEC-05, a random number generator without OpenSSL
-3. Tor v3 + addrv2, removal of UPnP, discourage-style banning
-4. Check the result of the mainnet staking test (section above): acceptance of the first stake block, handling of orphaned stakes
-5. Sort out the 47 failing functional tests (economic parameters, Raven names), regenerate the `bloom_tests` vectors
-6. Qt depends for Linux (the xcb packages), test operating the GUI on screen (the Windows cross build with static Qt 5.15.10 is done and merged; the Linux GUI build was confirmed with system Qt 5.15)
+## Open work
+
+The phases of the work are in `06-roadmap.md`, the status of every security finding in `04-security-audit.md` and the upstream changes that are taken over in `07-upstream-backports.md`.

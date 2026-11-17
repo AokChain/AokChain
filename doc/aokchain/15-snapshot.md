@@ -239,7 +239,7 @@ later heights were not profiled.
 
 ## 7. Measurements and checks
 
-All on 2026-11-11/12, main network, files served over the LAN (`http://10.0.0.15:8080/`).
+All on 2026-11-11/12, main network, files served by a web server on the same network.
 
 ### The snapshot
 
@@ -269,7 +269,7 @@ The databases are packed as LevelDB left them (not compacted).
 
 ### First start from the snapshot (daemon, new data directory)
 
-| | this server | 10.0.0.16 |
+| | build server | second server |
 |---|---|---|
 | download (LAN) | 8 s | 8.5 s |
 | unpacking | 35 s | 35 s |
@@ -290,14 +290,14 @@ as well. After `fetchblocks`: `getblock` of blocks 1, 1,500,000 and 3,031,432 an
 `getrawtransaction` of a transaction in block 1,500,000 byte-identical to the verification
 node. After a restart the node advertises `NODE_NETWORK` and follows the tip.
 
-The GUI wallet on this server, empty profile: language and data folder, then the splash
+The GUI wallet on the build server, empty profile: language and data folder, then the splash
 screen shows "downloading the snapshot, 380 MB / 1022 MB", unpacking, checking; then the
 wallet passphrase step, the backup step, the main window.
 
 ### Not measured or not checked
 
-* Download from the GitHub release (the snapshot is not uploaded yet): with the LAN the
-  download is 8 s; over the internet it is what 1 GB takes.
+* Download from the GitHub release: on the local network the download is 8 s; over the
+  internet it is what 1 GB takes.
 * Windows: the Windows build compiles and was not run through a snapshot start.
 * Receiving, sending and staking with a snapshot node on the main network (no coins
   there): done on regtest in `feature_snapshot.py`, including stakes of coins from before
