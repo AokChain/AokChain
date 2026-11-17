@@ -43,8 +43,9 @@ data folder, and then for a passphrase and a backup. See
 - A new node starts from a snapshot of the chain state whose hashes are compiled into the
   program and is at the tip within minutes. See [aokchain/15-snapshot.md](aokchain/15-snapshot.md)
   and [aokchain/12-bootstrap.md](aokchain/12-bootstrap.md).
-- Coming from 3.0.x: [aokchain/19-upgrade-guide.md](aokchain/19-upgrade-guide.md). On Linux,
-  `contrib/aokchain/upgrade.sh` installs or upgrades a node with one command.
+- Coming from 3.0.x: [aokchain/19-upgrade-guide.md](aokchain/19-upgrade-guide.md). On Linux, the
+  script made from `contrib/aokchain/upgrade.sh` installs or upgrades a node with one command
+  (see `contrib/aokchain/README.md`).
 
 Building from source
 --------------------
