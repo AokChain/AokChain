@@ -107,6 +107,17 @@ public:
      */
     bool ReadInStepBlock(uint256& hash) const;
     bool IsInStep() const;
+
+    /**
+     * What the governance database and the token database held when the chain state was last
+     * written and they had followed it: the block, and a hash of the content of each. When a
+     * start has brought the stores to that block again, their content is hashed and compared
+     * (VerifyStoresNote() in validation.h): the node sees for itself whether they are what
+     * they were.
+     */
+    bool WriteStoresNote(const uint256& hashBlock, const uint256& hashGovernance, const uint256& hashTokens);
+    bool ReadStoresNote(uint256& hashBlock, uint256& hashGovernance, uint256& hashTokens) const;
+    bool EraseStoresNote();
     size_t EstimateSize() const override;
 };
 

@@ -3,6 +3,7 @@
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
+#include <hash.h>
 #include <util.h>
 #include <consensus/params.h>
 #include <script/ismine.h>
@@ -33,6 +34,17 @@ struct RawBytes {
     {
         if (!bytes.empty())
             s.write((const char*)bytes.data(), bytes.size());
+    }
+};
+
+//! A key or a value as the bytes that it is made of.
+struct RawRecord {
+    std::vector<unsigned char> bytes;
+    template <typename Stream> void Unserialize(Stream& s)
+    {
+        bytes.resize(s.size());
+        if (!bytes.empty())
+            s.read((char*)bytes.data(), bytes.size());
     }
 };
 
@@ -120,6 +132,22 @@ bool CTokensDB::WriteStateBlock(const uint256& hashBlock)
 bool CTokensDB::IsStateBlockKey(const std::vector<unsigned char>& key)
 {
     return key == ToBytes(STATE_BLOCK_KEY);
+}
+
+uint256 CTokensDB::StateHash()
+{
+    CHashWriter ss(SER_GETHASH, 0);
+    std::unique_ptr<CDBIterator> it(NewIterator());
+    for (it->SeekToFirst(); it->Valid(); it->Next()) {
+        RawRecord key, value;
+        if (!it->GetKey(key) || key.bytes.empty() || !it->GetValue(value))
+            return uint256();
+        const char flag = (char)key.bytes[0];
+        if (flag == BLOCK_TOKEN_UNDO_DATA || flag == MEMPOOL_REISSUED_TX)
+            continue;
+        ss << key.bytes << value.bytes;
+    }
+    return ss.GetHash();
 }
 
 bool CTokensDB::WriteTokenData(const CNewToken &token, const int nHeight, const uint256& blockHash)

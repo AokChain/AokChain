@@ -262,7 +262,7 @@ bool AppInit(int argc, char* argv[])
     }
     Shutdown();
 
-    return fRet;
+    return fRet && !ExitFailureRequested();
 }
 
 int main(int argc, char* argv[])

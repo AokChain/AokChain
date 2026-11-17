@@ -154,6 +154,17 @@ bool ShutdownRequested()
     return fRequestShutdown;
 }
 
+/** The node has set the mark of a running node in the block index database (see AppInitMain):
+ *  a normal shutdown takes it away at its end. */
+static bool fRunningMarked = false;
+
+/** A file in the data directory while a re-index that the node began by itself is under way
+ *  (-autorebuild): it does not begin a second one right after the first. */
+static fs::path AutoReindexMarker()
+{
+    return GetDataDir() / "autoreindex";
+}
+
 /**
  * This is a minimally invasive approach to shutdown on LevelDB read errors from the
  * chainstate, while keeping user interface out of the common library, which is shared
@@ -285,6 +296,13 @@ void Shutdown()
         pcoinsTip.reset();
         pcoinscatcher.reset();
         pcoinsdbview.reset();
+        // The end of a normal shutdown: everything is written. (A start that finds the mark
+        // knows that the last run did not get here.)
+        if (pblocktree && fRunningMarked) {
+            pblocktree->WriteFlag("running", false);
+            pblocktree->Sync();
+            fRunningMarked = false;
+        }
         pblocktree.reset();
         delete ptokens;
         ptokens = nullptr;
@@ -420,6 +438,7 @@ std::string HelpMessage(HelpMessageMode mode)
             "Warning: Reverting this setting requires re-downloading the entire blockchain. "
             "(default: 0 = disable pruning blocks, 1 = allow manual pruning via RPC, >%u = automatically prune block files to stay under the specified target size in MiB)"), MIN_DISK_SPACE_FOR_BLOCK_FILES / 1024 / 1024));
     strUsage += HelpMessageOpt("-reindex-chainstate", _("Rebuild chain state from the currently indexed blocks"));
+    strUsage += HelpMessageOpt("-autorebuild", strprintf(_("Rebuild the chain state from the indexed blocks, or index the block files again, without being asked, when a start finds the databases in a state that it cannot go on from or a block that this node had validated before does not connect (default: %u)"), DEFAULT_AUTOREBUILD));
     strUsage += HelpMessageOpt("-reindex", _("Rebuild chain state and block index from the blk*.dat files on disk"));
 #ifndef WIN32
     strUsage += HelpMessageOpt("-sysperms", _("Create new files with system default permissions, instead of umask 077 (only effective with disabled wallet functionality)"));
@@ -709,6 +728,10 @@ void ThreadImport(std::vector<fs::path> vImportFiles)
         pblocktree->WriteReindexing(false);
         fReindex = false;
         LogPrintf("Reindexing finished\n");
+        {
+            boost::system::error_code ec;
+            fs::remove(AutoReindexMarker(), ec);
+        }
         // To avoid ending up in a situation without genesis block, re-try initializing (no-op if reindexing worked):
         LoadGenesisBlock(chainparams);
     }
@@ -1554,6 +1577,16 @@ bool AppInitMain(boost::thread_group& threadGroup, CScheduler& scheduler)
     auto snapshotStatus = [](const std::string& message) { uiInterface.InitMessage(message); };
     bool fSnapshotOnTrial = InstallSnapshotIfWanted(snapshotStatus);
 
+    // -autorebuild: what a start does by itself when the databases are not in a state that it
+    // can go on from. Each of the two steps is taken once in a start.
+    const bool fAutoRebuild = gArgs.GetBoolArg("-autorebuild", DEFAULT_AUTOREBUILD);
+    bool fAutoRebuildTried = false;
+    bool fAutoReindexTried = false;
+    // The node itself decided that this start builds the chain state, the token database and
+    // the governance database again from the block files
+    bool fAutoRebuildNow = false;
+    bool fUncleanStopSaid = false;
+
     bool fLoaded = false;
     while (!fLoaded && !fRequestShutdown) {
         bool fReset = fReindex;
@@ -1561,6 +1594,13 @@ bool AppInitMain(boost::thread_group& threadGroup, CScheduler& scheduler)
         // An index that is turned on or off is rebuilt by -reindex only: -reindex-chainstate keeps
         // the block index database, where the flags of the indexes are kept.
         bool fOnlyReindexHelps = false;
+        // With strLoadError: the chain state, the governance database or the token database is
+        // what is wrong, which building them again from the block files answers...
+        bool fChainStateAtFault = false;
+        // ...or the block index database is damaged, which indexing the block files again answers.
+        bool fBlockIndexAtFault = false;
+        // Which of them is being opened or read, for an error that this throws
+        bool fAtBlockIndex = true;
 
         uiInterface.InitMessage(_("Loading block index..."));
 
@@ -1571,7 +1611,30 @@ bool AppInitMain(boost::thread_group& threadGroup, CScheduler& scheduler)
                 pcoinsTip.reset();
                 pcoinsdbview.reset();
                 pcoinscatcher.reset();
+                // (closed first: a second pass of this loop cannot open what the first still holds)
+                pblocktree.reset();
                 pblocktree.reset(new CBlockTreeDB(nBlockTreeDBCache, false, fReset));
+
+                if (!fReset) {
+                    bool fWasRunning = false;
+                    if (!fUncleanStopSaid && pblocktree->ReadFlag("running", fWasRunning) && fWasRunning) {
+                        fUncleanStopSaid = true;
+                        LogPrintf("The last run of this node did not end with a normal shutdown. Its databases are compared with each other and brought in step.\n");
+                    }
+                    // A rebuild that was decided and is not done: a block that did not connect at
+                    // the last run (RequestChainStateRebuild), or a stop before the wipes below
+                    bool fRebuildMark = false;
+                    if (pblocktree->ReadFlag("rebuildchainstate", fRebuildMark) && fRebuildMark && !fReindexChainState) {
+                        if (!fAutoRebuild || fPruneMode || SnapshotNodeWithoutPastBlocks()) {
+                            LogPrintf("A rebuild of the chain state was decided at an earlier run and is not done. It is not done now (-autorebuild=0, or this node does not have all blocks).\n");
+                        } else {
+                            LogPrintf("A rebuild of the chain state was decided at an earlier run and is not done (see the earlier lines of this log): it is done now.\n");
+                            fReindexChainState = true;
+                            fAutoRebuildNow = true;
+                        }
+                    }
+                }
+                fAtBlockIndex = false;
 
                 delete ptokens;
                 delete ptokensdb;
@@ -1582,7 +1645,9 @@ bool AppInitMain(boost::thread_group& threadGroup, CScheduler& scheduler)
                 // below, with the chainstate and the governance database, after the checks of
                 // the block index: a start that stops at those checks (an index turned on or
                 // off) leaves the tokens as they are.
-                ptokensdb = new CTokensDB(nBlockTreeDBCache, false, fReset);
+                // (a rebuild that the node decided by itself wipes it here: it may be the very
+                // database that cannot be opened)
+                ptokensdb = new CTokensDB(nBlockTreeDBCache, false, fReset || fAutoRebuildNow);
                 ptokens = new CTokensCache();
                 ptokensCache = new CLRUCache<std::string, CDatabasedTokenData>(MAX_CACHE_TOKENS_SIZE);
 
@@ -1591,8 +1656,10 @@ bool AppInitMain(boost::thread_group& threadGroup, CScheduler& scheduler)
                 // Need to load tokens before we verify the database
                 if (!ptokensdb->LoadTokens()) {
                     strLoadError = _("Failed to load Tokens Database");
+                    fChainStateAtFault = true;
                     break;
                 }
+                fAtBlockIndex = true;
 
                 if (!ptokensdb->ReadReissuedMempoolState())
                     LogPrintf("Database failed to load last Reissued Mempool State. Will have to start from empty state");
@@ -1696,6 +1763,7 @@ bool AppInitMain(boost::thread_group& threadGroup, CScheduler& scheduler)
                 // already been used") and marks a valid block invalid. (-reindex wiped the token
                 // database when it was opened above.) Nothing has used the tokens since they were
                 // loaded there: they are loaded again, from the empty database.
+                fAtBlockIndex = false;
                 if (fReindexChainState && !fReset) {
                     delete ptokens;
                     delete ptokensdb;
@@ -1720,6 +1788,7 @@ bool AppInitMain(boost::thread_group& threadGroup, CScheduler& scheduler)
                 // This is a no-op if we cleared the coinsviewdb with -reindex or -reindex-chainstate
                 if (!pcoinsdbview->Upgrade()) {
                     strLoadError = _("Error upgrading chainstate database");
+                    fChainStateAtFault = true;
                     break;
                 }
 
@@ -1727,6 +1796,7 @@ bool AppInitMain(boost::thread_group& threadGroup, CScheduler& scheduler)
                 const bool fReplay = !pcoinsdbview->GetHeadBlocks().empty();
                 if (!ReplayBlocks(chainparams, pcoinsdbview.get())) {
                     strLoadError = _("Unable to replay blocks. You will need to rebuild the database using -reindex-chainstate.");
+                    fChainStateAtFault = true;
                     break;
                 }
 
@@ -1742,7 +1812,9 @@ bool AppInitMain(boost::thread_group& threadGroup, CScheduler& scheduler)
                     const bool fInStep = !fReplay && pcoinsdbview->IsInStep();
                     std::string strGovernanceError;
                     if (!governance->RecoverTo(pcoinsTip->GetBestBlock(), fInStep, strGovernanceError)) {
-                        return InitError(strprintf(_("The governance database does not belong to the chain state (%s). Restart with -reindex-chainstate to rebuild both."), strGovernanceError));
+                        strLoadError = strprintf(_("The governance database does not belong to the chain state (%s)"), strGovernanceError);
+                        fChainStateAtFault = true;
+                        break;
                     }
                 }
 
@@ -1751,6 +1823,7 @@ bool AppInitMain(boost::thread_group& threadGroup, CScheduler& scheduler)
                     // LoadChainTip sets chainActive based on pcoinsTip's best block
                     if (!LoadChainTip(chainparams)) {
                         strLoadError = _("Error initializing block database");
+                        fChainStateAtFault = true;
                         break;
                     }
                     assert(chainActive.Tip() != nullptr);
@@ -1761,9 +1834,33 @@ bool AppInitMain(boost::thread_group& threadGroup, CScheduler& scheduler)
                 {
                     std::string strTokenError;
                     if (!RecoverTokenState(chainparams, strTokenError)) {
-                        return InitError(strprintf(_("The token database does not belong to the chain state (%s). Restart with -reindex-chainstate to rebuild both."), strTokenError));
+                        strLoadError = strprintf(_("The token database does not belong to the chain state (%s)"), strTokenError);
+                        fChainStateAtFault = true;
+                        break;
                     }
                     if (ShutdownRequested()) break;
+                }
+
+                // The stores are at the block of the chain state: are the two small ones what
+                // they were when the chain state was written for that block?
+                {
+                    std::string strStoresError;
+                    if (!VerifyStoresNote(strStoresError)) {
+                        strLoadError = strprintf(_("A database of this node is damaged (%s)"), strStoresError);
+                        fChainStateAtFault = true;
+                        break;
+                    }
+                }
+
+                // A rebuild has wiped the stores and begun them anew: what remains of it is to
+                // connect the blocks, and a stop on that way is taken up like any other
+                if (!fReset) {
+                    bool fRebuildMark = false;
+                    if (fReindexChainState && pblocktree->ReadFlag("rebuildchainstate", fRebuildMark) && fRebuildMark) {
+                        pblocktree->WriteFlag("rebuildchainstate", false);
+                        pblocktree->Sync();
+                    }
+                    fAutoRebuildNow = false;
                 }
 
                 if (fSnapshotOnTrial) {
@@ -1809,17 +1906,30 @@ bool AppInitMain(boost::thread_group& threadGroup, CScheduler& scheduler)
                     if (!CVerifyDB().VerifyDB(chainparams, pcoinsdbview.get(), gArgs.GetArg("-checklevel", DEFAULT_CHECKLEVEL),
                                   gArgs.GetArg("-checkblocks", DEFAULT_CHECKBLOCKS))) {
                         strLoadError = _("Corrupted block database detected");
+                        fChainStateAtFault = true;
                         break;
                     }
                 }
             } catch (const std::exception& e) {
                 LogPrintf("%s\n", e.what());
                 strLoadError = _("Error opening block database");
+                // A database that is damaged: not one that cannot be read or written for another
+                // reason (the disk is full, the files belong to someone else), which no rebuild mends
+                if (std::string(e.what()) == "Database corrupted") {
+                    if (fAtBlockIndex)
+                        fBlockIndexAtFault = true;
+                    else
+                        fChainStateAtFault = true;
+                }
                 break;
             }
 
             fLoaded = true;
         } while(false);
+
+        // What a load that did not succeed has in memory is never written
+        if (!fLoaded)
+            pcoinsTip.reset();
 
         if (!fLoaded && fSnapshotOnTrial && !fRequestShutdown) {
             // Whatever went wrong, the snapshot is not used: remove every file of it and load
@@ -1838,6 +1948,38 @@ bool AppInitMain(boost::thread_group& threadGroup, CScheduler& scheduler)
             RemoveInstalledSnapshot();
             uiInterface.InitMessage(_("The snapshot was not accepted. Synchronizing from the blocks instead..."));
             continue;
+        }
+
+        // -autorebuild: the node helps itself where a rebuild from its own block files is the answer
+        if (!fLoaded && !fRequestShutdown && fAutoRebuild && !fReset && !fOnlyReindexHelps) {
+            if (fChainStateAtFault && !fAutoRebuildTried && pblocktree && !fPruneMode && !fHavePruned && !SnapshotNodeWithoutPastBlocks()) {
+                fAutoRebuildTried = true;
+                LogPrintf("%s.\nThe chain state, the token database and the governance database are built again from the block files at this start, as -reindex-chainstate does (-autorebuild=0 turns this off).\n", strLoadError);
+                uiInterface.InitMessage(_("Rebuilding the chain state from the block files..."));
+                // (kept until the stores are wiped and begun anew: a stop before that leads here again)
+                pblocktree->WriteFlag("rebuildchainstate", true);
+                pblocktree->Sync();
+                fReindexChainState = true;
+                fAutoRebuildNow = true;
+                continue;
+            }
+            if (fBlockIndexAtFault && !fAutoReindexTried && !fPruneMode && !SnapshotNodeWithoutPastBlocks()) {
+                fAutoReindexTried = true;
+                boost::system::error_code ec;
+                if (!fs::exists(AutoReindexMarker(), ec)) {
+                    FILE* marker = fsbridge::fopen(AutoReindexMarker(), "wb");
+                    if (marker) {
+                        FileCommit(marker);
+                        fclose(marker);
+                        LogPrintf("%s: the block index database is damaged.\nThe block files are indexed again at this start and every database is built from them, as -reindex does (-autorebuild=0 turns this off).\n", strLoadError);
+                        uiInterface.InitMessage(_("Indexing the block files again..."));
+                        fReindex = true;
+                        continue;
+                    }
+                } else {
+                    strLoadError += " (" + _("the node had begun to index the block files again by itself, and the block index database is damaged once more: it does not begin again") + ")";
+                }
+            }
         }
 
         if (!fLoaded && !fRequestShutdown) {
@@ -1870,6 +2012,10 @@ bool AppInitMain(boost::thread_group& threadGroup, CScheduler& scheduler)
     }
     if (fLoaded) {
         LogPrintf(" block index %15dms\n", GetTimeMillis() - nStart);
+        // From here to the end of a normal shutdown the node counts as running
+        pblocktree->WriteFlag("running", true);
+        pblocktree->Sync();
+        fRunningMarked = true;
     }
 
     fs::path est_path = GetDataDir() / FEE_ESTIMATES_FILENAME;

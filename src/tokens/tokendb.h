@@ -101,6 +101,9 @@ public:
     bool WriteStateBlock(const uint256& hashBlock);
     //! Whether these are the bytes of the key of that record (for code that walks the undo records).
     static bool IsStateBlockKey(const std::vector<unsigned char>& key);
+    //! A hash of the tokens and balances: of every record but the undo data, the block above and
+    //! the reissues that wait in the memory pool. Null when a record cannot be read.
+    uint256 StateHash();
 
 private:
     template <typename K, typename V> bool PutRecord(const K& key, const V& value);

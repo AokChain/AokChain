@@ -70,6 +70,11 @@ inline std::string _(const char *psz)
     return rv ? (*rv) : psz;
 }
 
+/** The program is to end with an error code although it shuts down in the normal way (a node that
+ *  stops to rebuild its databases at the next start: a service manager starts it again). */
+void RequestExitFailure();
+bool ExitFailureRequested();
+
 void SetupEnvironment();
 
 bool SetupNetworking();

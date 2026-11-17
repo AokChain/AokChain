@@ -3483,6 +3483,17 @@ bool static FlushStateToDisk(const CChainParams& chainparams, CValidationState &
             if (ptokensdb)
                 ptokensdb->WriteReissuedMempoolState();
 
+            // What the governance and the token database hold at this tip, for the check at
+            // the next start (VerifyStoresNote)
+            if (pcoinsdbview && governance && ptokensdb) {
+                const uint256 hashGovernance = fTokenStateInStep ? governance->ContentHash() : uint256();
+                const uint256 hashTokens = fTokenStateInStep ? ptokensdb->StateHash() : uint256();
+                if (hashGovernance.IsNull() || hashTokens.IsNull())
+                    pcoinsdbview->EraseStoresNote();
+                else
+                    pcoinsdbview->WriteStoresNote(hashFlushTip, hashGovernance, hashTokens);
+            }
+
             /** TOKENS END */
 
             nLastFlush = nNow;
@@ -3586,6 +3597,51 @@ void static UpdateTip(CBlockIndex *pindexNew, const CChainParams& chainParams) {
   * disconnectpool (note that the caller is responsible for mempool consistency
   * in any case).
   */
+/** The block for which a rebuild of the chain state was last asked, and when (block index database). */
+static const std::string DB_REBUILD_ASKED = "rebuildasked";
+
+/**
+ * A block that this node had fully validated before (its index entry says so) does not connect,
+ * or a block of its chain cannot be disconnected. Validation gives the same answer for the same
+ * chain, so the chain state, the governance database or the token database is not what it was.
+ * Instead of marking a valid block invalid (and leaving the chain that every other node
+ * follows), or staying on a branch that it cannot leave, the node notes that these databases
+ * are to be built again from the block files, and stops; the next start does it (init.cpp).
+ *
+ * Only blocks that this node itself has connected carry that validity, so a block from the
+ * network cannot bring this about. It is done once for a block and not twice within a day: a
+ * block that fails again on databases that were just built from the block files is invalid
+ * (a rule that a new version has tightened, say) and is treated as before.
+ *
+ * Returns true when the rebuild is asked for and the node is stopping.
+ */
+static bool RequestChainStateRebuild(const CBlockIndex* pindex, const std::string& strWhat)
+{
+    AssertLockHeld(cs_main);
+    if (!gArgs.GetBoolArg("-autorebuild", DEFAULT_AUTOREBUILD) || !pblocktree)
+        return false;
+    // (a node without all blocks cannot build its databases from them)
+    if (fPruneMode || fHavePruned || SnapshotNodeWithoutPastBlocks())
+        return false;
+    const int64_t nNow = GetTime();
+    std::pair<uint256, int64_t> last;
+    if (pblocktree->Read(DB_REBUILD_ASKED, last) &&
+        (last.first == pindex->GetBlockHash() || (nNow >= last.second && nNow - last.second < 24 * 60 * 60))) {
+        LogPrintf("Block %s at height %d, which this node had validated before, %s, and the databases of this node were built again not long ago: nothing more is done about it\n",
+                  pindex->GetBlockHash().ToString(), pindex->nHeight, strWhat);
+        return false;
+    }
+    if (!pblocktree->Write(DB_REBUILD_ASKED, std::make_pair(pindex->GetBlockHash(), nNow)) ||
+        !pblocktree->WriteFlag("rebuildchainstate", true) || !pblocktree->Sync())
+        return false;
+    RequestExitFailure();
+    AbortNode(strprintf("Block %s at height %d, which this node had validated before, %s. The databases of this node are not what they were. "
+                        "The chain state, the token database and the governance database are built again from the block files at the next start, without any option.",
+                        pindex->GetBlockHash().ToString(), pindex->nHeight, strWhat),
+              _("The databases of this node are damaged. They are built again from the block files at the next start: start the program again, no option is needed."));
+    return true;
+}
+
 bool static DisconnectTip(CValidationState& state, const CChainParams& chainparams, DisconnectedBlockTransactions *disconnectpool)
 {
     CBlockIndex *pindexDelete = chainActive.Tip();
@@ -3604,8 +3660,11 @@ bool static DisconnectTip(CValidationState& state, const CChainParams& chainpara
         CTokensCache tokenCache;
 
         assert(view.GetBestBlock() == pindexDelete->GetBlockHash());
-        if (DisconnectBlock(block, pindexDelete, view, &tokenCache) != DISCONNECT_OK)
+        if (DisconnectBlock(block, pindexDelete, view, &tokenCache) != DISCONNECT_OK) {
+            // (a block of the node's own chain: see RequestChainStateRebuild)
+            RequestChainStateRebuild(pindexDelete, "cannot be disconnected");
             return error("DisconnectTip(): DisconnectBlock %s failed", pindexDelete->GetBlockHash().ToString());
+        }
         bool flushed = view.Flush();
         assert(flushed);
 
@@ -3797,7 +3856,14 @@ bool static ConnectTip(CValidationState& state, const CChainParams& chainparams,
 
         int64_t nTimeConnectStart = GetTimeMicros();
 
+        const bool fValidatedBefore = pindexNew->IsValid(BLOCK_VALID_SCRIPTS);
         bool rv = ConnectBlock(blockConnecting, state, pindexNew, view, chainparams, &tokenCache);
+        // A block that this node itself had connected before is valid. When it does not connect
+        // now, the databases of this node are not what they were: the block is not marked
+        // invalid, the databases are built again (see RequestChainStateRebuild).
+        if (!rv && state.IsInvalid() && fValidatedBefore &&
+            RequestChainStateRebuild(pindexNew, strprintf("does not connect now (%s)", FormatStateMessage(state))))
+            return false;
         GetMainSignals().BlockChecked(blockConnecting, state);
         if (!rv) {
             if (state.IsInvalid())
@@ -5890,6 +5956,11 @@ bool RecoverTokenState(const CChainParams& params, std::string& strError)
 
     uint256 hashTokens;
     const bool fNoted = ptokensdb->ReadStateBlock(hashTokens);
+    if (!pindexTip && fNoted && !hashTokens.IsNull()) {
+        // (the chain state is gone and the token database is still that of a block)
+        strError = "the token database is that of a block and there is no chain state";
+        return false;
+    }
     if (!pcoinsdbview->IsInStep()) {
         // The chain state was last written by a version that does not note which block the
         // token database stands for (or not at all yet): it is taken to match the chain state,
@@ -5961,6 +6032,27 @@ bool RecoverTokenState(const CChainParams& params, std::string& strError)
         return false;
     }
     fTokenStateInStep = true;
+    return true;
+}
+
+bool VerifyStoresNote(std::string& strError)
+{
+    LOCK(cs_main);
+    if (!pcoinsdbview || !governance || !ptokensdb || !fTokenStateInStep || !pcoinsdbview->IsInStep())
+        return true;
+    uint256 hashBlock, hashGovernance, hashTokens;
+    if (!pcoinsdbview->ReadStoresNote(hashBlock, hashGovernance, hashTokens) || hashBlock != pcoinsdbview->GetBestBlock())
+        return true;
+    const int64_t nStart = GetTimeMillis();
+    if (governance->ContentHash() != hashGovernance) {
+        strError = "the governance database is not what it was when the chain state was written";
+        return false;
+    }
+    if (ptokensdb->StateHash() != hashTokens) {
+        strError = "the token database is not what it was when the chain state was written";
+        return false;
+    }
+    LogPrintf("The governance and the token database are what they were when the chain state was written (checked in %dms)\n", GetTimeMillis() - nStart);
     return true;
 }
 

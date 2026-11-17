@@ -954,6 +954,18 @@ void RenameThread(const char *name)
 #endif
 }
 
+static std::atomic<bool> fExitFailure(false);
+
+void RequestExitFailure()
+{
+    fExitFailure = true;
+}
+
+bool ExitFailureRequested()
+{
+    return fExitFailure;
+}
+
 void SetupEnvironment()
 {
 #ifdef HAVE_MALLOPT_ARENA_MAX

@@ -523,6 +523,21 @@ bool ReplayBlocks(const CChainParams& params, CCoinsView* view);
  */
 bool RecoverTokenState(const CChainParams& params, std::string& strError);
 
+/**
+ * At startup, when the stores have been brought to the block of the chain state: compares the
+ * content of the governance database and of the token database with what was noted of them
+ * when the chain state was written for that block (CCoinsViewDB::WriteStoresNote). Returns false
+ * when one of them is not what it was (strError says which). True when they are, and when
+ * nothing is known of them at this block (another version wrote the chain state last, or the
+ * write for this block did not get as far as the note).
+ */
+bool VerifyStoresNote(std::string& strError);
+
+/** -autorebuild: the node rebuilds its databases from the block files by itself when it finds at
+ *  start, or when a block that it had validated before does not connect, that they are not in
+ *  a state that it can go on from. */
+static const bool DEFAULT_AUTOREBUILD = true;
+
 /** Find the last common block between the parameter chain and a locator. */
 CBlockIndex* FindForkInGlobalIndex(const CChain& chain, const CBlockLocator& locator);
 

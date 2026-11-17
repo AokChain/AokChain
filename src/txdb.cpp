@@ -67,6 +67,9 @@ static const char DB_LAST_BLOCK = 'l';
 // The block of the last write of the chain state by a version that keeps the other stores in
 // step with it (see CCoinsViewDB::IsInStep in txdb.h).
 static const char DB_IN_STEP = 'M';
+// The block of that write, and what the governance and the token database held then (see
+// CCoinsViewDB::WriteStoresNote in txdb.h).
+static const char DB_STORES_NOTE = 'N';
 
 namespace {
 
@@ -118,6 +121,24 @@ bool CCoinsViewDB::ReadInStepBlock(uint256& hash) const {
 bool CCoinsViewDB::IsInStep() const {
     uint256 hash;
     return ReadInStepBlock(hash) && hash == GetBestBlock();
+}
+
+bool CCoinsViewDB::WriteStoresNote(const uint256& hashBlock, const uint256& hashGovernance, const uint256& hashTokens) {
+    return db.Write(DB_STORES_NOTE, std::make_pair(hashBlock, std::make_pair(hashGovernance, hashTokens)));
+}
+
+bool CCoinsViewDB::ReadStoresNote(uint256& hashBlock, uint256& hashGovernance, uint256& hashTokens) const {
+    std::pair<uint256, std::pair<uint256, uint256> > note;
+    if (!db.Read(DB_STORES_NOTE, note))
+        return false;
+    hashBlock = note.first;
+    hashGovernance = note.second.first;
+    hashTokens = note.second.second;
+    return true;
+}
+
+bool CCoinsViewDB::EraseStoresNote() {
+    return db.Erase(DB_STORES_NOTE);
 }
 
 std::vector<uint256> CCoinsViewDB::GetHeadBlocks() const {
