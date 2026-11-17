@@ -1,0 +1,17 @@
+Don't include <fp.h> on macOS
+
+Newer Apple clang defines TARGET_OS_MAC for every compile, so the bundled
+libpng tries to include the classic Mac OS header <fp.h>, which no SDK has.
+Upstream libpng dropped the TARGET_OS_MAC test in 1.6.40.
+
+--- a/qtbase/src/3rdparty/libpng/pngpriv.h
++++ b/qtbase/src/3rdparty/libpng/pngpriv.h
+@@ -529,7 +529,7 @@
+ #  include <float.h>
+ 
+ #  if (defined(__MWERKS__) && defined(macintosh)) || defined(applec) || \
+-    defined(THINK_C) || defined(__SC__) || defined(TARGET_OS_MAC)
++    defined(THINK_C) || defined(__SC__)
+    /* We need to check that <math.h> hasn't already been included earlier
+     * as it seems it doesn't agree with <fp.h>, yet we should really use
+     * <fp.h> if possible.
