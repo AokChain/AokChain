@@ -3,7 +3,7 @@
 .SH NAME
 aokchaind \- manual page for aokchaind v4.0.7.0
 .SH DESCRIPTION
-AokChain Core Daemon version v4.0.7.0
+AokChain Core Daemon version v4.0.7.0\-dirty
 .SS "Usage:"
 .TP
 aokchaind [options]
@@ -381,6 +381,11 @@ Spend unconfirmed change when sending transactions (default: 1)
 Let a payment take coins at an offline staking address on its own.
 Otherwise they are spent only when they are selected, with coin
 control or in a raw transaction (default: 0)
+.HP
+\fB\-staking\fR
+.IP
+Stake with the coins of every wallet while it is unlocked; the desktop
+wallet has a switch for it (default: 0)
 .HP
 \fB\-stakecombinethreshold=\fR<amt>
 .IP
