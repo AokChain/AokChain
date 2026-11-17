@@ -1,8 +1,14 @@
 # 01. Current status and change history
 
 - Working branch: `modernize` (original `master` = `5d1fd3d` "Updated version", 2022-09-24)
-- Repository: private GitHub repository `AokChain/AokChain4`, branch `4.0` (history continues from the public `AokChain/AokChain` at `5d1fd3d`; nothing is pushed to the public repository yet)
-- Client version: **4.0.0 release candidate** (`_CLIENT_VERSION_IS_RELEASE=false`). The release notes are in `release-notes-4.0.0.md`
+- Repository: branch `4.0`. Its history continues from `master` of `AokChain/AokChain` at `5d1fd3d`
+- Client version: **4.0.7** (`_CLIENT_VERSION_IS_RELEASE=true`). The changes of every version are in `CHANGELOG-4.0.0.md`; the release notes of 4.0.0 are in `release-notes-4.0.0.md`
+
+## Current release (2026-11-17): 4.0.7
+
+- 4.0.0 to 4.0.7 are released. What each version changed is in the changelog; the sections from "At a glance" on are the record of 2026-11-11, when 4.0.0 was prepared.
+- **4.0.7:** the desktop wallet runs several wallets in one window (the wallet is chosen at the top of the side bar; Create, Open, Restore and Close Wallet; a staking switch per wallet; notifications and the console name the wallet). A wallet that is created or loaded while the node runs stakes when the node runs with `-staking`, and `unloadwallet` waits for the staking thread of the wallet. The consensus rules and the chain state do not change, and a node with one wallet behaves as before.
+- **Checks:** 71 unit test suites and the functional baseline of 59 tests pass (`feature_staking_multiwallet.py` and `wallet_multiwallet.py` are new in it). A first start on the published main network snapshot (height 3,031,432) in a new data directory, without a network connection, gives the hashes of `getstatehashes` that are compiled into the program, and the 4.0.6 programs read the same hashes from the same data. The GUI was checked with three wallets, in English and in Korean.
 
 ## At a glance (2026-11-11)
 

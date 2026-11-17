@@ -1,9 +1,9 @@
-# AokChain Core 4.0.0 (candidate) changelog — compared with 3.0.5
+# AokChain Core 4.0 changelog — compared with 3.0.5
 
-- **Covers:** 4.0.0 release candidate (`modernize` branch, Windows test build `v4.0.0.0-0698aa2`)
+- **Covers:** 4.0.0 to 4.0.7. The first part describes 4.0.0 as it was prepared; every later version has its own section at the end.
 - **Baseline:** 3.0.5 (`5d1fd3d`, 2022-09-24)
-- **Size:** 136 commits (as of 2026-11-13)
-- **Status:** pre-release. Not yet observed on testnet and not code-signed.
+- **Size of 4.0.0:** 136 commits (as of 2026-11-13)
+- **Status:** released. The current version is 4.0.7 (2026-11-17). The Windows programs are not code-signed.
 
 ## Compatibility
 
@@ -217,3 +217,15 @@ Small fixes of the node, the RPC commands and the GUI; the rules and the chain s
 - The help of `createrawtransaction` has AOK examples (the token fee address and its fees) instead of the Ravencoin burn addresses, and valid JSON.
 - **GUI:** typos on the token pages ("Check Availabilty", "Select an token", "Can Reisssue", "Quantity is to large" and others); the quantity limits of Create Tokens and Reissue follow consensus (25,000,000,000; they were 21,000,000,000); large quantities are exact (24,999,999,999 became 24,999,999,999.00000256); the multisig backup help names the Wallet security card; the token send page says that tokens cannot go to an offline staking address.
 - New tests `wallet_send_arguments.py`, `interface_cli_rpcwait.py` and `wallet_removeaddress.py`; `feature_reindex.py`, `feature_reindex_tokens.py`, `feature_tokens.py` and `wallet_importprunedfunds.py` check the other changes. 57 functional tests and all 71 unit test suites pass.
+
+## 4.0.7 (2026-11-17)
+
+Several wallets in one window of the desktop wallet. The rules and the chain state do not change, and a node with one wallet behaves as before.
+
+- **GUI: several wallets in one window.** The window showed the first wallet of the node only. The wallet that is shown is now chosen at the top of the side bar, which names it and its lock state. Its menu lists the open wallets and has Create Wallet, Open Wallet (the wallets of the wallet folder that are not open, and Restore Wallet for a backup file) and Close Wallet; the Settings page has the same in the card "Your wallets", with the file of the wallet. Every page follows the wallet shown: overview, send, receive, transactions, tokens, create and manage tokens, explorer, address book, sign and multisig, settings. With several wallets open, the window title, the notifications of incoming and sent transactions and the console (it has a wallet selector) name the wallet.
+- **Create, open, restore, close.** A new wallet can be encrypted right away. Encrypting a wallet that is not the first one needs no restart: it is closed and opened again, then the backup is offered. The first wallet of the node restarts the program as before and cannot be closed. The wallets that were open are opened again at the next start, and the one shown last is shown again. With `-wallet` in the configuration or on the command line exactly those wallets are loaded and nothing is remembered. A wallet that a command loads or unloads while the window is open (`loadwallet`, `createwallet`, `restorewallet` or `unloadwallet`, in the console or from another program) appears in the window or leaves it within a few seconds.
+- **A wallet of its own for owner tokens.** Owner tokens (`NAME!`) can be kept in a separate wallet: tokens are created and reissued from it, and the wallet that is used every day cannot do either by mistake. The token pages work with the wallet that is shown; each wallet has its own tokens, addresses, multisig wallets and passphrase.
+- **Staking.** Every loaded wallet stakes on a thread of its own, as the wallets given at the start did. The switch in the side bar is that of the wallet shown, and the side bar says how many other wallets stake. New: a wallet that is created or loaded while the node runs (`createwallet`, `loadwallet`, `restorewallet`, or the GUI) stakes when the node runs with `-staking`; before, only the wallets of the start staked. `unloadwallet` waits for a kernel search that is running (at most a minute) before the wallet file is closed, and "The first kernel search took ..." is logged once per staking thread.
+- **`loadwallet`, `createwallet`, `restorewallet`, `unloadwallet`** share their code with the GUI. Their answers and error codes are unchanged. Unloading a wallet whose database environment nobody else uses removes the log files of that environment, as the shutdown does: the wallet file holds everything.
+- **GUI texts.** English plural forms for texts of 4.0 that showed "(s)" ("1 kind" and "2 kinds" of tokens, "24 h: 1 reward"). A wallet that is unlocked for staking only says "Staking only" under its name. The multisig page says "Only AOK can be sent from a multisig address. Tokens cannot be sent from one."
+- New test `feature_staking_multiwallet.py` (two wallets on regtest proof of stake); `wallet_multiwallet.py` checks the wallet folders, the endpoints and the errors of the wallet commands. Both are in the functional baseline (59 tests).
