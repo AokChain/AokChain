@@ -135,8 +135,8 @@ UniValue validateaddress(const JSONRPCRequest& request)
             "  \"hdmasterkeyid\" : \"<hash160>\" (string, optional) The Hash160 of the HD master pubkey\n"
             "}\n"
             "\nExamples:\n"
-            + HelpExampleCli("validateaddress", "\"1PSSGeFHDnKNxiEyFrD1wcEaHr9hrQDDWc\"")
-            + HelpExampleRpc("validateaddress", "\"1PSSGeFHDnKNxiEyFrD1wcEaHr9hrQDDWc\"")
+            + HelpExampleCli("validateaddress", "\"KaokChainExampLeAddressFirstxCXj28\"")
+            + HelpExampleRpc("validateaddress", "\"KaokChainExampLeAddressFirstxCXj28\"")
         );
 
 #ifdef ENABLE_WALLET
@@ -304,9 +304,9 @@ UniValue createmultisig(const JSONRPCRequest& request)
 
             "\nExamples:\n"
             "\nCreate a multisig address from 2 addresses\n"
-            + HelpExampleCli("createmultisig", "2 \"[\\\"16sSauSf5pF2UkUwvKGq4qjNRzBZYqgEL5\\\",\\\"171sgjn4YtPu27adkKGrdDwzRTxnRkBfKV\\\"]\"") +
+            + HelpExampleCli("createmultisig", "2 \"[\\\"KaokChainExampLeAddressFirstxCXj28\\\",\\\"KaokChainExampLeAddressNexty3g7Dd9\\\"]\"") +
             "\nAs a json rpc call\n"
-            + HelpExampleRpc("createmultisig", "2, \"[\\\"16sSauSf5pF2UkUwvKGq4qjNRzBZYqgEL5\\\",\\\"171sgjn4YtPu27adkKGrdDwzRTxnRkBfKV\\\"]\"")
+            + HelpExampleRpc("createmultisig", "2, \"[\\\"KaokChainExampLeAddressFirstxCXj28\\\",\\\"KaokChainExampLeAddressNexty3g7Dd9\\\"]\"")
         ;
         throw std::runtime_error(msg);
     }
@@ -338,11 +338,11 @@ UniValue verifymessage(const JSONRPCRequest& request)
             "\nUnlock the wallet for 30 seconds\n"
             + HelpExampleCli("walletpassphrase", "\"mypassphrase\" 30") +
             "\nCreate the signature\n"
-            + HelpExampleCli("signmessage", "\"1D1ZrZNe3JUo7ZycKEYQQiQAWd9y54F4XX\" \"my message\"") +
+            + HelpExampleCli("signmessage", "\"KaokChainExampLeAddressFirstxCXj28\" \"my message\"") +
             "\nVerify the signature\n"
-            + HelpExampleCli("verifymessage", "\"1D1ZrZNe3JUo7ZycKEYQQiQAWd9y54F4XX\" \"signature\" \"my message\"") +
+            + HelpExampleCli("verifymessage", "\"KaokChainExampLeAddressFirstxCXj28\" \"signature\" \"my message\"") +
             "\nAs json rpc\n"
-            + HelpExampleRpc("verifymessage", "\"1D1ZrZNe3JUo7ZycKEYQQiQAWd9y54F4XX\", \"signature\", \"my message\"")
+            + HelpExampleRpc("verifymessage", "\"KaokChainExampLeAddressFirstxCXj28\", \"signature\", \"my message\"")
         );
 
     LOCK(cs_main);
@@ -596,7 +596,7 @@ UniValue signmessagewithprivkey(const JSONRPCRequest& request)
             "\nCreate the signature\n"
             + HelpExampleCli("signmessagewithprivkey", "\"privkey\" \"my message\"") +
             "\nVerify the signature\n"
-            + HelpExampleCli("verifymessage", "\"1D1ZrZNe3JUo7ZycKEYQQiQAWd9y54F4XX\" \"signature\" \"my message\"") +
+            + HelpExampleCli("verifymessage", "\"KaokChainExampLeAddressFirstxCXj28\" \"signature\" \"my message\"") +
             "\nAs json rpc\n"
             + HelpExampleRpc("signmessagewithprivkey", "\"privkey\", \"my message\"")
         );
@@ -931,10 +931,10 @@ UniValue getaddressmempool(const JSONRPCRequest& request)
             "  }\n"
             "]\n"
             "\nExamples:\n"
-            + HelpExampleCli("getaddressmempool", "'{\"addresses\": [\"12c6DSiU4Rq3P4ZxziKxzrL5LmMBrzjrJX\"]}'")
-            + HelpExampleRpc("getaddressmempool", "{\"addresses\": [\"12c6DSiU4Rq3P4ZxziKxzrL5LmMBrzjrJX\"]}")
-            + HelpExampleCli("getaddressmempool", "'{\"addresses\": [\"12c6DSiU4Rq3P4ZxziKxzrL5LmMBrzjrJX\"]}', true")
-            + HelpExampleRpc("getaddressmempool", "{\"addresses\": [\"12c6DSiU4Rq3P4ZxziKxzrL5LmMBrzjrJX\"]}, true")
+            + HelpExampleCli("getaddressmempool", "'{\"addresses\": [\"KaokChainExampLeAddressFirstxCXj28\"]}'")
+            + HelpExampleRpc("getaddressmempool", "{\"addresses\": [\"KaokChainExampLeAddressFirstxCXj28\"]}")
+            + HelpExampleCli("getaddressmempool", "'{\"addresses\": [\"KaokChainExampLeAddressFirstxCXj28\"]}', true")
+            + HelpExampleRpc("getaddressmempool", "{\"addresses\": [\"KaokChainExampLeAddressFirstxCXj28\"]}, true")
         );
 
     std::vector<std::pair<uint160, int> > addresses;
@@ -1054,11 +1054,11 @@ UniValue getaddressutxos(const JSONRPCRequest& request)
             "  \"height\": n        (number) With \"chainInfo\": the height of the tip\n"
             "}\n"
             "\nExamples:\n"
-            + HelpExampleCli("getaddressutxos", "\"12c6DSiU4Rq3P4ZxziKxzrL5LmMBrzjrJX\"")
-            + HelpExampleCli("getaddressutxos", "'{\"addresses\": [\"12c6DSiU4Rq3P4ZxziKxzrL5LmMBrzjrJX\"]}'")
-            + HelpExampleCli("getaddressutxos", "'{\"addresses\": [\"12c6DSiU4Rq3P4ZxziKxzrL5LmMBrzjrJX\"], \"limit\": 1000}'")
-            + HelpExampleRpc("getaddressutxos", "{\"addresses\": [\"12c6DSiU4Rq3P4ZxziKxzrL5LmMBrzjrJX\"], \"limit\": 1000, \"after\": \"<next of the last page>\"}")
-            + HelpExampleRpc("getaddressutxos", "{\"addresses\": [\"12c6DSiU4Rq3P4ZxziKxzrL5LmMBrzjrJX\"],\"tokenName\":\"MY_TOKEN\"}")
+            + HelpExampleCli("getaddressutxos", "\"KaokChainExampLeAddressFirstxCXj28\"")
+            + HelpExampleCli("getaddressutxos", "'{\"addresses\": [\"KaokChainExampLeAddressFirstxCXj28\"]}'")
+            + HelpExampleCli("getaddressutxos", "'{\"addresses\": [\"KaokChainExampLeAddressFirstxCXj28\"], \"limit\": 1000}'")
+            + HelpExampleRpc("getaddressutxos", "{\"addresses\": [\"KaokChainExampLeAddressFirstxCXj28\"], \"limit\": 1000, \"after\": \"<next of the last page>\"}")
+            + HelpExampleRpc("getaddressutxos", "{\"addresses\": [\"KaokChainExampLeAddressFirstxCXj28\"],\"tokenName\":\"MY_TOKEN\"}")
             );
 
     const UniValue options = request.params[0].isObject() ? request.params[0].get_obj() : UniValue(UniValue::VOBJ);
@@ -1267,10 +1267,10 @@ UniValue getaddressdeltas(const JSONRPCRequest& request)
             "  }\n"
             "]\n"
             "\nExamples:\n"
-            + HelpExampleCli("getaddressdeltas", "'{\"addresses\": [\"12c6DSiU4Rq3P4ZxziKxzrL5LmMBrzjrJX\"]}'")
-            + HelpExampleRpc("getaddressdeltas", "{\"addresses\": [\"12c6DSiU4Rq3P4ZxziKxzrL5LmMBrzjrJX\"]}")
-            + HelpExampleCli("getaddressdeltas", "'{\"addresses\": [\"12c6DSiU4Rq3P4ZxziKxzrL5LmMBrzjrJX\"],\"tokenName\":\"MY_TOKEN\"}'")
-            + HelpExampleRpc("getaddressdeltas", "{\"addresses\": [\"12c6DSiU4Rq3P4ZxziKxzrL5LmMBrzjrJX\"],\"tokenName\":\"MY_TOKEN\"}")
+            + HelpExampleCli("getaddressdeltas", "'{\"addresses\": [\"KaokChainExampLeAddressFirstxCXj28\"]}'")
+            + HelpExampleRpc("getaddressdeltas", "{\"addresses\": [\"KaokChainExampLeAddressFirstxCXj28\"]}")
+            + HelpExampleCli("getaddressdeltas", "'{\"addresses\": [\"KaokChainExampLeAddressFirstxCXj28\"],\"tokenName\":\"MY_TOKEN\"}'")
+            + HelpExampleRpc("getaddressdeltas", "{\"addresses\": [\"KaokChainExampLeAddressFirstxCXj28\"],\"tokenName\":\"MY_TOKEN\"}")
         );
 
 
@@ -1395,10 +1395,10 @@ UniValue getaddressbalance(const JSONRPCRequest& request)
             "  },...\n"
             "\n]"
             "\nExamples:\n"
-            + HelpExampleCli("getaddressbalance", "'{\"addresses\": [\"12c6DSiU4Rq3P4ZxziKxzrL5LmMBrzjrJX\"]}'")
-            + HelpExampleCli("getaddressbalance", "'{\"addresses\": [\"12c6DSiU4Rq3P4ZxziKxzrL5LmMBrzjrJX\"]}', true")
-            + HelpExampleRpc("getaddressbalance", "{\"addresses\": [\"12c6DSiU4Rq3P4ZxziKxzrL5LmMBrzjrJX\"]}")
-            + HelpExampleRpc("getaddressbalance", "{\"addresses\": [\"12c6DSiU4Rq3P4ZxziKxzrL5LmMBrzjrJX\"]}, true")
+            + HelpExampleCli("getaddressbalance", "'{\"addresses\": [\"KaokChainExampLeAddressFirstxCXj28\"]}'")
+            + HelpExampleCli("getaddressbalance", "'{\"addresses\": [\"KaokChainExampLeAddressFirstxCXj28\"]}', true")
+            + HelpExampleRpc("getaddressbalance", "{\"addresses\": [\"KaokChainExampLeAddressFirstxCXj28\"]}")
+            + HelpExampleRpc("getaddressbalance", "{\"addresses\": [\"KaokChainExampLeAddressFirstxCXj28\"]}, true")
         );
 
     std::vector<std::pair<uint160, int> > addresses;
@@ -1527,10 +1527,10 @@ UniValue getaddresstxids(const JSONRPCRequest& request)
             "  ,...\n"
             "]\n"
             "\nExamples:\n"
-            + HelpExampleCli("getaddresstxids", "'{\"addresses\": [\"12c6DSiU4Rq3P4ZxziKxzrL5LmMBrzjrJX\"]}'")
-            + HelpExampleRpc("getaddresstxids", "{\"addresses\": [\"12c6DSiU4Rq3P4ZxziKxzrL5LmMBrzjrJX\"]}")
-            + HelpExampleCli("getaddresstxids", "'{\"addresses\": [\"12c6DSiU4Rq3P4ZxziKxzrL5LmMBrzjrJX\"]}', true")
-            + HelpExampleRpc("getaddresstxids", "{\"addresses\": [\"12c6DSiU4Rq3P4ZxziKxzrL5LmMBrzjrJX\"]}, true")
+            + HelpExampleCli("getaddresstxids", "'{\"addresses\": [\"KaokChainExampLeAddressFirstxCXj28\"]}'")
+            + HelpExampleRpc("getaddresstxids", "{\"addresses\": [\"KaokChainExampLeAddressFirstxCXj28\"]}")
+            + HelpExampleCli("getaddresstxids", "'{\"addresses\": [\"KaokChainExampLeAddressFirstxCXj28\"]}', true")
+            + HelpExampleRpc("getaddresstxids", "{\"addresses\": [\"KaokChainExampLeAddressFirstxCXj28\"]}, true")
         );
 
     std::vector<std::pair<uint160, int> > addresses;

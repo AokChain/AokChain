@@ -79,7 +79,7 @@ UniValue issue(const JSONRPCRequest& request)
         throw std::runtime_error(
             "issue \"token_name\" qty \"( to_address )\" \"( change_address )\" ( units ) ( reissuable ) ( has_ipfs ) \"( ipfs_hash )\n"
             + TokenActivationWarning() +
-            "\nIssue a token, subtoken or unique token.\n"
+            "\nIssue a token, a sub token or a unique token.\n"
             "Token name must not conflict with any existing token.\n"
             "Unit as the number of decimals precision for the token (0 for whole units (\"1\"), 8 for max precision (\"1.00000000\")\n"
             "Reissuable is true/false for whether additional units can be issued by the original issuer.\n"
@@ -92,7 +92,7 @@ UniValue issue(const JSONRPCRequest& request)
             "4. \"change_address\"        (string), optional, default=\"\"), address the AOK change will be sent to, if it is empty, change address will be generated for you\n"
             "5. \"units\"                 (integer, optional, default=0, min=0, max=8), the number of decimals precision for the token (0 for whole units (\"1\"), 8 for max precision (\"1.00000000\")\n"
             "6. \"reissuable\"            (boolean, optional, default=true (false for unique tokens)), whether future reissuance is allowed\n"
-            "7. \"has_ipfs\"              (boolean, optional, default=false), whether ifps hash is going to be added to the token\n"
+            "7. \"has_ipfs\"              (boolean, optional, default=false), whether an IPFS hash is going to be added to the token\n"
             "8. \"ipfs_hash\"             (string, optional but required if has_ipfs = 1), an ipfs hash (only sha2-256 hashes currently supported -- Qm...)\n"
 
             "\nResult:\n"
@@ -1166,7 +1166,7 @@ UniValue transfermany(const JSONRPCRequest& request)
             "                                    the number of addresses.\n"
             "\nExamples:\n"
             "\nSend two amounts to two different addresses:\n"
-            + HelpExampleCli("transfermany", "\"TOKEN_NAME\" \"{\\\"1D1ZrZNe3JUo7ZycKEYQQiQAWd9y54F4XX\\\":0.01,\\\"1353tsE8YMTA4EuV7dgUXGjNFf9KpVvKHz\\\":0.02}\"")
+            + HelpExampleCli("transfermany", "\"TOKEN_NAME\" \"{\\\"KaokChainExampLeAddressFirstxCXj28\\\":0.01,\\\"KaokChainExampLeAddressNexty3g7Dd9\\\":0.02}\"")
         );
 
     CWallet * const pwallet = GetWalletForJSONRPCRequest(request);
@@ -1252,7 +1252,7 @@ UniValue transfermanyoutputs(const JSONRPCRequest& request)
 {
     if (request.fHelp || request.params.size() != 1)
         throw std::runtime_error(
-            "transfermanyoutputs [{\"address\":\"Kb9ma4bw6aRcB6CrbE67VPzGH8VUyafTrh\",...}]\n"
+            "transfermanyoutputs [{\"address\":\"KaokChainExampLeAddressFirstxCXj28\",...}]\n"
             "\nSend transaction with multiple outputs."
             + TokenActivationWarning() +
             "\nArguments:\n"
@@ -1262,7 +1262,7 @@ UniValue transfermanyoutputs(const JSONRPCRequest& request)
             "                                    the number of addresses.\n"
             "\nExamples:\n"
             "\nSend two amounts to two different addresses:\n"
-            + HelpExampleCli("transfermanyoutputs", "[{\"address\":\"Kb9ma4bw6aRcB6CrbE67VPzGH8VUyafTrh\",...}]")
+            + HelpExampleCli("transfermanyoutputs", "[{\"address\":\"KaokChainExampLeAddressFirstxCXj28\",...}]")
         );
 
     CWallet * const pwallet = GetWalletForJSONRPCRequest(request);
@@ -1469,7 +1469,7 @@ UniValue reissue(const JSONRPCRequest& request)
                 "4. \"change_address\"           (string, optional) address that the change of the transaction will be sent to\n"
                 "5. \"reissuable\"               (boolean, optional, default=true), whether future reissuance is allowed\n"
                 "6. \"new_unit\"                 (numeric, optional, default=-1), the new units that will be associated with the token\n"
-                "7. \"new_ifps\"                 (string, optional, default=\"\"), whether to update the current ipfshash (only sha2-256 hashes currently supported -- Qm...)\n"
+                "7. \"new_ipfs\"                 (string, optional, default=\"\"), whether to update the current IPFS hash (only sha2-256 hashes currently supported -- Qm...)\n"
 
                 "\nResult:\n"
                 "\"txid\"                     (string) The transaction id\n"

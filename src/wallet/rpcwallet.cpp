@@ -200,9 +200,9 @@ UniValue getofflinestakingaddress(const JSONRPCRequest& request)
             "1. \"stakingaddress\"  (string, required) The staking address.\n"
             "2. \"spendingaddress\" (string, required) The spending address.\n\n"
             "\nExamples:\n"
-            + HelpExampleCli("getofflinestakingaddress", "\"KgZDBz1dV8H4zcZUZ3yV1336bKkQ5L4FXv\" \"Ktf4i17uoofsKJqMTuLsqGBzHY92bfjPux\"") +
+            + HelpExampleCli("getofflinestakingaddress", "\"KaokChainExampLeAddressFirstxCXj28\" \"KaokChainExampLeAddressNexty3g7Dd9\"") +
             "\nAs a json rpc call\n"
-            + HelpExampleRpc("getofflinestakingaddress", "\"KgZDBz1dV8H4zcZUZ3yV1336bKkQ5L4FXv\", \"Ktf4i17uoofsKJqMTuLsqGBzHY92bfjPux\"")
+            + HelpExampleRpc("getofflinestakingaddress", "\"KaokChainExampLeAddressFirstxCXj28\", \"KaokChainExampLeAddressNexty3g7Dd9\"")
         );
 
     if (!AreGovernanceDeployed())
@@ -316,8 +316,8 @@ UniValue setlabel(const JSONRPCRequest& request)
             "1. \"address\"         (string, required) The AokChain address to be associated with a label.\n"
             "2. \"label\"           (string, required) The label to assign to the address.\n"
             "\nExamples:\n"
-            + HelpExampleCli("setlabel", "\"1D1ZrZNe3JUo7ZycKEYQQiQAWd9y54F4XX\" \"tabby\"")
-            + HelpExampleRpc("setlabel", "\"1D1ZrZNe3JUo7ZycKEYQQiQAWd9y54F4XX\", \"tabby\"")
+            + HelpExampleCli("setlabel", "\"KaokChainExampLeAddressFirstxCXj28\" \"tabby\"")
+            + HelpExampleRpc("setlabel", "\"KaokChainExampLeAddressFirstxCXj28\", \"tabby\"")
         );
 
     LOCK2(cs_main, pwallet->cs_wallet);
@@ -374,8 +374,8 @@ UniValue getaccount(const JSONRPCRequest& request)
             "\nResult:\n"
             "\"accountname\"        (string) the account address\n"
             "\nExamples:\n"
-            + HelpExampleCli("getaccount", "\"1D1ZrZNe3JUo7ZycKEYQQiQAWd9y54F4XX\"")
-            + HelpExampleRpc("getaccount", "\"1D1ZrZNe3JUo7ZycKEYQQiQAWd9y54F4XX\"")
+            + HelpExampleCli("getaccount", "\"KaokChainExampLeAddressFirstxCXj28\"")
+            + HelpExampleRpc("getaccount", "\"KaokChainExampLeAddressFirstxCXj28\"")
         );
 
     LOCK2(cs_main, pwallet->cs_wallet);
@@ -525,7 +525,7 @@ UniValue sendtoaddress(const JSONRPCRequest& request)
             "                             to which you're sending the transaction. This is not part of the \n"
             "                             transaction, just kept in your wallet.\n"
             "6. subtractfeefromamount  (boolean, optional, default=false) The fee will be deducted from the amount being sent.\n"
-            "                             The recipient will receive less aokchains than you enter in the amount field.\n"
+            "                             The recipient will receive less AOK than you enter in the amount field.\n"
             "7. conf_target            (numeric, optional) Confirmation target (in blocks)\n"
             "8. \"estimate_mode\"      (string, optional, default=UNSET) The fee estimate mode, must be one of:\n"
             "       \"UNSET\"\n"
@@ -534,12 +534,12 @@ UniValue sendtoaddress(const JSONRPCRequest& request)
             "\nResult:\n"
             "\"txid\"                  (string) The transaction id.\n"
             "\nExamples:\n"
-            + HelpExampleCli("sendtoaddress", "\"Kb9ma4bw6aRcB6CrbE67VPzGH8VUyafTrh\" 0.1")
-            + HelpExampleCli("sendtoaddress", "\"Kb9ma4bw6aRcB6CrbE67VPzGH8VUyafTrh\" 0.1 0 \"donation\" \"seans outpost\"")
-            + HelpExampleCli("sendtoaddress", "\"Kb9ma4bw6aRcB6CrbE67VPzGH8VUyafTrh\" 0.1 0 \"\" \"\" true")
-            + HelpExampleCli("sendtoaddress", "\"Kb9ma4bw6aRcB6CrbE67VPzGH8VUyafTrh\" 0.1 1000000")
-            + "> aokchain-cli -named sendtoaddress address=\"Kb9ma4bw6aRcB6CrbE67VPzGH8VUyafTrh\" amount=0.1 conf_target=6 estimate_mode=ECONOMICAL\n"
-            + HelpExampleRpc("sendtoaddress", "\"Kb9ma4bw6aRcB6CrbE67VPzGH8VUyafTrh\", 0.1, 0, \"donation\", \"seans outpost\"")
+            + HelpExampleCli("sendtoaddress", "\"KaokChainExampLeAddressFirstxCXj28\" 0.1")
+            + HelpExampleCli("sendtoaddress", "\"KaokChainExampLeAddressFirstxCXj28\" 0.1 0 \"donation\" \"seans outpost\"")
+            + HelpExampleCli("sendtoaddress", "\"KaokChainExampLeAddressFirstxCXj28\" 0.1 0 \"\" \"\" true")
+            + HelpExampleCli("sendtoaddress", "\"KaokChainExampLeAddressFirstxCXj28\" 0.1 1000000")
+            + "> aokchain-cli -named sendtoaddress address=\"KaokChainExampLeAddressFirstxCXj28\" amount=0.1 conf_target=6 estimate_mode=ECONOMICAL\n"
+            + HelpExampleRpc("sendtoaddress", "\"KaokChainExampLeAddressFirstxCXj28\", 0.1, 0, \"donation\", \"seans outpost\"")
         );
 
     ObserveSafeMode();
@@ -694,11 +694,11 @@ UniValue signmessage(const JSONRPCRequest& request)
             "\nUnlock the wallet for 30 seconds\n"
             + HelpExampleCli("walletpassphrase", "\"mypassphrase\" 30") +
             "\nCreate the signature\n"
-            + HelpExampleCli("signmessage", "\"1D1ZrZNe3JUo7ZycKEYQQiQAWd9y54F4XX\" \"my message\"") +
+            + HelpExampleCli("signmessage", "\"KaokChainExampLeAddressFirstxCXj28\" \"my message\"") +
             "\nVerify the signature\n"
-            + HelpExampleCli("verifymessage", "\"1D1ZrZNe3JUo7ZycKEYQQiQAWd9y54F4XX\" \"signature\" \"my message\"") +
+            + HelpExampleCli("verifymessage", "\"KaokChainExampLeAddressFirstxCXj28\" \"signature\" \"my message\"") +
             "\nAs json rpc\n"
-            + HelpExampleRpc("signmessage", "\"1D1ZrZNe3JUo7ZycKEYQQiQAWd9y54F4XX\", \"my message\"")
+            + HelpExampleRpc("signmessage", "\"KaokChainExampLeAddressFirstxCXj28\", \"my message\"")
         );
 
     LOCK2(cs_main, pwallet->cs_wallet);
@@ -752,13 +752,13 @@ UniValue getreceivedbyaddress(const JSONRPCRequest& request)
             "amount   (numeric) The total amount in " + CURRENCY_UNIT + " received at this address.\n"
             "\nExamples:\n"
             "\nThe amount from transactions with at least 1 confirmation\n"
-            + HelpExampleCli("getreceivedbyaddress", "\"1D1ZrZNe3JUo7ZycKEYQQiQAWd9y54F4XX\"") +
+            + HelpExampleCli("getreceivedbyaddress", "\"KaokChainExampLeAddressFirstxCXj28\"") +
             "\nThe amount including unconfirmed transactions, zero confirmations\n"
-            + HelpExampleCli("getreceivedbyaddress", "\"1D1ZrZNe3JUo7ZycKEYQQiQAWd9y54F4XX\" 0") +
+            + HelpExampleCli("getreceivedbyaddress", "\"KaokChainExampLeAddressFirstxCXj28\" 0") +
             "\nThe amount with at least 6 confirmations\n"
-            + HelpExampleCli("getreceivedbyaddress", "\"1D1ZrZNe3JUo7ZycKEYQQiQAWd9y54F4XX\" 6") +
+            + HelpExampleCli("getreceivedbyaddress", "\"KaokChainExampLeAddressFirstxCXj28\" 6") +
             "\nAs a json rpc call\n"
-            + HelpExampleRpc("getreceivedbyaddress", "\"1D1ZrZNe3JUo7ZycKEYQQiQAWd9y54F4XX\", 6")
+            + HelpExampleRpc("getreceivedbyaddress", "\"KaokChainExampLeAddressFirstxCXj28\", 6")
        );
 
     ObserveSafeMode();
@@ -1059,13 +1059,13 @@ UniValue sendfrom(const JSONRPCRequest& request)
             "\"txid\"                 (string) The transaction id.\n"
             "\nExamples:\n"
             "\nSend 0.01 " + CURRENCY_UNIT + " from the default account to the address, must have at least 1 confirmation\n"
-            + HelpExampleCli("sendfrom", "\"\" \"Kb9ma4bw6aRcB6CrbE67VPzGH8VUyafTrh\" 0.01") +
+            + HelpExampleCli("sendfrom", "\"\" \"KaokChainExampLeAddressFirstxCXj28\" 0.01") +
             "\nSend 0.01 from the tabby account to the given address, funds must have at least 6 confirmations\n"
-            + HelpExampleCli("sendfrom", "\"tabby\" \"Kb9ma4bw6aRcB6CrbE67VPzGH8VUyafTrh\" 0.01 0 6 \"donation\" \"seans outpost\"") +
+            + HelpExampleCli("sendfrom", "\"tabby\" \"KaokChainExampLeAddressFirstxCXj28\" 0.01 0 6 \"donation\" \"seans outpost\"") +
             "\nSend 0.01 that is locked until block 1000000\n"
-            + HelpExampleCli("sendfrom", "\"\" \"Kb9ma4bw6aRcB6CrbE67VPzGH8VUyafTrh\" 0.01 1000000") +
+            + HelpExampleCli("sendfrom", "\"\" \"KaokChainExampLeAddressFirstxCXj28\" 0.01 1000000") +
             "\nAs a json rpc call\n"
-            + HelpExampleRpc("sendfrom", "\"tabby\", \"Kb9ma4bw6aRcB6CrbE67VPzGH8VUyafTrh\", 0.01, 0, 6, \"donation\", \"seans outpost\"")
+            + HelpExampleRpc("sendfrom", "\"tabby\", \"KaokChainExampLeAddressFirstxCXj28\", 0.01, 0, 6, \"donation\", \"seans outpost\"")
         );
 
     ObserveSafeMode();
@@ -1142,7 +1142,7 @@ UniValue sendmany(const JSONRPCRequest& request)
             "                           a transaction with a message has version 2. Anyone can read it in the block chain.\n"
             "5. subtractfeefrom         (array, optional) A json array with addresses.\n"
             "                           The fee will be equally deducted from the amount of each selected address.\n"
-            "                           Those recipients will receive less aokchains than you enter in their corresponding amount field.\n"
+            "                           Those recipients will receive less AOK than you enter in their corresponding amount field.\n"
             "                           If no addresses are specified here, the sender pays the fee.\n"
             "    [\n"
             "      \"address\"          (string) Subtract fee from this address\n"
@@ -1159,13 +1159,13 @@ UniValue sendmany(const JSONRPCRequest& request)
             "                                    the number of addresses.\n"
             "\nExamples:\n"
             "\nSend two amounts to two different addresses:\n"
-            + HelpExampleCli("sendmany", "\"\" \"{\\\"1D1ZrZNe3JUo7ZycKEYQQiQAWd9y54F4XX\\\":0.01,\\\"1353tsE8YMTA4EuV7dgUXGjNFf9KpVvKHz\\\":0.02}\"") +
+            + HelpExampleCli("sendmany", "\"\" \"{\\\"KaokChainExampLeAddressFirstxCXj28\\\":0.01,\\\"KaokChainExampLeAddressNexty3g7Dd9\\\":0.02}\"") +
             "\nSend two amounts to two different addresses setting the confirmation and comment:\n"
-            + HelpExampleCli("sendmany", "\"\" \"{\\\"1D1ZrZNe3JUo7ZycKEYQQiQAWd9y54F4XX\\\":0.01,\\\"1353tsE8YMTA4EuV7dgUXGjNFf9KpVvKHz\\\":0.02}\" 6 \"testing\"") +
+            + HelpExampleCli("sendmany", "\"\" \"{\\\"KaokChainExampLeAddressFirstxCXj28\\\":0.01,\\\"KaokChainExampLeAddressNexty3g7Dd9\\\":0.02}\" 6 \"testing\"") +
             "\nSend two amounts to two different addresses, subtract fee from amount:\n"
-            + HelpExampleCli("sendmany", "\"\" \"{\\\"1D1ZrZNe3JUo7ZycKEYQQiQAWd9y54F4XX\\\":0.01,\\\"1353tsE8YMTA4EuV7dgUXGjNFf9KpVvKHz\\\":0.02}\" 1 \"\" \"[\\\"1D1ZrZNe3JUo7ZycKEYQQiQAWd9y54F4XX\\\",\\\"1353tsE8YMTA4EuV7dgUXGjNFf9KpVvKHz\\\"]\"") +
+            + HelpExampleCli("sendmany", "\"\" \"{\\\"KaokChainExampLeAddressFirstxCXj28\\\":0.01,\\\"KaokChainExampLeAddressNexty3g7Dd9\\\":0.02}\" 1 \"\" \"[\\\"KaokChainExampLeAddressFirstxCXj28\\\",\\\"KaokChainExampLeAddressNexty3g7Dd9\\\"]\"") +
             "\nAs a json rpc call\n"
-            + HelpExampleRpc("sendmany", "\"\", \"{\\\"1D1ZrZNe3JUo7ZycKEYQQiQAWd9y54F4XX\\\":0.01,\\\"1353tsE8YMTA4EuV7dgUXGjNFf9KpVvKHz\\\":0.02}\", 6, \"testing\"")
+            + HelpExampleRpc("sendmany", "\"\", \"{\\\"KaokChainExampLeAddressFirstxCXj28\\\":0.01,\\\"KaokChainExampLeAddressNexty3g7Dd9\\\":0.02}\", 6, \"testing\"")
         );
 
     ObserveSafeMode();
@@ -1314,9 +1314,9 @@ UniValue addmultisigaddress(const JSONRPCRequest& request)
 
             "\nExamples:\n"
             "\nAdd a multisig address from 2 addresses\n"
-            + HelpExampleCli("addmultisigaddress", "2 \"[\\\"16sSauSf5pF2UkUwvKGq4qjNRzBZYqgEL5\\\",\\\"171sgjn4YtPu27adkKGrdDwzRTxnRkBfKV\\\"]\"") +
+            + HelpExampleCli("addmultisigaddress", "2 \"[\\\"KaokChainExampLeAddressFirstxCXj28\\\",\\\"KaokChainExampLeAddressNexty3g7Dd9\\\"]\"") +
             "\nAs json rpc call\n"
-            + HelpExampleRpc("addmultisigaddress", "2, \"[\\\"16sSauSf5pF2UkUwvKGq4qjNRzBZYqgEL5\\\",\\\"171sgjn4YtPu27adkKGrdDwzRTxnRkBfKV\\\"]\"")
+            + HelpExampleRpc("addmultisigaddress", "2, \"[\\\"KaokChainExampLeAddressFirstxCXj28\\\",\\\"KaokChainExampLeAddressNexty3g7Dd9\\\"]\"")
         ;
         throw std::runtime_error(msg);
     }
@@ -1638,7 +1638,7 @@ UniValue listreceivedbyaddress(const JSONRPCRequest& request)
             + HelpExampleCli("listreceivedbyaddress", "")
             + HelpExampleCli("listreceivedbyaddress", "6 true")
             + HelpExampleRpc("listreceivedbyaddress", "6, true, true")
-            + HelpExampleRpc("listreceivedbyaddress", "6, true, true, \"1M72Sfpbz1BPpXFHz9m3CdqATR44Jvaydd\"")
+            + HelpExampleRpc("listreceivedbyaddress", "6, true, true, \"KaokChainExampLeAddressFirstxCXj28\"")
         );
 
     ObserveSafeMode();
@@ -2608,7 +2608,7 @@ UniValue walletpassphrase(const JSONRPCRequest& request)
         throw std::runtime_error(
             "walletpassphrase \"passphrase\" timeout\n"
             "\nStores the wallet decryption key in memory for 'timeout' seconds.\n"
-            "This is needed prior to performing transactions related to private keys such as sending aokchains\n"
+            "This is needed prior to performing transactions related to private keys such as sending AOK\n"
             "\nArguments:\n"
             "1. \"passphrase\"     (string, required) The wallet passphrase\n"
             "2. timeout            (numeric, required) The time to keep the decryption key in seconds.\n"
@@ -2771,7 +2771,7 @@ UniValue walletlock(const JSONRPCRequest& request)
             "\nSet the passphrase for 2 minutes to perform a transaction\n"
             + HelpExampleCli("walletpassphrase", "\"my pass phrase\" 120") +
             "\nPerform a send (requires passphrase set)\n"
-            + HelpExampleCli("sendtoaddress", "\"1M72Sfpbz1BPpXFHz9m3CdqATR44Jvaydd\" 1.0") +
+            + HelpExampleCli("sendtoaddress", "\"KaokChainExampLeAddressFirstxCXj28\" 1.0") +
             "\nClear the passphrase since we are done before 2 minutes is up\n"
             + HelpExampleCli("walletlock", "") +
             "\nAs json rpc call\n"
@@ -2870,7 +2870,7 @@ UniValue lockunspent(const JSONRPCRequest& request)
             "\nUpdates list of temporarily unspendable outputs.\n"
             "Temporarily lock (unlock=false) or unlock (unlock=true) specified transaction outputs.\n"
             "If no transaction outputs are specified when unlocking then all current locked transaction outputs are unlocked.\n"
-            "A locked transaction output will not be chosen by automatic coin selection, when spending aokchains.\n"
+            "A locked transaction output will not be chosen by automatic coin selection, when spending AOK.\n"
             "Locks are stored in memory only. Nodes start with zero locked outputs, and the locked output list\n"
             "is always cleared (by virtue of process exit) when a node stops or fails.\n"
             "Also see the listunspent call\n"
@@ -3527,8 +3527,8 @@ UniValue listunspent(const JSONRPCRequest& request)
 
             "\nExamples\n"
             + HelpExampleCli("listunspent", "")
-            + HelpExampleCli("listunspent", "6 9999999 \"[\\\"1PGFqEzfmQch1gKD3ra4k18PNj3tTUUSqg\\\",\\\"1LtvqCaApEdUGFkpKMM4MstjcaL4dKg8SP\\\"]\"")
-            + HelpExampleRpc("listunspent", "6, 9999999 \"[\\\"1PGFqEzfmQch1gKD3ra4k18PNj3tTUUSqg\\\",\\\"1LtvqCaApEdUGFkpKMM4MstjcaL4dKg8SP\\\"]\"")
+            + HelpExampleCli("listunspent", "6 9999999 \"[\\\"KaokChainExampLeAddressFirstxCXj28\\\",\\\"KaokChainExampLeAddressNexty3g7Dd9\\\"]\"")
+            + HelpExampleRpc("listunspent", "6, 9999999 \"[\\\"KaokChainExampLeAddressFirstxCXj28\\\",\\\"KaokChainExampLeAddressNexty3g7Dd9\\\"]\"")
             + HelpExampleCli("listunspent", "6 9999999 '[]' true '{ \"minimumAmount\": 0.005 }'")
             + HelpExampleRpc("listunspent", "6, 9999999, [] , true, { \"minimumAmount\": 0.005 } ")
         );
@@ -3703,8 +3703,8 @@ UniValue listunspenttoken(const JSONRPCRequest& request)
 
             "\nExamples\n"
             + HelpExampleCli("listunspenttoken", "")
-            + HelpExampleCli("listunspenttoken", "EXAMPLE 6 9999999 \"[\\\"1PGFqEzfmQch1gKD3ra4k18PNj3tTUUSqg\\\",\\\"1LtvqCaApEdUGFkpKMM4MstjcaL4dKg8SP\\\"]\"")
-            + HelpExampleRpc("listunspenttoken", "EXAMPLE 6, 9999999 \"[\\\"1PGFqEzfmQch1gKD3ra4k18PNj3tTUUSqg\\\",\\\"1LtvqCaApEdUGFkpKMM4MstjcaL4dKg8SP\\\"]\"")
+            + HelpExampleCli("listunspenttoken", "EXAMPLE 6 9999999 \"[\\\"KaokChainExampLeAddressFirstxCXj28\\\",\\\"KaokChainExampLeAddressNexty3g7Dd9\\\"]\"")
+            + HelpExampleRpc("listunspenttoken", "EXAMPLE 6, 9999999 \"[\\\"KaokChainExampLeAddressFirstxCXj28\\\",\\\"KaokChainExampLeAddressNexty3g7Dd9\\\"]\"")
             + HelpExampleCli("listunspenttoken", "EXAMPLE 6 9999999 '[]' true '{ \"minimumAmount\": 0.005 }'")
             + HelpExampleRpc("listunspenttoken", "EXAMPLE 6, 9999999, [] , true, { \"minimumAmount\": 0.005 } ")
         );
@@ -3858,7 +3858,7 @@ UniValue fundrawtransaction(const JSONRPCRequest& request)
                             "     \"subtractFeeFromOutputs\" (array, optional) A json array of integers.\n"
                             "                              The fee will be equally deducted from the amount of each specified output.\n"
                             "                              The outputs are specified by their zero-based index, before any change output is added.\n"
-                            "                              Those recipients will receive less aokchains than you enter in their corresponding amount field.\n"
+                            "                              Those recipients will receive less AOK than you enter in their corresponding amount field.\n"
                             "                              If no outputs are specified here, the sender pays the fee.\n"
                             "                                  [vout_index,...]\n"
 //                            "     \"replaceable\"            (boolean, optional) Marks this transaction as BIP125 replaceable.\n"
