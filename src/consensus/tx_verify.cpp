@@ -192,7 +192,13 @@ bool CheckTransaction(const CTransaction& tx, CValidationState &state, CTokensCa
         if (!MoneyRange(nValueOut))
             return state.DoS(100, false, REJECT_INVALID, "bad-txns-txouttotal-toolarge");
 
-        if (txout.scriptPubKey.IsOfflineStaking() && !AreGovernanceDeployed())
+        // Outputs that are valid from an activation height on (offline staking here, tokens
+        // and tokens on script hash addresses below): here they are checked for the memory
+        // pool, against the next block of the active chain. In a block they are checked
+        // against the height of that block (CheckTxOutputsAtHeight() in validation.cpp): the
+        // active chain is not at that height while blocks are read back from disk or arrive
+        // ahead of the tip.
+        if (fMemPoolCheck && txout.scriptPubKey.IsOfflineStaking() && !AreGovernanceDeployed())
             return state.DoS(100, false, REJECT_INVALID, "offline-staking-not-enabled");
 
         /** TOKENS START */
@@ -203,12 +209,12 @@ bool CheckTransaction(const CTransaction& tx, CValidationState &state, CTokensCa
         if (txout.scriptPubKey.IsTokenScript(nType, nScriptType, fIsOwner))
             isToken = true;
 
-        if (isToken && nScriptType == TX_SCRIPTHASH) {
+        if (fMemPoolCheck && isToken && nScriptType == TX_SCRIPTHASH) {
             if (!AreTokensP2SHDeployed())
                 return state.DoS(0, false, REJECT_INVALID, "bad-txns-p2sh-token-not-active");
         }
 
-        if (!AreTokensDeployed() && isToken && !fReindex)
+        if (fMemPoolCheck && !AreTokensDeployed() && isToken && !fReindex)
             return state.DoS(100, false, REJECT_INVALID, "bad-txns-is-token-and-token-not-active");
 
         // These checks only parse the script and do not need tokenCache. They

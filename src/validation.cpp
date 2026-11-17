@@ -2497,6 +2497,40 @@ static int64_t nTimeCallbacks = 0;
 static int64_t nTimeTotal = 0;
 static int64_t nBlocksTotal = 0;
 
+/** Outputs that are valid only from an activation height on (offline staking, tokens, tokens
+ *  on script hash addresses), checked against the height of the block that the transaction
+ *  is in. CheckTransaction() makes the same checks for the memory pool, against the next
+ *  block of the active chain. A block has to be checked against its own height: while blocks
+ *  are read back from disk (-reindex, -loadblock) or arrive ahead of the tip, the active
+ *  chain is not at the height of the block. The rules and their heights are the same. */
+static bool CheckTxOutputsAtHeight(const CTransaction& tx, CValidationState& state, int nHeight, const Consensus::Params& consensusParams)
+{
+    const bool fOfflineStaking = nHeight >= consensusParams.nGovernanceHeight;
+    const bool fTokens = nHeight >= consensusParams.nTokensDeploymentHeight;
+    const bool fTokensP2SH = nHeight >= consensusParams.nTokensP2SHDeploymentHeight;
+    if (fOfflineStaking && fTokens && fTokensP2SH)
+        return true;
+
+    for (const CTxOut& txout : tx.vout) {
+        if (!fOfflineStaking && txout.scriptPubKey.IsOfflineStaking())
+            return state.DoS(100, false, REJECT_INVALID, "offline-staking-not-enabled");
+
+        int nType = 0;
+        int nScriptType = 0;
+        bool fIsOwner = false;
+        if (!txout.scriptPubKey.IsTokenScript(nType, nScriptType, fIsOwner))
+            continue;
+
+        if (!fTokensP2SH && nScriptType == TX_SCRIPTHASH)
+            return state.DoS(0, false, REJECT_INVALID, "bad-txns-p2sh-token-not-active");
+
+        // (as before, not for blocks that are read back from disk)
+        if (!fTokens && !fReindex)
+            return state.DoS(100, false, REJECT_INVALID, "bad-txns-is-token-and-token-not-active");
+    }
+    return true;
+}
+
 /** Apply the effects of this block (with given index) on the UTXO set represented by coins.
  *  Validity checks that depend on the UTXO set are also done; ConnectBlock()
  *  can fail if those validity checks fail (among other reasons). */
@@ -2670,6 +2704,10 @@ static bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockInd
         // Check TX version here
         if (!AreGovernanceDeployed() && tx.nVersion > 1)
             return state.DoS(100, error("%s : Received block with tx v2 before messages activation", __func__), REJECT_INVALID, "bad-transaction-v2-not-active");
+
+        // Outputs that are valid from an activation height on
+        if (!CheckTxOutputsAtHeight(tx, state, pindex->nHeight, chainparams.GetConsensus()))
+            return error("%s: %s (tx hash %s)", __func__, state.GetRejectReason(), txhash.ToString());
 
         nInputs += tx.vin.size();
 
@@ -4679,6 +4717,11 @@ static bool ContextualCheckBlock(const CBlock& block, CValidationState& state, c
         if (!IsFinalTx(*tx, nHeight, nLockTimeCutoff)) {
             return state.DoS(10, false, REJECT_INVALID, "bad-txns-nonfinal", false, "non-final transaction");
         }
+
+        // Outputs that are valid from an activation height on
+        if (!CheckTxOutputsAtHeight(*tx, state, nHeight, consensusParams))
+            return state.Invalid(false, state.GetRejectCode(), state.GetRejectReason(),
+                                 strprintf("Transaction check failed (tx hash %s) %s", tx->GetHash().ToString(), state.GetRejectReason()));
 
         if (tx->IsReissueToken()) {
             CReissueToken reissue;
