@@ -158,6 +158,9 @@ bool ShutdownRequested()
  *  a normal shutdown takes it away at its end. */
 static bool fRunningMarked = false;
 
+/** The last run left its pid file behind: it did not end with a normal shutdown. */
+static bool fPidFileLeft = false;
+
 /** A file in the data directory while a re-index that the node began by itself is under way
  *  (-autorebuild): it does not begin a second one right after the first. */
 static fs::path AutoReindexMarker()
@@ -1361,6 +1364,12 @@ bool AppInitMain(boost::thread_group& threadGroup, CScheduler& scheduler)
     const CChainParams& chainparams = Params();
     // ********************************************************* Step 4a: application initialization
 #ifndef WIN32
+    // (a normal shutdown takes this file away: one that is still there was left by a run that
+    // did not end that way, whatever version it was)
+    {
+        boost::system::error_code ec;
+        fPidFileLeft = fs::exists(GetPidFile(), ec);
+    }
     CreatePidFile(GetPidFile(), getpid());
 #endif
     if (gArgs.GetBoolArg("-shrinkdebugfile", logCategories == BCLog::NONE)) {
@@ -1585,7 +1594,10 @@ bool AppInitMain(boost::thread_group& threadGroup, CScheduler& scheduler)
     // The node itself decided that this start builds the chain state, the token database and
     // the governance database again from the block files
     bool fAutoRebuildNow = false;
-    bool fUncleanStopSaid = false;
+    // The mark of a running node as the last run left it (read once: this start sets it)
+    bool fRunningRead = false;
+    bool fRunningKnown = false;
+    bool fWasRunning = false;
 
     bool fLoaded = false;
     while (!fLoaded && !fRequestShutdown) {
@@ -1615,11 +1627,23 @@ bool AppInitMain(boost::thread_group& threadGroup, CScheduler& scheduler)
                 pblocktree.reset();
                 pblocktree.reset(new CBlockTreeDB(nBlockTreeDBCache, false, fReset));
 
+                // A run of an earlier version that did not end with a normal shutdown: this version
+                // sets its own mark while it runs, an earlier one leaves only the pid file
+                bool fEarlierVersionUnclean = false;
                 if (!fReset) {
-                    bool fWasRunning = false;
-                    if (!fUncleanStopSaid && pblocktree->ReadFlag("running", fWasRunning) && fWasRunning) {
-                        fUncleanStopSaid = true;
-                        LogPrintf("The last run of this node did not end with a normal shutdown. Its databases are compared with each other and brought in step.\n");
+                    if (!fRunningRead) {
+                        fRunningRead = true;
+                        fRunningKnown = pblocktree->ReadFlag("running", fWasRunning);
+                        if (fRunningKnown && fWasRunning)
+                            LogPrintf("The last run of this node did not end with a normal shutdown. Its databases are compared with each other and brought in step.\n");
+                    }
+                    fEarlierVersionUnclean = fPidFileLeft && !(fRunningKnown && fWasRunning);
+                    // From here to the end of a normal shutdown the node counts as running (set
+                    // at once: a stop while it loads is a stop of this version too)
+                    if (!fRunningMarked) {
+                        pblocktree->WriteFlag("running", true);
+                        pblocktree->Sync();
+                        fRunningMarked = true;
                     }
                     // A rebuild that was decided and is not done: a block that did not connect at
                     // the last run (RequestChainStateRebuild), or a stop before the wipes below
@@ -1807,6 +1831,20 @@ bool AppInitMain(boost::thread_group& threadGroup, CScheduler& scheduler)
 
                 // The on-disk coinsdb is now in a good state, create the cache
                 pcoinsTip.reset(new CCoinsViewCache(pcoinscatcher.get()));
+
+                // An earlier version left the data directory without a normal shutdown. That version
+                // kept no notes: nothing says whether the governance database (which it wrote
+                // with every block) and the token database (which it wrote after the chain state)
+                // belong to this chain state, and they cannot be checked against it. The node
+                // makes sure once, by building them again.
+                if (fEarlierVersionUnclean && !fReindexChainState && !pcoinsTip->GetBestBlock().IsNull()) {
+                    if (fAutoRebuild && !fAutoRebuildTried && !fPruneMode) {
+                        strLoadError = _("The last run of this node was by an earlier version and did not end with a normal shutdown: nothing says whether its databases belong together");
+                        fChainStateAtFault = true;
+                        break;
+                    }
+                    LogPrintf("The last run of this node was by an earlier version and did not end with a normal shutdown. Its databases cannot be checked against each other; -reindex-chainstate builds them again.\n");
+                }
 
                 // The governance database is written with every block, the chain state at its
                 // flushes: after an unclean stop it is brought back to the block that the chain
@@ -2055,7 +2093,7 @@ bool AppInitMain(boost::thread_group& threadGroup, CScheduler& scheduler)
     }
     if (fLoaded) {
         LogPrintf(" block index %15dms\n", GetTimeMillis() - nStart);
-        // From here to the end of a normal shutdown the node counts as running
+        // (after a re-index the block index database is a new one: the mark of a running node again)
         pblocktree->WriteFlag("running", true);
         pblocktree->Sync();
         fRunningMarked = true;

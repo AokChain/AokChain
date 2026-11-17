@@ -20,6 +20,7 @@ chain state by removecoin (-regtest only).
 
 import os
 import shutil
+import subprocess
 import time
 from decimal import Decimal
 
@@ -151,15 +152,54 @@ class AutoRebuildTest(AokChainTestFramework):
         assert_equal(self.count_in_log(REBUILT), 3)
         self.same_state()
 
+        self.log.info("An earlier version left the directory without a normal shutdown: the node makes sure once")
+        # (an earlier version leaves no mark of its own while it runs, only its pid file)
+        self.stop_node(1)
+        open(os.path.join(n1.datadir, "regtest", "aokchaind.pid"), "w").close()
+        self.start1()
+        assert_equal(self.count_in_log("was by an earlier version and did not end with a normal shutdown"), 1)
+        assert_equal(self.count_in_log(REBUILT), 4)
+        self.same_state()
+        # this version's own unclean stop is answered by its notes, without a rebuild
+        n1.process.kill()
+        n1.process.wait()
+        n1.running = False
+        n1.process = None
+        n1.rpc_connected = False
+        n1.rpc = None
+        self.start1()
+        assert_equal(self.count_in_log("did not end with a normal shutdown. Its databases are compared"), 1)
+        assert_equal(self.count_in_log(REBUILT), 4)
+        self.same_state()
+
+        self.log.info("A second instance on the directory of a running node ends at the lock and changes nothing")
+        # (what the node does by itself, it does only as the one program that holds the lock of
+        # the data directory: a second one never gets as far as looking at the pid file)
+        pid_file = os.path.join(n1.datadir, "regtest", "aokchaind.pid")
+        with open(pid_file) as f:
+            assert_equal(int(f.read()), n1.process.pid)
+        rebuilds = self.count_in_log(REBUILT)
+        earlier = self.count_in_log("was by an earlier version and did not end with a normal shutdown")
+        for extra in ([], ["-reindex-chainstate"], ["-reindex"]):
+            second = subprocess.run(n1.args + self.args + extra, stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=120)
+            assert_equal(second.returncode, 1)
+            assert "Cannot obtain a lock on data directory" in second.stderr.decode(), second.stderr
+        with open(pid_file) as f:
+            assert_equal(int(f.read()), n1.process.pid)
+        assert_equal(self.count_in_log(REBUILT), rebuilds)
+        assert_equal(self.count_in_log("was by an earlier version and did not end with a normal shutdown"), earlier)
+        self.mine(2)
+        self.same_state()
+
         self.log.info("-autorebuild=0: the node says what is wrong and does not start")
         self.stop_node(1)
         self.remove("tokens")
         n1.start(self.args + ["-checkmempool=0", "-autorebuild=0"], stderr=self.stderr1)
         self.wait_exit(1)
-        assert_equal(self.count_in_log(REBUILT), 3)
+        assert_equal(self.count_in_log(REBUILT), 4)
         assert self.count_in_log("The token database does not belong to the chain state") >= 2
         self.start1()
-        assert_equal(self.count_in_log(REBUILT), 4)
+        assert_equal(self.count_in_log(REBUILT), 5)
         self.same_state()
 
         self.log.info("A block that the node had validated does not connect: it stops, and the next start builds the databases again")
