@@ -11,12 +11,15 @@ with the chain state of the new block and the token database of the block of
 the write before: tokens issued, reissued and transferred in between were
 gone from it, without a sign.
 
-The token database now notes the block that it stands for. At startup the
-token effects of the blocks between that block and the chain state are applied
-again from the block files.
+The token database is now written as one batch together with the block that it
+stands for. At startup the token effects of the blocks between that block and
+the chain state are applied again from the block files, in steps when the way
+is long, and a stop on that way is taken up again at the next start.
 
 The write of the chain state is interrupted with -dbcrashratio, which stops the
-node after a partial batch (-dbbatchsize=1: after the first record).
+node after a partial batch (-dbbatchsize=1: after the first record). The write
+of the token database is interrupted with -dbcrashtokenwrite=<n>, which stops
+the node where its n-th write of token records would begin (-regtest only).
 """
 
 from decimal import Decimal
@@ -33,6 +36,10 @@ class TokensUncleanStopTest(AokChainTestFramework):
     def mine(self, n=1):
         self.nodes[0].generate(n)
         self.sync_all()
+
+    def count_in_log(self, node, text):
+        with open(node.datadir + "/regtest/debug.log", encoding="utf8") as log:
+            return log.read().count(text)
 
     def same_state(self):
         hashes = [node.getstatehashes() for node in self.nodes]
@@ -116,6 +123,68 @@ class TokensUncleanStopTest(AokChainTestFramework):
         n1 = self.nodes[1]
         self.mine()
         assert_equal(n1.listmytokens(), {"BEFORE": 10, "CRASHCOIN": 100})
+        self.same_state()
+
+        self.log.info("The write of the token database itself is interrupted")
+        self.stop_node(1)
+        self.start_node(1, ["-dbcrashtokenwrite=1"])
+        connect_nodes_bi(self.nodes, 0, 1)
+        n1 = self.nodes[1]
+        n0.issue("INSIDE", 77, address0, "", 0, True)
+        self.mine()
+        n0.transfer("INSIDE", 7, address1)
+        n0.transfer("CRASHCOIN", 5, address1)
+        self.mine()
+        n0.reissue("BEFORE", 50, address0)
+        n0.issueunique("CRASHCOIN", ["two"])
+        self.mine()
+        names = ["BEFORE", "CRASHCOIN", "CRASHCOIN#one", "CRASHCOIN#two", "INSIDE"]
+        expected = {name: n0.gettokendata(name) for name in names}
+        mine = {"BEFORE": 10, "CRASHCOIN": 105, "INSIDE": 7}
+        assert_equal(n1.listmytokens(), mine)
+        tip = n0.getbestblockhash()
+        try:
+            n1.gettxoutsetinfo()
+            raise AssertionError("the node was to stop in the write")
+        except AssertionError:
+            raise
+        except Exception:
+            pass
+        n1.wait_until_stopped()
+        assert_equal(self.count_in_log(n1, "Simulating a crash in the write of the token database"), 1)
+
+        self.log.info("The repair at the next start is interrupted twice: each start goes on where the last one got to")
+        # (three blocks behind; a step for every block; the second write of a run stops the node)
+        repairs = self.count_in_log(n1, "Tokens: the token database is at height")
+        for crashes in (2, 3):
+            n1.start(["-tokencatchupstep=1", "-dbcrashtokenwrite=2"])
+            n1.wait_until_stopped()
+            assert_equal(self.count_in_log(n1, "Simulating a crash in the write of the token database"), crashes)
+        self.start_node(1, ["-tokencatchupstep=1"])
+        n1 = self.nodes[1]
+        assert_equal(self.count_in_log(n1, "Tokens: the token database is at height"), repairs + 3)
+        # (the chain state had been written: the node is at the tip before it has a peer)
+        assert_equal(n1.getbestblockhash(), tip)
+        assert_equal({name: n1.gettokendata(name) for name in names}, expected)
+        assert_equal(n1.listmytokens(), mine)
+        # (node1 sent CRASHCOIN on above: what is left of the first amount is on a change address)
+        assert_equal(n1.listtokenbalancesbyaddress(address1), {"BEFORE": 10, "CRASHCOIN": 5, "INSIDE": 7})
+        for address in (address0, address1):
+            assert_equal(n1.listtokenbalancesbyaddress(address), n0.listtokenbalancesbyaddress(address))
+        connect_nodes_bi(self.nodes, 0, 1)
+        self.same_state()
+
+        self.log.info("The chain goes on, and a normal stop and start changes nothing")
+        n1.transfer("INSIDE", 3, n0.getnewaddress())
+        sync_mempools(self.nodes)
+        self.mine()
+        self.stop_node(1)
+        self.start_node(1)
+        connect_nodes_bi(self.nodes, 0, 1)
+        n1 = self.nodes[1]
+        self.mine()
+        assert_equal(n1.listmytokens(), {"BEFORE": 10, "CRASHCOIN": 105, "INSIDE": 4})
+        assert_equal(self.count_in_log(n1, "Tokens: the token database is at height"), repairs + 3)
         self.same_state()
 
 

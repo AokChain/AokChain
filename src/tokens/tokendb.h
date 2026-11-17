@@ -11,6 +11,7 @@
 
 #include <string>
 #include <map>
+#include <vector>
 #include <dbwrapper.h>
 
 class CNewToken;
@@ -76,6 +77,38 @@ public:
     bool TokenAddressDirUnique(std::string& holderAddress, const std::string& tokenName);
 
     std::string UsernameAddress(const std::string& tokenName);
+
+    /**
+     * The state of the token database (tokens and balances) is written in dumps. All records
+     * of one dump and the block that the database then stands for go out as one batch, written
+     * and synced together: a stop inside a dump leaves the database at the block of the dump
+     * before, never in between, and RecoverTokenState() brings it forward at the next start.
+     *
+     * Between BeginDump() and CommitDump() the calls above that write or erase tokens and
+     * balances are collected instead of written; the last call for a key counts. Reads do not
+     * see them: a dump writes from the token cache and reads nothing back.
+     *
+     * The block is kept under a key that begins like the token undo records. No version counts
+     * those into the hash of the token state, and a version that does not know the record
+     * reads past it.
+     */
+    void BeginDump();
+    bool CommitDump(const uint256& hashBlock);
+    void AbortDump();
+    //! The block that the database stands for (false: it does not say).
+    bool ReadStateBlock(uint256& hashBlock);
+    //! Notes that block alone: the database is taken to stand for it as it is.
+    bool WriteStateBlock(const uint256& hashBlock);
+    //! Whether these are the bytes of the key of that record (for code that walks the undo records).
+    static bool IsStateBlockKey(const std::vector<unsigned char>& key);
+
+private:
+    template <typename K, typename V> bool PutRecord(const K& key, const V& value);
+    template <typename K> bool EraseRecord(const K& key);
+
+    //! Between BeginDump() and CommitDump(): key -> (erase, value), as they go to the database.
+    bool m_dumping = false;
+    std::map<std::vector<unsigned char>, std::pair<bool, std::vector<unsigned char> > > m_dump;
 };
 
 

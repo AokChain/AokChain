@@ -274,7 +274,8 @@ void MarkSnapshotAccepted()
         int erased = 0;
         for (it->SeekToFirst(); it->Valid(); it->Next()) {
             RawRecord key;
-            if (it->GetKey(key) && !key.bytes.empty() && (char)key.bytes[0] == 'U') {
+            // (not the block that the database stands for, which is kept among them)
+            if (it->GetKey(key) && !key.bytes.empty() && (char)key.bytes[0] == 'U' && !CTokensDB::IsStateBlockKey(key.bytes)) {
                 batch.Erase(RawKey(key.bytes));
                 ++erased;
             }

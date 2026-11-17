@@ -1759,6 +1759,7 @@ bool AppInitMain(boost::thread_group& threadGroup, CScheduler& scheduler)
                     if (!RecoverTokenState(chainparams, strTokenError)) {
                         return InitError(strprintf(_("The token database does not belong to the chain state (%s). Restart with -reindex-chainstate to rebuild both."), strTokenError));
                     }
+                    if (ShutdownRequested()) break;
                 }
 
                 if (fSnapshotOnTrial) {

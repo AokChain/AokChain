@@ -64,12 +64,9 @@ static const char DB_FLAG = 'F';
 static const char DB_REINDEX_FLAG = 'R';
 static const char DB_LAST_BLOCK = 'l';
 
-// Notes that keep the token database in step with the coins database (see CCoinsViewDB::IsInStep
-// in txdb.h). They are kept in the coins database because no version lists or hashes anything of
-// it but the unspent outputs: a version without them does not see them.
+// The block of the last write of the chain state by a version that keeps the other stores in
+// step with it (see CCoinsViewDB::IsInStep in txdb.h).
 static const char DB_IN_STEP = 'M';
-static const char DB_TOKENS_BLOCK = 'N';
-static const char DB_TOKENS_PENDING = 'Q';
 
 namespace {
 
@@ -121,25 +118,6 @@ bool CCoinsViewDB::ReadInStepBlock(uint256& hash) const {
 bool CCoinsViewDB::IsInStep() const {
     uint256 hash;
     return ReadInStepBlock(hash) && hash == GetBestBlock();
-}
-
-bool CCoinsViewDB::ReadTokenStateBlock(uint256& hash) const {
-    return db.Read(DB_TOKENS_BLOCK, hash);
-}
-
-bool CCoinsViewDB::ReadTokenDumpPending(uint256& hash) const {
-    return db.Read(DB_TOKENS_PENDING, hash);
-}
-
-bool CCoinsViewDB::WriteTokenDumpPending(const uint256& hash) {
-    return db.Write(DB_TOKENS_PENDING, hash, true);
-}
-
-bool CCoinsViewDB::WriteTokenStateBlock(const uint256& hash) {
-    CDBBatch batch(db);
-    batch.Write(DB_TOKENS_BLOCK, hash);
-    batch.Erase(DB_TOKENS_PENDING);
-    return db.WriteBatch(batch, true);
 }
 
 std::vector<uint256> CCoinsViewDB::GetHeadBlocks() const {
@@ -204,7 +182,7 @@ bool CCoinsViewDB::BatchWrite(CCoinsMap &mapCoins, const uint256 &hashBlock) {
     // In the last batch, mark the database as consistent with hashBlock again.
     batch.Erase(DB_HEAD_BLOCKS);
     batch.Write(DB_BEST_BLOCK, hashBlock);
-    // (and as written by a version that notes which block the token database stands for)
+    // (and as written by a version that keeps the other stores in step with it)
     batch.Write(DB_IN_STEP, hashBlock);
 
     LogPrint(BCLog::COINDB, "Writing final batch of %.2f MiB\n", batch.SizeEstimate() * (1.0 / 1048576.0));

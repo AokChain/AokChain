@@ -510,14 +510,16 @@ bool ReplayBlocks(const CChainParams& params, CCoinsView* view);
 
 /**
  * At startup, after the chain tip is loaded: brings the token database to the block that the
- * chain state is at. The token database is written after the chain state; when the node
- * stopped in between (or ReplayBlocks() finished an interrupted write of the chain state), it
- * is that of an earlier block of the same chain, and the token effects of the blocks in
- * between are applied again from the block and undo files. Returns false when that cannot be
- * done (the database was being written when the node stopped, or is that of another branch;
- * strError says which): only a rebuild (-reindex-chainstate) helps then.
+ * chain state is at. The token database is written after the chain state, as one batch with
+ * the block it then stands for (see CTokensDB::BeginDump). When the node stopped before that
+ * batch was written (or ReplayBlocks() finished an interrupted write of the chain state), the
+ * database is that of an earlier block of the same chain, and the token effects of the blocks
+ * in between are applied again from the block and undo files; a long way is written in steps.
+ * Returns false when that cannot be done (the database stands for a block of another branch,
+ * does not say which block it stands for, or a block cannot be read; strError says which).
  * When the chain state was last written by a version that does not note the block of the token
  * database (see CCoinsViewDB::IsInStep), the two are taken to match, as they always were.
+ * After a request to shut down it returns true with the way not finished: the caller checks.
  */
 bool RecoverTokenState(const CChainParams& params, std::string& strError);
 

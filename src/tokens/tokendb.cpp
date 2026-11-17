@@ -20,24 +20,121 @@ static const char MY_TOKEN_FLAG = 'M';
 static const char BLOCK_TOKEN_UNDO_DATA = 'U';
 static const char MEMPOOL_REISSUED_TX = 'Z';
 
+// The block that the database stands for (see BeginDump in tokendb.h): under the letter of
+// the undo records, with a key that no block hash makes.
+static const std::pair<char, std::string> STATE_BLOCK_KEY = std::make_pair(BLOCK_TOKEN_UNDO_DATA, std::string("state"));
+
+namespace {
+//! Bytes that are written as they are.
+struct RawBytes {
+    const std::vector<unsigned char>& bytes;
+    explicit RawBytes(const std::vector<unsigned char>& bytesIn) : bytes(bytesIn) {}
+    template <typename Stream> void Serialize(Stream& s) const
+    {
+        if (!bytes.empty())
+            s.write((const char*)bytes.data(), bytes.size());
+    }
+};
+
+template <typename T> std::vector<unsigned char> ToBytes(const T& obj)
+{
+    CDataStream ss(SER_DISK, CLIENT_VERSION);
+    ss << obj;
+    return std::vector<unsigned char>(ss.begin(), ss.end());
+}
+} // namespace
+
 static size_t MAX_DATABASE_RESULTS = 50000;
 
 CTokensDB::CTokensDB(size_t nCacheSize, bool fMemory, bool fWipe) : CDBWrapper(GetDataDir() / "tokens", nCacheSize, fMemory, fWipe) {
 }
 
+template <typename K, typename V>
+bool CTokensDB::PutRecord(const K& key, const V& value)
+{
+    if (!m_dumping)
+        return Write(key, value);
+    m_dump[ToBytes(key)] = std::make_pair(false, ToBytes(value));
+    return true;
+}
+
+template <typename K>
+bool CTokensDB::EraseRecord(const K& key)
+{
+    if (!m_dumping)
+        return Erase(key);
+    m_dump[ToBytes(key)] = std::make_pair(true, std::vector<unsigned char>());
+    return true;
+}
+
+void CTokensDB::BeginDump()
+{
+    AssertLockHeld(cs_main);
+    m_dump.clear();
+    m_dumping = true;
+}
+
+void CTokensDB::AbortDump()
+{
+    m_dump.clear();
+    m_dumping = false;
+}
+
+bool CTokensDB::CommitDump(const uint256& hashBlock)
+{
+    AssertLockHeld(cs_main);
+    CDBBatch batch(*this);
+    const size_t nRecords = m_dump.size();
+    for (auto it = m_dump.begin(); it != m_dump.end(); it = m_dump.erase(it)) {
+        if (it->second.first)
+            batch.Erase(RawBytes(it->first));
+        else
+            batch.Write(RawBytes(it->first), RawBytes(it->second.second));
+    }
+    batch.Write(STATE_BLOCK_KEY, hashBlock);
+    m_dumping = false;
+    LogPrint(BCLog::COINDB, "Token database: %u record(s), %.2f MiB, for block %s\n", (unsigned int)nRecords,
+             batch.SizeEstimate() * (1.0 / 1048576.0), hashBlock.ToString());
+    // For tests (-regtest only, -dbcrashtokenwrite=<n>): stop where the n-th write of token
+    // records of this run would begin.
+    if (nRecords > 0 && Params().MineBlocksOnDemand()) {
+        static int nWrites = 0;
+        if (++nWrites == gArgs.GetArg("-dbcrashtokenwrite", 0)) {
+            LogPrintf("Simulating a crash in the write of the token database. Goodbye.\n");
+            _Exit(0);
+        }
+    }
+    return WriteBatch(batch, true);
+}
+
+bool CTokensDB::ReadStateBlock(uint256& hashBlock)
+{
+    return Read(STATE_BLOCK_KEY, hashBlock);
+}
+
+bool CTokensDB::WriteStateBlock(const uint256& hashBlock)
+{
+    return Write(STATE_BLOCK_KEY, hashBlock, true);
+}
+
+bool CTokensDB::IsStateBlockKey(const std::vector<unsigned char>& key)
+{
+    return key == ToBytes(STATE_BLOCK_KEY);
+}
+
 bool CTokensDB::WriteTokenData(const CNewToken &token, const int nHeight, const uint256& blockHash)
 {
     CDatabasedTokenData data(token, nHeight, blockHash);
-    return Write(std::make_pair(TOKEN_FLAG, token.strName), data);
+    return PutRecord(std::make_pair(TOKEN_FLAG, token.strName), data);
 }
 
 bool CTokensDB::WriteTokenAddressQuantity(const std::string &tokenName, const std::string &address, const CAmount &quantity)
 {
-    return Write(std::make_pair(TOKEN_ADDRESS_QUANTITY_FLAG, std::make_pair(tokenName, address)), quantity);
+    return PutRecord(std::make_pair(TOKEN_ADDRESS_QUANTITY_FLAG, std::make_pair(tokenName, address)), quantity);
 }
 
 bool CTokensDB::WriteAddressTokenQuantity(const std::string &address, const std::string &tokenName, const CAmount& quantity) {
-    return Write(std::make_pair(ADDRESS_TOKEN_QUANTITY_FLAG, std::make_pair(address, tokenName)), quantity);
+    return PutRecord(std::make_pair(ADDRESS_TOKEN_QUANTITY_FLAG, std::make_pair(address, tokenName)), quantity);
 }
 
 bool CTokensDB::ReadTokenData(const std::string& strName, CNewToken& token, int& nHeight, uint256& blockHash)
@@ -66,7 +163,7 @@ bool CTokensDB::ReadAddressTokenQuantity(const std::string &address, const std::
 
 bool CTokensDB::EraseTokenData(const std::string& tokenName)
 {
-    return Erase(std::make_pair(TOKEN_FLAG, tokenName));
+    return EraseRecord(std::make_pair(TOKEN_FLAG, tokenName));
 }
 
 bool CTokensDB::EraseMyTokenData(const std::string& tokenName)
@@ -75,11 +172,11 @@ bool CTokensDB::EraseMyTokenData(const std::string& tokenName)
 }
 
 bool CTokensDB::EraseTokenAddressQuantity(const std::string &tokenName, const std::string &address) {
-    return Erase(std::make_pair(TOKEN_ADDRESS_QUANTITY_FLAG, std::make_pair(tokenName, address)));
+    return EraseRecord(std::make_pair(TOKEN_ADDRESS_QUANTITY_FLAG, std::make_pair(tokenName, address)));
 }
 
 bool CTokensDB::EraseAddressTokenQuantity(const std::string &address, const std::string &tokenName) {
-    return Erase(std::make_pair(ADDRESS_TOKEN_QUANTITY_FLAG, std::make_pair(address, tokenName)));
+    return EraseRecord(std::make_pair(ADDRESS_TOKEN_QUANTITY_FLAG, std::make_pair(address, tokenName)));
 }
 
 bool EraseAddressTokenQuantity(const std::string &address, const std::string &tokenName);

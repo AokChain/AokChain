@@ -95,26 +95,18 @@ public:
     bool Sync() { return db.Sync(); }
 
     /**
-     * Keeping the token database in step with this one. The token database is written after
-     * the chain state, record by record:
-     *   token dump pending   it is being written, for this block
-     *   token state block    the block that it stands for (written when it is complete)
-     * These notes are kept here, where no version lists or hashes anything but the unspent
-     * outputs, so that a version without them does not see them.
+     * Every write of the chain state by this version notes its block a second time, next to
+     * the best block. A version that does not do so leaves that note behind when it writes the
+     * chain state: IsInStep() is false for a data directory whose chain state such a version
+     * has written last (or that has not been written yet). What the other stores note about
+     * their own block (see RecoverTokenState()) was written before that and is not trusted
+     * then: they are taken to match the chain state, as they always were.
      *
-     * Such a version can write to the same data directory in between (after a downgrade) and
-     * leaves the notes as they were. To recognise that, every write of the chain state by this
-     * version notes its block a second time, next to the best block: IsInStep() is false for a
-     * data directory whose chain state such a version has written last (or that this version
-     * has not written yet). The notes about the token database are not trusted then, and it is
-     * taken to match the chain state, as it always was. See RecoverTokenState().
+     * The note is kept here, where no version lists or hashes anything but the unspent
+     * outputs, so that a version without it does not see it.
      */
     bool ReadInStepBlock(uint256& hash) const;
     bool IsInStep() const;
-    bool ReadTokenStateBlock(uint256& hash) const;
-    bool ReadTokenDumpPending(uint256& hash) const;
-    bool WriteTokenDumpPending(const uint256& hash);
-    bool WriteTokenStateBlock(const uint256& hash);
     size_t EstimateSize() const override;
 };
 
