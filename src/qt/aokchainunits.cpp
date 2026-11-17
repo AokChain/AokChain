@@ -53,9 +53,9 @@ QString AokChainUnits::description(int unit)
 {
     switch(unit)
     {
-    case AOK: return QString("AokChains");
-    case mAOK: return QString("Milli-AokChains (1 / 1" THIN_SP_UTF8 "000)");
-    case uAOK: return QString("Micro-AokChains (1 / 1" THIN_SP_UTF8 "000" THIN_SP_UTF8 "000)");
+    case AOK: return QString("AOK");
+    case mAOK: return QString("Milli-AOK (1 / 1" THIN_SP_UTF8 "000)");
+    case uAOK: return QString("Micro-AOK (1 / 1" THIN_SP_UTF8 "000" THIN_SP_UTF8 "000)");
     default: return QString("???");
     }
 }

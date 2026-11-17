@@ -411,13 +411,13 @@ bool AskPassphraseDialog::eventFilter(QObject *object, QEvent *event)
     if (event->type() == QEvent::InputMethod) {
         QInputMethodEvent *ime = static_cast<QInputMethodEvent *>(event);
         if (HasNonAsciiCharacter(ime->commitString()) || HasNonAsciiCharacter(ime->preeditString())) {
-            ui->capsLabel->setText(tr("Only English letters, digits and symbols can be used in the passphrase. Check the Korean/English key."));
+            ui->capsLabel->setText(tr("Only English letters, digits and symbols can be used in the passphrase. Check the input language of the keyboard."));
             ui->capsLabel->show();
             return true;
         }
     }
     if (event->type() == QEvent::KeyPress && HasNonAsciiCharacter(static_cast<QKeyEvent *>(event)->text())) {
-        ui->capsLabel->setText(tr("Only English letters, digits and symbols can be used in the passphrase. Check the Korean/English key."));
+        ui->capsLabel->setText(tr("Only English letters, digits and symbols can be used in the passphrase. Check the input language of the keyboard."));
         ui->capsLabel->show();
         return true;
     }

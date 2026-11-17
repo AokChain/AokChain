@@ -91,6 +91,7 @@ HelpMessageDialog::HelpMessageDialog(QWidget *parent, bool about) :
         strUsage += HelpMessageOpt("-rootcertificates=<file>", tr("Set SSL root certificates for payment request (default: -system-)").toStdString());
         strUsage += HelpMessageOpt("-splash", strprintf(tr("Show splash screen on startup (default: %u)").toStdString(), DEFAULT_SPLASHSCREEN));
         strUsage += HelpMessageOpt("-resetguisettings", tr("Reset all settings changed in the GUI").toStdString());
+        strUsage += HelpMessageOpt("-advancedui", strprintf(tr("Show the controls for experts: the unit of the amount fields, and owner tokens in the fields for sending tokens (default: %u)").toStdString(), 0));
         if (showDebug) {
             strUsage += HelpMessageOpt("-uiplatform", strprintf("Select platform to customize UI for (one of windows, macosx, other; default: %s)", AokChainGUI::DEFAULT_UIPLATFORM));
         }
