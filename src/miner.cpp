@@ -553,35 +553,41 @@ bool CheckStake(const std::shared_ptr<const CBlock> pblock, CWallet& wallet)
     if(!pblock->IsProofOfStake())
         return error("CheckStake() : %s is not a proof-of-stake block", hashBlock.GetHex());
 
-    // verify hash target and signature of coinstake tx
-    CValidationState state;
-    if (!CheckProofOfStake(mapBlockIndex[pblock->hashPrevBlock], state, *pblock->vtx[1], pblock->nBits, pblock->nTime, proofHash, hashTarget, *pcoinsTip))
-        return error("CheckStake() : proof-of-stake checking failed");
+    {
+        // The check reads the block index and looks the inputs of the stake up in the UTXO
+        // set, and a lookup inserts into the coin cache: like every other use of the chain
+        // state it has to run under cs_main. (It ran without it, next to block validation in
+        // the message handler thread.)
+        LOCK2(cs_main, wallet.cs_wallet);
+
+        BlockMap::const_iterator mi = mapBlockIndex.find(pblock->hashPrevBlock);
+        if (mi == mapBlockIndex.end() || mi->second != chainActive.Tip())
+            return error("CheckStake() : generated block is stale");
+
+        // verify hash target and signature of coinstake tx
+        CValidationState state;
+        if (!CheckProofOfStake(mi->second, state, *pblock->vtx[1], pblock->nBits, pblock->nTime, proofHash, hashTarget, *pcoinsTip))
+            return error("CheckStake() : proof-of-stake checking failed");
+
+        for(const CTxIn& vin : pblock->vtx[1]->vin) {
+            if (wallet.IsSpent(vin.prevout.hash, vin.prevout.n)) {
+                return error("CheckStake() : generated block became invalid due to stake UTXO being spent");
+            }
+        }
+    }
 
     //// debug print
     LogPrint(BCLog::COINSTAKE, "CheckStake() : new proof-of-stake block found  \n  hash: %s \nproofhash: %s  \ntarget: %s\n", hashBlock.GetHex(), proofHash.GetHex(), hashTarget.GetHex());
     LogPrint(BCLog::COINSTAKE, "%s\n", pblock->ToString());
     LogPrint(BCLog::COINSTAKE, "out %s\n", FormatMoney(pblock->vtx[1]->GetValueOut()));
 
-    // Found a solution
-    {
-        LOCK(cs_main);
-        if (pblock->hashPrevBlock != chainActive.Tip()->GetBlockHash())
-            return error("CheckStake() : generated block is stale");
-
-        LOCK(wallet.cs_wallet);
-        for(const CTxIn& vin : pblock->vtx[1]->vin) {
-            if (wallet.IsSpent(vin.prevout.hash, vin.prevout.n)) {
-                return error("CheckStake() : generated block became invalid due to stake UTXO being spent");
-            }
-        }
-
-        // Process this block the same as if we had received it from another node
-        bool fNewBlock = false;
-        uint256 hash = pblock->GetBlockHash();
-        if (!ProcessNewBlock(Params(), pblock, true, &fNewBlock, hash))
-            return error("CheckStake() : ProcessBlock, block not accepted");
-    }
+    // Found a solution. Process this block the same as if we had received it from another
+    // node: without cs_main, which ProcessNewBlock() takes itself. If the tip has moved since
+    // the check above, the block is one more candidate at its height, as it would be had it
+    // arrived a moment later.
+    bool fNewBlock = false;
+    if (!ProcessNewBlock(Params(), pblock, true, &fNewBlock, hashBlock))
+        return error("CheckStake() : ProcessBlock, block not accepted");
 
     return true;
 }
@@ -752,8 +758,12 @@ void ThreadStakeMiner(CWallet *pwallet)
 
             if (fTryToSync) {
                 fTryToSync = false;
-                if (g_connman->vNodes.size() < 2 ||
-                    chainActive.Tip()->GetBlockTime() < GetTime() - 10 * 60) {
+                int64_t nTipTime;
+                {
+                    LOCK(cs_main);
+                    nTipTime = chainActive.Tip()->GetBlockTime();
+                }
+                if (g_connman->vNodes.size() < 2 || nTipTime < GetTime() - 10 * 60) {
                     MilliSleep(60000);
                     continue;
                 }

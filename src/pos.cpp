@@ -139,6 +139,9 @@ bool CheckKernel(CBlockIndex* pindexPrev, unsigned int nBits, uint32_t nTimeBloc
 
 bool CheckKernel(CBlockIndex* pindexPrev, unsigned int nBits, uint32_t nTimeBlock, const COutPoint& prevout, CCoinsViewCache& view, const std::map<COutPoint, CStakeCache>& cache)
 {
+    // (the view is the UTXO set of the tip, or built on it: a lookup can insert into its cache)
+    AssertLockHeld(cs_main);
+
     if (!pindexPrev)
         return false;
 
@@ -195,6 +198,8 @@ bool CheckKernel(CBlockIndex* pindexPrev, unsigned int nBits, uint32_t nTimeBloc
 // Check kernel hash target and coinstake signature
 bool CheckProofOfStake(CBlockIndex* pindexPrev, CValidationState& state, const CTransaction& tx, unsigned int nBits, uint32_t nTimeBlock, uint256& hashProofOfStake, uint256& targetProofOfStake, CCoinsViewCache& view)
 {
+    AssertLockHeld(cs_main);
+
     if (!pindexPrev)
         return false;
 
