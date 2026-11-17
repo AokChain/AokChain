@@ -116,7 +116,7 @@ UniValue getpeerinfo(const JSONRPCRequest& request)
             "    \"minping\": n,              (numeric) minimum observed ping time (if any at all)\n"
             "    \"pingwait\": n,             (numeric) ping wait (if non-zero)\n"
             "    \"version\": v,              (numeric) The peer version, such as 7001\n"
-            "    \"subver\": \"/Satoshi:0.8.5/\",  (string) The string version\n"
+            "    \"subver\": \"/AokChain:4.0.7/\",  (string) The string version\n"
             "    \"inbound\": true|false,     (boolean) Inbound (true) or Outbound (false)\n"
             "    \"addnode\": true|false,     (boolean) Whether connection was due to addnode/-connect or if it was an automatic/inbound connection\n"
             "    \"startingheight\": n,       (numeric) The starting height (block) of the peer\n"
@@ -233,8 +233,8 @@ UniValue addnode(const JSONRPCRequest& request)
             "1. \"node\"     (string, required) The node (see getpeerinfo for nodes)\n"
             "2. \"command\"  (string, required) 'add' to add a node to the list, 'remove' to remove a node from the list, 'onetry' to try a connection to the node once\n"
             "\nExamples:\n"
-            + HelpExampleCli("addnode", "\"192.168.0.6:8767\" \"onetry\"")
-            + HelpExampleRpc("addnode", "\"192.168.0.6:8767\", \"onetry\"")
+            + HelpExampleCli("addnode", "\"192.168.0.6:33441\" \"onetry\"")
+            + HelpExampleRpc("addnode", "\"192.168.0.6:33441\", \"onetry\"")
         );
 
     if(!g_connman)
@@ -275,9 +275,9 @@ UniValue disconnectnode(const JSONRPCRequest& request)
             "1. \"address\"     (string, optional) The IP address/port of the node\n"
             "2. \"nodeid\"      (number, optional) The node ID (see getpeerinfo for node IDs)\n"
             "\nExamples:\n"
-            + HelpExampleCli("disconnectnode", "\"192.168.0.6:8767\"")
+            + HelpExampleCli("disconnectnode", "\"192.168.0.6:33441\"")
             + HelpExampleCli("disconnectnode", "\"\" 1")
-            + HelpExampleRpc("disconnectnode", "\"192.168.0.6:8767\"")
+            + HelpExampleRpc("disconnectnode", "\"192.168.0.6:33441\"")
             + HelpExampleRpc("disconnectnode", "\"\", 1")
         );
 
@@ -322,7 +322,7 @@ UniValue getaddednodeinfo(const JSONRPCRequest& request)
             "    \"connected\" : true|false,          (boolean) If connected\n"
             "    \"addresses\" : [                    (list of objects) Only when connected = true\n"
             "       {\n"
-            "         \"address\" : \"192.168.0.201:8767\",  (string) The aokchain server IP and port we're connected to\n"
+            "         \"address\" : \"192.168.0.201:33441\",  (string) The aokchain server IP and port we're connected to\n"
             "         \"connected\" : \"outbound\"           (string) connection, inbound or outbound\n"
             "       }\n"
             "     ]\n"
@@ -448,7 +448,7 @@ UniValue getnetworkinfo(const JSONRPCRequest& request)
             "\nResult:\n"
             "{\n"
             "  \"version\": xxxxx,                      (numeric) the server version\n"
-            "  \"subversion\": \"/Satoshi:x.x.x/\",     (string) the server subversion string\n"
+            "  \"subversion\": \"/AokChain:x.x.x/\",     (string) the server subversion string\n"
             "  \"protocolversion\": xxxxx,              (numeric) the protocol version\n"
             "  \"localservices\": \"xxxxxxxxxxxxxxxx\", (string) the services we offer to the network\n"
             "  \"localrelay\": true|false,              (bool) true if transaction relay is requested from peers\n"

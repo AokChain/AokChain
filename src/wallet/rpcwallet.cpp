@@ -195,7 +195,7 @@ UniValue getofflinestakingaddress(const JSONRPCRequest& request)
     if (request.fHelp || request.params.size() != 2)
         throw std::runtime_error(
             "getofflinestakingaddress \"stakingaddress\" \"spendingaddress\"\n"
-            "Returns a offline staking address based on two address inputs\n"
+            "Returns an offline staking address based on two address inputs\n"
             "Arguments:\n"
             "1. \"stakingaddress\"  (string, required) The staking address.\n"
             "2. \"spendingaddress\" (string, required) The spending address.\n\n"
@@ -409,7 +409,7 @@ UniValue getaddressesbyaccount(const JSONRPCRequest& request)
             "1. \"account\"        (string, required) The account name.\n"
             "\nResult:\n"
             "[                     (json array of string)\n"
-            "  \"address\"         (string) a aokchain address associated with the given account\n"
+            "  \"address\"         (string) an aokchain address associated with the given account\n"
             "  ,...\n"
             "]\n"
             "\nExamples:\n"
@@ -1038,7 +1038,7 @@ UniValue sendfrom(const JSONRPCRequest& request)
     if (request.fHelp || request.params.size() < 3 || request.params.size() > 8)
         throw std::runtime_error(
             "sendfrom \"fromaccount\" \"toaddress\" amount ( lock_time minconf \"comment\" \"comment_to\" subtractfeefromamount )\n"
-            "\nDEPRECATED (use sendtoaddress). Sent an amount from an account to a aokchain address."
+            "\nDEPRECATED (use sendtoaddress). Sent an amount from an account to an aokchain address."
             + HelpRequiringPassphrase(pwallet) + "\n"
             "\nArguments:\n"
             "1. \"fromaccount\"       (string, required) The name of the account to send funds from. May be the default account using \"\".\n"
@@ -1297,7 +1297,7 @@ UniValue addmultisigaddress(const JSONRPCRequest& request)
     {
         std::string msg = "addmultisigaddress nrequired [\"key\",...] ( \"label\" )\n"
             "\nAdd a nrequired-to-sign multisignature address to the wallet.\n"
-            "Each key is a AokChain address or hex-encoded public key.\n"
+            "Each key is an AokChain address or hex-encoded public key.\n"
             "If 'label' is specified, assign address to that label.\n"
 
             "\nArguments:\n"
@@ -1310,7 +1310,7 @@ UniValue addmultisigaddress(const JSONRPCRequest& request)
             "3. \"label\"        (string, optional) A label to assign the addresses to.\n"
 
             "\nResult:\n"
-            "\"address\"         (string) A aokchain address associated with the keys.\n"
+            "\"address\"         (string) An aokchain address associated with the keys.\n"
 
             "\nExamples:\n"
             "\nAdd a multisig address from 2 addresses\n"
@@ -4012,7 +4012,7 @@ UniValue fundrawtransaction(const JSONRPCRequest& request)
 
 UniValue bumpfee(const JSONRPCRequest& request)
 {
-    throw std::runtime_error("bumpfee has been deprecated on the AOK Wallet.");
+    throw std::runtime_error("bumpfee is not available in AokChain Core.");
 
 //    CWallet * const pwallet = GetWalletForJSONRPCRequest(request);
 //
