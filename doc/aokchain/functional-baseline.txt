@@ -64,3 +64,4 @@ feature_stake_missing_coin.py
 feature_governance_unclean_stop.py
 feature_tokens_unclean_stop.py
 feature_auto_rebuild.py
+feature_random_stops.py

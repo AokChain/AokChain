@@ -131,6 +131,7 @@ BASE_SCRIPTS= [
     'feature_governance_unclean_stop.py',
     'feature_tokens_unclean_stop.py',
     'feature_auto_rebuild.py',
+    'feature_random_stops.py',
     'feature_offline_staking.py',
     'feature_future_drift.py',
     'p2p_orphan_processing.py',
