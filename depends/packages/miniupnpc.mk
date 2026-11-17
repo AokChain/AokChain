@@ -8,7 +8,7 @@ $(package)_sha256_hash=b0c3a27056840fd0ec9328a5a9bac3dc5e0ec6d2e8733349cf577b0aa
 # 2.2.x fixes CVE-2024-52917 class issues (infinite loop on malformed replies).
 define $(package)_set_vars
 $(package)_build_opts=CC="$($(package)_cc)"
-$(package)_build_opts_darwin=OS=Darwin LIBTOOL="$($(package)_libtool)"
+$(package)_build_opts_darwin=LIBTOOL="$($(package)_libtool)"
 $(package)_build_opts_mingw32=-f Makefile.mingw
 # Makefile.mingw builds the static library in the top-level directory.
 $(package)_libfile=build/libminiupnpc.a
