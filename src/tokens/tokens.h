@@ -196,6 +196,8 @@ public :
     bool ContainsToken(const std::string& tokenName);
 
     bool CheckIfTokenExists(const std::string& name, bool fForceDuplicateCheck = true);
+    //! Looks in this cache, in the global token cache and in the metadata cache and database.
+    //! All of them belong to cs_main: the caller holds it.
     bool GetTokenMetaDataIfExists(const std::string &name, CNewToken &token, int& nHeight, uint256& blockHash);
     bool GetTokenMetaDataIfExists(const std::string &name, CNewToken &token);
 

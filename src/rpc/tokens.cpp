@@ -53,8 +53,11 @@ std::string TokenTypeToString(KnownTokenType& tokenType)
     }
 }
 
+/** An amount of a token in that token's units. The units are looked up in the token
+ *  metadata cache, which belongs to cs_main: the caller holds it. */
 UniValue UnitValueFromAmount(const CAmount& amount, const std::string token_name)
 {
+    AssertLockHeld(cs_main);
 
     auto currentActiveTokenCache = GetCurrentTokenCache();
     if (!currentActiveTokenCache)
@@ -1625,7 +1628,10 @@ UniValue listtokens(const JSONRPCRequest& request)
         if (verbose) {
             UniValue detail(UniValue::VOBJ);
             detail.pushKV("name", token.strName);
-            detail.pushKV("amount", UnitValueFromAmount(token.nAmount, token.strName));
+            // The amount is given in the units of the record that was just read, without
+            // another lookup of the same token in the metadata cache: that cache belongs
+            // to cs_main, and a long list would push everything else out of it.
+            detail.pushKV("amount", ValueFromAmount(token.nAmount, IsTokenNameAnOwner(token.strName) ? OWNER_UNITS : token.units));
             detail.pushKV("units", token.units);
             detail.pushKV("reissuable", token.nReissuable);
             detail.pushKV("has_ipfs", token.nHasIPFS);
@@ -1669,6 +1675,8 @@ UniValue getcacheinfo(const JSONRPCRequest& request)
                 + HelpExampleRpc("getcacheinfo", "")
                 + HelpExampleCli("getcacheinfo", "")
         );
+
+    LOCK(cs_main);
 
     auto currentActiveTokenCache = GetCurrentTokenCache();
     if (!currentActiveTokenCache)

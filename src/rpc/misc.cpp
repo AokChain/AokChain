@@ -1412,6 +1412,16 @@ UniValue getaddressbalance(const JSONRPCRequest& request)
         includeTokens = request.params[1].get_bool();
     }
 
+    // The tip that decides which time-locked amounts count as spendable: read once, under
+    // cs_main, instead of from the active chain for every entry of the index without it.
+    int nTipHeight;
+    int64_t nTipMedianTime;
+    {
+        LOCK(cs_main);
+        nTipHeight = chainActive.Height();
+        nTipMedianTime = chainActive.Tip() ? chainActive.Tip()->GetMedianTimePast() : 0;
+    }
+
     if (includeTokens) {
         if (!AreTokensDeployed())
             throw JSONRPCError(RPC_INVALID_PARAMETER, "Tokens aren't active.  includeTokens can't be true.");
@@ -1440,7 +1450,7 @@ UniValue getaddressbalance(const JSONRPCRequest& request)
                     balances[tokenName].first += it->second;
                 }
 
-                if (it->first.timeLock < ((int64_t)it->first.timeLock < LOCKTIME_THRESHOLD ? (int64_t)chainActive.Height() : (int64_t)chainActive.Tip()->GetMedianTimePast()))
+                if (it->first.timeLock < ((int64_t)it->first.timeLock < LOCKTIME_THRESHOLD ? (int64_t)nTipHeight : nTipMedianTime))
                 {
                     balances[tokenName].second += it->second;
                 } else {
@@ -1449,13 +1459,18 @@ UniValue getaddressbalance(const JSONRPCRequest& request)
             }
 
         UniValue result(UniValue::VARR);
+
+        // The token metadata cache belongs to cs_main
+        LOCK(cs_main);
         auto currentActiveTokenCache = GetCurrentTokenCache();
 
         for (std::map<std::string, std::pair<CAmount, CAmount>>::const_iterator it = balances.begin();
                 it != balances.end(); it++) {
 
+            // (the coin itself is not a token: nothing to look up, its units are the default)
             CNewToken token;
-            currentActiveTokenCache->GetTokenMetaDataIfExists(it->first, token);
+            if (it->first != "AOK" && currentActiveTokenCache)
+                currentActiveTokenCache->GetTokenMetaDataIfExists(it->first, token);
 
             UniValue balance(UniValue::VOBJ);
             balance.pushKV("tokenName", it->first);
@@ -1486,7 +1501,7 @@ UniValue getaddressbalance(const JSONRPCRequest& request)
             if (it->second > 0) {
                 received += it->second;
             }
-            if (it->first.timeLock < ((int64_t)it->first.timeLock < LOCKTIME_THRESHOLD ? (int64_t)chainActive.Height() : (int64_t)chainActive.Tip()->GetMedianTimePast())) {
+            if (it->first.timeLock < ((int64_t)it->first.timeLock < LOCKTIME_THRESHOLD ? (int64_t)nTipHeight : nTipMedianTime)) {
                 balance += it->second;
             } else {
                 locked += it->second;

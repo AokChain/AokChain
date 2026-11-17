@@ -508,6 +508,8 @@ UniValue createrawtransaction(const JSONRPCRequest& request)
         rawTx.vin.push_back(in);
     }
 
+    // The token outputs below are checked against the token caches, which belong to cs_main
+    LOCK(cs_main);
     auto currentActiveTokenCache = GetCurrentTokenCache();
 
     std::set<CTxDestination> destinations;
