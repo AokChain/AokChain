@@ -3276,6 +3276,21 @@ static bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockInd
  * if they're too large, if it's been a while since the last write,
  * or always and in all cases if we're in prune mode and are deleting files.
  */
+/** Writes the token cache to the token database, which then stands for the block hashTip
+ *  (see CCoinsViewDB::IsInStep). */
+static bool WriteTokenState(CTokensCache& cache, const uint256& hashTip)
+{
+    // (unit tests run without the global coins database: nothing is noted there)
+    if (pcoinsdbview && !pcoinsdbview->WriteTokenDumpPending(hashTip))
+        return false;
+    if (!cache.DumpCacheToDatabase())
+        return false;
+    if (!pcoinsdbview)
+        return true;
+    // The records of the dump are on disk before the note that they are complete
+    return (!ptokensdb || ptokensdb->Sync()) && pcoinsdbview->WriteTokenStateBlock(hashTip);
+}
+
 bool static FlushStateToDisk(const CChainParams& chainparams, CValidationState &state, FlushStateMode mode, int nManualPruneHeight) {
     int64_t nMempoolUsage = mempool.DynamicMemoryUsage();
     LOCK(cs_main);
@@ -3416,9 +3431,12 @@ bool static FlushStateToDisk(const CChainParams& chainparams, CValidationState &
                 // Flush the tokenstate
                 auto currentActiveTokenCache = GetCurrentTokenCache();
                 if (currentActiveTokenCache) {
-                    if (!currentActiveTokenCache->DumpCacheToDatabase())
+                    if (!WriteTokenState(*currentActiveTokenCache, hashFlushTip))
                         return AbortNode(state, "Failed to write to token database");
                 }
+            } else if (pcoinsdbview && !pcoinsdbview->WriteTokenStateBlock(hashFlushTip)) {
+                // (no tokens yet: the empty token database stands for this block too)
+                return AbortNode(state, "Failed to write to coin database");
             }
 
             // Write the reissue mempool data to database
@@ -5776,6 +5794,106 @@ static bool RollforwardBlock(const CBlockIndex* pindex, CCoinsViewCache& inputs,
     return true;
 }
 
+/** Applies the token effects of a connected block to the token cache again. They are those of
+ *  its inputs and outputs (UpdateCoins()): the same calls, on a view that holds nothing but the
+ *  outputs that the block spends, taken from its undo data. The chain state is not touched. */
+static bool RollforwardTokens(const CBlockIndex* pindex, const CChainParams& params)
+{
+    CBlock block;
+    if (!ReadBlockFromDisk(block, pindex, params.GetConsensus()))
+        return error("%s: ReadBlockFromDisk failed at %d, hash=%s", __func__, pindex->nHeight, pindex->GetBlockHash().ToString());
+    CBlockUndo blockUndo;
+    const CDiskBlockPos pos = pindex->GetUndoPos();
+    if (pos.IsNull() || !UndoReadFromDisk(blockUndo, pos, pindex->pprev->GetBlockHash()))
+        return error("%s: no undo data at %d, hash=%s", __func__, pindex->nHeight, pindex->GetBlockHash().ToString());
+    if (blockUndo.vtxundo.size() + 1 != block.vtx.size())
+        return error("%s: block and undo data inconsistent at %d", __func__, pindex->nHeight);
+
+    CCoinsView viewEmpty;
+    CCoinsViewCache view(&viewEmpty);
+    CTokensCache tokenCache;
+    for (size_t i = 0; i < block.vtx.size(); i++) {
+        const CTransaction& tx = *block.vtx[i];
+        if (i > 0) {
+            const CTxUndo& txundo = blockUndo.vtxundo[i - 1];
+            if (txundo.vprevout.size() != tx.vin.size())
+                return error("%s: transaction and undo data inconsistent at %d", __func__, pindex->nHeight);
+            for (size_t j = 0; j < tx.vin.size(); j++) {
+                Coin coin = txundo.vprevout[j];
+                view.AddCoin(tx.vin[j].prevout, std::move(coin), true);
+                if (!view.SpendCoin(tx.vin[j].prevout, nullptr, &tokenCache))
+                    return error("%s: input %s at %d", __func__, tx.vin[j].prevout.ToString(), pindex->nHeight);
+            }
+        }
+        std::pair<std::string, CBlockTokenUndo> undoPair = std::make_pair("", CBlockTokenUndo());
+        AddCoins(view, tx, pindex->nHeight, pindex->GetBlockHash(), true, &tokenCache, &undoPair);
+    }
+    return tokenCache.Flush();
+}
+
+bool RecoverTokenState(const CChainParams& params, std::string& strError)
+{
+    LOCK(cs_main);
+    if (!ptokensdb || !pcoinsdbview)
+        return true;
+
+    const CBlockIndex* pindexTip = chainActive.Tip();
+    const uint256 hashTip = pindexTip ? pindexTip->GetBlockHash() : uint256();
+
+    if (!pcoinsdbview->IsInStep()) {
+        // The chain state was last written by a version that does not note which block the
+        // token database stands for (or not at all yet): it is taken to match the chain state,
+        // as it always was, and that is noted from here on.
+        if (!pcoinsdbview->WriteTokenStateBlock(hashTip)) {
+            strError = "the coins database cannot be written";
+            return false;
+        }
+        return true;
+    }
+
+    uint256 hashTokens;
+    if (pcoinsdbview->ReadTokenDumpPending(hashTokens)) {
+        strError = "the token database was being written when the node stopped";
+        return false;
+    }
+    if (!pcoinsdbview->ReadTokenStateBlock(hashTokens) || hashTokens == hashTip)
+        return true;
+
+    // The block that the token database stands for must be one that the chain state builds on
+    // (the null hash: the state before the first block).
+    int nHeightTokens = 0;
+    if (!hashTokens.IsNull()) {
+        BlockMap::const_iterator mi = mapBlockIndex.find(hashTokens);
+        if (!pindexTip || mi == mapBlockIndex.end() || pindexTip->GetAncestor(mi->second->nHeight) != mi->second) {
+            strError = strprintf("the token database is that of block %s, the chain state that of block %s",
+                                 hashTokens.ToString(), hashTip.ToString());
+            return false;
+        }
+        nHeightTokens = mi->second->nHeight;
+    }
+    if (!pindexTip)
+        return true;
+
+    // The chain state got further than the token database: the node stopped between the two
+    // writes, or ReplayBlocks() has just finished a write of the chain state.
+    LogPrintf("Tokens: the token database is at height %d, the chain state at height %d; the blocks in between are applied to it again\n",
+              nHeightTokens, pindexTip->nHeight);
+    for (int nHeight = nHeightTokens + 1; nHeight <= pindexTip->nHeight; ++nHeight) {
+        if (ShutdownRequested())
+            return true; // (nothing is written yet: the next start does it)
+        if (!RollforwardTokens(pindexTip->GetAncestor(nHeight), params)) {
+            strError = strprintf("the token effects of the block at height %d cannot be applied again", nHeight);
+            return false;
+        }
+    }
+    CTokensCache* cache = GetCurrentTokenCache();
+    if (!cache || !WriteTokenState(*cache, hashTip)) {
+        strError = "the token database cannot be written";
+        return false;
+    }
+    return true;
+}
+
 bool ReplayBlocks(const CChainParams& params, CCoinsView* view)
 {
     LOCK(cs_main);
@@ -5790,6 +5908,15 @@ bool ReplayBlocks(const CChainParams& params, CCoinsView* view)
 
     uiInterface.ShowProgress(_("Replaying blocks..."), 0, false);
     LogPrintf("Replaying blocks\n");
+
+    // The token database is written after the chain state, so it is still that of the old
+    // tip. A version that did not note that (see CCoinsViewDB::IsInStep) may have begun this
+    // write: note it now, for RecoverTokenState().
+    if (pcoinsdbview) {
+        uint256 hashInStep;
+        if (!pcoinsdbview->ReadInStepBlock(hashInStep) || hashInStep != hashHeads[1])
+            pcoinsdbview->WriteTokenStateBlock(hashHeads[1]);
+    }
 
     const CBlockIndex* pindexOld = nullptr;  // Old tip during the interrupted flush.
     const CBlockIndex* pindexNew;            // New tip during the interrupted flush.

@@ -1752,6 +1752,15 @@ bool AppInitMain(boost::thread_group& threadGroup, CScheduler& scheduler)
                     assert(chainActive.Tip() != nullptr);
                 }
 
+                // The token database is written after the chain state: when the node stopped
+                // between the two, the blocks in between are applied to it again.
+                {
+                    std::string strTokenError;
+                    if (!RecoverTokenState(chainparams, strTokenError)) {
+                        return InitError(strprintf(_("The token database does not belong to the chain state (%s). Restart with -reindex-chainstate to rebuild both."), strTokenError));
+                    }
+                }
+
                 if (fSnapshotOnTrial) {
                     std::string strSnapshotError = "it has no chain";
                     if (is_coinsview_empty || !VerifyInstalledSnapshot(strSnapshotError, snapshotStatus)) {
