@@ -3199,6 +3199,10 @@ void GetTxOutTokenTypes(const std::vector<CTxOut>& vout, int& issues, int& reiss
 }
 
 bool ParseTokenScript(CScript scriptPubKey, uint160 &hashBytes, int& nScriptType, std::string &tokenName, CAmount &tokenAmount, uint32_t &nTokenLockTime) {
+    // Only a transfer can have a lock time. The callers store this value in the address
+    // index for every kind of token output, so it is set for every kind.
+    nTokenLockTime = 0;
+
     int nType;
     bool fIsOwner;
     int _nStartingPoint;

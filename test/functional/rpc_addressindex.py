@@ -433,6 +433,44 @@ class AddressIndexTest(AokChainTestFramework):
         assert(not has_p2pk_output())
         assert_equal(self.nodes[1].getaddressbalance(pk_address), balance_spent)
 
+        # Tokens in the address index: an issued and a reissued token, and the owner token,
+        # are not time locked. Each time a transfer with a lock time is in the same block:
+        # nothing of it may show at the other token outputs.
+        print("Testing tokens in the address index...")
+        wallet, index = self.nodes[0], self.nodes[1]
+
+        def token_balances(address):
+            return {entry["tokenName"]: entry for entry in index.getaddressbalance({"addresses": [address]}, True)}
+
+        wallet.issue("LOCKSOURCE", 100, wallet.getnewaddress())
+        wallet.generate(1)
+        self.sync_all()
+        locked_until = index.getblockcount() + 1000
+        locked_at = wallet.getnewaddress()
+        holder = wallet.getnewaddress()
+        wallet.transfer("LOCKSOURCE", 10, locked_at, locked_until)
+        wallet.issue("INDEXTEST", 1000, holder)
+        wallet.generate(1)
+        self.sync_all()
+        assert_equal(token_balances(locked_at)["LOCKSOURCE"]["locked"], 10 * COIN)
+        assert_equal(token_balances(locked_at)["LOCKSOURCE"]["balance"], 0)
+        issued = token_balances(holder)
+        assert_equal(issued["INDEXTEST"]["balance"], 1000 * COIN)
+        assert_equal(issued["INDEXTEST"]["locked"], 0)
+        assert_equal(issued["INDEXTEST!"]["balance"], 1 * COIN)
+        assert_equal(issued["INDEXTEST!"]["locked"], 0)
+
+        reissued_to = wallet.getnewaddress()
+        wallet.transfer("LOCKSOURCE", 10, wallet.getnewaddress(), locked_until)
+        wallet.reissue("INDEXTEST", 500, reissued_to)
+        wallet.generate(1)
+        self.sync_all()
+        reissued = token_balances(reissued_to)
+        assert_equal(reissued["INDEXTEST"]["balance"], 500 * COIN)
+        assert_equal(reissued["INDEXTEST"]["locked"], 0)
+        owner_at = [address for address in index.listaddressesbytoken("INDEXTEST!")][0]
+        assert_equal(token_balances(owner_at)["INDEXTEST!"]["locked"], 0)
+
         # mediantime of a block is the median time past, as getblockchaininfo has it for the tip
         print("Testing mediantime...")
         tip = self.nodes[1].getbestblockhash()
