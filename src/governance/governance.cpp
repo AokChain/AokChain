@@ -390,7 +390,7 @@ bool CGovernance::EndChainStateFlush(const uint256& hashTip)
     return WriteBatch(batch);
 }
 
-bool CGovernance::RecoverTo(const uint256& hashChainStateTip, std::string& strError)
+bool CGovernance::RecoverTo(const uint256& hashChainStateTip, bool fInStep, std::string& strError)
 {
     LOCK(cs);
     assert(vChanges.empty());
@@ -424,9 +424,17 @@ bool CGovernance::RecoverTo(const uint256& hashChainStateTip, std::string& strEr
         // The write of the chain state went through, only its end was not noted here: the
         // state is that of this block, the journal is of blocks before it.
     } else if (!fBase || hashBase != hashChainStateTip) {
-        // The chain state is not at the block that the journal began at: a version that keeps
-        // no journal has written it since. What is left of the journal says nothing about the
-        // state now; the database is taken to match the chain state, as it always was.
+        // The chain state is not at the block that the journal began at.
+        if (fBase && fInStep) {
+            // This version wrote the chain state last, and it never does so without a note
+            // here: the journal does not explain the state.
+            strError = strprintf("the journal of the governance database began at block %s, the chain state is that of block %s",
+                                 hashBase.ToString(), hashChainStateTip.ToString());
+            return false;
+        }
+        // A version that keeps no journal has written the chain state since. What is left of
+        // the journal says nothing about the state now; the database is taken to match the
+        // chain state, as it always was.
         if (!journal.empty())
             LogPrintf("Governance: the chain state was written by another version since the journal began; the journal is dropped\n");
     } else {

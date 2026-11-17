@@ -2366,6 +2366,22 @@ static DisconnectResult DisconnectBlock(const CBlock& block, const CBlockIndex* 
     return fClean ? DISCONNECT_OK : DISCONNECT_UNCLEAN;
 }
 
+/** Syncs the undo files, other than the last one, that were written to since the last write
+ *  of the block index (FlushBlockFile() syncs the last one). */
+void static FlushEarlierUndoFiles()
+{
+    LOCK(cs_LastBlockFile);
+    for (int nFile : setDirtyFileInfo) {
+        if (nFile == nLastBlockFile)
+            continue;
+        FILE* file = OpenUndoFile(CDiskBlockPos(nFile, 0), true);
+        if (file) {
+            FileCommit(file);
+            fclose(file);
+        }
+    }
+}
+
 void static FlushBlockFile(bool fFinalize = false)
 {
     LOCK(cs_LastBlockFile);
@@ -3377,6 +3393,10 @@ bool static FlushStateToDisk(const CChainParams& chainparams, CValidationState &
                 return state.Error("out of disk space");
             // First make sure all block and undo data is flushed to disk.
             FlushBlockFile();
+            // (also the undo data that went into an earlier undo file: a block is not always
+            // connected while its block file is the last one, and the block index, which is
+            // synced below, must not say that undo data exists before it is on disk)
+            FlushEarlierUndoFiles();
             // Then update all block file information (which may refer to block and undo files).
             {
                 std::vector<std::pair<int, const CBlockFileInfo*> > vFiles;
@@ -3401,6 +3421,20 @@ bool static FlushStateToDisk(const CChainParams& chainparams, CValidationState &
             nLastWrite = nNow;
         }
         // Flush best chain related state. This can only be done if the blocks / block index write was also done.
+        //
+        // The order of the writes, and what is synced before what. A forced stop of the machine
+        // loses every write that was not synced, in each database a different amount of its tail:
+        //  1. (above) block and undo files, synced, then the block index, synced: the block index
+        //     never refers to data that is not on disk, and it knows every block that one of the
+        //     stores below stands for
+        //  2. the governance database notes the write that follows, synced: it holds every command
+        //     up to this tip, and what it needs to go back to the tip of the write before
+        //  3. the chain state, synced
+        //  4. the governance database drops what it kept for going back
+        //  5. the token database, as one synced batch with this tip: never ahead of the chain state
+        // At startup each store is brought to the block of the chain state: ReplayBlocks() (a write
+        // of the chain state that was cut short), CGovernance::RecoverTo() (back), RecoverTokenState()
+        // (forward).
         if (fDoFullFlush) {
 
 

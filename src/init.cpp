@@ -1724,6 +1724,7 @@ bool AppInitMain(boost::thread_group& threadGroup, CScheduler& scheduler)
                 }
 
                 // ReplayBlocks is a no-op if we cleared the coinsviewdb with -reindex or -reindex-chainstate
+                const bool fReplay = !pcoinsdbview->GetHeadBlocks().empty();
                 if (!ReplayBlocks(chainparams, pcoinsdbview.get())) {
                     strLoadError = _("Unable to replay blocks. You will need to rebuild the database using -reindex-chainstate.");
                     break;
@@ -1736,8 +1737,11 @@ bool AppInitMain(boost::thread_group& threadGroup, CScheduler& scheduler)
                 // flushes: after an unclean stop it is brought back to the block that the chain
                 // state is at, or the blocks in between would be judged with a later state.
                 {
+                    // (a write of the chain state that was finished just now may have been begun by
+                    // a version that keeps no journal: the journal itself says if it was not)
+                    const bool fInStep = !fReplay && pcoinsdbview->IsInStep();
                     std::string strGovernanceError;
-                    if (!governance->RecoverTo(pcoinsTip->GetBestBlock(), strGovernanceError)) {
+                    if (!governance->RecoverTo(pcoinsTip->GetBestBlock(), fInStep, strGovernanceError)) {
                         return InitError(strprintf(_("The governance database does not belong to the chain state (%s). Restart with -reindex-chainstate to rebuild both."), strGovernanceError));
                     }
                 }

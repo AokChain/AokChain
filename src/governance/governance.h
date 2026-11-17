@@ -90,21 +90,26 @@ public:
      *
      * Every commit to the database now also records what it replaced (a journal), and with
      * the first record the block that the chain state was at:
-     *   BeginChainStateFlush(tip)  before the chain state is written for this tip
-     *   EndChainStateFlush(tip)    after it: the journal is not needed any more
-     *   RecoverTo(tip)             at startup, with the block that the chain state is at: undoes
+     *   BeginChainStateFlush(tip)  before the chain state is written for this tip (synced: the
+     *                              chain state is never ahead of what this database can be
+     *                              brought back to)
+     *   EndChainStateFlush(tip)    after it is on disk: the journal is not needed any more
+     *   RecoverTo(tip, fInStep)    at startup, with the block that the chain state is at: undoes
      *                              the journal when the chain state is still at the block that
      *                              the journal began at.
-     * When the chain state is at neither that block nor the block of a flush in progress, a
-     * version without the journal has written it in between: what is left of the journal says
-     * nothing then, and the database is taken to match the chain state, as it always was.
+     * When the chain state is at neither that block nor the block of a flush in progress, the
+     * journal does not explain the state. If a version without the journal has written the
+     * chain state in between (fInStep false, see CCoinsViewDB::IsInStep), what is left of the
+     * journal says nothing: it is dropped and the database is taken to match the chain state,
+     * as it always was. If this version wrote the chain state last, RecoverTo() returns false:
+     * the database cannot be brought to the chain state, both have to be built again.
      * The journal exists only between two writes of the chain state; after a clean stop the
      * database holds nothing that an earlier version does not know.
-     * RecoverTo() returns false when the journal cannot be read (strError says so).
+     * RecoverTo() also returns false when the journal cannot be read (strError says what).
      */
     bool BeginChainStateFlush(const uint256& hashTip);
     bool EndChainStateFlush(const uint256& hashTip);
-    bool RecoverTo(const uint256& hashChainStateTip, std::string& strError);
+    bool RecoverTo(const uint256& hashChainStateTip, bool fInStep, std::string& strError);
 
     using CDBWrapper::Sync;
 
