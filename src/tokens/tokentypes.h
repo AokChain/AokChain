@@ -9,6 +9,8 @@
 #include <string>
 #include <sstream>
 #include <list>
+#include <mutex>
+#include <stdexcept>
 #include <unordered_map>
 #include <amount.h>
 #include <script/standard.h>
@@ -344,6 +346,10 @@ struct CTokenCacheSpendToken
 };
 
 // Least Recently Used Cache
+//
+// The cache locks its own lists. Reading an entry moves it to the front, so even two
+// readers change the lists; the token metadata cache is used under cs_main, but a
+// caller that does not hold it must never be able to break the lists or the heap.
 template<typename cache_key_t, typename cache_value_t>
 class CLRUCache
 {
@@ -361,6 +367,7 @@ public:
 
     void Put(const cache_key_t& key, const cache_value_t& value)
     {
+        std::lock_guard<std::mutex> lock(cs_cache);
         auto it = cacheItemsMap.find(key);
         cacheItemsList.push_front(key_value_pair_t(key, value));
         if (it != cacheItemsMap.end())
@@ -381,6 +388,7 @@ public:
 
     void Erase(const cache_key_t& key)
     {
+        std::lock_guard<std::mutex> lock(cs_cache);
         auto it = cacheItemsMap.find(key);
         if (it != cacheItemsMap.end())
         {
@@ -389,8 +397,10 @@ public:
         }
     }
 
-    const cache_value_t& Get(const cache_key_t& key)
+    /** A copy of the entry (a reference into the list would not outlive the lock). */
+    cache_value_t Get(const cache_key_t& key)
     {
+        std::lock_guard<std::mutex> lock(cs_cache);
         auto it = cacheItemsMap.find(key);
         if (it == cacheItemsMap.end())
         {
@@ -403,41 +413,62 @@ public:
         }
     }
 
+    /** Exists() and Get() in one step: false when the key is not in the cache. */
+    bool GetIfExists(const cache_key_t& key, cache_value_t& value)
+    {
+        std::lock_guard<std::mutex> lock(cs_cache);
+        auto it = cacheItemsMap.find(key);
+        if (it == cacheItemsMap.end())
+            return false;
+        cacheItemsList.splice(cacheItemsList.begin(), cacheItemsList, it->second);
+        value = it->second->second;
+        return true;
+    }
+
     bool Exists(const cache_key_t& key) const
     {
+        std::lock_guard<std::mutex> lock(cs_cache);
         return cacheItemsMap.find(key) != cacheItemsMap.end();
     }
 
     size_t Size() const
     {
+        std::lock_guard<std::mutex> lock(cs_cache);
         return cacheItemsMap.size();
     }
 
 
     void Clear()
     {
+        std::lock_guard<std::mutex> lock(cs_cache);
         cacheItemsMap.clear();
         cacheItemsList.clear();
     }
 
     void SetNull()
     {
+        std::lock_guard<std::mutex> lock(cs_cache);
         maxSize = 0;
-        Clear();
+        cacheItemsMap.clear();
+        cacheItemsList.clear();
     }
 
     size_t MaxSize() const
     {
+        std::lock_guard<std::mutex> lock(cs_cache);
         return maxSize;
     }
 
 
     void SetSize(const size_t size)
     {
+        std::lock_guard<std::mutex> lock(cs_cache);
         maxSize = size;
     }
 
-   const std::unordered_map<cache_key_t, list_iterator_t>& GetItemsMap()
+    /** The lists themselves, for memory statistics. Not locked: the caller holds the
+     *  lock that keeps every writer out (cs_main for the token metadata cache). */
+    const std::unordered_map<cache_key_t, list_iterator_t>& GetItemsMap()
     {
         return cacheItemsMap;
     }
@@ -450,12 +481,16 @@ public:
 
     CLRUCache(const CLRUCache& cache)
     {
+        std::lock_guard<std::mutex> lock(cache.cs_cache);
         this->cacheItemsList = cache.cacheItemsList;
-        this->cacheItemsMap = cache.cacheItemsMap;
+        // the map points into this cache's own list, not into the list it was copied from
+        for (auto it = this->cacheItemsList.begin(); it != this->cacheItemsList.end(); ++it)
+            this->cacheItemsMap[it->first] = it;
         this->maxSize = cache.maxSize;
     }
 
 private:
+    mutable std::mutex cs_cache;
     std::list<key_value_pair_t> cacheItemsList;
     std::unordered_map<cache_key_t, list_iterator_t> cacheItemsMap;
     size_t maxSize;
