@@ -898,7 +898,7 @@ QWidget *SignHubPage::buildCreate()
     layout->setContentsMargins(0, 0, 0, 0);
     layout->setSpacing(18);
 
-    // the three steps, on the right of the title
+    // the three steps, in a row of their own under the title: next to it they do not fit a 1280 px window
     QWidget *stepper = new QWidget(page);
     QHBoxLayout *stepLayout = new QHBoxLayout(stepper);
     stepLayout->setContentsMargins(0, 0, 0, 0);
@@ -915,7 +915,12 @@ QWidget *SignHubPage::buildCreate()
             stepLayout->addWidget(dash);
         }
     }
-    layout->addLayout(subHeader(tr("Make a multisig wallet"), nullptr, stepper));
+    layout->addLayout(subHeader(tr("Make a multisig wallet")));
+    QHBoxLayout *stepRow = new QHBoxLayout();
+    stepRow->setContentsMargins(0, 0, 0, 0);
+    stepRow->addWidget(stepper);
+    stepRow->addStretch();
+    layout->addLayout(stepRow);
 
     createStack = new QStackedWidget(page);
     layout->addWidget(createStack, 1);
