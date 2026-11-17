@@ -311,7 +311,7 @@ void WalletController::openWallet(const QString &name)
     if (operation || modelFor(name))
         return;
     const std::string walletName = name.toStdString();
-    start(tr("Opening %1 …").arg(displayName(name)), false, [this, walletName] {
+    start(tr("Opening %1...").arg(displayName(name)), false, [this, walletName] {
         WalletLoadResult result;
         std::string error, warning;
         CWallet *wallet = LoadWalletByName(walletName, result, error, warning);
@@ -337,7 +337,7 @@ void WalletController::createWallet(const QString &name, bool encrypt)
     if (operation)
         return;
     const std::string walletName = name.trimmed().toStdString();
-    start(tr("Creating %1 …").arg(QString::fromStdString(walletName)), false, [this, walletName, encrypt] {
+    start(tr("Creating %1...").arg(QString::fromStdString(walletName)), false, [this, walletName, encrypt] {
         WalletLoadResult result;
         std::string error, warning;
         CWallet *wallet = CreateWalletByName(walletName, result, error, warning);
@@ -366,7 +366,7 @@ void WalletController::restoreWallet(const QString &name, const QString &backupF
         return;
     const std::string walletName = name.trimmed().toStdString();
     const std::string file = backupFile.toStdString();
-    start(tr("Restoring %1 …").arg(QString::fromStdString(walletName)), false, [this, walletName, file] {
+    start(tr("Restoring %1...").arg(QString::fromStdString(walletName)), false, [this, walletName, file] {
         WalletLoadResult result;
         std::string error, warning;
         CWallet *wallet = RestoreWalletFromBackup(walletName, file, result, error, warning);
@@ -393,7 +393,7 @@ void WalletController::closeWallet(WalletModel *model)
         return;
     CWallet *wallet = model->getWallet();
     QPointer<WalletModel> guard(model);
-    start(tr("Closing %1 …").arg(displayName(model)), false, [this, wallet, guard] {
+    start(tr("Closing %1...").arg(displayName(model)), false, [this, wallet, guard] {
         bool closed = false;
         const WalletUnloadResult result = UnloadWallet(wallet, closed);
         QMetaObject::invokeMethod(this, [this, guard, result, closed] {
@@ -422,7 +422,7 @@ void WalletController::reopenWallet(WalletModel *model)
     CWallet *wallet = model->getWallet();
     const std::string walletName = wallet->GetName();
     QPointer<WalletModel> guard(model);
-    start(tr("Finishing the encryption of %1 …").arg(displayName(model)), false, [this, wallet, walletName, guard] {
+    start(tr("Finishing the encryption of %1...").arg(displayName(model)), false, [this, wallet, walletName, guard] {
         bool closed = false;
         const WalletUnloadResult unloaded = UnloadWallet(wallet, closed);
         CWallet *reopened = nullptr;
@@ -475,7 +475,7 @@ void WalletController::openNextRemembered()
         if (!fs::exists(fs::absolute(name.toStdString(), GetWalletDir())))
             continue;
         const std::string walletName = name.toStdString();
-        start(tr("Opening %1 …").arg(displayName(name)), true, [this, walletName] {
+        start(tr("Opening %1...").arg(displayName(name)), true, [this, walletName] {
             WalletLoadResult result;
             std::string error, warning;
             CWallet *wallet = LoadWalletByName(walletName, result, error, warning);

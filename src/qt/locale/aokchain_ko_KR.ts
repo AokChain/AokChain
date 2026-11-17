@@ -1364,7 +1364,7 @@
         <translation>유효한 AokChain 주소입니다</translation>
     </message>
     <message>
-        <source>A user name: it is resolved to its address when sending</source>
+        <source>A username: it is resolved to its address when sending</source>
         <translation>사용자 이름입니다. 보낼 때 연결된 주소로 바뀝니다</translation>
     </message>
     <message>
@@ -3929,7 +3929,7 @@
         <translation>유효한 AokChain 주소입니다</translation>
     </message>
     <message>
-        <source>A user name: it is resolved to its address when sending</source>
+        <source>A username: it is resolved to its address when sending</source>
         <translation>사용자 이름입니다. 보낼 때 연결된 주소로 바뀝니다</translation>
     </message>
     <message>
@@ -8665,8 +8665,8 @@
         <translation>지갑</translation>
     </message>
     <message>
-        <source>Opening %1 …</source>
-        <translation>%1 여는 중…</translation>
+        <source>Opening %1...</source>
+        <translation>%1 여는 중...</translation>
     </message>
     <message>
         <source>Open wallet</source>
@@ -8677,8 +8677,8 @@
         <translation>%1 지갑을 열지 못했습니다: %2</translation>
     </message>
     <message>
-        <source>Creating %1 …</source>
-        <translation>%1 만드는 중…</translation>
+        <source>Creating %1...</source>
+        <translation>%1 만드는 중...</translation>
     </message>
     <message>
         <source>Create wallet</source>
@@ -8689,8 +8689,8 @@
         <translation>%1 지갑을 만들지 못했습니다: %2</translation>
     </message>
     <message>
-        <source>Restoring %1 …</source>
-        <translation>%1 복원하는 중…</translation>
+        <source>Restoring %1...</source>
+        <translation>%1 복원하는 중...</translation>
     </message>
     <message>
         <source>Restore wallet</source>
@@ -8701,8 +8701,8 @@
         <translation>%1 지갑을 복원하지 못했습니다: %2</translation>
     </message>
     <message>
-        <source>Closing %1 …</source>
-        <translation>%1 닫는 중…</translation>
+        <source>Closing %1...</source>
+        <translation>%1 닫는 중...</translation>
     </message>
     <message>
         <source>The wallet is being rescanned. Try again when the rescan is over.</source>
@@ -8721,8 +8721,8 @@
         <translation>지갑은 닫혔지만 실행 중인 명령이 지갑 파일을 아직 쓰고 있습니다. 프로그램을 끝내면 풀립니다. 그 전에는 파일을 복사하거나 옮기지 마세요.</translation>
     </message>
     <message>
-        <source>Finishing the encryption of %1 …</source>
-        <translation>%1 암호화를 마무리하는 중…</translation>
+        <source>Finishing the encryption of %1...</source>
+        <translation>%1 암호화를 마무리하는 중...</translation>
     </message>
     <message>
         <source>Encrypt wallet</source>

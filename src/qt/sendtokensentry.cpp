@@ -343,7 +343,7 @@ void SendTokensEntry::updateAddressHint(const QString &address)
         addressHint->setText(tr("This is a valid AokChain address"));
     } else if (IsUsernameValid(text.toStdString())) {
         addressHint->setProperty("role", "secondary");
-        addressHint->setText(tr("A user name: it is resolved to its address when sending"));
+        addressHint->setText(tr("A username: it is resolved to its address when sending"));
     } else {
         addressHint->setProperty("role", "error");
         addressHint->setText(tr("This is not a valid AokChain address"));
