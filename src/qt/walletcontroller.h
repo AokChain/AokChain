@@ -21,6 +21,7 @@ class WalletModel;
 
 QT_BEGIN_NAMESPACE
 class QProgressDialog;
+class QTimer;
 class QWidget;
 QT_END_NAMESPACE
 
@@ -137,6 +138,10 @@ private:
     void openNextRemembered();
     void rememberOpenWallets();
     void rememberCurrent();
+    /** Follow the wallets of the node: a command may have loaded or unloaded one */
+    void syncWithNode();
+
+    QTimer *syncTimer;
 };
 
 #endif // AOKCHAIN_QT_WALLETCONTROLLER_H

@@ -12,9 +12,11 @@
 #include "wallet/wallet.h"
 #include "wallet/walletutil.h"
 
+#include <QApplication>
 #include <QProgressDialog>
 #include <QRegExp>
 #include <QSettings>
+#include <QTimer>
 #include <QVariantMap>
 
 #include <algorithm>
@@ -61,7 +63,8 @@ WalletController::WalletController(const PlatformStyle *_platformStyle, OptionsM
     worker(new QObject()),
     parentWindow(nullptr),
     operation(nullptr),
-    openingRemembered(false)
+    openingRemembered(false),
+    syncTimer(nullptr)
 {
     worker->moveToThread(&thread);
     connect(&thread, &QThread::finished, worker, &QObject::deleteLater);
@@ -173,6 +176,40 @@ void WalletController::addStartupWallets()
     // open (openRememberedWallets), so it is not overwritten here
     if (!walletModels.isEmpty())
         setCurrent(walletModels.first(), false);
+    if (!syncTimer) {
+        syncTimer = new QTimer(this);
+        syncTimer->setInterval(2000);
+        connect(syncTimer, &QTimer::timeout, this, &WalletController::syncWithNode);
+        syncTimer->start();
+    }
+}
+
+void WalletController::syncWithNode()
+{
+    // The window opens and closes its wallets itself (openWallet() and the others). A command can
+    // do the same behind its back: loadwallet, createwallet, restorewallet and unloadwallet, in the
+    // console or from another program. The window follows, so that every loaded wallet is shown
+    // and none is shown that is gone.
+    // Not while an operation of the controller runs (its result adds or removes the model), and
+    // not under a dialog: a page must not be taken away below a dialog of its own.
+    if (operation || openingRemembered || QApplication::activeModalWidget())
+        return;
+    const std::vector<CWallet*> loaded = GetWallets();
+    bool changed = false;
+    for (WalletModel *model : QList<WalletModel*>(walletModels)) {
+        if (std::find(loaded.begin(), loaded.end(), model->getWallet()) == loaded.end()) {
+            removeModel(model);
+            changed = true;
+        }
+    }
+    for (CWallet *wallet : loaded) {
+        if (!modelFor(wallet)) {
+            addModel(wallet);
+            changed = true;
+        }
+    }
+    if (changed)
+        rememberOpenWallets();
 }
 
 void WalletController::setCurrent(WalletModel *model)
