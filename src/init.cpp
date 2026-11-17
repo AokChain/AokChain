@@ -1625,8 +1625,13 @@ bool AppInitMain(boost::thread_group& threadGroup, CScheduler& scheduler)
                     // the last run (RequestChainStateRebuild), or a stop before the wipes below
                     bool fRebuildMark = false;
                     if (pblocktree->ReadFlag("rebuildchainstate", fRebuildMark) && fRebuildMark && !fReindexChainState) {
-                        if (!fAutoRebuild || fPruneMode || SnapshotNodeWithoutPastBlocks()) {
-                            LogPrintf("A rebuild of the chain state was decided at an earlier run and is not done. It is not done now (-autorebuild=0, or this node does not have all blocks).\n");
+                        if (!fAutoRebuild || fPruneMode) {
+                            LogPrintf("A rebuild of the chain state was decided at an earlier run and is not done. It is not done now (-autorebuild=0, or this node is pruned).\n");
+                        } else if (SnapshotNodeWithoutPastBlocks()) {
+                            // (it cannot rebuild from blocks: it starts over from the snapshot, below)
+                            strLoadError = _("A rebuild of the databases was decided at an earlier run and is not done");
+                            fChainStateAtFault = true;
+                            break;
                         } else {
                             LogPrintf("A rebuild of the chain state was decided at an earlier run and is not done (see the earlier lines of this log): it is done now.\n");
                             fReindexChainState = true;
@@ -1952,7 +1957,27 @@ bool AppInitMain(boost::thread_group& threadGroup, CScheduler& scheduler)
 
         // -autorebuild: the node helps itself where a rebuild from its own block files is the answer
         if (!fLoaded && !fRequestShutdown && fAutoRebuild && !fReset && !fOnlyReindexHelps) {
-            if (fChainStateAtFault && !fAutoRebuildTried && pblocktree && !fPruneMode && !fHavePruned && !SnapshotNodeWithoutPastBlocks()) {
+            if (fChainStateAtFault && !fAutoRebuildTried && pblocktree && !fPruneMode && !fHavePruned && SnapshotNodeWithoutPastBlocks()) {
+                // A node that started from a chain state snapshot and has not fetched the blocks
+                // before it cannot build its databases from the block files: it starts over
+                fAutoRebuildTried = true;
+                LogPrintf("%s.\nThis node started from a chain state snapshot and does not have the blocks before it: it starts over from the snapshot (-autorebuild=0 turns this off). The wallet is not touched.\n", strLoadError);
+                uiInterface.InitMessage(_("Starting over from the chain state snapshot..."));
+                UnloadBlockIndex();
+                pcoinsTip.reset();
+                pcoinsdbview.reset();
+                pcoinscatcher.reset();
+                pblocktree.reset();
+                delete ptokensdb;
+                ptokensdb = nullptr;
+                delete governance;
+                governance = nullptr;
+                fSnapshotOnTrial = StartOverFromSnapshot(snapshotStatus);
+                if (!fSnapshotOnTrial)
+                    return InitError(_("The databases of this node are damaged. It started from a chain state snapshot and does not have the blocks before it, so it starts over from the snapshot, and the snapshot could not be fetched now (is the network connection up?). Start the program again when it can be fetched: no option is needed."));
+                continue;
+            }
+            if (fChainStateAtFault && !fAutoRebuildTried && pblocktree && !fPruneMode && !fHavePruned) {
                 fAutoRebuildTried = true;
                 LogPrintf("%s.\nThe chain state, the token database and the governance database are built again from the block files at this start, as -reindex-chainstate does (-autorebuild=0 turns this off).\n", strLoadError);
                 uiInterface.InitMessage(_("Rebuilding the chain state from the block files..."));

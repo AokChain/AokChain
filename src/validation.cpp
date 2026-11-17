@@ -3620,8 +3620,9 @@ static bool RequestChainStateRebuild(const CBlockIndex* pindex, const std::strin
     AssertLockHeld(cs_main);
     if (!gArgs.GetBoolArg("-autorebuild", DEFAULT_AUTOREBUILD) || !pblocktree)
         return false;
-    // (a node without all blocks cannot build its databases from them)
-    if (fPruneMode || fHavePruned || SnapshotNodeWithoutPastBlocks())
+    // (a pruned node cannot build its databases from its blocks; a node that started from a
+    // snapshot starts over from it)
+    if (fPruneMode || fHavePruned)
         return false;
     const int64_t nNow = GetTime();
     std::pair<uint256, int64_t> last;
@@ -3636,7 +3637,7 @@ static bool RequestChainStateRebuild(const CBlockIndex* pindex, const std::strin
         return false;
     RequestExitFailure();
     AbortNode(strprintf("Block %s at height %d, which this node had validated before, %s. The databases of this node are not what they were. "
-                        "The chain state, the token database and the governance database are built again from the block files at the next start, without any option.",
+                        "The chain state, the token database and the governance database are built again from the block files (on a node that started from a snapshot: from the snapshot) at the next start, without any option.",
                         pindex->GetBlockHash().ToString(), pindex->nHeight, strWhat),
               _("The databases of this node are damaged. They are built again from the block files at the next start: start the program again, no option is needed."));
     return true;

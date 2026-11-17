@@ -770,6 +770,15 @@ void RemoveInstalledSnapshot()
     LogPrintf("Snapshot: removed. The node synchronizes by validating the blocks.\n");
 }
 
+bool StartOverFromSnapshot(std::function<void(const std::string&)> status)
+{
+    RemoveInstalledSnapshot();
+    boost::system::error_code ec;
+    fs::remove(GetDataDir() / NO_PAST_BLOCKS_NAME, ec);
+    fPastBlocksMissing = false;
+    return InstallSnapshotIfWanted(status);
+}
+
 bool InstallSnapshotIfWanted(std::function<void(const std::string&)> status)
 {
     const CChainParams::SnapshotParams& pinned = Params().Snapshot();

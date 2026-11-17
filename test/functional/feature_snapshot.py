@@ -345,6 +345,35 @@ class SnapshotTest(AokChainTestFramework):
         assert_equal(node2.getblockcount(), node0.getblockcount())
         connect_nodes(node2, 0)
 
+        self.log.info("A damaged database: the node starts over from the snapshot by itself and keeps its wallet")
+        balance = node2.getbalance()
+        assert balance > 0
+        self.stop_node(2)
+        shutil.rmtree(os.path.join(node2.datadir, "regtest", "tokens"))
+        # ...and the snapshot cannot be fetched: the node says so and ends; nothing is asked of the operator but to start it again
+        unreachable = [arg if not arg.startswith("-bootstrapurl=") else "-bootstrapurl=http://127.0.0.1:9/" for arg in args2]
+        self.assert_start_raises_init_error(2, unreachable, "the snapshot could not be fetched now")
+        assert "it starts over from the snapshot" in self.log_of(2)
+        del server.requests[:]
+        self.start_node(2, args2)
+        assert [r for r in server.requests if ".part" in r[0]], "the snapshot was not fetched again"
+        assert_equal(node2.getsnapshotinfo()["past_blocks"], "missing")
+        assert_equal(node2.getsnapshotinfo()["snapshot_height"], HEIGHT)
+        connect_nodes(node2, 0)
+        sync_blocks([node0, node2])
+        self.assert_same_state(node0, node2, index=False, full=False)
+        assert_equal(node2.getbalance(), balance)
+        # the same when the node can fetch the snapshot at once: one start, no message
+        self.stop_node(2)
+        shutil.rmtree(os.path.join(node2.datadir, "regtest", "chainstate"))
+        self.start_node(2, args2)
+        assert_equal(self.log_of(2).count("it starts over from the snapshot"), 2)
+        connect_nodes(node2, 0)
+        sync_blocks([node0, node2])
+        self.assert_same_state(node0, node2, index=False, full=False)
+        assert_equal(node2.getbalance(), balance)
+        assert_equal(node2.getsnapshotinfo()["past_blocks"], "missing")
+
         self.log.info("A fork that begins below the snapshot height is refused")
         self.start_node(1, COMMON + ["-txindex=0"])
         node1.invalidateblock(node1.getblockhash(HEIGHT))

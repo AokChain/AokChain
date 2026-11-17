@@ -95,6 +95,15 @@ bool FetchPastBlocksNow(std::string& error);
  * not trusted until VerifyInstalledSnapshot() has passed.
  */
 bool InstallSnapshotIfWanted(std::function<void(const std::string&)> status);
+
+/**
+ * A node that started from a snapshot and does not have the blocks before it cannot build its
+ * databases again from the block files. When it cannot go on from its databases it starts over:
+ * the chain databases and the block files are removed and the snapshot is installed again, as in
+ * a new data directory (the wallet is not touched). False when the snapshot could not be
+ * installed now; the data directory is then that of a new node, and the next start tries again.
+ */
+bool StartOverFromSnapshot(std::function<void(const std::string&)> status);
 /** After the databases are loaded: compare their content hashes with the pinned ones. */
 bool VerifyInstalledSnapshot(std::string& error, std::function<void(const std::string&)> status);
 /** Remove what InstallSnapshotIfWanted() unpacked (the databases must be closed). */
