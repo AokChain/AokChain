@@ -16,6 +16,9 @@ at a time, and the node stakes one block in each slot.
    "walletpassphrase <passphrase> 0 true" opens it for staking only
  - getstakinginfo answers for the wallet of the request
  - without -staking no wallet stakes
+ - with -stakingwallet only the wallets that it names stake: another wallet of
+   the start does not, a wallet that is loaded later does not, and a named
+   wallet that is loaded later does
 """
 
 import time
@@ -183,6 +186,42 @@ class StakingMultiWalletTest(AokChainTestFramework):
             info = wallet.getstakinginfo()
             assert not info["enabled"] and not info["staking"], info
         assert_equal(self.nodes[1].getblockcount(), height)
+
+        self.log.info("With -stakingwallet the other wallet of the start does not stake")
+        self.stop_node(0)
+        n0, w1, w2 = self.restart_node0(["-staking=1", "-stakingwallet=wallet.dat"])
+        # the first wallet is named and still locked; the second one has coins and no passphrase,
+        # and would stake in the next slot
+        self.no_stake(n0)
+        info = w2.getstakinginfo()
+        assert info["enabled"] and not info["staking"], info
+        w1.walletpassphrase(PASSPHRASE, 0, True)
+        assert_equal(self.stake(2), ["first"] * 2)
+
+        self.log.info("With -stakingwallet a wallet that is loaded later does not stake")
+        n0.unloadwallet("second")
+        n0.loadwallet("second")
+        w1.walletlock()
+        self.no_stake(n0)
+        assert not w2.getstakinginfo()["staking"]
+
+        self.log.info("A wallet that -stakingwallet names stakes when it is loaded later")
+        self.stop_node(0)
+        self.start_node(0, self.pos_args + ["-staking=1", "-stakingwallet=second", "-stakingwallet=another", "-wallet=wallet.dat", "-mocktime=%d" % self.t])
+        connect_nodes_bi(self.nodes, 0, 1)
+        n0 = self.nodes[0]
+        self.no_stake(n0)
+        n0.loadwallet("second")
+        self.wallets = {"first": n0.get_wallet_rpc("wallet.dat"), "second": n0.get_wallet_rpc("second")}
+        assert_equal(self.stake(2), ["second"] * 2)
+
+    def no_stake(self, node):
+        """Two slots pass and the node makes no block."""
+        height = node.getblockcount()
+        self.t += 2 * SLOT
+        self.set_time(self.t)
+        time.sleep(4)
+        assert_equal(node.getblockcount(), height)
 
 
 if __name__ == '__main__':
