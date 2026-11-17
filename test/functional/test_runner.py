@@ -128,6 +128,7 @@ BASE_SCRIPTS= [
     'tool_wallet.py',
     'feature_stake_combine.py',
     'feature_stake_missing_coin.py',
+    'feature_governance_unclean_stop.py',
     'feature_offline_staking.py',
     'feature_future_drift.py',
     'p2p_orphan_processing.py',

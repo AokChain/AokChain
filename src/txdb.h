@@ -91,6 +91,8 @@ public:
 
     //! Attempt to update from an older database format. Returns whether an error occurred.
     bool Upgrade();
+    //! Makes what has been written durable (the writes of a flush are not, by themselves).
+    bool Sync() { return db.Sync(); }
     size_t EstimateSize() const override;
 };
 

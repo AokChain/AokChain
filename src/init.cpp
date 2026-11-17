@@ -1732,6 +1732,16 @@ bool AppInitMain(boost::thread_group& threadGroup, CScheduler& scheduler)
                 // The on-disk coinsdb is now in a good state, create the cache
                 pcoinsTip.reset(new CCoinsViewCache(pcoinscatcher.get()));
 
+                // The governance database is written with every block, the chain state at its
+                // flushes: after an unclean stop it is brought back to the block that the chain
+                // state is at, or the blocks in between would be judged with a later state.
+                {
+                    std::string strGovernanceError;
+                    if (!governance->RecoverTo(pcoinsTip->GetBestBlock(), strGovernanceError)) {
+                        return InitError(strprintf(_("The governance database does not belong to the chain state (%s). Restart with -reindex-chainstate to rebuild both."), strGovernanceError));
+                    }
+                }
+
                 bool is_coinsview_empty = fReset || fReindexChainState || pcoinsTip->GetBestBlock().IsNull();
                 if (!is_coinsview_empty) {
                     // LoadChainTip sets chainActive based on pcoinsTip's best block

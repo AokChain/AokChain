@@ -57,8 +57,9 @@ public:
     bool DumpFreezeStats(std::vector< std::pair< CScript, bool > > *FreezeVector);
     bool GetFrozenScripts(std::vector< CScript > *FreezeVector);
 
-    /** Hash over every record of the database, in key order: the same on every node with the same chain.
-     *  It covers the database only, not changes of an open level (see BeginChanges). */
+    /** Hash over every record of the governance state in the database, in key order: the same on
+     *  every node with the same chain. It covers the database only, not changes of an open level
+     *  (see BeginChanges), and not the journal that keeps it in step with the chain state. */
     uint256 ContentHash();
 
     /**
@@ -78,6 +79,32 @@ public:
     void BeginChanges();
     bool CommitChanges();
     void DiscardChanges();
+
+    /**
+     * Keeping in step with the chain state. The commands of a block are written here when the
+     * block is connected or disconnected; the chain state (the coins database) is written much
+     * later, at its next flush. After a stop without a flush (a kill, a crash, a power failure)
+     * this database was therefore that of a later block than the chain state, and the blocks
+     * in between were judged again with it: an address that is frozen later counted as frozen
+     * already, and a valid block was rejected and marked invalid.
+     *
+     * Every commit to the database now also records what it replaced (a journal), and with
+     * the first record the block that the chain state was at:
+     *   BeginChainStateFlush(tip)  before the chain state is written for this tip
+     *   EndChainStateFlush(tip)    after it: the journal is not needed any more
+     *   RecoverTo(tip)             at startup, with the block that the chain state is at: undoes
+     *                              the journal when the chain state is still at the block that
+     *                              the journal began at.
+     * When the chain state is at neither that block nor the block of a flush in progress, a
+     * version without the journal has written it in between: what is left of the journal says
+     * nothing then, and the database is taken to match the chain state, as it always was.
+     * The journal exists only between two writes of the chain state; after a clean stop the
+     * database holds nothing that an earlier version does not know.
+     * RecoverTo() returns false when the journal cannot be read (strError says so).
+     */
+    bool BeginChainStateFlush(const uint256& hashTip);
+    bool EndChainStateFlush(const uint256& hashTip);
+    bool RecoverTo(const uint256& hashChainStateTip, std::string& strError);
 
     using CDBWrapper::Sync;
 
@@ -105,6 +132,15 @@ private:
     void SetFeeEntry(CDBBatch& batch, int height, std::optional<CScript> script);
     //! Writes the batch when no level is open. Hold cs.
     bool Finish(CDBBatch& batch);
+
+    //! Number of the next journal record. Guarded by cs.
+    uint32_t nJournalNext = 0;
+    //! The block that the chain state was last written for (or loaded at). Guarded by cs.
+    uint256 hashChainState;
+    //! Puts what the changes replace in the database into the batch, as a journal record. Hold cs.
+    void WriteJournal(CDBBatch& batch, const Changes& changes);
+    //! Erases the journal records and the pending mark in the batch. Hold cs.
+    void EraseJournal(CDBBatch& batch);
 };
 
 /**

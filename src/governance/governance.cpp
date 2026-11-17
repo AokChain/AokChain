@@ -26,6 +26,13 @@ static const char DB_COST = 'c';
 
 static const char DB_GOVERNANCE_INIT  = 'G';
 
+// Keeping in step with the chain state (see BeginChainStateFlush in governance.h). These
+// records exist only between two writes of the chain state and are not part of the governance
+// state: ContentHash() leaves them out.
+static const char DB_CHAINSTATE_PENDING = 'P';  //!< block that the chain state is being flushed for
+static const char DB_JOURNAL = 'J';             //!< (DB_JOURNAL, number) -> what a commit replaced
+static const char DB_JOURNAL_BASE = 'K';        //!< block that the chain state was at when the journal began
+
 namespace {
     struct FreezeEntry {
         char key;
@@ -142,6 +149,69 @@ namespace {
     };
 }
 
+namespace {
+    struct JournalKey {
+        char key;
+        uint32_t number;
+
+        JournalKey() : key(DB_JOURNAL), number(0) {}
+        explicit JournalKey(uint32_t number) : key(DB_JOURNAL), number(number) {}
+
+        template<typename Stream>
+        void Serialize(Stream &s) const {
+            s << key;
+            s << number;
+        }
+
+        template<typename Stream>
+        void Unserialize(Stream& s) {
+            s >> key;
+            s >> number;
+        }
+    };
+
+    /** The values that one commit replaced. had: whether there was a record. */
+    struct JournalRecord {
+        struct Freeze { CScript script; bool had; bool frozen; };
+        struct Cost { int type; int height; bool had; CAmount cost; };
+        struct Fee { int height; bool had; CScript script; };
+        std::vector<Freeze> freeze;
+        std::vector<Cost> cost;
+        std::vector<Fee> fee;
+        bool hadNumber = false;
+        bool setNumber = false;
+        unsigned int number = 0;
+
+        template<typename Stream>
+        void Serialize(Stream &s) const {
+            WriteCompactSize(s, freeze.size());
+            for (const Freeze& item : freeze)
+                s << item.script << item.had << item.frozen;
+            WriteCompactSize(s, cost.size());
+            for (const Cost& item : cost)
+                s << item.type << item.height << item.had << item.cost;
+            WriteCompactSize(s, fee.size());
+            for (const Fee& item : fee)
+                s << item.height << item.had << item.script;
+            s << setNumber << hadNumber << number;
+        }
+
+        template<typename Stream>
+        void Unserialize(Stream& s) {
+            freeze.resize(ReadCompactSize(s));
+            for (Freeze& item : freeze)
+                s >> item.script >> item.had >> item.frozen;
+            cost.resize(ReadCompactSize(s));
+            for (Cost& item : cost)
+                s >> item.type >> item.height >> item.had >> item.cost;
+            fee.resize(ReadCompactSize(s));
+            for (Fee& item : fee)
+                s >> item.height >> item.had >> item.script;
+            s >> setNumber >> hadNumber >> number;
+        }
+    };
+}
+
 CGovernance::CGovernance(size_t nCacheSize, bool fMemory, bool fWipe) : CDBWrapper(GetDataDir() / "governance", nCacheSize, fMemory, fWipe) 
 {
 }
@@ -234,8 +304,9 @@ bool CGovernance::CommitChanges()
     if (changes.freeze.empty() && changes.cost.empty() && changes.fee.empty() && !changes.numberFrozen)
         return true;
 
-    // to the database, as one batch
+    // to the database, as one batch, with what it replaces (see BeginChainStateFlush)
     CDBBatch batch(*this);
+    WriteJournal(batch, changes);
     for (const auto& item : changes.freeze)
         batch.Write(FreezeEntry(item.first), FreezeDetails(item.second));
     for (const auto& item : changes.cost) {
@@ -253,6 +324,146 @@ bool CGovernance::CommitChanges()
     if (changes.numberFrozen)
         batch.Write(DB_NUMBER_FROZEN, *changes.numberFrozen);
     return WriteBatch(batch);
+}
+
+// ---- Keeping in step with the chain state (see BeginChainStateFlush in governance.h)
+
+void CGovernance::WriteJournal(CDBBatch& batch, const Changes& changes)
+{
+    AssertLockHeld(cs);
+    JournalRecord record;
+    for (const auto& item : changes.freeze) {
+        FreezeDetails details;
+        const bool had = Read(FreezeEntry(item.first), details);
+        record.freeze.push_back({item.first, had, had && details.frozen});
+    }
+    for (const auto& item : changes.cost) {
+        CostDetails details;
+        const bool had = Read(CostEntry(item.first.first, item.first.second), details);
+        record.cost.push_back({item.first.first, item.first.second, had, had ? details.cost : 0});
+    }
+    for (const auto& item : changes.fee) {
+        FeeDetails details;
+        const bool had = Read(FeeEntry(item.first), details);
+        record.fee.push_back({item.first, had, had ? details.script : CScript()});
+    }
+    if (changes.numberFrozen) {
+        record.setNumber = true;
+        record.hadNumber = Read(DB_NUMBER_FROZEN, record.number);
+    }
+    if (nJournalNext == 0)
+        batch.Write(DB_JOURNAL_BASE, hashChainState);
+    batch.Write(JournalKey(nJournalNext++), record);
+}
+
+void CGovernance::EraseJournal(CDBBatch& batch)
+{
+    AssertLockHeld(cs);
+    std::unique_ptr<CDBIterator> it(NewIterator());
+    for (it->Seek(JournalKey()); it->Valid(); it->Next()) {
+        JournalKey key;
+        if (!it->GetKey(key) || key.key != DB_JOURNAL)
+            break;
+        batch.Erase(key);
+    }
+    batch.Erase(DB_JOURNAL_BASE);
+    batch.Erase(DB_CHAINSTATE_PENDING);
+    nJournalNext = 0;
+}
+
+bool CGovernance::BeginChainStateFlush(const uint256& hashTip)
+{
+    LOCK(cs);
+    CDBBatch batch(*this);
+    batch.Write(DB_CHAINSTATE_PENDING, hashTip);
+    // On disk before the chain state is written: the chain state must never be ahead of what
+    // this database can be brought back to.
+    return WriteBatch(batch, true);
+}
+
+bool CGovernance::EndChainStateFlush(const uint256& hashTip)
+{
+    LOCK(cs);
+    CDBBatch batch(*this);
+    EraseJournal(batch);
+    hashChainState = hashTip;
+    return WriteBatch(batch);
+}
+
+bool CGovernance::RecoverTo(const uint256& hashChainStateTip, std::string& strError)
+{
+    LOCK(cs);
+    assert(vChanges.empty());
+
+    hashChainState = hashChainStateTip;
+    uint256 hashPending, hashBase;
+    const bool fPending = Read(DB_CHAINSTATE_PENDING, hashPending);
+    const bool fBase = Read(DB_JOURNAL_BASE, hashBase);
+
+    std::map<uint32_t, JournalRecord> journal;
+    {
+        std::unique_ptr<CDBIterator> it(NewIterator());
+        for (it->Seek(JournalKey()); it->Valid(); it->Next()) {
+            JournalKey key;
+            if (!it->GetKey(key) || key.key != DB_JOURNAL)
+                break;
+            JournalRecord record;
+            if (!it->GetValue(record)) {
+                strError = "a journal record of the governance database cannot be read";
+                return false;
+            }
+            journal.emplace(key.number, std::move(record));
+        }
+    }
+    nJournalNext = 0;
+    if (journal.empty() && !fPending && !fBase)
+        return true;
+
+    CDBBatch batch(*this);
+    if (fPending && hashPending == hashChainStateTip) {
+        // The write of the chain state went through, only its end was not noted here: the
+        // state is that of this block, the journal is of blocks before it.
+    } else if (!fBase || hashBase != hashChainStateTip) {
+        // The chain state is not at the block that the journal began at: a version that keeps
+        // no journal has written it since. What is left of the journal says nothing about the
+        // state now; the database is taken to match the chain state, as it always was.
+        if (!journal.empty())
+            LogPrintf("Governance: the chain state was written by another version since the journal began; the journal is dropped\n");
+    } else {
+        // The chain state is where it was when the journal began: undo what was written here
+        // since, the newest first.
+        for (auto it = journal.rbegin(); it != journal.rend(); ++it) {
+            const JournalRecord& record = it->second;
+            for (const JournalRecord::Freeze& item : record.freeze) {
+                if (item.had)
+                    batch.Write(FreezeEntry(item.script), FreezeDetails(item.frozen));
+                else
+                    batch.Erase(FreezeEntry(item.script));
+            }
+            for (const JournalRecord::Cost& item : record.cost) {
+                if (item.had)
+                    batch.Write(CostEntry(item.type, item.height), CostDetails(item.cost));
+                else
+                    batch.Erase(CostEntry(item.type, item.height));
+            }
+            for (const JournalRecord::Fee& item : record.fee) {
+                if (item.had)
+                    batch.Write(FeeEntry(item.height), FeeDetails(item.script));
+                else
+                    batch.Erase(FeeEntry(item.height));
+            }
+            if (record.setNumber) {
+                if (record.hadNumber)
+                    batch.Write(DB_NUMBER_FROZEN, record.number);
+                else
+                    batch.Erase(DB_NUMBER_FROZEN);
+            }
+        }
+        if (!journal.empty())
+            LogPrintf("Governance: the chain state was not written after the last %u change(s) of the governance state; they are undone and come back with their blocks\n", (unsigned int)journal.size());
+    }
+    EraseJournal(batch);
+    return WriteBatch(batch, true);
 }
 
 bool CGovernance::GetFreezeEntry(const CScript& script, bool& frozen) const
@@ -727,6 +938,9 @@ uint256 CGovernance::ContentHash()
         RawRecord key, value;
         if (!it->GetKey(key) || !it->GetValue(value))
             return uint256();
+        // (not the state: the journal that keeps the database in step with the chain state)
+        if (!key.bytes.empty() && (key.bytes[0] == DB_CHAINSTATE_PENDING || key.bytes[0] == DB_JOURNAL || key.bytes[0] == DB_JOURNAL_BASE))
+            continue;
         ss << key.bytes << value.bytes;
     }
     return ss.GetHash();

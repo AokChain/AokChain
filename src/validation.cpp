@@ -3393,9 +3393,22 @@ bool static FlushStateToDisk(const CChainParams& chainparams, CValidationState &
             if (!CheckDiskSpace((48 * 2 * 2 * pcoinsTip->GetCacheSize()) + tokenDirtyCacheSize * 2)) /** TOKENS START */ /** TOKENS END */
                 return state.Error("out of disk space");
 
+            // The governance database is written block by block and is at this tip already. It
+            // notes that the chain state follows now, and keeps what it needs to go back to the
+            // block of the last flush until the chain state is on disk for this one (after an
+            // unclean stop it was ahead of the chain state; see CGovernance::RecoverTo).
+            const uint256 hashFlushTip = pcoinsTip->GetBestBlock();
+            if (governance && !governance->BeginChainStateFlush(hashFlushTip))
+                return AbortNode(state, "Failed to write to governance database");
+
             // Flush the chainstate (which may refer to block index entries).
             if (!pcoinsTip->Flush())
                 return AbortNode(state, "Failed to write to coin database");
+            // On disk, before the stores that follow it note that they match it
+            if (pcoinsdbview && !pcoinsdbview->Sync())
+                return AbortNode(state, "Failed to write to coin database");
+            if (governance && !governance->EndChainStateFlush(hashFlushTip))
+                return AbortNode(state, "Failed to write to governance database");
 
             /** TOKENS START */
             // Flush the tokenstate
