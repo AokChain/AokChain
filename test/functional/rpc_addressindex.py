@@ -145,7 +145,9 @@ class AddressIndexTest(AokChainTestFramework):
         scriptPubKey2 = CScript([OP_DUP, OP_HASH160, addressHash2, OP_EQUALVERIFY, OP_CHECKSIG])
         self.nodes[0].importprivkey(privkey2)
 
-        unspent = self.nodes[0].listunspent()
+        # (an output that is large enough for the two payments below: the first one that
+        # the wallet lists may be a small rest of an earlier payment)
+        unspent = sorted(self.nodes[0].listunspent(), key=lambda output: output["amount"], reverse=True)
         tx = CTransaction()
         tx.vin = [CTxIn(COutPoint(int(unspent[0]["txid"], 16), unspent[0]["vout"]))]
         amount = int(unspent[0]["amount"] * 100000000 - 100000)
