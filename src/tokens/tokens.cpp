@@ -1501,10 +1501,13 @@ bool CTokensCache::RemoveReissueToken(const CReissueToken& reissue, const std::s
     setNewReissueToRemove.insert(reissueToken);
 
     if (fTokenIndex) {
-        // Get the best amount form the database or dirty cache
-        if (!GetBestTokenAddressAmount(*this, reissue.strName, address))
-            return error("%s : Trying to undo reissue of an token but the tokens amount isn't in the database",
-                         __func__);
+        // Get the best amount form the database or dirty cache. A reissue that
+        // added no tokens left no amount for an address without the token.
+        if (!GetBestTokenAddressAmount(*this, reissue.strName, address)) {
+            if (reissueToken.reissue.nAmount != 0)
+                return error("%s : Trying to undo reissue of an token but the tokens amount isn't in the database",
+                             __func__);
+        }
 
         mapTokensAddressAmount[pair] -= reissue.nAmount;
 
