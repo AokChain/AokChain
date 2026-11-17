@@ -143,7 +143,12 @@ AC_DEFUN([AOKCHAIN_QT_CONFIGURE],[
           AC_DEFINE(QT_WINDOWS_VISTA_STYLE, 1, [Define this symbol if the qt windows vista style plugin exists])
         fi
       elif test x$TARGET_OS = xlinux; then
-        _AOKCHAIN_QT_CHECK_STATIC_PLUGINS([Q_IMPORT_PLUGIN(QXcbIntegrationPlugin)],[-lqxcb -lxcb-static])
+        dnl Since Qt 5.8 the xcb plugin uses the xcb libraries of the system or of depends, not a bundled copy.
+        if ${PKG_CONFIG} --exists "Qt5Core >= 5.8" 2>/dev/null; then
+          _AOKCHAIN_QT_CHECK_STATIC_PLUGINS([Q_IMPORT_PLUGIN(QXcbIntegrationPlugin)],[-lqxcb])
+        else
+          _AOKCHAIN_QT_CHECK_STATIC_PLUGINS([Q_IMPORT_PLUGIN(QXcbIntegrationPlugin)],[-lqxcb -lxcb-static])
+        fi
         AC_DEFINE(QT_QPA_PLATFORM_XCB, 1, [Define this symbol if the qt platform is xcb])
       elif test x$TARGET_OS = xdarwin; then
         AX_CHECK_LINK_FLAG([[-framework IOKit]],[QT_LIBS="$QT_LIBS -framework IOKit"],[AC_MSG_ERROR(could not iokit framework)])
@@ -347,14 +352,36 @@ AC_DEFUN([_AOKCHAIN_QT_FIND_STATIC_PLUGINS],[
      if test x$use_pkgconfig = xyes; then
      : dnl
      m4_ifdef([PKG_CHECK_MODULES],[
-       PKG_CHECK_MODULES([QTPLATFORM], [Qt5PlatformSupport], [QT_LIBS="$QTPLATFORM_LIBS $QT_LIBS"])
-       if test x$TARGET_OS = xlinux; then
-         PKG_CHECK_MODULES([X11XCB], [x11-xcb], [QT_LIBS="$X11XCB_LIBS $QT_LIBS"])
-         if ${PKG_CONFIG} --exists "Qt5Core >= 5.5" 2>/dev/null; then
-           PKG_CHECK_MODULES([QTXCBQPA], [Qt5XcbQpa], [QT_LIBS="$QTXCBQPA_LIBS $QT_LIBS"])
+       if ${PKG_CONFIG} --exists "Qt5Core >= 5.8" 2>/dev/null; then
+         dnl Qt 5.8 split PlatformSupport into several static libraries.
+         PKG_CHECK_MODULES([QT_ACCESSIBILITY], [Qt5AccessibilitySupport], [QT_LIBS="$QT_ACCESSIBILITY_LIBS $QT_LIBS"])
+         PKG_CHECK_MODULES([QT_DEVICEDISCOVERY], [Qt5DeviceDiscoverySupport], [QT_LIBS="$QT_DEVICEDISCOVERY_LIBS $QT_LIBS"])
+         PKG_CHECK_MODULES([QT_EDID], [Qt5EdidSupport], [QT_LIBS="$QT_EDID_LIBS $QT_LIBS"])
+         PKG_CHECK_MODULES([QT_EVENTDISPATCHER], [Qt5EventDispatcherSupport], [QT_LIBS="$QT_EVENTDISPATCHER_LIBS $QT_LIBS"])
+         PKG_CHECK_MODULES([QT_FB], [Qt5FbSupport], [QT_LIBS="$QT_FB_LIBS $QT_LIBS"])
+         PKG_CHECK_MODULES([QT_FONTDATABASE], [Qt5FontDatabaseSupport], [QT_LIBS="$QT_FONTDATABASE_LIBS $QT_LIBS"])
+         PKG_CHECK_MODULES([QT_THEME], [Qt5ThemeSupport], [QT_LIBS="$QT_THEME_LIBS $QT_LIBS"])
+         if test x$TARGET_OS = xlinux; then
+           PKG_CHECK_MODULES([QT_SERVICE], [Qt5ServiceSupport], [QT_LIBS="$QT_SERVICE_LIBS $QT_LIBS"])
+           PKG_CHECK_MODULES([QT_XCBQPA], [Qt5XcbQpa], [QT_LIBS="$QT_XCBQPA_LIBS $QT_LIBS"])
+           PKG_CHECK_MODULES([QT_XKBCOMMON], [Qt5XkbCommonSupport], [QT_LIBS="$QT_XKBCOMMON_LIBS $QT_LIBS"])
+         elif test x$TARGET_OS = xdarwin; then
+           dnl Not tried here: these are the libraries the cocoa plugin of a static Qt 5.15 asks for.
+           PKG_CHECK_MODULES([QT_CLIPBOARD], [Qt5ClipboardSupport], [QT_LIBS="$QT_CLIPBOARD_LIBS $QT_LIBS"], [true])
+           PKG_CHECK_MODULES([QT_GRAPHICS], [Qt5GraphicsSupport], [QT_LIBS="$QT_GRAPHICS_LIBS $QT_LIBS"], [true])
+           PKG_CHECK_MODULES([QT_SERVICE], [Qt5ServiceSupport], [QT_LIBS="$QT_SERVICE_LIBS $QT_LIBS"], [true])
+           PKG_CHECK_MODULES([QTPRINT], [Qt5PrintSupport], [QT_LIBS="$QTPRINT_LIBS $QT_LIBS"], [true])
          fi
-       elif test x$TARGET_OS = xdarwin; then
-         PKG_CHECK_MODULES([QTPRINT], [Qt5PrintSupport], [QT_LIBS="$QTPRINT_LIBS $QT_LIBS"])
+       else
+         PKG_CHECK_MODULES([QTPLATFORM], [Qt5PlatformSupport], [QT_LIBS="$QTPLATFORM_LIBS $QT_LIBS"])
+         if test x$TARGET_OS = xlinux; then
+           PKG_CHECK_MODULES([X11XCB], [x11-xcb], [QT_LIBS="$X11XCB_LIBS $QT_LIBS"])
+           if ${PKG_CONFIG} --exists "Qt5Core >= 5.5" 2>/dev/null; then
+             PKG_CHECK_MODULES([QTXCBQPA], [Qt5XcbQpa], [QT_LIBS="$QTXCBQPA_LIBS $QT_LIBS"])
+           fi
+         elif test x$TARGET_OS = xdarwin; then
+           PKG_CHECK_MODULES([QTPRINT], [Qt5PrintSupport], [QT_LIBS="$QTPRINT_LIBS $QT_LIBS"])
+         fi
        fi
      ])
      else
