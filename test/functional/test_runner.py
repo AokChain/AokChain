@@ -127,6 +127,7 @@ BASE_SCRIPTS= [
     'rpc_upstream.py',
     'tool_wallet.py',
     'feature_stake_combine.py',
+    'feature_stake_missing_coin.py',
     'feature_offline_staking.py',
     'feature_future_drift.py',
     'p2p_orphan_processing.py',

@@ -3378,8 +3378,39 @@ bool CWallet::SelectCoinsForStaking(CAmount& nTargetValue, std::set<std::pair<co
     return true;
 }
 
+bool CWallet::StakeCoinInChainState(const COutPoint& outpoint, const uint256& hashTip)
+{
+    AssertLockHeld(cs_main);
+    AssertLockHeld(cs_wallet);
+
+    auto it = mapStakeCoinsMissing.find(outpoint);
+    if (pcoinsTip->HaveCoin(outpoint)) {
+        if (it != mapStakeCoinsMissing.end())
+            mapStakeCoinsMissing.erase(it);
+        return true;
+    }
+    // The wallet hears of a block after the chain state has it: a coin that the tip has just
+    // spent is missing here for a moment. Only a coin that stays away over several blocks counts.
+    if (it == mapStakeCoinsMissing.end()) {
+        mapStakeCoinsMissing.emplace(outpoint, std::make_pair(hashTip, 1));
+    } else if (it->second.first != hashTip) {
+        it->second.first = hashTip;
+        if (++it->second.second == STAKE_COIN_MISSING_BLOCKS) {
+            LogPrintf("Staking: %s is unspent for wallet \"%s\" but not in the chain state of this node; it is left out of stakes. "
+                      "If the wallet is right, the chain state is damaged: restart the node once with -reindex-chainstate.\n",
+                      outpoint.ToString(), GetName());
+        }
+    }
+    return false;
+}
+
 bool CWallet::CreateCoinStake(const CKeyStore& keystore, unsigned int nBits, const CAmount& nTotalFees, uint32_t nTimeBlock, CMutableTransaction& tx, CKey& key)
 {
+    // The search reads the chain tip and looks every coin up in the UTXO set, which inserts
+    // into the coin cache: only under cs_main (SignBlock() takes both locks).
+    AssertLockHeld(cs_main);
+    AssertLockHeld(cs_wallet);
+
     CBlockIndex* pindexPrev = chainActive.Tip();
     arith_uint256 bnTargetPerCoinDay;
     bnTargetPerCoinDay.SetCompact(nBits);
@@ -3427,6 +3458,9 @@ bool CWallet::CreateCoinStake(const CKeyStore& keystore, unsigned int nBits, con
         // Search backward in time from the given txNew timestamp
         // Search nSearchInterval seconds back up to nMaxStakeSearchInterval
         COutPoint prevoutStake = COutPoint(pcoin.first->GetHash(), pcoin.second);
+        // A coin that the chain state of this node does not hold cannot stake here
+        if (!StakeCoinInChainState(prevoutStake, pindexPrev->GetBlockHash()))
+            continue;
         if (CheckKernel(pindexPrev, nBits, nTimeBlock, prevoutStake, *pcoinsTip, stakeCache))
         {
             // Found a kernel
@@ -3510,6 +3544,26 @@ bool CWallet::CreateCoinStake(const CKeyStore& keystore, unsigned int nBits, con
             break; // if kernel is found stop searching
     }
 
+    if (!mapStakeCoinsMissing.empty()) {
+        // (coins that the wallet no longer offers, because it has heard of their spend)
+        std::set<COutPoint> setOffered;
+        for (const std::pair<const CWalletTx*, unsigned int>& pcoin : setCoins)
+            setOffered.insert(COutPoint(pcoin.first->GetHash(), pcoin.second));
+        int nMissing = 0;
+        for (auto it = mapStakeCoinsMissing.begin(); it != mapStakeCoinsMissing.end();) {
+            if (!setOffered.count(it->first)) {
+                it = mapStakeCoinsMissing.erase(it);
+                continue;
+            }
+            if (it->second.second >= STAKE_COIN_MISSING_BLOCKS)
+                nMissing++;
+            ++it;
+        }
+        m_stake_coins_missing = nMissing;
+    } else {
+        m_stake_coins_missing = 0;
+    }
+
     if (nCredit == 0 || nCredit > nBalance - nReserveBalance)
         return false;
 
@@ -3533,6 +3587,11 @@ bool CWallet::CreateCoinStake(const CKeyStore& keystore, unsigned int nBits, con
             // stake matures
             if (nCredit >= GetStakeSplitThreshold())
                 break;
+            // A further input that the chain state does not hold would make every stake of
+            // this wallet invalid for this node, whatever its kernel: one such coin stopped a
+            // wallet from staking at all.
+            if (!StakeCoinInChainState(COutPoint(pcoin.first->GetHash(), pcoin.second), pindexPrev->GetBlockHash()))
+                continue;
 
             txNew.vin.push_back(CTxIn(pcoin.first->GetHash(), pcoin.second));
             nCredit += pcoin.first->tx->vout[pcoin.second].nValue;

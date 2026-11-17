@@ -257,6 +257,8 @@ static UniValue getstakinginfo(const JSONRPCRequest& request)
             "  \"stakes_24h\": n,           (numeric) stakes of this wallet in the chain in the last 24 hours\n"
             "  \"orphaned_24h\": n,         (numeric) stakes of the last 24 hours that lost against another block; they earn nothing\n"
             "  \"reward_24h\": x.xxx,       (numeric) what the stakes of the last 24 hours brought, in " + CURRENCY_UNIT + "\n"
+            "  \"coins_missing\": n,        (numeric) coins that the wallet would stake but that the chain state of this node does not hold;\n"
+            "                             not 0 means that wallet and chain state disagree (debug.log names the coins)\n"
             "  ...\n"
             "}\n");
 
@@ -308,6 +310,7 @@ static UniValue getstakinginfo(const JSONRPCRequest& request)
         obj.pushKV("stakes_24h", stats.nStakes);
         obj.pushKV("orphaned_24h", stats.nOrphaned);
         obj.pushKV("reward_24h", ValueFromAmount(stats.nReward));
+        obj.pushKV("coins_missing", (int)pwallet->m_stake_coins_missing);
     }
 #endif
 

@@ -934,6 +934,12 @@ private:
     const CBlockIndex* m_last_block_processed = nullptr;
 
     std::map<COutPoint, CStakeCache> stakeCache;
+    //! For m_stake_coins_missing: the tip at which a coin was last seen missing, and at how
+    //! many tips in a row. Guarded by cs_wallet.
+    std::map<COutPoint, std::pair<uint256, int> > mapStakeCoinsMissing;
+    //! Whether the chain state holds this coin of the wallet (cs_main and cs_wallet held).
+    //! Keeps mapStakeCoinsMissing and logs a coin that stays missing, once.
+    bool StakeCoinInChainState(const COutPoint& outpoint, const uint256& hashTip);
 
     boost::thread_group* stakeThread = nullptr;
     /** StartStake() and StopStake() come from several threads: the start, wallet commands, the GUI */
@@ -1435,6 +1441,13 @@ public:
     //! searching. Reported by getstakinginfo.
     std::atomic<int64_t> m_last_coin_stake_search_time{0};
     std::atomic<int64_t> m_last_coin_stake_search_interval{0};
+
+    //! Coins that the wallet counts as unspent and old enough to stake, but that the chain
+    //! state of this node did not hold at the last STAKE_COIN_MISSING_BLOCKS tips the staking
+    //! thread searched at. They are left out of stakes. Reported by getstakinginfo: any other
+    //! value than 0 means that the wallet and the chain state of the node disagree.
+    std::atomic<int> m_stake_coins_missing{0};
+    static const int STAKE_COIN_MISSING_BLOCKS = 3;
 
     /**
      * Blocks until the wallet state is up-to-date to /at least/ the current

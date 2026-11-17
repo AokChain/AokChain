@@ -1206,6 +1206,28 @@ UniValue gettxoutsetinfo(const JSONRPCRequest& request)
     return ret;
 }
 
+UniValue removecoin(const JSONRPCRequest& request)
+{
+    if (request.fHelp || request.params.size() != 2)
+        throw std::runtime_error(
+            "removecoin \"txid\" n\n"
+            "\nFor tests (-regtest only): removes an unspent output from the chain state of this node,\n"
+            "as a damaged chain state lacks it, and writes the chain state.\n"
+            "\nResult:\n"
+            "true|false    (boolean) whether the output was there\n");
+
+    if (!Params().MineBlocksOnDemand())
+        throw std::runtime_error("removecoin for regression testing (-regtest mode) only");
+
+    bool fRemoved;
+    {
+        LOCK(cs_main);
+        fRemoved = pcoinsTip->SpendCoin(COutPoint(ParseHashV(request.params[0], "txid"), request.params[1].get_int()));
+    }
+    FlushStateToDisk();
+    return fRemoved;
+}
+
 UniValue gettxout(const JSONRPCRequest& request)
 {
     if (request.fHelp || request.params.size() < 2 || request.params.size() > 3)
@@ -2508,6 +2530,7 @@ static const CRPCCommand commands[] =
     { "blockchain",         "checkfreeze",            &checkfreeze,            {} },
 
     /* Not shown in help */
+    { "hidden",             "removecoin",             &removecoin,             {"txid","n"} },
     { "hidden",             "invalidateblock",        &invalidateblock,        {"blockhash"} },
     { "hidden",             "reconsiderblock",        &reconsiderblock,        {"blockhash"} },
     { "hidden",             "waitfornewblock",        &waitfornewblock,        {"timeout"} },
