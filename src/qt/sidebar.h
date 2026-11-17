@@ -23,6 +23,9 @@ public:
 
 protected:
     void paintEvent(QPaintEvent* event) override;
+    /** A click asks for the change; the owner sets the state when it has happened (a passphrase
+     *  dialog may come first, and may be cancelled). */
+    void nextCheckState() override {}
 };
 
 /** A navigation item of the side bar, bound to a (checkable) action. */
