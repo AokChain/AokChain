@@ -441,6 +441,11 @@ case $host in
      fi
 
      AX_CHECK_LINK_FLAG([[-Wl,-headerpad_max_install_names]], [LDFLAGS="$LDFLAGS -Wl,-headerpad_max_install_names"])
+     dnl libc++ leaves std::random_shuffle out in C++17, and the wallet's coin
+     dnl selection still calls it. _LIBCPP_ENABLE_CXX17_REMOVED_RANDOM_SHUFFLE
+     dnl keeps it available. The lasting change is std::shuffle in coin
+     dnl selection, a wallet change to be reviewed on its own; this define
+     dnl goes away with it.
      CPPFLAGS="$CPPFLAGS -DMAC_OSX -DOBJC_OLD_DISPATCH_PROTOTYPES=0 -D_LIBCPP_ENABLE_CXX17_REMOVED_RANDOM_SHUFFLE"
      OBJCXXFLAGS="$CXXFLAGS"
      ;;
