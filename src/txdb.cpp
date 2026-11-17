@@ -64,6 +64,12 @@ static const char DB_FLAG = 'F';
 static const char DB_REINDEX_FLAG = 'R';
 static const char DB_LAST_BLOCK = 'l';
 
+// The journal of the address index and of the index of unspent outputs by address (see
+// CBlockTreeDB::WriteAddressIndexes in txdb.h)
+static const char DB_INDEX_JOURNAL = 'j';       //!< (DB_INDEX_JOURNAL, number) -> what a batch replaced
+static const char DB_INDEX_JOURNAL_BASE = 'n';  //!< block that the chain state was at when the journal began
+static const char DB_INDEX_PENDING = 'q';       //!< block that the chain state is being written for
+
 // The block of the last write of the chain state by a version that keeps the other stores in
 // step with it (see CCoinsViewDB::IsInStep in txdb.h).
 static const char DB_IN_STEP = 'M';
@@ -397,6 +403,267 @@ bool CBlockTreeDB::ReadAddressUnspentIndex(uint160 addressHash, int type,
         }
     }
 
+    return true;
+}
+
+namespace {
+//! Bytes that are written as they are.
+struct IndexRawBytes {
+    const std::vector<unsigned char>& bytes;
+    explicit IndexRawBytes(const std::vector<unsigned char>& bytesIn) : bytes(bytesIn) {}
+    template <typename Stream> void Serialize(Stream& s) const
+    {
+        if (!bytes.empty())
+            s.write((const char*)bytes.data(), bytes.size());
+    }
+};
+
+//! A value as the bytes that it is made of.
+struct IndexRawValue {
+    std::vector<unsigned char> bytes;
+    template <typename Stream> void Unserialize(Stream& s)
+    {
+        bytes.resize(s.size());
+        if (!bytes.empty())
+            s.read((char*)bytes.data(), bytes.size());
+    }
+};
+
+template <typename T> std::vector<unsigned char> IndexKeyBytes(const T& obj)
+{
+    CDataStream ss(SER_DISK, CLIENT_VERSION);
+    ss << obj;
+    return std::vector<unsigned char>(ss.begin(), ss.end());
+}
+
+struct IndexJournalKey {
+    char key;
+    uint32_t number;
+
+    IndexJournalKey() : key(DB_INDEX_JOURNAL), number(0) {}
+    explicit IndexJournalKey(uint32_t numberIn) : key(DB_INDEX_JOURNAL), number(numberIn) {}
+
+    template <typename Stream> void Serialize(Stream& s) const
+    {
+        s << key;
+        s << number;
+    }
+    template <typename Stream> void Unserialize(Stream& s)
+    {
+        s >> key;
+        s >> number;
+    }
+};
+
+//! What one batch replaced: every key that it wrote or erased, and what the key held before.
+struct IndexJournalRecord {
+    struct Item {
+        std::vector<unsigned char> key;
+        bool had;
+        std::vector<unsigned char> value;
+    };
+    std::vector<Item> items;
+
+    template <typename Stream> void Serialize(Stream& s) const
+    {
+        WriteCompactSize(s, items.size());
+        for (const Item& item : items)
+            s << item.key << item.had << item.value;
+    }
+    template <typename Stream> void Unserialize(Stream& s)
+    {
+        items.resize(ReadCompactSize(s));
+        for (Item& item : items)
+            s >> item.key >> item.had >> item.value;
+    }
+};
+
+//! A batch is written when it has grown to this size (bytes)
+const size_t INDEX_BATCH_SIZE = 16 << 20;
+} // namespace
+
+bool CBlockTreeDB::WriteAddressIndexes(const std::vector<std::pair<CAddressIndexKey, CAmount> >& vectAdd,
+                                       const std::vector<std::pair<CAddressIndexKey, CAmount> >& vectErase,
+                                       const std::vector<std::pair<CAddressUnspentKey, CAddressUnspentValue> >& vectUnspent)
+{
+    AssertLockHeld(cs_main);
+    CDBBatch batch(*this);
+    IndexJournalRecord record;
+    record.items.reserve(vectAdd.size() + vectErase.size() + vectUnspent.size());
+    auto note = [&](std::vector<unsigned char>&& key) {
+        IndexJournalRecord::Item item;
+        IndexRawValue old;
+        item.had = Read(IndexRawBytes(key), old);
+        item.key = std::move(key);
+        item.value = std::move(old.bytes);
+        record.items.push_back(std::move(item));
+    };
+    for (const auto& entry : vectAdd) {
+        const auto key = std::make_pair(DB_ADDRESSINDEX, entry.first);
+        note(IndexKeyBytes(key));
+        batch.Write(key, entry.second);
+    }
+    for (const auto& entry : vectErase) {
+        const auto key = std::make_pair(DB_ADDRESSINDEX, entry.first);
+        note(IndexKeyBytes(key));
+        batch.Erase(key);
+    }
+    for (const auto& entry : vectUnspent) {
+        const auto key = std::make_pair(DB_ADDRESSUNSPENTINDEX, entry.first);
+        note(IndexKeyBytes(key));
+        if (entry.second.IsNull())
+            batch.Erase(key);
+        else
+            batch.Write(key, entry.second);
+    }
+    if (record.items.empty())
+        return true;
+    if (nIndexJournalNext == 0)
+        batch.Write(DB_INDEX_JOURNAL_BASE, hashIndexChainState);
+    batch.Write(IndexJournalKey(nIndexJournalNext++), record);
+    return WriteBatch(batch);
+}
+
+bool CBlockTreeDB::NoteChainStateFlush(const uint256& hashTip)
+{
+    return Write(DB_INDEX_PENDING, hashTip, true);
+}
+
+bool CBlockTreeDB::EraseIndexJournal()
+{
+    // In parts: the notes that say what the journal is for go last, so that a stop on the way
+    // leaves a journal that the next start still reads the same way
+    CDBBatch batch(*this);
+    {
+        std::unique_ptr<CDBIterator> it(NewIterator());
+        for (it->Seek(IndexJournalKey()); it->Valid(); it->Next()) {
+            IndexJournalKey key;
+            if (!it->GetKey(key) || key.key != DB_INDEX_JOURNAL)
+                break;
+            batch.Erase(key);
+            if (batch.SizeEstimate() > INDEX_BATCH_SIZE) {
+                if (!WriteBatch(batch))
+                    return false;
+                batch.Clear();
+            }
+        }
+    }
+    batch.Erase(DB_INDEX_JOURNAL_BASE);
+    batch.Erase(DB_INDEX_PENDING);
+    nIndexJournalNext = 0;
+    return WriteBatch(batch);
+}
+
+bool CBlockTreeDB::DropIndexJournal(const uint256& hashTip)
+{
+    AssertLockHeld(cs_main);
+    hashIndexChainState = hashTip;
+    return EraseIndexJournal();
+}
+
+bool CBlockTreeDB::RecoverAddressIndexes(const uint256& hashChainStateTip, bool fInStep, std::string& strError)
+{
+    AssertLockHeld(cs_main);
+    hashIndexChainState = hashChainStateTip;
+    nIndexJournalNext = 0;
+    uint256 hashPending, hashBase;
+    const bool fPending = Read(DB_INDEX_PENDING, hashPending);
+    const bool fBase = Read(DB_INDEX_JOURNAL_BASE, hashBase);
+
+    std::vector<uint32_t> numbers;
+    {
+        std::unique_ptr<CDBIterator> it(NewIterator());
+        for (it->Seek(IndexJournalKey()); it->Valid(); it->Next()) {
+            IndexJournalKey key;
+            if (!it->GetKey(key) || key.key != DB_INDEX_JOURNAL)
+                break;
+            numbers.push_back(key.number);
+        }
+    }
+    if (numbers.empty() && !fPending && !fBase)
+        return true;
+
+    if (fPending && hashPending == hashChainStateTip) {
+        // The write of the chain state went through, only its end was not noted here: the
+        // indexes are those of this block, the journal is of blocks before it.
+    } else if (!fBase || hashBase != hashChainStateTip) {
+        // The chain state is not at the block that the journal began at.
+        if (fBase && fInStep) {
+            strError = strprintf("the journal of the address index began at block %s, the chain state is that of block %s",
+                                 hashBase.ToString(), hashChainStateTip.ToString());
+            return false;
+        }
+        // (a version that keeps no journal has written the chain state since: the indexes are
+        // taken as they are, as they always were)
+        if (!numbers.empty())
+            LogPrintf("Address index: the chain state was written by another version since the journal began; the journal is dropped\n");
+    } else {
+        // The chain state is where it was when the journal began: undo what was written to the
+        // indexes since, the newest first. Each record is taken out of the journal with what
+        // it undoes, so that a stop on the way leaves the rest to the next start.
+        std::sort(numbers.begin(), numbers.end());
+        CDBBatch batch(*this);
+        for (auto number = numbers.rbegin(); number != numbers.rend(); ++number) {
+            IndexJournalRecord record;
+            if (!Read(IndexJournalKey(*number), record)) {
+                strError = "a record of the journal of the address index cannot be read";
+                return false;
+            }
+            for (auto item = record.items.rbegin(); item != record.items.rend(); ++item) {
+                if (item->had)
+                    batch.Write(IndexRawBytes(item->key), IndexRawBytes(item->value));
+                else
+                    batch.Erase(IndexRawBytes(item->key));
+            }
+            batch.Erase(IndexJournalKey(*number));
+            if (batch.SizeEstimate() > INDEX_BATCH_SIZE) {
+                if (!WriteBatch(batch, true)) {
+                    strError = "the block index database cannot be written";
+                    return false;
+                }
+                batch.Clear();
+            }
+        }
+        if (!WriteBatch(batch, true)) {
+            strError = "the block index database cannot be written";
+            return false;
+        }
+        LogPrintf("Address index: the chain state was not written after the last %u change(s) of the address index; they are undone and come back with their blocks\n", (unsigned int)numbers.size());
+    }
+    if (!EraseIndexJournal() || !Sync()) {
+        strError = "the block index database cannot be written";
+        return false;
+    }
+    return true;
+}
+
+bool CBlockTreeDB::WipeAddressIndexes()
+{
+    AssertLockHeld(cs_main);
+    CDBBatch batch(*this);
+    size_t nErased = 0;
+    for (const char prefix : {DB_ADDRESSINDEX, DB_ADDRESSUNSPENTINDEX, DB_SPENTINDEX, DB_TIMESTAMPINDEX, DB_BLOCKHASHINDEX, DB_INDEX_JOURNAL}) {
+        std::unique_ptr<CDBIterator> it(NewIterator());
+        const std::vector<unsigned char> first(1, (unsigned char)prefix);
+        for (it->Seek(IndexRawBytes(first)); it->Valid(); it->Next()) {
+            IndexRawValue key;
+            if (!it->GetKey(key) || key.bytes.empty() || (char)key.bytes[0] != prefix)
+                break;
+            batch.Erase(IndexRawBytes(key.bytes));
+            ++nErased;
+            if (batch.SizeEstimate() > INDEX_BATCH_SIZE) {
+                if (!WriteBatch(batch))
+                    return false;
+                batch.Clear();
+            }
+        }
+    }
+    batch.Erase(DB_INDEX_JOURNAL_BASE);
+    batch.Erase(DB_INDEX_PENDING);
+    nIndexJournalNext = 0;
+    if (!WriteBatch(batch, true))
+        return false;
+    LogPrintf("The address, spent and time indexes are emptied (%u entries): the blocks fill them again as they are connected\n", (unsigned int)nErased);
     return true;
 }
 

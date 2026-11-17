@@ -2348,12 +2348,9 @@ static DisconnectResult DisconnectBlock(const CBlock& block, const CBlockIndex* 
     view.SetBestBlock(pindex->pprev->GetBlockHash());
 
     if (!ignoreAddressIndex && fAddressIndex) {
-        if (!pblocktree->EraseAddressIndex(addressIndex)) {
-            error("Failed to delete address index");
-            return DISCONNECT_FAILED;
-        }
-        if (!pblocktree->UpdateAddressUnspentIndex(addressUnspentIndex)) {
-            error("Failed to write address unspent index");
+        // (one batch, with what it replaces: see CBlockTreeDB::WriteAddressIndexes)
+        if (!pblocktree->WriteAddressIndexes({}, addressIndex, addressUnspentIndex)) {
+            error("Failed to write address index");
             return DISCONNECT_FAILED;
         }
     }
@@ -3236,12 +3233,9 @@ static bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockInd
             return AbortNode(state, "Failed to write transaction index");
 
     if (!ignoreAddressIndex && fAddressIndex) {
-        if (!pblocktree->WriteAddressIndex(addressIndex)) {
+        // (one batch, with what it replaces: see CBlockTreeDB::WriteAddressIndexes)
+        if (!pblocktree->WriteAddressIndexes(addressIndex, {}, addressUnspentIndex)) {
             return AbortNode(state, "Failed to write address index");
-        }
-
-        if (!pblocktree->UpdateAddressUnspentIndex(addressUnspentIndex)) {
-            return AbortNode(state, "Failed to write address unspent index");
         }
     }
 
@@ -3430,7 +3424,8 @@ bool static FlushStateToDisk(const CChainParams& chainparams, CValidationState &
         //  2. the governance database notes the write that follows, synced: it holds every command
         //     up to this tip, and what it needs to go back to the tip of the write before
         //  3. the chain state, synced
-        //  4. the governance database drops what it kept for going back
+        //  4. the governance database drops what it kept for going back (and with -addressindex the
+        //     block index database, which notes the write at 2 and keeps a journal in the same way)
         //  5. the token database, as one synced batch with this tip: never ahead of the chain state
         // At startup each store is brought to the block of the chain state: ReplayBlocks() (a write
         // of the chain state that was cut short), CGovernance::RecoverTo() (back), RecoverTokenState()
@@ -3453,6 +3448,9 @@ bool static FlushStateToDisk(const CChainParams& chainparams, CValidationState &
             const uint256 hashFlushTip = pcoinsTip->GetBestBlock();
             if (governance && !governance->BeginChainStateFlush(hashFlushTip))
                 return AbortNode(state, "Failed to write to governance database");
+            // (the same for the address index, which is written block by block too)
+            if (fAddressIndex && !pblocktree->NoteChainStateFlush(hashFlushTip))
+                return AbortNode(state, "Failed to write to block index database");
 
             // Flush the chainstate (which may refer to block index entries).
             if (!pcoinsTip->Flush())
@@ -3462,6 +3460,8 @@ bool static FlushStateToDisk(const CChainParams& chainparams, CValidationState &
                 return AbortNode(state, "Failed to write to coin database");
             if (governance && !governance->EndChainStateFlush(hashFlushTip))
                 return AbortNode(state, "Failed to write to governance database");
+            if (fAddressIndex && !pblocktree->DropIndexJournal(hashFlushTip))
+                return AbortNode(state, "Failed to write to block index database");
 
             /** TOKENS START */
             // Flush the tokenstate: after the chain state, so that the token database is never

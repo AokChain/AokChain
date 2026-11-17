@@ -1821,6 +1821,24 @@ bool AppInitMain(boost::thread_group& threadGroup, CScheduler& scheduler)
                         fChainStateAtFault = true;
                         break;
                     }
+                    // The address index is written with every block as well. A rebuild of the
+                    // chain state fills it again: it is emptied first, so that it holds the
+                    // blocks of the chain and no others.
+                    if (fAddressIndex) {
+                        LOCK(cs_main);
+                        std::string strIndexError;
+                        if (fReindexChainState && !fReset) {
+                            if (!pblocktree->WipeAddressIndexes()) {
+                                strLoadError = _("Error writing to the block index database");
+                                break;
+                            }
+                        } else if (!pblocktree->RecoverAddressIndexes(pcoinsTip->GetBestBlock(), fInStep, strIndexError)) {
+                            strLoadError = strprintf(_("The address index does not belong to the chain state (%s)"), strIndexError);
+                            fOnlyReindexHelps = true;
+                            fBlockIndexAtFault = true;
+                            break;
+                        }
+                    }
                 }
 
                 bool is_coinsview_empty = fReset || fReindexChainState || pcoinsTip->GetBestBlock().IsNull();
@@ -1956,7 +1974,7 @@ bool AppInitMain(boost::thread_group& threadGroup, CScheduler& scheduler)
         }
 
         // -autorebuild: the node helps itself where a rebuild from its own block files is the answer
-        if (!fLoaded && !fRequestShutdown && fAutoRebuild && !fReset && !fOnlyReindexHelps) {
+        if (!fLoaded && !fRequestShutdown && fAutoRebuild && !fReset && (!fOnlyReindexHelps || fBlockIndexAtFault)) {
             if (fChainStateAtFault && !fAutoRebuildTried && pblocktree && !fPruneMode && !fHavePruned && SnapshotNodeWithoutPastBlocks()) {
                 // A node that started from a chain state snapshot and has not fetched the blocks
                 // before it cannot build its databases from the block files: it starts over

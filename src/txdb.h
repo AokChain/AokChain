@@ -168,6 +168,42 @@ public:
                                  std::vector<std::pair<CAddressUnspentKey, CAddressUnspentValue> > &vect);
     bool WriteAddressIndex(const std::vector<std::pair<CAddressIndexKey, CAmount> > &vect);
     bool EraseAddressIndex(const std::vector<std::pair<CAddressIndexKey, CAmount> > &vect);
+
+    /**
+     * The address index and the index of unspent outputs by address are written with every
+     * block that is connected or disconnected, the chain state only at its flushes. After a
+     * stop without a flush they were those of a later tip than the chain state, and when the
+     * node then followed another branch (or the writes of a disconnected block had reached the
+     * disk and those of its return had not) entries of blocks that are not in the chain stayed,
+     * or entries of blocks that are in it were missing: commands answered with wrong balances.
+     *
+     * WriteAddressIndexes() writes what one block changes in both as one batch, together with
+     * what the batch replaces (a journal) and, with the first record, the block that the chain
+     * state was at:
+     *   NoteChainStateFlush(tip)    before the chain state is written for this tip (synced)
+     *   DropIndexJournal(tip)       after it is on disk: the journal is not needed any more
+     *   RecoverAddressIndexes(tip, fInStep)
+     *                               at startup, with the block that the chain state is at:
+     *                               undoes the journal when the chain state is still at the
+     *                               block that the journal began at, so that the indexes are
+     *                               those of the chain state again.
+     * As with the governance database (CGovernance::RecoverTo): a journal that a version without
+     * it has overtaken is dropped; one that does not fit although this version wrote the chain
+     * state last is reported (false: only indexing the block files again makes the indexes
+     * right). The journal is undone and dropped in parts, so that a long one (a first
+     * synchronization) does not have to fit into memory.
+     *
+     * WipeAddressIndexes() empties the indexes that are filled when blocks are connected (these
+     * two, the spent index and the time index): a rebuild of the chain state fills them again,
+     * and only with the blocks of the chain.
+     */
+    bool WriteAddressIndexes(const std::vector<std::pair<CAddressIndexKey, CAmount> >& vectAdd,
+                             const std::vector<std::pair<CAddressIndexKey, CAmount> >& vectErase,
+                             const std::vector<std::pair<CAddressUnspentKey, CAddressUnspentValue> >& vectUnspent);
+    bool NoteChainStateFlush(const uint256& hashTip);
+    bool DropIndexJournal(const uint256& hashTip);
+    bool RecoverAddressIndexes(const uint256& hashChainStateTip, bool fInStep, std::string& strError);
+    bool WipeAddressIndexes();
     bool ReadAddressIndex(uint160 addressHash, int type, std::string tokenName,
                           std::vector<std::pair<CAddressIndexKey, CAmount> > &addressIndex,
                           int start = 0, int end = 0);
@@ -183,6 +219,13 @@ public:
     bool WriteFlag(const std::string &name, bool fValue);
     bool ReadFlag(const std::string &name, bool &fValue);
     bool LoadBlockIndexGuts(const Consensus::Params& consensusParams, std::function<CBlockIndex*(const uint256&)> insertBlockIndex);
+
+private:
+    bool EraseIndexJournal();
+    //! Number of the next record of the index journal, and the block that the chain state was
+    //! last written for (or loaded at). Guarded by cs_main.
+    uint32_t nIndexJournalNext = 0;
+    uint256 hashIndexChainState;
 };
 
 #endif // AOKCHAIN_TXDB_H
