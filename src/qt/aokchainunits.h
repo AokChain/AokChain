@@ -59,7 +59,7 @@ public:
     explicit AokChainUnits(QObject *parent);
 
     /** AokChain units.
-      @note Source: https://en.aokchain.it/wiki/Units . Please add only sensible ones
+      @note Source: https://en.bitcoin.it/wiki/Units . Please add only sensible ones
      */
     enum Unit
     {

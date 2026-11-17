@@ -37,7 +37,7 @@
  *
  * \section intro_sec Introduction
  *
- * This is the developer documentation of the reference client for an experimental new digital currency called AokChain (https://www.aokchain.org/),
+ * This is the developer documentation of the reference client for an experimental new digital currency called AokChain (https://aok.network/),
  * which enables instant payments to anyone, anywhere in the world. AokChain uses peer-to-peer technology to operate
  * with no central authority: managing transactions and issuing money are carried out collectively by the network.
  *

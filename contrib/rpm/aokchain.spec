@@ -20,8 +20,8 @@ Summary:	Peer to Peer Cryptographic Currency
 
 Group:		Applications/System
 License:	MIT
-URL:		https://aokchain.org/
-Source0:	https://aokchain.org/bin/aokchain-core-%{version}/aokchain-%{version}.tar.gz
+URL:		https://aok.network/
+Source0:	https://github.com/AokChain/AokChain/archive/v%{version}.tar.gz
 Source1:	http://download.oracle.com/berkeley-db/db-%{bdbv}.NC.tar.gz
 
 Source10:	https://raw.githubusercontent.com/aokchain/aokchain/v%{version}/contrib/debian/examples/aokchain.conf
@@ -332,11 +332,10 @@ if [ `%{_sbindir}/sestatus |grep -c "disabled"` -eq 0 ]; then
 for selinuxvariant in %{selinux_variants}; do
 	%{_sbindir}/semodule -s ${selinuxvariant} -i %{_datadir}/selinux/${selinuxvariant}/aokchain.pp &> /dev/null || :
 done
-%{_sbindir}/semanage port -a -t aokchain_port_t -p tcp 8766
-%{_sbindir}/semanage port -a -t aokchain_port_t -p tcp 8767
-%{_sbindir}/semanage port -a -t aokchain_port_t -p tcp 18766
-%{_sbindir}/semanage port -a -t aokchain_port_t -p tcp 18767
-%{_sbindir}/semanage port -a -t aokchain_port_t -p tcp 18443
+%{_sbindir}/semanage port -a -t aokchain_port_t -p tcp 33440
+%{_sbindir}/semanage port -a -t aokchain_port_t -p tcp 33441
+%{_sbindir}/semanage port -a -t aokchain_port_t -p tcp 44550
+%{_sbindir}/semanage port -a -t aokchain_port_t -p tcp 44551
 %{_sbindir}/semanage port -a -t aokchain_port_t -p tcp 18444
 %{_sbindir}/fixfiles -R aokchain-server restore &> /dev/null || :
 %{_sbindir}/restorecon -R %{_localstatedir}/lib/aokchain || :
@@ -353,11 +352,10 @@ fi
 # SELinux
 if [ $1 -eq 0 ]; then
 	if [ `%{_sbindir}/sestatus |grep -c "disabled"` -eq 0 ]; then
-	%{_sbindir}/semanage port -d -p tcp 8766
-	%{_sbindir}/semanage port -d -p tcp 8767
-	%{_sbindir}/semanage port -d -p tcp 18766
-	%{_sbindir}/semanage port -d -p tcp 18767
-	%{_sbindir}/semanage port -d -p tcp 18443
+	%{_sbindir}/semanage port -d -p tcp 33440
+	%{_sbindir}/semanage port -d -p tcp 33441
+	%{_sbindir}/semanage port -d -p tcp 44550
+	%{_sbindir}/semanage port -d -p tcp 44551
 	%{_sbindir}/semanage port -d -p tcp 18444
 	for selinuxvariant in %{selinux_variants}; do
 		%{_sbindir}/semodule -s ${selinuxvariant} -r aokchain &> /dev/null || :

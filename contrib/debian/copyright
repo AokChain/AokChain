@@ -1,14 +1,13 @@
 Format: http://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
 Upstream-Name: AokChain
-Upstream-Contact: Satoshi Nakamoto <satoshin@gmx.com>
- irc://#aokchain@freenode.net
+Upstream-Contact: https://github.com/AokChain/AokChain/issues
 Source: https://github.com/AokChain/AokChain
 
 Files: *
 Copyright: 2009-2017, AokChain Core Developers
 License: Expat
-Comment: The AokChain Core Developers encompasses the current developers listed on aokchain.org,
-         as well as the numerous contributors to the project.
+Comment: The AokChain Core Developers encompasses the developers of AokChain Core, of Raven Core
+         and of Bitcoin Core, as well as the numerous contributors to these projects.
 
 Files: debian/*
 Copyright: 2010-2011, Jonas Smedegaard <dr@jones.dk>
@@ -83,7 +82,7 @@ Files: src/qt/res/icons/about.png
        src/qt/res/src/aokchain.svg
 Copyright: Bitboy, Jonas Schnelli
 License: public-domain
-Comment: Site: https://aokchaintalk.org/?topic=1756.0
+Comment: Site: https://bitcointalk.org/?topic=1756.0
 
 
 License: Expat

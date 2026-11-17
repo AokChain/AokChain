@@ -26,7 +26,7 @@ Contains files used to package aokchaind/aokchain-qt
 for Debian-based Linux systems. If you compile aokchaind/aokchain-qt yourself, there are some useful files here.
 
 ### [Gitian-descriptors](/contrib/gitian-descriptors) ###
-Files used during the gitian build process. For more information about gitian, see the [the AokChain Core documentation repository](https://github.com/aokchain-core/docs).
+Files used during the gitian build process. For more information about gitian, see the [the AokChain Core documentation repository](https://github.com/bitcoin-core/docs).
 
 ### [Gitian-keys](/contrib/gitian-keys)
 PGP keys used for signing AokChain Core [Gitian release](/doc/release-process.md) results.
@@ -47,4 +47,4 @@ Test and Verify Tools
 Utilities to generate test vectors for the data-driven AokChain tests.
 
 ### [Verify Binaries](/contrib/verifybinaries) ###
-This script attempts to download and verify the signature file SHA256SUMS.asc from aokchain.org.
+Compare the SHA-256 hash of a downloaded release file with the hash published in the SHA256SUMS file of that release.
