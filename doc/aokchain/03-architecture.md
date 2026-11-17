@@ -115,7 +115,7 @@ aokchaind = server + common + univalue + util + wallet + zmq + consensus + crypt
 
 ## 5. Versions
 
-- Client: `_CLIENT_VERSION_*` in `configure.ac` (currently 4.0.8).
+- Client: `_CLIENT_VERSION_*` in `configure.ac` (currently 4.0.9).
 - Protocol (`src/version.h`): `PROTOCOL_VERSION` 70021 (3.0.x: 70020), `MIN_PEER_PROTO_VERSION` = 60018, `TOKENDATA_VERSION` 70017.
 
 ## 6. RPCs specific to AokChain

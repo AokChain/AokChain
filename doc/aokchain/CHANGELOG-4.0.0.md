@@ -1,9 +1,9 @@
 # AokChain Core 4.0 changelog — compared with 3.0.5
 
-- **Covers:** 4.0.0 to 4.0.8. The first part describes 4.0.0 as it was prepared; every later version has its own section at the end.
+- **Covers:** 4.0.0 to 4.0.9. The first part describes 4.0.0 as it was prepared; every later version has its own section at the end.
 - **Baseline:** 3.0.5 (`5d1fd3d`, 2022-09-24)
 - **Size of 4.0.0:** 136 commits (as of 2026-11-13)
-- **Status:** released. The current version is 4.0.8 (2026-11-17). The Windows programs are not code-signed.
+- **Status:** released. The current version is 4.0.9 (2026-11-17). The Windows programs are not code-signed.
 
 ## Compatibility
 
@@ -246,3 +246,11 @@ Maintenance release from the review before the public release. The rules do not 
 - **Version text.** A build from a source archive names its own commit. The release programs are built from the release tag and report the plain version, `v4.0.8`.
 - **Documents.** The links to upstream documents work again, and `doc/README.md` describes the 4.0 packages and the documents that exist.
 - New tests `feature_tokens_undo.py`, `feature_activation_heights.py` and `rpc_tokens_concurrent.py`; `feature_staking_multiwallet.py` checks `-stakingwallet`. The functional baseline has 62 tests.
+
+## 4.0.9 (2026-11-17)
+
+Build release for macOS. The node and the wallet are those of 4.0.8: nothing changes in their behaviour, and the Linux and Windows programs work as in 4.0.8. A node that runs 4.0.8 does not need this version.
+
+- **macOS on Apple silicon.** The release builds on an Apple silicon Mac straight from the release tag, for macOS 11.0 and later: `depends` builds every library for `aarch64-apple-darwin`, and Qt is linked into the desktop wallet. The steps are in `doc/build-osx.md`.
+- **macOS 11.0 is the minimum** for every macOS build, and the app says so in its `Info.plist`.
+- **Build.** `config.site` of `depends` sets `PKG_CONFIG_LIBDIR` under its right name, so that a build with `depends` takes its libraries from there only. The Linux and Windows release builds find the same libraries as before.
