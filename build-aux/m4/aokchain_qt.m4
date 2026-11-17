@@ -146,6 +146,24 @@ AC_DEFUN([AOKCHAIN_QT_CONFIGURE],[
         dnl Since Qt 5.8 the xcb plugin uses the xcb libraries of the system or of depends, not a bundled copy.
         if ${PKG_CONFIG} --exists "Qt5Core >= 5.8" 2>/dev/null; then
           _AOKCHAIN_QT_CHECK_STATIC_PLUGINS([Q_IMPORT_PLUGIN(QXcbIntegrationPlugin)],[-lqxcb])
+          dnl Input methods (IBus, the compose key). A static build has no other way to
+          dnl type text of other scripts; without the plugins the build goes on without them.
+          if test -f "$qt_plugin_path/platforminputcontexts/libibusplatforminputcontextplugin.a"; then
+            AC_MSG_CHECKING(for the static Qt input context plugins)
+            CHECK_STATIC_PLUGINS_TEMP_LIBS="$LIBS"
+            qt_input_context_libs="-L$qt_plugin_path/platforminputcontexts -libusplatforminputcontextplugin -lcomposeplatforminputcontextplugin"
+            LIBS="$qt_input_context_libs $QT_DBUS_LIBS $QT_LIBS $LIBS"
+            AC_LINK_IFELSE([AC_LANG_PROGRAM([[
+              #define QT_STATICPLUGIN
+              #include <QtPlugin>
+              Q_IMPORT_PLUGIN(QIbusPlatformInputContextPlugin)
+              Q_IMPORT_PLUGIN(QComposePlatformInputContextPlugin)]],
+              [[return 0;]])],
+              [AC_MSG_RESULT(yes); QT_LIBS="$qt_input_context_libs $QT_LIBS"
+               AC_DEFINE(QT_XCB_INPUT_CONTEXTS, 1, [Define this symbol if the input context plugins of the xcb platform are linked])],
+              [AC_MSG_RESULT(no)])
+            LIBS="$CHECK_STATIC_PLUGINS_TEMP_LIBS"
+          fi
         else
           _AOKCHAIN_QT_CHECK_STATIC_PLUGINS([Q_IMPORT_PLUGIN(QXcbIntegrationPlugin)],[-lqxcb -lxcb-static])
         fi

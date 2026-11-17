@@ -77,6 +77,10 @@ Q_IMPORT_PLUGIN(AccessibleFactory)
 #endif
 #if defined(QT_QPA_PLATFORM_XCB)
 Q_IMPORT_PLUGIN(QXcbIntegrationPlugin);
+#if defined(QT_XCB_INPUT_CONTEXTS)
+Q_IMPORT_PLUGIN(QIbusPlatformInputContextPlugin);
+Q_IMPORT_PLUGIN(QComposePlatformInputContextPlugin);
+#endif
 #elif defined(QT_QPA_PLATFORM_WINDOWS)
 Q_IMPORT_PLUGIN(QWindowsIntegrationPlugin);
 #if defined(QT_WINDOWS_VISTA_STYLE)
