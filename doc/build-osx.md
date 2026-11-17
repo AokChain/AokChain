@@ -3,6 +3,41 @@ Mac OS X Build Instructions and Notes
 The commands in this guide should be executed in a Terminal application.
 The built-in one is located in `/Applications/Utilities/Terminal.app`.
 
+Release build on Apple silicon
+------------------------------
+This is how the macOS programs of a release are built: every library comes
+from `depends`, Qt included, and nothing is taken from Homebrew or the system
+except the compiler and the build tools. The programs run on macOS 11.0 and
+later.
+
+Install Xcode (or its command line tools) and, for the build tools only,
+`git`, `pkg-config`, `python3`, `autoconf`, `automake` and `libtool`. Then,
+in a clean checkout of the release tag:
+
+    make -C depends HOST=aarch64-apple-darwin darwin_native_packages=
+    ./autogen.sh
+    CONFIG_SITE=$PWD/depends/aarch64-apple-darwin/share/config.site ./configure --prefix=/ --with-gui=qt5 --disable-gui-tests --disable-bench --enable-tests --with-tx
+    make
+    make appbundle
+
+`darwin_native_packages=` leaves out the helpers that only a cross build from
+Linux needs. `make appbundle` writes `AokChain-Qt.app`; because Qt is linked
+in, the bundle refers to nothing outside the system and needs no
+`macdeployqt`. `hdiutil create` makes the disk image from it. The node and the
+command-line tools are `src/aokchaind`, `src/aokchain-cli`, `src/aokchain-tx`
+and `src/aokchain-wallet`.
+
+The unit tests run with `contrib/aokchain/unit-tests.sh`, the functional tests
+with `test/functional/test_runner.py` (they need a Python that still has
+`asyncore`, that is 3.11 or older).
+
+A program that is given to other people has to be signed with a Developer ID
+Application certificate and notarized, or Gatekeeper refuses it.
+
+The sections below are the older way with Homebrew libraries. They are kept
+for reference; current Homebrew versions of Boost need source changes that
+the tree does not have.
+
 Preparation
 -----------
 Install the OS X command line tools:
@@ -116,7 +151,7 @@ Uncheck everything except Qt Creator during the installation process.
 Notes
 -----
 
-* Tested on OS X 10.8 through 10.14 on 64-bit Intel processors only.
+* The release build is made and tested on Apple silicon; the lowest supported version is macOS 11.0. The Homebrew instructions were last tested on OS X 10.8 through 10.14 on 64-bit Intel processors.
 
 * Building with downloaded Qt binaries is not officially supported. 
 
