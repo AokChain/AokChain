@@ -72,15 +72,17 @@ A wallet that had been used for a long time became very slow as transactions acc
 
 - **Compiler:** C++17. Builds on current systems (Ubuntu 24.04, GCC 13). 3.0.5 did not build there.
 - **Dependencies:** Boost 1.64 → 1.83, OpenSSL 1.0.1k → 3.0.15, libevent 2.1.8 → 2.1.12, ZeroMQ 4.2.2 → 4.3.5, miniupnpc 2.0 → 2.2.7. BDB stays at 4.8.30.
-- **Windows build:** Qt 5.7.1 → 5.15.10. This part lives in a separate work tree and is not merged into `modernize` yet.
+- **Windows build:** Qt 5.7.1 → 5.15.10.
 
-## Tests
+## Tests (4.0.0, as of 2026-11-11)
 
 - **Unit tests:** 73 of 78 pass. 3.0.5 did not compile them. The remaining 5 need new bloom filter test data.
 - **Functional tests:** a baseline of 38 passes (including the multisig flow `wallet_multisig_flow.py`, the bootstrap `feature_bootstrap.py` and the old peer cutoff `p2p_old_peer_cutoff.py`). None ran on 3.0.5. The 47 that still fail expect Bitcoin or Ravencoin values and have not been ported.
 - **Mainnet:** full chain revalidation, history scan, live tip following, two real payments confirmed.
 
-## Known limitations
+## Known limitations of 4.0.0 (as of 2026-11-11)
+
+Several of these changed before the release and in later versions: see the sections below.
 
 - **Peer discovery:** the DNS seed does not answer and most fixed seeds are dead, so a fresh install may need peers added with `addnode`.
 - **Mainnet staking:** staking is running on mainnet but has not produced a block yet, so acceptance of a block made by 4.0.0 is not confirmed.
