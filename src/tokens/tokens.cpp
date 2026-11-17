@@ -217,7 +217,7 @@ bool IsTypeCheckNameValid(const KnownTokenType type, const std::string& name, st
         }  //Tokens and sub-tokens need to leave one extra char for OWNER indicator
 
         if (!IsTokenNameASubtoken(name) && name.size() < MIN_TOKEN_LENGTH) {
-            error = "Name must be contain " + std::to_string(MIN_TOKEN_LENGTH) + " characters";
+            error = "Name must have at least " + std::to_string(MIN_TOKEN_LENGTH) + " characters";
             return false;
         }
 
@@ -228,7 +228,11 @@ bool IsTypeCheckNameValid(const KnownTokenType type, const std::string& name, st
         }
 
         if (!valid) {
-            error = "Name contains invalid characters (Valid characters are: A-Z 0-9 _ .) (special characters can't be the first or last characters)";
+            // (a name that is kept for the coin itself is refused by the same check)
+            if (std::regex_match(name.substr(0, name.find('/')), PROTECTED_NAMES))
+                error = "Name is reserved: AOK, AOKCHAIN, AOKCOIN, AOKHACOIN and AOKHACHAIN cannot be token names";
+            else
+                error = "Name contains invalid characters (Valid characters are: A-Z 0-9 _ .) (special characters can't be the first or last characters)";
             return false;
         }
 
@@ -1094,7 +1098,7 @@ bool CReissueToken::IsValid(std::string &strError, CTokensCache& tokenCache, boo
         // (A negative nAmount is rejected further below.)
         if (token.nAmount < 0 || token.nAmount > MAX_MONEY_TOKENS || this->nAmount > MAX_MONEY_TOKENS - token.nAmount) {
             strError = _("Unable to reissue token: token_name '") + strName +
-                       _("' the amount trying to reissue is to large");
+                       _("' the amount trying to reissue is too large");
             return false;
         }
 
