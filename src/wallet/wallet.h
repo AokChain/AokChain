@@ -62,6 +62,12 @@ CWallet* GetWallet(const std::string& name);
 /** The first wallet (the one of the first -wallet option, wallet.dat by default), or nullptr.
  *  It cannot be unloaded: the solo miner and the token calls without a wallet argument use it. */
 CWallet* GetDefaultWallet();
+
+/** Whether -staking starts the staking of the wallet with this name: of every wallet, or of the
+ *  wallets that -stakingwallet names when that option is given. Asked for the wallets of the start
+ *  and for a wallet that is opened or made later. (The switch of the desktop wallet does not ask:
+ *  there the user chooses the wallet.) */
+bool StakingStartsForWallet(const std::string& name);
 /** Whether this is the first wallet, see GetDefaultWallet() */
 bool IsDefaultWallet(const CWallet* wallet);
 

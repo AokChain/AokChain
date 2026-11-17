@@ -74,6 +74,7 @@ std::string WalletInit::GetHelpString(bool showDebug)
     strUsage += HelpMessageOpt("-spendzeroconfchange", strprintf(_("Spend unconfirmed change when sending transactions (default: %u)"), DEFAULT_SPEND_ZEROCONF_CHANGE));
     strUsage += HelpMessageOpt("-spendofflinestaking", strprintf(_("Let a payment take coins at an offline staking address on its own. Otherwise they are spent only when they are selected, with coin control or in a raw transaction (default: %u)"), DEFAULT_SPEND_OFFLINE_STAKING));
     strUsage += HelpMessageOpt("-staking", strprintf("Stake with the coins of every wallet while it is unlocked; the desktop wallet has a switch for it (default: %u)", DEFAULT_STAKE));
+    strUsage += HelpMessageOpt("-stakingwallet=<name>", "With -staking, stake with this wallet only, by its name as listwallets shows it; may be given several times. A wallet that is not named does not stake, whether it is opened at the start or later (default: every wallet stakes)");
     strUsage += HelpMessageOpt("-stakecombinethreshold=<amt>", strprintf(_("A stake gathers the coins of its address that are smaller than this amount (in %s) and is split in two when it reaches twice the amount, so the staking coins end up between one and two times this size (default: %s)"),
                                                             CURRENCY_UNIT, FormatMoney(DEFAULT_STAKE_COMBINE_THRESHOLD)));
     strUsage += HelpMessageOpt("-txconfirmtarget=<n>", strprintf(_("If paytxfee is not set, include enough fee so transactions begin confirmation on average within n blocks (default: %u)"), DEFAULT_TX_CONFIRM_TARGET));
@@ -362,7 +363,8 @@ void WalletInit::Start(CScheduler& scheduler)
         LogPrintf("Staking disabled\n");
     } else {
         for (CWallet* pwallet : GetWallets()) {
-            pwallet->StartStake();
+            if (StakingStartsForWallet(pwallet->GetName()))
+                pwallet->StartStake();
         }
     }
 }

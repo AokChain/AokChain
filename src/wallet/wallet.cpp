@@ -98,6 +98,20 @@ CWallet* GetDefaultWallet()
     return vpwallets.empty() ? nullptr : vpwallets[0];
 }
 
+bool StakingStartsForWallet(const std::string& name)
+{
+    if (!gArgs.GetBoolArg("-staking", DEFAULT_STAKE))
+        return false;
+    if (!gArgs.IsArgSet("-stakingwallet"))
+        return true;
+    for (const std::string& named : gArgs.GetArgs("-stakingwallet")) {
+        if (named == name)
+            return true;
+    }
+    LogPrintf("Wallet \"%s\" does not stake: -stakingwallet does not name it\n", name);
+    return false;
+}
+
 bool IsDefaultWallet(const CWallet* wallet)
 {
     LOCK(cs_wallets);
@@ -143,8 +157,8 @@ static CWallet* OpenWalletByName(const std::string& name, bool fCreate, WalletLo
         AddWallet(wallet);
     }
     wallet->postInitProcess();
-    // as the wallets of the start: they stake when -staking is on
-    if (gArgs.GetBoolArg("-staking", DEFAULT_STAKE))
+    // as the wallets of the start: they stake when -staking is on, unless -stakingwallet names others
+    if (StakingStartsForWallet(wallet->GetName()))
         wallet->StartStake();
     result = WalletLoadResult::OK;
     return wallet;
