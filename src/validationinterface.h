@@ -44,6 +44,13 @@ void UnregisterAllValidationInterfaces();
  * will result in a deadlock (that DEBUG_LOCKORDER will miss).
  */
 void CallFunctionInValidationInterfaceQueue(std::function<void ()> func);
+/**
+ * Returns when every callback that was in the notification queue at the time of the call has
+ * run (or when the node is shutting down). The callbacks take cs_main and cs_wallet: the
+ * caller must hold neither, nor any lock that a validation interface client waits for, and
+ * must not be a callback itself.
+ */
+void SyncWithValidationInterfaceQueue();
 
 class CValidationInterface {
 protected:
@@ -130,6 +137,9 @@ public:
     void UnregisterBackgroundSignalScheduler();
     /** Call any remaining callbacks on the calling thread */
     void FlushBackgroundCallbacks();
+
+    /** Number of callbacks in the notification queue that have not started yet */
+    size_t CallbacksPending();
 
     /** Register with mempool to call TransactionRemovedFromMempool callbacks */
     void RegisterWithMempoolSignals(CTxMemPool& pool);

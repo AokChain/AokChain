@@ -68,9 +68,9 @@ TestingSetup::TestingSetup(const std::string &chainName) : BasicTestingSetup(cha
     fs::create_directories(pathTemp);
     gArgs.ForceSetArg("-datadir", pathTemp.string());
 
-    // Note that because we don't bother running a scheduler thread here,
-    // callbacks via CValidationInterface are unreliable, but that's OK,
-    // our unit tests aren't testing multiple parts of the code at once.
+    // A scheduler thread serves the validation interface queue: block connection waits for
+    // the queue when it gets long (see ActivateBestChain), and nothing else would empty it.
+    threadGroup.create_thread(boost::bind(&CScheduler::serviceQueue, &scheduler));
     GetMainSignals().RegisterBackgroundSignalScheduler(scheduler);
 
     mempool.setSanityCheck(1.0);

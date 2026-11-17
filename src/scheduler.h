@@ -110,6 +110,9 @@ public:
     // Processes all remaining queue members on the calling thread, blocking until queue is empty
     // Must be called after the CScheduler has no remaining processing threads!
     void EmptyQueue();
+
+    // Number of callbacks that have not started yet
+    size_t CallbacksPending();
 };
 
 #endif

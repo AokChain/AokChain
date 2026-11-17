@@ -739,8 +739,9 @@ void ThreadImport(std::vector<fs::path> vImportFiles)
     }
 
     // scan for better chains in the block chain database, that are not yet connected in the active best chain
+    // (after -reindex and -reindex-chainstate that is the whole chain: let the notifications keep up)
     CValidationState state;
-    if (!ActivateBestChain(state, chainparams)) {
+    if (!ActivateBestChain(state, chainparams, std::shared_ptr<const CBlock>(), nullptr, true)) {
         LogPrintf("Failed to connect best block");
         StartShutdown();
     }

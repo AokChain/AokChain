@@ -9,6 +9,9 @@
 
 #include "test/test_aokchain.h"
 
+#include <atomic>
+#include <future>
+
 #include <boost/bind.hpp>
 #include <boost/thread.hpp>
 #include <boost/test/unit_test.hpp>
@@ -121,6 +124,47 @@ BOOST_AUTO_TEST_SUITE(scheduler_tests)
             counterSum += counter[i];
         }
         BOOST_CHECK_EQUAL(counterSum, 200);
+    }
+
+    // The queue of a single-threaded client says how many callbacks have not started yet: block
+    // connection uses that to wait for the validation interface clients instead of filling the
+    // queue with every connected block.
+    BOOST_AUTO_TEST_CASE(singlethreadedscheduler_pending)
+    {
+        CScheduler scheduler;
+        SingleThreadedSchedulerClient queue(&scheduler);
+        BOOST_CHECK_EQUAL(queue.CallbacksPending(), 0U);
+
+        // Nothing serves the queue yet: everything stays pending
+        std::atomic<int> nDone{0};
+        std::promise<void> first_started, release_first;
+        queue.AddToProcessQueue([&] {
+            first_started.set_value();
+            release_first.get_future().wait();
+            nDone++;
+        });
+        for (int i = 0; i < 20; i++)
+            queue.AddToProcessQueue([&] { nDone++; });
+        BOOST_CHECK_EQUAL(queue.CallbacksPending(), 21U);
+
+        // The first callback runs and blocks: the 20 behind it wait
+        boost::thread_group threads;
+        threads.create_thread(boost::bind(&CScheduler::serviceQueue, &scheduler));
+        first_started.get_future().wait();
+        BOOST_CHECK_EQUAL(queue.CallbacksPending(), 20U);
+        BOOST_CHECK_EQUAL(nDone.load(), 0);
+
+        // A caller that waits for the queue (as SyncWithValidationInterfaceQueue does): its own
+        // callback runs after everything that was queued before it
+        std::promise<void> drained;
+        queue.AddToProcessQueue([&] { drained.set_value(); });
+        release_first.set_value();
+        drained.get_future().wait();
+        BOOST_CHECK_EQUAL(nDone.load(), 21);
+        BOOST_CHECK_EQUAL(queue.CallbacksPending(), 0U);
+
+        scheduler.stop(true);
+        threads.join_all();
     }
 
 BOOST_AUTO_TEST_SUITE_END()

@@ -3982,12 +3982,22 @@ static void NotifyHeaderTip() {
     }
 }
 
+/** Notifications of connected blocks that may wait in the queue before block connection pauses for them */
+static const size_t MAX_VALIDATION_CALLBACKS_PENDING = 10;
+
+static void LimitValidationInterfaceQueue()
+{
+    AssertLockNotHeld(cs_main);
+    if (GetMainSignals().CallbacksPending() > MAX_VALIDATION_CALLBACKS_PENDING)
+        SyncWithValidationInterfaceQueue();
+}
+
 /**
  * Make the best chain active, in multiple steps. The result is either failure
  * or an activated best chain. pblock is either nullptr or a pointer to a block
  * that is already loaded (to avoid loading it again from disk).
  */
-bool ActivateBestChain(CValidationState &state, const CChainParams& chainparams, std::shared_ptr<const CBlock> pblock, const uint256 *phash) {
+bool ActivateBestChain(CValidationState &state, const CChainParams& chainparams, std::shared_ptr<const CBlock> pblock, const uint256 *phash, bool fMayWait) {
     // Note that while we're often called here from ProcessNewBlock, this is
     // far from a guarantee. Things in the P2P/RPC will often end up calling
     // us in the middle of ProcessNewBlock - do not assume pblock is set
@@ -4000,6 +4010,13 @@ bool ActivateBestChain(CValidationState &state, const CChainParams& chainparams,
         boost::this_thread::interruption_point();
         if (ShutdownRequested())
             break;
+
+        // Each connected block is handed to the validation interface clients with the block
+        // itself. They run on another thread and need cs_main: while this loop connects block
+        // after block they fall behind, and the queue grew by every block of a rebuild of the
+        // chain state (several gigabytes on the main network).
+        if (fMayWait)
+            LimitValidationInterfaceQueue();
 
         const CBlockIndex *pindexFork;
         bool fInitialDownload;
@@ -5206,7 +5223,8 @@ bool ProcessNewBlock(const CChainParams& chainparams, const std::shared_ptr<cons
     NotifyHeaderTip();
 
     CValidationState state; // Only used to report errors, not invalidity - ignore it
-    if (!ActivateBestChain(state, chainparams, pblock, &hash))
+    // (no caller holds cs_main here: the function takes it itself, above)
+    if (!ActivateBestChain(state, chainparams, pblock, &hash, true))
         return error("%s: ActivateBestChain failed", __func__);
 
     return true;

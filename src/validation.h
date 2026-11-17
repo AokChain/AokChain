@@ -329,7 +329,11 @@ void SetRestoreCoinTime(bool fRestore);
 /** Retrieve a transaction (from memory pool, or from disk, if possible) */
 bool GetTransaction(const uint256 &hash, CTransactionRef &tx, const Consensus::Params& params, uint256 &hashBlock, bool fAllowSlow = false);
 /** Find the best known block, and make it the tip of the block chain */
-bool ActivateBestChain(CValidationState& state, const CChainParams& chainparams, std::shared_ptr<const CBlock> pblock = std::shared_ptr<const CBlock>(), const uint256 *phash = NULL);
+/** fMayWait: the caller holds no lock (not cs_main either), so the function may wait between two
+ *  steps until the validation interface clients (wallets, the peer logic) have handled the blocks
+ *  connected so far. Without that, a long run of connects (a rebuild of the chain state, a
+ *  reindex, a catch-up) keeps every connected block in the notification queue, in memory. */
+bool ActivateBestChain(CValidationState& state, const CChainParams& chainparams, std::shared_ptr<const CBlock> pblock = std::shared_ptr<const CBlock>(), const uint256 *phash = NULL, bool fMayWait = false);
 CAmount GetBlockSubsidy(int nHeight, const Consensus::Params& consensusParams);
 
 /** Guess verification progress (as a fraction between 0.0=genesis and 1.0=current tip). */

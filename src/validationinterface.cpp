@@ -13,9 +13,14 @@
 #include "sync.h"
 #include "txmempool.h"
 #include "util.h"
+#include "validation.h"
 
 #include <list>
 #include <atomic>
+#include <chrono>
+#include <future>
+
+#include <boost/thread.hpp>
 
 #include <boost/signals2/signal.hpp>
 
@@ -107,8 +112,29 @@ void UnregisterAllValidationInterfaces() {
     g_signals.m_internals->BlockFound.disconnect_all_slots();
 }
 
+size_t CMainSignals::CallbacksPending() {
+    if (!m_internals) return 0;
+    return m_internals->m_schedulerClient.CallbacksPending();
+}
+
 void CallFunctionInValidationInterfaceQueue(std::function<void ()> func) {
     g_signals.m_internals->m_schedulerClient.AddToProcessQueue(std::move(func));
+}
+
+void SyncWithValidationInterfaceQueue() {
+    AssertLockNotHeld(cs_main);
+    // (the callback may run after this function has returned, on shutdown: it owns the promise)
+    auto promise = std::make_shared<std::promise<void>>();
+    std::future<void> done = promise->get_future();
+    CallFunctionInValidationInterfaceQueue([promise] {
+        promise->set_value();
+    });
+    while (done.wait_for(std::chrono::milliseconds(100)) != std::future_status::ready) {
+        // The scheduler thread ends on shutdown; nothing drains the queue then.
+        if (ShutdownRequested())
+            return;
+        boost::this_thread::interruption_point();
+    }
 }
 
 void CMainSignals::MempoolEntryRemoved(CTransactionRef ptx, MemPoolRemovalReason reason) {
