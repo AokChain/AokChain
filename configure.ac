@@ -441,7 +441,7 @@ case $host in
      fi
 
      AX_CHECK_LINK_FLAG([[-lboost_system -Wl,-headerpad_max_install_names]], [LDFLAGS="$LDFLAGS -lboost_system -Wl,-headerpad_max_install_names"])
-     CPPFLAGS="$CPPFLAGS -DMAC_OSX -DOBJC_OLD_DISPATCH_PROTOTYPES=0"
+     CPPFLAGS="$CPPFLAGS -DMAC_OSX -DOBJC_OLD_DISPATCH_PROTOTYPES=0 -D_LIBCPP_ENABLE_CXX17_REMOVED_RANDOM_SHUFFLE"
      OBJCXXFLAGS="$CXXFLAGS"
      ;;
    *linux*)
