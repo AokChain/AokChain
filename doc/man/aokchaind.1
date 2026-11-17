@@ -387,6 +387,13 @@ control or in a raw transaction (default: 0)
 Stake with the coins of every wallet while it is unlocked; the desktop
 wallet has a switch for it (default: 0)
 .HP
+\fB\-stakingwallet=\fR<name>
+.IP
+With \fB\-staking\fR, stake with this wallet only, by its name as listwallets
+shows it; may be given several times. A wallet that is not named
+does not stake, whether it is opened at the start or later
+(default: every wallet stakes)
+.HP
 \fB\-stakecombinethreshold=\fR<amt>
 .IP
 A stake gathers the coins of its address that are smaller than this
