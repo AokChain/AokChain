@@ -1,10 +1,10 @@
-# 02. Build and test guide (for the build server)
+# 02. Build and test guide
 
 ## Environment
 
 | Item | Value |
 |---|---|
-| OS | Ubuntu 24.04.5 LTS, x86_64, 8 cores, 15GB RAM, 48GB disk (30GB free as of 2026-11) |
+| OS | Ubuntu 24.04.5 LTS, x86_64, 8 cores, 15GB RAM |
 | Compiler | gcc/g++ 13.3, **C++17** |
 | Boost | 1.83 (system) |
 | OpenSSL | 3.0.13 (system) |
@@ -55,11 +55,10 @@ If `./libtool --features` shows `disable shared libraries`, run `./configure ...
 
 ### Unit tests
 ```bash
-./src/test/test_aokchain                         # all
-./src/test/test_aokchain --run_test=token_tx_tests   # one suite
-./src/test/test_aokchain --report_level=short
+contrib/aokchain/unit-tests.sh                        # every suite on its own, compared with doc/aokchain/unit-baseline.txt
+./src/test/test_aokchain --run_test=token_tx_tests    # one suite
 ```
-For the current state see 05-stability-testing.md (73 of 78 pass; the 5 failures are all in `bloom_tests`).
+Run them through the script. `test_aokchain` in a single run also executes the cases that are switched off (`doc/aokchain/unit-not-run.txt`) and stops at their failures. For the current state see 05-stability-testing.md (all 71 suites pass).
 
 ### Functional tests (these actually start regtest nodes)
 ```bash
@@ -72,7 +71,7 @@ python3 test/functional/test_runner.py -j8 --combinedlogslen=0 > /tmp/ft.log
 
 ### Minimum set for regression checks (always after a change)
 ```bash
-make -j8 && ./src/test/test_aokchain --report_level=short
+make -j8 && contrib/aokchain/unit-tests.sh
 python3 test/functional/test_runner.py -j8 $(cat doc/aokchain/functional-baseline.txt)
 ```
 `functional-baseline.txt` contains the list of functional tests that currently pass. When a test is fixed so that it passes, add it to this list.
