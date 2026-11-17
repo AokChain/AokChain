@@ -1,13 +1,15 @@
 # 01. Current status and change history
 
 - Branch: `4.0`. Its history continues from `master` of `AokChain/AokChain` at `5d1fd3d` ("Updated version", 2022-09-24)
-- Client version: **4.0.7** (`_CLIENT_VERSION_IS_RELEASE=true`). The changes of every version are in `CHANGELOG-4.0.0.md`; the release notes of 4.0.0 are in `release-notes-4.0.0.md`
+- Client version: **4.0.8** (`_CLIENT_VERSION_IS_RELEASE=true`). The changes of every version are in `CHANGELOG-4.0.0.md`; the release notes of 4.0.0 are in `release-notes-4.0.0.md`
 
-## Current release (2026-11-17): 4.0.7
+## Current release (2026-11-17): 4.0.8
 
-- 4.0.0 to 4.0.7 are released. What each version changed is in the changelog; the sections from "At a glance" on are the record of 2026-11-11, when 4.0.0 was prepared.
+- 4.0.0 to 4.0.8 are released. What each version changed is in the changelog; the sections from "At a glance" on are the record of 2026-11-11, when 4.0.0 was prepared.
+- **4.0.8:** maintenance release from the review before the public release. Token queries are coordinated with block processing; reorganizations and re-indexing with token transactions are exact; the address index stores a lock time for token transfers only (a node with `-addressindex` is started once with `-reindex`). The desktop wallet is available for Linux again, and the release programs are built from the release tag. The consensus rules and the chain state do not change. `-stakingwallet` names the wallets that stake when a node has several (since 4.0.7 a wallet that is opened while the node runs stakes as well).
+- **Checks of 4.0.8:** 71 unit test suites and the functional baseline of 62 tests pass (`feature_tokens_undo.py`, `feature_activation_heights.py` and `rpc_tokens_concurrent.py` are new in it). The whole main network chain was read back with `-reindex` and gave the same tip and state hashes as before. A node started from the published snapshot (height 3,031,432) synchronized to the tip and followed it beside a 4.0.7 node, with equal state hashes at every comparison.
 - **4.0.7:** the desktop wallet runs several wallets in one window (the wallet is chosen at the top of the side bar; Create, Open, Restore and Close Wallet; a staking switch per wallet; notifications and the console name the wallet). A wallet that is created or loaded while the node runs stakes when the node runs with `-staking`, and `unloadwallet` waits for the staking thread of the wallet. The consensus rules and the chain state do not change, and a node with one wallet behaves as before.
-- **Checks:** 71 unit test suites and the functional baseline of 59 tests pass (`feature_staking_multiwallet.py` and `wallet_multiwallet.py` are new in it). A first start on the published main network snapshot (height 3,031,432) in a new data directory, without a network connection, gives the hashes of `getstatehashes` that are compiled into the program, and the 4.0.6 programs read the same hashes from the same data. The GUI was checked with three wallets, in English and in Korean.
+- **Checks of 4.0.7:** 71 unit test suites and the functional baseline of 59 tests pass (`feature_staking_multiwallet.py` and `wallet_multiwallet.py` are new in it). A first start on the published main network snapshot (height 3,031,432) in a new data directory, without a network connection, gives the hashes of `getstatehashes` that are compiled into the program, and the 4.0.6 programs read the same hashes from the same data. The GUI was checked with three wallets, in English and in Korean.
 
 ## At a glance (2026-11-11)
 

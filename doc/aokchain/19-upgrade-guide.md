@@ -6,7 +6,7 @@ upgraded on its own, at any time.
 
 ## Requirements
 
-- Linux: Ubuntu 22.04 or later (glibc 2.35), x86_64. The archive
+- Linux: Ubuntu 22.04 or later (glibc 2.34), x86_64. The archive
   `aokchain-4.0.0…-linux-x86_64.tar.gz` holds `aokchaind`, `aokchain-cli`, `aokchain-tx` and
   `aokchain-wallet`; nothing else has to be installed.
 - The wallet file format is that of 3.0.x (Berkeley DB 4.8). A wallet can be opened by
@@ -79,6 +79,22 @@ Going back: stop the node, put the two old programs back, start it.
   Make a new backup after encrypting: the old backups are unencrypted.
 - **Offline staking** keeps the spending key away from the server altogether
   (18-offline-staking.md). It needs 4.0 on the staking majority.
+- **Several wallets in one node.** With `staking=1` every wallet that the node has open
+  stakes. Since 4.0.7 this includes a wallet that is opened later (`loadwallet`,
+  `createwallet`, the wallet menu of the desktop wallet); up to 4.0.6 only the wallets of
+  the start staked. A node that stakes with one wallet and keeps other wallets for a
+  service names the wallets that stake:
+
+  ```
+  stakingwallet=<name as listwallets shows it>
+  ```
+
+  The line stands beside `staking=1` in the configuration file and may be given several
+  times, once for every wallet that stakes. A wallet that is not named does not stake,
+  whether it is opened at the start or later.
+  Put the line into the configuration before the first start of 4.0.7 or later: a coin
+  that has staked cannot be spent for 60 blocks, and a stake gathers the small coins of
+  its address into one.
 
 ## Exchange nodes
 

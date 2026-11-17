@@ -1,9 +1,9 @@
 # AokChain Core 4.0 changelog — compared with 3.0.5
 
-- **Covers:** 4.0.0 to 4.0.7. The first part describes 4.0.0 as it was prepared; every later version has its own section at the end.
+- **Covers:** 4.0.0 to 4.0.8. The first part describes 4.0.0 as it was prepared; every later version has its own section at the end.
 - **Baseline:** 3.0.5 (`5d1fd3d`, 2022-09-24)
 - **Size of 4.0.0:** 136 commits (as of 2026-11-13)
-- **Status:** released. The current version is 4.0.7 (2026-11-17). The Windows programs are not code-signed.
+- **Status:** released. The current version is 4.0.8 (2026-11-17). The Windows programs are not code-signed.
 
 ## Compatibility
 
@@ -231,3 +231,18 @@ Several wallets in one window of the desktop wallet. The rules and the chain sta
 - **`loadwallet`, `createwallet`, `restorewallet`, `unloadwallet`** share their code with the GUI. Their answers and error codes are unchanged. Unloading a wallet whose database environment nobody else uses removes the log files of that environment, as the shutdown does: the wallet file holds everything.
 - **GUI texts.** English plural forms for texts of 4.0 that showed "(s)" ("1 kind" and "2 kinds" of tokens, "24 h: 1 reward"). A wallet that is unlocked for staking only says "Staking only" under its name. The multisig page says "Only AOK can be sent from a multisig address. Tokens cannot be sent from one."
 - New test `feature_staking_multiwallet.py` (two wallets on regtest proof of stake); `wallet_multiwallet.py` checks the wallet folders, the endpoints and the errors of the wallet commands. Both are in the functional baseline (59 tests).
+
+## 4.0.8 (2026-11-17)
+
+Maintenance release from the review before the public release. The rules do not change: 4.0.8 accepts the same blocks as 4.0.0 to 4.0.7, and the chain state is not touched. Upgrade every node.
+
+- **Token queries.** The commands that read token data are coordinated with block processing, and listing tokens is a little faster.
+- **Reorganizations and re-indexing.** Disconnecting blocks and reading blocks back from disk (`-reindex`, `-reindex-chainstate`) are exact for every kind of token transaction: issues, reissues, transfers, sub tokens, unique tokens, usernames and owner tokens.
+- **Address index.** Token outputs other than transfers are stored without a lock time. A node that runs with `-addressindex` should be started once with `-reindex` after the upgrade, which corrects the records of earlier blocks; new blocks are right without it, and `getaddressutxos` was not affected. Other nodes need nothing.
+- **Staking wallets.** `-stakingwallet=<name>` names the wallets that `-staking` stakes with; it may be given several times, and without it every wallet stakes, as before. Since 4.0.7 a wallet that is opened while the node runs stakes like the wallets of the start. A node that stakes with one wallet and opens others for a service names its staking wallet: the others do not stake, whether they are opened at the start or later (`19-upgrade-guide.md`).
+- **Desktop wallet.** The staking switch shows "on" only once staking has started, not while the passphrase is being asked for. The steps of the multisig wizard have a row of their own, so its title fits a window of 1280 px. The units are named AOK, Milli-AOK and Micro-AOK; "username" is one word everywhere; the passphrase hint names no keyboard key.
+- **Desktop wallet for Linux.** The Linux release has the desktop wallet again, as 3.0.5 had: `aokchain-qt` in an archive of its own, with Qt linked in. It uses the X and font libraries that an Ubuntu 22.04 or 24.04 desktop installs, and types other scripts through IBus. To build it, depends has the Linux libraries of Qt 5.15 and configure finds the parts of a static Qt.
+- **Help texts.** Every example uses AokChain's ports and example addresses that belong to nobody; amounts are in AOK. A token name that is too short or reserved is refused with that reason (the error codes are unchanged). `-staking` and `-advancedui` are in the help, and the man pages are those of the current programs.
+- **Version text.** A build from a source archive names its own commit. The release programs are built from the release tag and report the plain version, `v4.0.8`.
+- **Documents.** The links to upstream documents work again, and `doc/README.md` describes the 4.0 packages and the documents that exist.
+- New tests `feature_tokens_undo.py`, `feature_activation_heights.py` and `rpc_tokens_concurrent.py`; `feature_staking_multiwallet.py` checks `-stakingwallet`. The functional baseline has 62 tests.
