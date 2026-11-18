@@ -316,6 +316,7 @@ void Shutdown()
         delete governance;
         governance = nullptr;
     }
+    TestCrashPoint("shutdown-tail");
     g_wallet_init_interface->Stop();
 
 #if ENABLE_ZMQ
@@ -1215,6 +1216,8 @@ bool AppInitParameterInteraction()
 
     nMaxBlocksPerStake = (unsigned int)std::max<int64_t>(1, gArgs.GetArg("-maxblocksperstake", DEFAULT_MAX_BLOCKS_PER_STAKE));
 
+    if (gArgs.IsArgSet("-testcrashat") && !chainparams.MineBlocksOnDemand())
+        return InitError("-testcrashat is for regression testing (-regtest) only");
     if (gArgs.IsArgSet("-masteraddress")) {
         if (!chainparams.MineBlocksOnDemand())
             return InitError("-masteraddress is for regression testing (-regtest) only");
@@ -1372,6 +1375,7 @@ bool AppInitMain(boost::thread_group& threadGroup, CScheduler& scheduler)
     }
     CreatePidFile(GetPidFile(), getpid());
 #endif
+    TestCrashPoint("pidfile");
     if (gArgs.GetBoolArg("-shrinkdebugfile", logCategories == BCLog::NONE)) {
         // Do this first since it both loads a bunch of debug.log into memory,
         // and because this needs to happen before any other debug.log printing
@@ -1645,6 +1649,7 @@ bool AppInitMain(boost::thread_group& threadGroup, CScheduler& scheduler)
                         pblocktree->Sync();
                         fRunningMarked = true;
                     }
+                    TestCrashPoint("running-mark");
                     // A rebuild that was decided and is not done: a block that did not connect at
                     // the last run (RequestChainStateRebuild), or a stop before the wipes below
                     bool fRebuildMark = false;

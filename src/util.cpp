@@ -966,6 +966,15 @@ bool ExitFailureRequested()
     return fExitFailure;
 }
 
+void TestCrashPoint(const char* point)
+{
+    static const std::string strPoint = gArgs.GetArg("-testcrashat", "");
+    if (strPoint.empty() || strPoint != point)
+        return;
+    LogPrintf("Simulating a crash at the point '%s'. Goodbye.\n", point);
+    _Exit(0);
+}
+
 void SetupEnvironment()
 {
 #ifdef HAVE_MALLOPT_ARENA_MAX

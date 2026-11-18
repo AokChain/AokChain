@@ -75,6 +75,10 @@ inline std::string _(const char *psz)
 void RequestExitFailure();
 bool ExitFailureRequested();
 
+/** For tests (-testcrashat=<point>, -regtest only): at the point of that name the program ends
+ *  at once, without writing or closing anything more, as a program that is killed there. */
+void TestCrashPoint(const char* point);
+
 void SetupEnvironment();
 
 bool SetupNetworking();
