@@ -11,6 +11,7 @@
 #include <chain.h>
 #include <sync.h>
 
+#include <memory>
 #include <map>
 #include <optional>
 #include <utility>
@@ -28,6 +29,58 @@
 #define GOVERNANCE_COST_UNIQUE 3
 #define GOVERNANCE_COST_SUB 4
 #define GOVERNANCE_COST_USERNAME 5
+
+/**
+ * What a commit of governance changes replaced: for every key that it wrote or erased, what the
+ * key held before. It is the exact inverse of the commit as a whole, whatever the number and
+ * the order of the commands that made it, and whether a command changed anything.
+ *  - The journal that keeps the database in step with the chain state is made of these
+ *    (CGovernance::BeginChainStateFlush).
+ *  - The one of a block's commit is kept from the moment the block is connected
+ *    (CGovernance::WriteBlockUndo). When the block is disconnected, the governance state is
+ *    put back from it to what it was before the block (CGovernance::ApplyBlockUndo).
+ */
+struct CGovernanceUndo {
+    struct Freeze { CScript script; bool had; bool frozen; };
+    struct Cost { int type; int height; bool had; CAmount cost; };
+    struct Fee { int height; bool had; CScript script; };
+    std::vector<Freeze> freeze;
+    std::vector<Cost> cost;
+    std::vector<Fee> fee;
+    bool hadNumber = false;
+    bool setNumber = false;
+    unsigned int number = 0;
+    //! (not stored) a commit went to the database, and this is what it replaced
+    bool fSet = false;
+
+    template<typename Stream>
+    void Serialize(Stream &s) const {
+        WriteCompactSize(s, freeze.size());
+        for (const Freeze& item : freeze)
+            s << item.script << item.had << item.frozen;
+        WriteCompactSize(s, cost.size());
+        for (const Cost& item : cost)
+            s << item.type << item.height << item.had << item.cost;
+        WriteCompactSize(s, fee.size());
+        for (const Fee& item : fee)
+            s << item.height << item.had << item.script;
+        s << setNumber << hadNumber << number;
+    }
+
+    template<typename Stream>
+    void Unserialize(Stream& s) {
+        freeze.resize(ReadCompactSize(s));
+        for (Freeze& item : freeze)
+            s >> item.script >> item.had >> item.frozen;
+        cost.resize(ReadCompactSize(s));
+        for (Cost& item : cost)
+            s >> item.type >> item.height >> item.had >> item.cost;
+        fee.resize(ReadCompactSize(s));
+        for (Fee& item : fee)
+            s >> item.height >> item.had >> item.script;
+        s >> setNumber >> hadNumber >> number;
+    }
+};
 
 class CGovernance : CDBWrapper 
 {
@@ -77,8 +130,44 @@ public:
      * Use CGovernanceChanges. The levels are not saved: they live while cs_main is held.
      */
     void BeginChanges();
-    bool CommitChanges();
+    //! pundo: when the commit goes to the database (the outermost level), what it replaced
+    bool CommitChanges(CGovernanceUndo* pundo = nullptr);
     void DiscardChanges();
+
+    /**
+     * Puts back what the commit of a block replaced: the governance state is then exactly the
+     * one before that block, for every command and any number and order of commands, also
+     * commands that changed nothing. (The Revert... functions above guess the state before a
+     * command from the command; they are used only for blocks that a version without this
+     * record connected.) Like the commands, it goes to the open level of changes.
+     */
+    bool ApplyBlockUndo(const CGovernanceUndo& undo);
+
+    /**
+     * The records of what the blocks replaced, by block. They are kept in a database of their
+     * own, next to this one (<datadir>/governanceundo): this database holds the governance
+     * state and nothing else, every record of it counts for the hash that nodes compare, and
+     * the block index and the chain state are files that a snapshot is made of and that other
+     * versions read. A version that does not know the records never looks at them, and a
+     * snapshot cannot bring any.
+     *  - WriteBlockUndo() is on disk when it returns: a block is never connected for good
+     *    without its record.
+     *  - A record belongs to one block (its hash) and is written again every time the block is
+     *    connected. It is read only when that block is disconnected, which is when the state
+     *    is the one after that block.
+     *  - The database is emptied with this one (a rebuild of the chain state connects every
+     *    block again and writes every record again).
+     * ReadUndoSince()/WriteUndoSince(): the block that the chain state was at when a version
+     * that keeps the records took the node over (null: from the first block on), and the
+     * script of the master address then (the records are kept for the blocks that spend
+     * from it). That block and the blocks before it may have no record; a later block
+     * without one is damage. See LoadGovernanceUndoSince() in validation.cpp.
+     */
+    bool WriteBlockUndo(const uint256& hashBlock, const CGovernanceUndo& undo);
+    bool ReadBlockUndo(const uint256& hashBlock, CGovernanceUndo& undo) const;
+    bool EraseBlockUndo(const uint256& hashBlock);
+    bool ReadUndoSince(uint256& hashBlock, CScript& master) const;
+    bool WriteUndoSince(const uint256& hashBlock, const CScript& master);
 
     /**
      * Keeping in step with the chain state. The commands of a block are written here when the
@@ -110,18 +199,23 @@ public:
     bool BeginChainStateFlush(const uint256& hashTip);
     bool EndChainStateFlush(const uint256& hashTip);
     bool RecoverTo(const uint256& hashChainStateTip, bool fInStep, std::string& strError);
+    //! Whether this version began a write of the chain state for this block and did not get to
+    //! note its end (asked before RecoverTo(), which takes the note away).
+    bool ChainStateFlushBegun(const uint256& hashTip) const;
 
     using CDBWrapper::Sync;
 
 private:
     struct Changes {
-        std::map<CScript, bool> freeze;                                 //!< script -> frozen
+        std::map<CScript, std::optional<bool>> freeze;                  //!< script -> frozen; none: erased
         std::map<std::pair<int, int>, std::optional<CAmount>> cost;     //!< (type, height) -> cost; none: erased
         std::map<int, std::optional<CScript>> fee;                      //!< height -> fee script; none: erased
         std::optional<unsigned int> numberFrozen;
     };
     //! Open levels, the innermost last. Guarded by cs.
     std::vector<Changes> vChanges;
+    //! What the blocks replaced (see WriteBlockUndo).
+    std::unique_ptr<CDBWrapper> m_undo;
     //! Guards vChanges. Readers outside cs_main (RPC) may run while a block is connected.
     mutable CCriticalSection cs;
 
@@ -132,6 +226,7 @@ private:
     bool GetFeeEntry(int height, CScript& script) const;
     // Writes into the innermost level, or into the batch when no level is open. Hold cs.
     void SetFreezeEntry(CDBBatch& batch, const CScript& script, bool frozen);
+    void EraseFreezeEntry(CDBBatch& batch, const CScript& script);
     void SetNumberFrozen(CDBBatch& batch, unsigned int number);
     void SetCostEntry(CDBBatch& batch, int type, int height, std::optional<CAmount> cost);
     void SetFeeEntry(CDBBatch& batch, int height, std::optional<CScript> script);
@@ -143,7 +238,8 @@ private:
     //! The block that the chain state was last written for (or loaded at). Guarded by cs.
     uint256 hashChainState;
     //! Puts what the changes replace in the database into the batch, as a journal record. Hold cs.
-    void WriteJournal(CDBBatch& batch, const Changes& changes);
+    CGovernanceUndo Replaced(const Changes& changes) const;
+    void WriteJournal(CDBBatch& batch, const CGovernanceUndo& record);
     //! Erases the journal records and the pending mark in the batch. Hold cs.
     void EraseJournal(CDBBatch& batch);
 };
@@ -174,11 +270,11 @@ public:
     CGovernanceChanges(const CGovernanceChanges&) = delete;
     CGovernanceChanges& operator=(const CGovernanceChanges&) = delete;
 
-    bool Commit()
+    bool Commit(CGovernanceUndo* pundo = nullptr)
     {
         if (m_done) return true;
         m_done = true;
-        return m_governance ? m_governance->CommitChanges() : true;
+        return m_governance ? m_governance->CommitChanges(pundo) : true;
     }
 
 private:

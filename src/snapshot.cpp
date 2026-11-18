@@ -723,6 +723,10 @@ void WipeChainData()
     boost::system::error_code ec;
     for (const char* dir : SNAPSHOT_DIRS)
         fs::remove_all(GetDataDir() / dir, ec);
+    // (what the blocks of the removed chain replaced in the governance state; a snapshot
+    // brings none)
+    fs::remove_all(GetDataDir() / "governanceundo", ec);
+    fs::remove(GetDataDir() / "governanceundo.since", ec);
     const fs::path blocks = GetDataDir() / "blocks";
     if (fs::is_directory(blocks, ec)) {
         std::vector<fs::path> files;

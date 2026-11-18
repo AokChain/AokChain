@@ -1228,6 +1228,27 @@ UniValue removecoin(const JSONRPCRequest& request)
     return fRemoved;
 }
 
+UniValue removegovernanceundo(const JSONRPCRequest& request)
+{
+    if (request.fHelp || request.params.size() != 1)
+        throw std::runtime_error(
+            "removegovernanceundo \"blockhash\"\n"
+            "\nFor tests (-regtest only): removes the record of what the governance commands of a block\n"
+            "replaced, as a damaged database lacks it.\n"
+            "\nResult:\n"
+            "true|false    (boolean) whether there was a record\n");
+
+    if (!Params().MineBlocksOnDemand())
+        throw std::runtime_error("removegovernanceundo for regression testing (-regtest mode) only");
+
+    const uint256 hash = ParseHashV(request.params[0], "blockhash");
+    LOCK(cs_main);
+    CGovernanceUndo undo;
+    if (!governance->ReadBlockUndo(hash, undo))
+        return false;
+    return governance->EraseBlockUndo(hash);
+}
+
 UniValue gettxout(const JSONRPCRequest& request)
 {
     if (request.fHelp || request.params.size() < 2 || request.params.size() > 3)
@@ -2531,6 +2552,7 @@ static const CRPCCommand commands[] =
 
     /* Not shown in help */
     { "hidden",             "removecoin",             &removecoin,             {"txid","n"} },
+    { "hidden",             "removegovernanceundo",   &removegovernanceundo,   {"blockhash"} },
     { "hidden",             "invalidateblock",        &invalidateblock,        {"blockhash"} },
     { "hidden",             "reconsiderblock",        &reconsiderblock,        {"blockhash"} },
     { "hidden",             "waitfornewblock",        &waitfornewblock,        {"timeout"} },

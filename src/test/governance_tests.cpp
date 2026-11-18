@@ -7,6 +7,8 @@
 
 #include <boost/test/unit_test.hpp>
 
+#include <functional>
+
 // The levels of governance changes (CGovernance::BeginChanges): what a block commands is seen
 // by the rest of the block at once, and is in the database only when the level is committed.
 
@@ -199,6 +201,135 @@ BOOST_AUTO_TEST_CASE(governance_journal)
     BOOST_CHECK(db.ContentHash() == ahead);
     BOOST_CHECK(db.RecoverTo(block0, true, error)); // (nothing is left of the journal)
     BOOST_CHECK(db.ContentHash() == ahead);
+}
+
+// What the commit of a block replaced puts the state back exactly (CGovernance::ApplyBlockUndo),
+// where the reverts of single commands do not: commands that change nothing, a script that was
+// not known before, several commands for one script.
+BOOST_AUTO_TEST_CASE(governance_block_undo)
+{
+    CGovernance db(1 << 20, true, true);
+    BOOST_REQUIRE(db.Init(true, Params()));
+    const CScript a = Script(1), b = Script(2), c = Script(3), d = Script(4);
+    const CScript fee = db.GetFeeScript();
+
+    // a state to begin with: a frozen, b known and not frozen, c and d unknown
+    BOOST_CHECK(db.FreezeScript(a));
+    BOOST_CHECK(db.FreezeScript(b));
+    BOOST_CHECK(db.UnfreezeScript(b));
+    const uint256 before = db.ContentHash();
+    const size_t listed = Frozen(db);
+
+    // "block" 1: what its commands replace is kept, the block is disconnected, the state is the one before
+    auto roundtrip = [&](const std::function<void()>& commands) {
+        CGovernanceUndo undo;
+        {
+            CGovernanceChanges changes(&db);
+            commands();
+            BOOST_CHECK(changes.Commit(&undo));
+        }
+        BOOST_CHECK(undo.fSet);
+        {
+            CGovernanceChanges changes(&db);
+            BOOST_CHECK(db.ApplyBlockUndo(undo));
+            BOOST_CHECK(changes.Commit());
+        }
+        BOOST_CHECK(db.ContentHash() == before);
+        BOOST_CHECK(!db.CanSend(a));
+        BOOST_CHECK(db.CanSend(b) && db.ScriptExist(b));
+        BOOST_CHECK(db.CanSend(c) && !db.ScriptExist(c));
+        BOOST_CHECK_EQUAL(db.GetNumberOfFrozenScripts(), 1U);
+        BOOST_CHECK_EQUAL(Frozen(db), listed);
+        BOOST_CHECK(db.GetFeeScript() == fee);
+    };
+
+    // commands that change nothing
+    roundtrip([&] { BOOST_CHECK(db.FreezeScript(a)); });      // already frozen
+    roundtrip([&] { BOOST_CHECK(db.UnfreezeScript(b)); });    // already unfrozen
+    // a script that was not known: no entry may stay
+    roundtrip([&] { BOOST_CHECK(db.FreezeScript(c)); });
+    roundtrip([&] { BOOST_CHECK(db.UnfreezeScript(c)); });
+    // several commands for one script, in either order, also across "transactions"
+    roundtrip([&] { BOOST_CHECK(db.UnfreezeScript(b)); BOOST_CHECK(db.FreezeScript(b)); });
+    roundtrip([&] { BOOST_CHECK(db.FreezeScript(b)); BOOST_CHECK(db.UnfreezeScript(b)); });
+    roundtrip([&] { BOOST_CHECK(db.UnfreezeScript(a)); BOOST_CHECK(db.FreezeScript(a)); BOOST_CHECK(db.UnfreezeScript(a)); });
+    roundtrip([&] { BOOST_CHECK(db.FreezeScript(c)); BOOST_CHECK(db.FreezeScript(c)); BOOST_CHECK(db.UnfreezeScript(d)); });
+    // costs and the fee script, twice in one block
+    roundtrip([&] {
+        BOOST_CHECK(db.UpdateCost(7 * COIN, GOVERNANCE_COST_ROOT, 100));
+        BOOST_CHECK(db.UpdateCost(8 * COIN, GOVERNANCE_COST_ROOT, 100));
+        BOOST_CHECK(db.UpdateCost(9 * COIN, GOVERNANCE_COST_SUB, 100));
+        BOOST_CHECK(db.UpdateFeeScript(c, 100));
+        BOOST_CHECK(db.UpdateFeeScript(d, 100));
+    });
+    // everything at once
+    roundtrip([&] {
+        BOOST_CHECK(db.FreezeScript(a));
+        BOOST_CHECK(db.UnfreezeScript(a));
+        BOOST_CHECK(db.FreezeScript(d));
+        BOOST_CHECK(db.UpdateCost(7 * COIN, GOVERNANCE_COST_ROOT, 100));
+        BOOST_CHECK(db.UnfreezeScript(b));
+        BOOST_CHECK(db.UpdateFeeScript(c, 100));
+    });
+
+    // the records are kept by block, apart from the state: they do not count for its hash
+    {
+        CGovernanceUndo undo, read;
+        {
+            CGovernanceChanges changes(&db);
+            BOOST_CHECK(db.FreezeScript(c));
+            BOOST_CHECK(db.UpdateCost(7 * COIN, GOVERNANCE_COST_ROOT, 100));
+            BOOST_CHECK(changes.Commit(&undo));
+        }
+        const uint256 with = db.ContentHash();
+        const uint256 block = uint256S("11");
+        uint256 since;
+        CScript master;
+        BOOST_CHECK(!db.ReadBlockUndo(block, read));
+        BOOST_CHECK(!db.ReadUndoSince(since, master));
+        BOOST_CHECK(db.WriteBlockUndo(block, undo));
+        BOOST_CHECK(db.WriteUndoSince(block, a));
+        BOOST_CHECK(db.ContentHash() == with);
+        BOOST_CHECK(db.ReadBlockUndo(block, read));
+        BOOST_CHECK(db.ReadUndoSince(since, master) && since == block && master == a);
+        BOOST_CHECK(!db.ReadBlockUndo(uint256S("12"), read));
+        BOOST_CHECK_EQUAL(read.freeze.size(), 1U);
+        BOOST_CHECK(read.freeze[0].script == c && !read.freeze[0].had);
+        BOOST_CHECK_EQUAL(read.cost.size(), 1U);
+        BOOST_CHECK(!read.cost[0].had && read.cost[0].type == GOVERNANCE_COST_ROOT && read.cost[0].height == 100);
+        BOOST_CHECK(read.setNumber && read.hadNumber && read.number == 1);
+        {
+            CGovernanceChanges changes(&db);
+            BOOST_CHECK(db.ApplyBlockUndo(read));
+            BOOST_CHECK(changes.Commit());
+        }
+        BOOST_CHECK(db.ContentHash() == before);
+        BOOST_CHECK(db.EraseBlockUndo(block));
+        BOOST_CHECK(!db.ReadBlockUndo(block, read));
+        // a nested commit (the check of the last blocks at startup) hands no record out
+        CGovernanceUndo none;
+        {
+            CGovernanceChanges outer(&db);
+            {
+                CGovernanceChanges inner(&db);
+                BOOST_CHECK(db.FreezeScript(d));
+                BOOST_CHECK(inner.Commit(&none));
+            }
+            BOOST_CHECK(!none.fSet);
+        }
+        BOOST_CHECK(db.ContentHash() == before);
+    }
+
+    // the reverts of single commands are not exact for these: the reason for the record
+    {
+        CGovernanceChanges changes(&db);
+        BOOST_CHECK(db.UnfreezeScript(b));       // changes nothing
+        BOOST_CHECK(changes.Commit());
+    }
+    BOOST_CHECK(db.ContentHash() == before);
+    BOOST_CHECK(db.RevertUnfreezeScript(b));     // "reverts" it into a freeze
+    BOOST_CHECK(!db.CanSend(b));
+    BOOST_CHECK(db.ContentHash() != before);
 }
 
 BOOST_AUTO_TEST_SUITE_END()

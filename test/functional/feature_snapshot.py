@@ -31,6 +31,7 @@ import struct
 import subprocess
 import sys
 import zlib
+from decimal import Decimal
 
 from feature_bootstrap import Server, sha256_of
 from test_framework.test_framework import AokChainTestFramework
@@ -139,12 +140,29 @@ class SnapshotTest(AokChainTestFramework):
         node0 = self.nodes[0]
         contrib = os.path.join(os.path.dirname(os.path.realpath(__file__)), "..", "..", "contrib", "aokchain")
 
-        self.log.info("A chain with transactions and a token")
+        self.log.info("A chain with transactions, a token and a governance command")
+        # (every node of this test gets the master address: COMMON is what they are started with)
+        master, frozen = node0.getnewaddress(), node0.getnewaddress()
+        COMMON.append("-masteraddress=" + master)
+        self.stop_node(0)
+        self.start_node(0, COMMON)
+        node0 = self.nodes[0]
         node0.generate(120)
         node0.issue("SNAPTOKEN", 1000)
         for i in range(20):
             node0.sendtoaddress(node0.getnewaddress(), 1 + i)
+            if i == 3:
+                node0.sendtoaddress(master, 10)
+            if i == 4:
+                # the master address freezes an address: the node that makes the snapshot keeps
+                # a record of what that replaced, and the snapshot does not bring it along
+                coin = node0.listunspent(1, 9999999, [master])[0]
+                script = bytes.fromhex(node0.validateaddress(frozen)["scriptPubKey"])
+                data = (bytes([71, 65, 70, len(script)]) + script).hex()
+                raw = node0.createrawtransaction([{"txid": coin["txid"], "vout": coin["vout"]}], {"data": data, master: coin["amount"] - Decimal("0.01")})
+                node0.sendrawtransaction(node0.signrawtransactionwithwallet(raw)["hex"])
             node0.generate(1)
+        assert_equal(node0.checkfreeze(frozen), True)
         old_tx = node0.sendtoaddress(node0.getnewaddress(), 7)
         node0.generate(1)
         backup = os.path.join(self.options.tmpdir, "wallet-at-141.dat")
@@ -163,6 +181,8 @@ class SnapshotTest(AokChainTestFramework):
         node1 = self.nodes[1]
         wait_until(lambda: node1.getbootstrapinfo()["state"] in ("done", "failed"), timeout=120)
         assert_equal(node1.getblockcount(), HEIGHT)
+        assert_equal(node1.checkfreeze(frozen), True)
+        assert os.path.isdir(os.path.join(node1.datadir, "regtest", "governanceundo"))
         self.hashes = node1.getstatehashes()
         assert_equal(self.hashes["height"], HEIGHT)
         assert_equal(self.hashes["block"], node0.getblockhash(HEIGHT))
@@ -301,6 +321,11 @@ class SnapshotTest(AokChainTestFramework):
         assert_equal(node2.listtokens("SNAPTOKEN*"), node0.listtokens("SNAPTOKEN*"))
         blocks_dir = os.path.join(node2.datadir, "regtest", "blocks")
         assert not os.path.exists(os.path.join(node2.datadir, "regtest", "snapshot-download"))
+        # the governance state came with the snapshot; the records of what blocks replace in it
+        # begin with the blocks that this node connects itself
+        assert_equal(node2.checkfreeze(frozen), True)
+        with open(os.path.join(node2.datadir, "regtest", "governanceundo.since")) as f:
+            assert_equal(f.read().strip(), self.hashes["block"])
 
         self.log.info("It follows the chain from a peer and keeps the same state")
         connect_nodes(node2, 0)

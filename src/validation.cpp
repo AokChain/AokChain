@@ -1898,6 +1898,124 @@ int ApplyTxInUndo(Coin&& undo, CCoinsViewCache& view, const COutPoint& out, CTok
     return fClean ? DISCONNECT_OK : DISCONNECT_UNCLEAN;
 }
 
+/**
+ * The blocks of the chain state that this version may not have connected itself: the block
+ * that the chain state was at when this version took the node over, and the blocks before it
+ * (nullptr: none). Their governance commands may have no record of what they replaced; every
+ * block connected since has one (CGovernance::WriteBlockUndo). Guarded by cs_main.
+ */
+static const CBlockIndex* pindexGovernanceUndoSince = nullptr;
+static bool fGovernanceUndoSinceKnown = false;
+
+/** The block of the take-over is noted twice: with the records (CGovernance::WriteUndoSince)
+ *  and in this file of the data directory. The file without the note in the database says
+ *  that the database of the records was lost. */
+static fs::path GovernanceUndoSinceFile()
+{
+    return GetDataDir() / "governanceundo.since";
+}
+
+static bool ReadGovernanceUndoSinceFile(uint256& hash)
+{
+    FILE* file = fsbridge::fopen(GovernanceUndoSinceFile(), "r");
+    if (!file)
+        return false;
+    char hex[64];
+    const size_t read = fread(hex, 1, sizeof(hex), file);
+    fclose(file);
+    const std::string str(hex, read);
+    if (read != sizeof(hex) || !IsHex(str))
+        return false;
+    hash = uint256S(str);
+    return true;
+}
+
+static bool WriteGovernanceUndoSinceFile(const uint256& hash)
+{
+    const fs::path path = GovernanceUndoSinceFile();
+    const fs::path pathNew = path.string() + ".new";
+    FILE* file = fsbridge::fopen(pathNew, "w");
+    if (!file)
+        return false;
+    const std::string str = hash.GetHex() + "\n";
+    const bool fWritten = fwrite(str.data(), 1, str.size(), file) == str.size();
+    FileCommit(file);
+    return (fclose(file) == 0) && fWritten && RenameOver(pathNew, path);
+}
+
+bool LoadGovernanceUndoSince(const uint256& hashChainState, bool fOwnChainState, std::string& strError, bool& fRecordsLost)
+{
+    LOCK(cs_main);
+    fRecordsLost = false;
+    fGovernanceUndoSinceKnown = false;
+    pindexGovernanceUndoSince = nullptr;
+    if (!governance)
+        return true;
+
+    // The note stands while every block that came to the chain state after it was connected
+    // by this version, with the master address of today: while this version wrote the chain
+    // state last. (An empty chain state is begun anew below.)
+    const CScript masterKey = GetScriptForDestination(DecodeDestination(Params().GovernanceMasterAddress()));
+    uint256 hashFile;
+    if (!hashChainState.IsNull() && fOwnChainState && ReadGovernanceUndoSinceFile(hashFile)) {
+        uint256 hashNoted;
+        CScript masterNoted;
+        if (!governance->ReadUndoSince(hashNoted, masterNoted)) {
+            // The records have been kept since that block, and their database does not know of
+            // it: it is not the database that they were written to.
+            strError = "the database of what the governance commands of the blocks replaced is gone";
+            fRecordsLost = true;
+            return false;
+        }
+        // (-masteraddress, for tests, makes another address the master address: which blocks
+        // have a record then is not what it was)
+        if (hashNoted == hashFile && masterNoted == masterKey) {
+            if (hashFile.IsNull()) {
+                fGovernanceUndoSinceKnown = true;   // every block
+                return true;
+            }
+            BlockMap::const_iterator it = mapBlockIndex.find(hashFile);
+            if (it != mapBlockIndex.end()) {
+                pindexGovernanceUndoSince = it->second;
+                fGovernanceUndoSinceKnown = true;
+                return true;
+            }
+        }
+    }
+
+    // This version takes the chain state as it is: whatever is in it may have been connected
+    // by a version that kept no records. (An empty chain state: nothing was.)
+    if (!hashChainState.IsNull()) {
+        BlockMap::const_iterator it = mapBlockIndex.find(hashChainState);
+        if (it == mapBlockIndex.end()) {
+            strError = "the block of the chain state is not in the block index";
+            return false;
+        }
+        pindexGovernanceUndoSince = it->second;
+    }
+    // (the database first: the file never says more than the database knows)
+    if (!governance->WriteUndoSince(hashChainState, masterKey) || !WriteGovernanceUndoSinceFile(hashChainState)) {
+        pindexGovernanceUndoSince = nullptr;
+        strError = "cannot write the note of the block from which on the governance records are kept";
+        return false;
+    }
+    if (pindexGovernanceUndoSince)
+        LogPrintf("Governance: what the commands of a block replace is on record for the blocks connected from now on (after block %s, height %d)\n",
+                  hashChainState.ToString(), pindexGovernanceUndoSince->nHeight);
+    fGovernanceUndoSinceKnown = true;
+    return true;
+}
+
+/** Whether this version connected the block (of the active chain) itself. */
+static bool GovernanceUndoKept(const CBlockIndex* pindex)
+{
+    AssertLockHeld(cs_main);
+    if (!fGovernanceUndoSinceKnown)
+        return false;
+    const CBlockIndex* since = pindexGovernanceUndoSince;
+    return !since || pindex->nHeight > since->nHeight || since->GetAncestor(pindex->nHeight) != pindex;
+}
+
 /** Undo the effects of this block (with given index) on the UTXO set represented by coins.
  *  When FAILED is returned, view is left in an indeterminate state. */
 /** Undo the effects of this block (with given index) on the UTXO set represented by coins.
@@ -1910,6 +2028,27 @@ static DisconnectResult DisconnectBlock(const CBlock& block, const CBlockIndex* 
     // The governance commands of the block are undone in a level of changes, written only
     // when the whole block is disconnected (see CGovernance::BeginChanges).
     CGovernanceChanges governanceChanges(governance);
+
+    // What the commands of this block replaced was kept when the block was connected: the
+    // governance state is put back from it, to exactly what it was before the block.
+    // A block that a version without that record connected has none: its commands are reverted
+    // one by one below, as they always were (which is the state before the block only when
+    // each of them changed something and none of them met another one for the same script).
+    // A block that this version connected always has the record when one of its transactions
+    // spends an output of the master address: without it the state before the block is not
+    // known, and the block is not disconnected (the node then builds its state again).
+    CGovernanceUndo governanceUndo;
+    bool fGovernanceUndo = false;      // the state was put back from the record
+    bool fGovernanceUndoDue = false;   // there is no record where there must be one
+    if (fApplyGovernance && governance) {
+        fGovernanceUndo = governance->ReadBlockUndo(block.GetBlockHash(), governanceUndo);
+        if (!fGovernanceUndo) {
+            fGovernanceUndoDue = GovernanceUndoKept(pindex);
+        } else if (!governance->ApplyBlockUndo(governanceUndo)) {
+            error("DisconnectBlock(): failed to put back the governance state");
+            return DISCONNECT_FAILED;
+        }
+    }
 
     CBlockUndo blockUndo;
     CDiskBlockPos pos = pindex->GetUndoPos();
@@ -2265,7 +2404,11 @@ static DisconnectResult DisconnectBlock(const CBlock& block, const CBlockIndex* 
             }
 
             // Master key signature found
-            if (fCheckGovernance) {
+            if (fCheckGovernance && fGovernanceUndoDue) {
+                error("DisconnectBlock(): what the governance commands of block %s replaced is not on record", block.GetBlockHash().ToString());
+                return DISCONNECT_FAILED;
+            }
+            if (fCheckGovernance && !fGovernanceUndo) {
                 for (auto out : tx.vout) {
                     // Check if output is OP_RETURN
                     if (out.scriptPubKey.size() >= 5 && out.scriptPubKey[0] == OP_RETURN) {
@@ -2708,6 +2851,8 @@ static bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockInd
     // the block see them, the database gets them only when the whole block is valid and is
     // connected (not for fJustCheck). Every early return below discards them.
     CGovernanceChanges governanceChanges(governance);
+    // (whether what the commit of this block replaces is kept, see the end)
+    bool fGovernanceRecord = false;
 
     for (unsigned int i = 0; i < block.vtx.size(); i++)
     {
@@ -3015,6 +3160,18 @@ static bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockInd
             }
         }
 
+        // DisconnectBlock looks for governance commands in every transaction, other than the
+        // coinbase, that spends an output of the master address: for exactly those blocks, what
+        // the commit of the block replaces is kept (see the end).
+        if (!tx.IsCoinBase() && !fGovernanceRecord) {
+            for (const CTxIn& txin : tx.vin) {
+                if (view.AccessCoin(txin.prevout).out.scriptPubKey == masterKey) {
+                    fGovernanceRecord = true;
+                    break;
+                }
+            }
+        }
+
         // Check governance
         if (!tx.IsCoinBase() && !tx.IsCoinStake() && AreGovernanceDeployed()) {
             bool fCheckGovernance = false;
@@ -3271,7 +3428,14 @@ static bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockInd
     int64_t nTime5 = GetTimeMicros(); nTimeIndex += nTime5 - nTime4;
     LogPrint(BCLog::BENCH, "    - Index writing: %.2fms [%.2fs (%.2fms/blk)]\n", MILLI * (nTime5 - nTime4), nTimeIndex * MICRO, nTimeIndex * MILLI / nBlocksTotal);
 
-    if (!governanceChanges.Commit())
+    // What the commit of this block replaced is kept for the day the block is disconnected
+    // (DisconnectBlock). The record is on disk before the block counts as connected. After
+    // the commit: a stop in between is answered by the journal of the governance database,
+    // and the block, connected again, writes the record again.
+    CGovernanceUndo governanceUndo;
+    if (!governanceChanges.Commit(&governanceUndo))
+        return AbortNode(state, "Failed to write to the governance database");
+    if (fGovernanceRecord && governanceUndo.fSet && !governance->WriteBlockUndo(block.GetBlockHash(), governanceUndo))
         return AbortNode(state, "Failed to write to the governance database");
 
     int64_t nTime6 = GetTimeMicros(); nTimeCallbacks += nTime6 - nTime5;
@@ -6239,6 +6403,8 @@ void UnloadBlockIndex()
     chainActive.SetTip(nullptr);
     pindexBestInvalid = nullptr;
     pindexBestHeader = nullptr;
+    pindexGovernanceUndoSince = nullptr;
+    fGovernanceUndoSinceKnown = false;
     mempool.clear();
     mapBlocksUnlinked.clear();
     vinfoBlockFile.clear();

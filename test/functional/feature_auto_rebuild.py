@@ -12,6 +12,7 @@
   next start, without any option, does it. Not twice within a day and not twice
   for the same block: then the block is taken to be invalid, as before.
 - The block index database is damaged: the block files are indexed again, once.
+- The same when the records of what the governance commands of its blocks replaced are gone.
 - -autorebuild=0 turns all of this off.
 
 The databases are damaged by removing them while the node is stopped, and the
@@ -265,6 +266,28 @@ class AutoRebuildTest(AokChainTestFramework):
         self.start1()
         assert_equal(self.count_in_log(REINDEXED), 2)
         wait_until(lambda: not os.path.exists(marker), timeout=60)
+        self.same_state()
+
+        self.log.info("The records of what the governance commands of the blocks replaced are gone: the databases are built again")
+        since = os.path.join(n1.datadir, "regtest", "governanceundo.since")
+        rebuilds = self.count_in_log(REBUILT)
+        self.stop_node(1)
+        assert os.path.isfile(since)
+        self.remove("governanceundo")
+        self.start1()
+        assert_equal(self.count_in_log("the database of what the governance commands of the blocks replaced is gone"), 1)
+        assert_equal(self.count_in_log(REBUILT), rebuilds + 1)
+        self.same_state()
+
+        self.log.info("A data directory that never had them is taken as it is")
+        taken_over = self.count_in_log("is on record for the blocks connected from now on")
+        self.stop_node(1)
+        self.remove("governanceundo")
+        os.remove(since)
+        self.start1()
+        assert_equal(self.count_in_log(REBUILT), rebuilds + 1)
+        assert_equal(self.count_in_log("is on record for the blocks connected from now on"), taken_over + 1)
+        assert os.path.isfile(since)
         self.same_state()
 
 

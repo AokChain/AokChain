@@ -1853,10 +1853,27 @@ bool AppInitMain(boost::thread_group& threadGroup, CScheduler& scheduler)
                     // (a write of the chain state that was finished just now may have been begun by
                     // a version that keeps no journal: the journal itself says if it was not)
                     const bool fInStep = !fReplay && pcoinsdbview->IsInStep();
+                    // Whether this version wrote the chain state last: also when it began the
+                    // write that was finished just now (asked before RecoverTo() takes the
+                    // note of that write away).
+                    const bool fOwnChainState = fInStep || (fReplay && governance->ChainStateFlushBegun(pcoinsTip->GetBestBlock()));
                     std::string strGovernanceError;
                     if (!governance->RecoverTo(pcoinsTip->GetBestBlock(), fInStep, strGovernanceError)) {
                         strLoadError = strprintf(_("The governance database does not belong to the chain state (%s)"), strGovernanceError);
                         fChainStateAtFault = true;
+                        break;
+                    }
+                    // Which blocks of the chain state this version connected itself: for those
+                    // it has on record what their governance commands replaced.
+                    std::string strUndoError;
+                    bool fRecordsLost = false;
+                    if (!LoadGovernanceUndoSince(pcoinsTip->GetBestBlock(), fOwnChainState, strUndoError, fRecordsLost)) {
+                        if (fRecordsLost) {
+                            strLoadError = strprintf(_("A database of this node is damaged (%s)"), strUndoError);
+                            fChainStateAtFault = true;
+                        } else {
+                            strLoadError = strprintf(_("Error writing to the governance database (%s)"), strUndoError);
+                        }
                         break;
                     }
                     // The address index is written with every block as well. A rebuild of the

@@ -532,6 +532,15 @@ bool RecoverTokenState(const CChainParams& params, std::string& strError);
  * write for this block did not get as far as the note).
  */
 bool VerifyStoresNote(std::string& strError);
+/**
+ * Called once the chain state is open and brought to a block (hashChainState; null: empty),
+ * before any block is disconnected or connected. fOwnChainState: this version wrote the chain
+ * state last. Notes from which block on every block has the record of what its governance
+ * commands replaced, see DisconnectBlock(). Returns false with fRecordsLost when the records
+ * that this node kept are gone (the databases have to be built again), and false without it
+ * when the note cannot be written.
+ */
+bool LoadGovernanceUndoSince(const uint256& hashChainState, bool fOwnChainState, std::string& strError, bool& fRecordsLost);
 
 /** -autorebuild: the node rebuilds its databases from the block files by itself when it finds at
  *  start, or when a block that it had validated before does not connect, that they are not in

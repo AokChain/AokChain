@@ -170,50 +170,47 @@ namespace {
         }
     };
 
-    /** The values that one commit replaced. had: whether there was a record. */
-    struct JournalRecord {
-        struct Freeze { CScript script; bool had; bool frozen; };
-        struct Cost { int type; int height; bool had; CAmount cost; };
-        struct Fee { int height; bool had; CScript script; };
-        std::vector<Freeze> freeze;
-        std::vector<Cost> cost;
-        std::vector<Fee> fee;
-        bool hadNumber = false;
-        bool setNumber = false;
-        unsigned int number = 0;
-
-        template<typename Stream>
-        void Serialize(Stream &s) const {
-            WriteCompactSize(s, freeze.size());
-            for (const Freeze& item : freeze)
-                s << item.script << item.had << item.frozen;
-            WriteCompactSize(s, cost.size());
-            for (const Cost& item : cost)
-                s << item.type << item.height << item.had << item.cost;
-            WriteCompactSize(s, fee.size());
-            for (const Fee& item : fee)
-                s << item.height << item.had << item.script;
-            s << setNumber << hadNumber << number;
-        }
-
-        template<typename Stream>
-        void Unserialize(Stream& s) {
-            freeze.resize(ReadCompactSize(s));
-            for (Freeze& item : freeze)
-                s >> item.script >> item.had >> item.frozen;
-            cost.resize(ReadCompactSize(s));
-            for (Cost& item : cost)
-                s >> item.type >> item.height >> item.had >> item.cost;
-            fee.resize(ReadCompactSize(s));
-            for (Fee& item : fee)
-                s >> item.height >> item.had >> item.script;
-            s >> setNumber >> hadNumber >> number;
-        }
-    };
+    /** The values that one commit replaced (see CGovernanceUndo in governance.h). */
+    typedef CGovernanceUndo JournalRecord;
 }
 
-CGovernance::CGovernance(size_t nCacheSize, bool fMemory, bool fWipe) : CDBWrapper(GetDataDir() / "governance", nCacheSize, fMemory, fWipe) 
+CGovernance::CGovernance(size_t nCacheSize, bool fMemory, bool fWipe) : CDBWrapper(GetDataDir() / "governance", nCacheSize, fMemory, fWipe),
+    m_undo(new CDBWrapper(GetDataDir() / "governanceundo", 1 << 20, fMemory, fWipe))
 {
+}
+
+// The database of what the blocks replaced (see WriteBlockUndo in governance.h)
+static const char DB_BLOCK_UNDO = 'u';   //!< (DB_BLOCK_UNDO, block) -> CGovernanceUndo
+static const char DB_UNDO_SINCE = 's';   //!< block from which on every connected block has its record
+
+bool CGovernance::WriteBlockUndo(const uint256& hashBlock, const CGovernanceUndo& undo)
+{
+    return m_undo->Write(std::make_pair(DB_BLOCK_UNDO, hashBlock), undo, true);
+}
+
+bool CGovernance::ReadBlockUndo(const uint256& hashBlock, CGovernanceUndo& undo) const
+{
+    return m_undo->Read(std::make_pair(DB_BLOCK_UNDO, hashBlock), undo);
+}
+
+bool CGovernance::EraseBlockUndo(const uint256& hashBlock)
+{
+    return m_undo->Erase(std::make_pair(DB_BLOCK_UNDO, hashBlock), true);
+}
+
+bool CGovernance::ReadUndoSince(uint256& hashBlock, CScript& master) const
+{
+    std::pair<uint256, CScript> since;
+    if (!m_undo->Read(DB_UNDO_SINCE, since))
+        return false;
+    hashBlock = since.first;
+    master = since.second;
+    return true;
+}
+
+bool CGovernance::WriteUndoSince(const uint256& hashBlock, const CScript& master)
+{
+    return m_undo->Write(DB_UNDO_SINCE, std::make_pair(hashBlock, master), true);
 }
 
 bool CGovernance::Init(bool fWipe, const CChainParams& chainparams) {
@@ -280,7 +277,7 @@ void CGovernance::DiscardChanges()
     vChanges.pop_back();
 }
 
-bool CGovernance::CommitChanges()
+bool CGovernance::CommitChanges(CGovernanceUndo* pundo)
 {
     LOCK(cs);
     assert(!vChanges.empty());
@@ -301,14 +298,25 @@ bool CGovernance::CommitChanges()
         return true;
     }
 
+    // to the database: what it replaces is the inverse of this commit (for the caller, who
+    // keeps it with the block, and for the journal)
+    const CGovernanceUndo record = Replaced(changes);
+    if (pundo) {
+        *pundo = record;
+        pundo->fSet = true;
+    }
     if (changes.freeze.empty() && changes.cost.empty() && changes.fee.empty() && !changes.numberFrozen)
         return true;
 
-    // to the database, as one batch, with what it replaces (see BeginChainStateFlush)
+    // as one batch, with what it replaces (see BeginChainStateFlush)
     CDBBatch batch(*this);
-    WriteJournal(batch, changes);
-    for (const auto& item : changes.freeze)
-        batch.Write(FreezeEntry(item.first), FreezeDetails(item.second));
+    WriteJournal(batch, record);
+    for (const auto& item : changes.freeze) {
+        if (item.second)
+            batch.Write(FreezeEntry(item.first), FreezeDetails(*item.second));
+        else
+            batch.Erase(FreezeEntry(item.first));
+    }
     for (const auto& item : changes.cost) {
         if (item.second)
             batch.Write(CostEntry(item.first.first, item.first.second), CostDetails(*item.second));
@@ -328,10 +336,10 @@ bool CGovernance::CommitChanges()
 
 // ---- Keeping in step with the chain state (see BeginChainStateFlush in governance.h)
 
-void CGovernance::WriteJournal(CDBBatch& batch, const Changes& changes)
+CGovernanceUndo CGovernance::Replaced(const Changes& changes) const
 {
     AssertLockHeld(cs);
-    JournalRecord record;
+    CGovernanceUndo record;
     for (const auto& item : changes.freeze) {
         FreezeDetails details;
         const bool had = Read(FreezeEntry(item.first), details);
@@ -351,9 +359,38 @@ void CGovernance::WriteJournal(CDBBatch& batch, const Changes& changes)
         record.setNumber = true;
         record.hadNumber = Read(DB_NUMBER_FROZEN, record.number);
     }
+    return record;
+}
+
+void CGovernance::WriteJournal(CDBBatch& batch, const CGovernanceUndo& record)
+{
+    AssertLockHeld(cs);
     if (nJournalNext == 0)
         batch.Write(DB_JOURNAL_BASE, hashChainState);
     batch.Write(JournalKey(nJournalNext++), record);
+}
+
+bool CGovernance::ApplyBlockUndo(const CGovernanceUndo& undo)
+{
+    LOCK(cs);
+    CDBBatch batch(*this);
+    for (const CGovernanceUndo::Freeze& item : undo.freeze) {
+        if (item.had)
+            SetFreezeEntry(batch, item.script, item.frozen);
+        else
+            EraseFreezeEntry(batch, item.script);
+    }
+    for (const CGovernanceUndo::Cost& item : undo.cost)
+        SetCostEntry(batch, item.type, item.height, item.had ? std::optional<CAmount>(item.cost) : std::nullopt);
+    for (const CGovernanceUndo::Fee& item : undo.fee)
+        SetFeeEntry(batch, item.height, item.had ? std::optional<CScript>(item.script) : std::nullopt);
+    if (undo.setNumber) {
+        // (the database has this record from its first day on: Init())
+        if (!undo.hadNumber)
+            return error("%s: the record of a block says that there was no number of frozen scripts", __func__);
+        SetNumberFrozen(batch, undo.number);
+    }
+    return Finish(batch);
 }
 
 void CGovernance::EraseJournal(CDBBatch& batch)
@@ -388,6 +425,13 @@ bool CGovernance::EndChainStateFlush(const uint256& hashTip)
     EraseJournal(batch);
     hashChainState = hashTip;
     return WriteBatch(batch);
+}
+
+bool CGovernance::ChainStateFlushBegun(const uint256& hashTip) const
+{
+    LOCK(cs);
+    uint256 hashPending;
+    return Read(DB_CHAINSTATE_PENDING, hashPending) && hashPending == hashTip;
 }
 
 bool CGovernance::RecoverTo(const uint256& hashChainStateTip, bool fInStep, std::string& strError)
@@ -480,7 +524,9 @@ bool CGovernance::GetFreezeEntry(const CScript& script, bool& frozen) const
     for (auto level = vChanges.rbegin(); level != vChanges.rend(); ++level) {
         auto it = level->freeze.find(script);
         if (it != level->freeze.end()) {
-            frozen = it->second;
+            if (!it->second)
+                return false;
+            frozen = *it->second;
             return true;
         }
     }
@@ -549,6 +595,15 @@ void CGovernance::SetFreezeEntry(CDBBatch& batch, const CScript& script, bool fr
         vChanges.back().freeze[script] = frozen;
     else
         batch.Write(FreezeEntry(script), FreezeDetails(frozen));
+}
+
+void CGovernance::EraseFreezeEntry(CDBBatch& batch, const CScript& script)
+{
+    AssertLockHeld(cs);
+    if (!vChanges.empty())
+        vChanges.back().freeze[script] = std::nullopt;
+    else
+        batch.Erase(FreezeEntry(script));
 }
 
 void CGovernance::SetNumberFrozen(CDBBatch& batch, unsigned int number)
@@ -746,20 +801,28 @@ bool CGovernance::DumpFreezeStats(std::vector< std::pair< CScript, bool > > *Fre
     }
 
     if (!vChanges.empty()) {
-        // the open levels: their value for a script in the list, new scripts at the end
-        std::map<CScript, bool> pending;
+        // the open levels: their value for a script in the list (none: the script is taken
+        // out of it), new scripts at the end
+        std::map<CScript, std::optional<bool>> pending;
         for (const Changes& level : vChanges)
             for (const auto& item : level.freeze)
                 pending[item.first] = item.second;
-        for (auto& item : *FreezeVector) {
+        std::vector<std::pair<CScript, bool>> merged;
+        for (const auto& item : *FreezeVector) {
             auto found = pending.find(item.first);
-            if (found != pending.end()) {
-                item.second = found->second;
+            if (found == pending.end()) {
+                merged.push_back(item);
+            } else {
+                if (found->second)
+                    merged.emplace_back(item.first, *found->second);
                 pending.erase(found);
             }
         }
-        for (const auto& item : pending)
-            FreezeVector->emplace_back(item.first, item.second);
+        for (const auto& item : pending) {
+            if (item.second)
+                merged.emplace_back(item.first, *item.second);
+        }
+        FreezeVector->swap(merged);
     }
 
     return true;
