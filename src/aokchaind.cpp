@@ -56,6 +56,11 @@ void WaitForShutdown(boost::thread_group* threadGroup)
         MilliSleep(200);
         fShutdown = ShutdownRequested();
     }
+    // -testshutdownpause=<ms> (-regtest only): the time between a stop request and the stop
+    // of the threads, which is 200 ms at most, is made long enough for a test to act in it
+    const int64_t nTestPause = gArgs.GetArg("-testshutdownpause", 0);
+    if (nTestPause > 0)
+        MilliSleep(nTestPause);
     if (threadGroup)
     {
         Interrupt(*threadGroup);

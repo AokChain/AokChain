@@ -1353,8 +1353,8 @@ bool AppInitParameterInteraction()
 
     if (gArgs.IsArgSet("-testcrashat") && !chainparams.MineBlocksOnDemand())
         return InitError("-testcrashat is for regression testing (-regtest) only");
-    if ((gArgs.IsArgSet("-teststopat") || gArgs.IsArgSet("-testfailtokenwrite") || gArgs.IsArgSet("-testabortat") || gArgs.IsArgSet("-testactivationpause") || gArgs.IsArgSet("-testthrowat")) && !chainparams.MineBlocksOnDemand())
-        return InitError("-teststopat, -testfailtokenwrite, -testabortat, -testactivationpause and -testthrowat are for regression testing (-regtest) only");
+    if ((gArgs.IsArgSet("-teststopat") || gArgs.IsArgSet("-testfailtokenwrite") || gArgs.IsArgSet("-testabortat") || gArgs.IsArgSet("-testactivationpause") || gArgs.IsArgSet("-testthrowat") || gArgs.IsArgSet("-testshutdownpause")) && !chainparams.MineBlocksOnDemand())
+        return InitError("-teststopat, -testfailtokenwrite, -testabortat, -testactivationpause, -testthrowat and -testshutdownpause are for regression testing (-regtest) only");
     if (gArgs.IsArgSet("-masteraddress")) {
         if (!chainparams.MineBlocksOnDemand())
             return InitError("-masteraddress is for regression testing (-regtest) only");

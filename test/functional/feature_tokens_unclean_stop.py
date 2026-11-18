@@ -25,7 +25,7 @@ the node where its n-th write of token records would begin (-regtest only).
 from decimal import Decimal
 
 from test_framework.test_framework import AokChainTestFramework
-from test_framework.util import assert_equal, connect_nodes_bi, disconnect_nodes, sync_blocks, sync_mempools
+from test_framework.util import assert_equal, assert_raises_rpc_error, connect_nodes_bi, disconnect_nodes, sync_blocks, sync_mempools
 
 
 class TokensUncleanStopTest(AokChainTestFramework):
@@ -191,7 +191,9 @@ class TokensUncleanStopTest(AokChainTestFramework):
         repairs = self.count_in_log(n1, "Tokens: the token database is at height")
         self.stop_node(1)
         stderr1 = open(self.options.tmpdir + "/node1.stderr", "w")
-        self.start_node(1, ["-testfailtokenwrite=1"], stderr=stderr1)
+        # (-testshutdownpause: the node stays up for three seconds after it has asked for its
+        # stop, so that the block below reaches it on its way down at every run)
+        self.start_node(1, ["-testfailtokenwrite=1", "-testshutdownpause=3000"], stderr=stderr1)
         connect_nodes_bi(self.nodes, 0, 1)
         n1 = self.nodes[1]
         n0.issue("FAILED", 5, address0, "", 0, True)
@@ -211,11 +213,9 @@ class TokensUncleanStopTest(AokChainTestFramework):
             n1.gettxoutsetinfo()   # (asks for a write of the state: the write of the tokens fails, the node stops)
         except Exception:
             pass
-        # ...and the block reaches the node while it is on its way down
-        try:
-            self.log.info("The block that came after the failed write: %s" % n1.submitblock(late_hex))
-        except Exception as e:
-            self.log.info("The block that came after the failed write was not taken any more (%s)" % type(e).__name__)
+        # ...and the block reaches the node while it is on its way down: it is not taken, and
+        # the answer is an error, not a verdict on the block
+        assert_raises_rpc_error(-25, "the node is stopping after a failure of its own", n1.submitblock, late_hex)
         n1.wait_until_stopped()
         assert_equal(self.count_in_log(n1, "Simulating a write of the token database that fails"), 1)
         # (a node that is on its way down after a write that failed connects no further block)

@@ -1477,7 +1477,20 @@ void static InvalidChainFound(CBlockIndex* pindexNew)
     CheckForkWarningConditions();
 }
 
+/**
+ * The node is on its way down after a failure of its own: a write that failed, a rebuild of
+ * its databases that it has asked for (AbortNode). The threads go on for a moment. What the
+ * node holds may be the very thing that failed, so it judges no block by it any more: it
+ * takes no new block (AcceptBlock), connects none that fails (ConnectTip), gives no block a
+ * failure mark (InvalidBlockFound) and asks for nothing more (RequestChainStateRebuild).
+ */
+static std::atomic<bool> fNodeAborting(false);
+
 void static InvalidBlockFound(CBlockIndex *pindex, const CValidationState &state) {
+    // (no mark while the node goes down: it would be written with the block index at the
+    // shutdown and outlive whatever mends the databases)
+    if (fNodeAborting)
+        return;
     if (!state.CorruptionPossible()) {
         pindex->nStatus |= BLOCK_FAILED_VALID;
         g_failed_blocks.insert(pindex);
@@ -1693,14 +1706,6 @@ bool UndoReadFromDisk(CBlockUndo& blockundo, const CDiskBlockPos& pos, const uin
 
     return true;
 }
-
-/**
- * The node is on its way down after a failure of its own: a write that failed, a rebuild of
- * its databases that it has asked for (AbortNode). The threads go on for a moment. What the
- * node holds may be the very thing that failed, so it judges no block by it any more
- * (ConnectTip), and asks for nothing more (RequestChainStateRebuild).
- */
-std::atomic<bool> fNodeAborting(false);
 
 /** Abort with a message */
 bool AbortNode(const std::string& strMessage, const std::string& userMessage="")
@@ -5541,6 +5546,13 @@ static bool AcceptBlock(const std::shared_ptr<const CBlock>& pblock, CValidation
 
     if (fNewBlock) *fNewBlock = false;
     AssertLockHeld(cs_main);
+
+    // The node is on its way down after a failure of its own (see fNodeAborting). The checks
+    // below read its chain state and its token cache, which may be what failed: no block is
+    // taken, none is judged, none gets a mark. An error, not a verdict: the peer that sent
+    // the block is not blamed, and the block comes again after the next start.
+    if (fNodeAborting)
+        return state.Error("the node is stopping after a failure of its own: no block is taken");
 
     CBlockIndex *pindexDummy = nullptr;
     CBlockIndex *&pindex = ppindex ? *ppindex : pindexDummy;
