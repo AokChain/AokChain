@@ -187,6 +187,35 @@ class TokensUncleanStopTest(AokChainTestFramework):
         assert_equal(self.count_in_log(n1, "Tokens: the token database is at height"), repairs + 3)
         self.same_state()
 
+        self.log.info("A write of the token database that fails: the database is not said to stand for a block whose changes it lacks")
+        repairs = self.count_in_log(n1, "Tokens: the token database is at height")
+        self.stop_node(1)
+        stderr1 = open(self.options.tmpdir + "/node1.stderr", "w")
+        self.start_node(1, ["-testfailtokenwrite=1"], stderr=stderr1)
+        connect_nodes_bi(self.nodes, 0, 1)
+        n1 = self.nodes[1]
+        n0.issue("FAILED", 5, address0, "", 0, True)
+        self.mine()
+        n0.transfer("INSIDE", 1, address1)
+        self.mine()
+        try:
+            n1.gettxoutsetinfo()   # (asks for a write of the state: the write of the tokens fails, the node stops)
+        except Exception:
+            pass
+        n1.wait_until_stopped()
+        assert_equal(self.count_in_log(n1, "Simulating a write of the token database that fails"), 1)
+        # (its last write, at the shutdown, went through: the token database must not have been
+        # marked with the tip by it)
+        self.start_node(1, stderr=stderr1)
+        connect_nodes_bi(self.nodes, 0, 1)
+        n1 = self.nodes[1]
+        assert_equal(self.count_in_log(n1, "Tokens: the token database is at height"), repairs + 1)
+        self.mine()
+        assert_equal(n1.gettokendata("FAILED"), n0.gettokendata("FAILED"))
+        assert_equal(n1.listmytokens(), {"BEFORE": 10, "CRASHCOIN": 105, "INSIDE": 5})
+        self.same_state()
+        stderr1.close()
+
 
 if __name__ == '__main__':
     TokensUncleanStopTest().main()

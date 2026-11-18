@@ -3466,7 +3466,21 @@ static bool WriteTokenState(CTokensCache& cache, const uint256& hashTip)
         ptokensdb->AbortDump();
         return false;
     }
-    return ptokensdb->CommitDump(hashTip);
+    // The cache has handed its changes to the batch and holds them no more. When the batch is
+    // not written, the token database stays where it is, behind the chain state: nothing may be
+    // written later as its state at another block (a write that succeeds after one that failed
+    // would say that the database stands for a tip whose changes it does not have). The next
+    // start applies the blocks in between again (RecoverTokenState).
+    bool fCommitted = false;
+    try {
+        fCommitted = ptokensdb->CommitDump(hashTip);
+    } catch (...) {
+        fTokenStateInStep = false;
+        throw;
+    }
+    if (!fCommitted)
+        fTokenStateInStep = false;
+    return fCommitted;
 }
 
 /**
