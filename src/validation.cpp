@@ -4403,9 +4403,15 @@ bool ActivateBestChain(CValidationState &state, const CChainParams& chainparams,
 
     CBlockIndex *pindexMostWork = nullptr;
     CBlockIndex *pindexNewTip = nullptr;
+    uint64_t nFailureMarkCommandsSeen = 0;
     int nStopAtHeight = gArgs.GetArg("-stopatheight", DEFAULT_STOPATHEIGHT);
+    // -testactivationpause=<ms> (-regtest only): a pause before every step, in which a command
+    // of a test gets its turn
+    static const int64_t nTestPause = gArgs.GetArg("-testactivationpause", 0);
     do {
         boost::this_thread::interruption_point();
+        if (nTestPause > 0)
+            MilliSleep(nTestPause);
 
         // Each connected block is handed to the validation interface clients with the block
         // itself. They run on another thread and need cs_main: while this loop connects block

@@ -969,6 +969,12 @@ bool ExitFailureRequested()
 void TestCrashPoint(const char* point)
 {
     static const std::string strPoint = gArgs.GetArg("-testcrashat", "");
+    // -testabortat=<point> (-regtest only): an internal check fails at that point
+    static const std::string strAbort = gArgs.GetArg("-testabortat", "");
+    if (!strAbort.empty() && strAbort == point) {
+        LogPrintf("A check fails at the point '%s' (-testabortat)\n", point);
+        assert(!"-testabortat");
+    }
     if (strPoint.empty() || strPoint != point)
         return;
     LogPrintf("Simulating a crash at the point '%s'. Goodbye.\n", point);
