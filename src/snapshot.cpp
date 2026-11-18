@@ -30,12 +30,14 @@
 
 #include <boost/thread.hpp>
 
+#include <algorithm>
 #include <map>
 #include <thread>
 #include <vector>
 
 #ifndef WIN32
 #include <fcntl.h>
+#include <sys/stat.h>
 #include <unistd.h>
 #endif
 
@@ -788,17 +790,174 @@ void WipeChainData()
     WipeBlockFilesAndRecords();
 }
 
+/** The size of the files below a directory, in bytes (0 when there is none). */
+uint64_t DirectorySize(const fs::path& dir)
+{
+    uint64_t size = 0;
+    boost::system::error_code ec;
+    if (!fs::is_directory(dir, ec))
+        return 0;
+    for (fs::recursive_directory_iterator it(dir, ec), end; !ec && it != end; it.increment(ec)) {
+        boost::system::error_code ecFile;
+        if (fs::is_regular_file(it->path(), ecFile)) {
+            const uintmax_t n = fs::file_size(it->path(), ecFile);
+            if (!ecFile)
+                size += n;
+        }
+    }
+    return size;
+}
+
+/** Copies a file; the copy is on disk when this returns true. */
+bool CopyFileToDisk(const fs::path& from, const fs::path& to, std::string& error)
+{
+    FILE* in = fsbridge::fopen(from, "rb");
+    if (!in) {
+        error = strprintf("cannot read %s", from.string());
+        return false;
+    }
+    FILE* out = fsbridge::fopen(to, "wb");
+    if (!out) {
+        fclose(in);
+        error = strprintf("cannot write %s", to.string());
+        return false;
+    }
+    std::vector<char> buffer(1 << 20);
+    bool ok = true;
+    size_t got;
+    while (ok && (got = fread(buffer.data(), 1, buffer.size(), in)) > 0)
+        ok = fwrite(buffer.data(), 1, got, out) == got;
+    ok = ok && !ferror(in) && fflush(out) == 0;
+    if (ok)
+        FileCommit(out);
+    fclose(in);
+    if (fclose(out) != 0)
+        ok = false;
+    if (!ok)
+        error = strprintf("cannot write %s (is the disk full?)", to.string());
+    return ok;
+}
+
+/** Copies what a directory holds into another one, which exists. */
+bool CopyDirectoryContent(const fs::path& from, const fs::path& to, std::string& error)
+{
+    boost::system::error_code ec;
+    std::vector<fs::path> entries;
+    for (fs::directory_iterator it(from, ec), end; !ec && it != end; it.increment(ec))
+        entries.push_back(it->path());
+    if (ec) {
+        error = strprintf("cannot read %s (%s)", from.string(), ec.message());
+        return false;
+    }
+    for (const fs::path& entry : entries) {
+        const fs::path dest = to / entry.filename();
+        if (fs::is_directory(entry, ec)) {
+            fs::create_directory(dest, ec);
+            if (!fs::is_directory(dest, ec)) {
+                error = strprintf("cannot make %s", dest.string());
+                return false;
+            }
+            if (!CopyDirectoryContent(entry, dest, error))
+                return false;
+        } else if (!CopyFileToDisk(entry, dest, error)) {
+            return false;
+        }
+    }
+    SyncDirectory(to);
+    return true;
+}
+
+/** Removes what a directory holds, and keeps the directory. */
+bool EmptyDirectory(const fs::path& dir, std::string& error)
+{
+    boost::system::error_code ec;
+    std::vector<fs::path> entries;
+    for (fs::directory_iterator it(dir, ec), end; !ec && it != end; it.increment(ec))
+        entries.push_back(it->path());
+    for (const fs::path& entry : entries) {
+        fs::remove_all(entry, ec);
+        if (ec) {
+            error = strprintf("cannot remove %s (%s)", entry.string(), ec.message());
+            return false;
+        }
+    }
+    return true;
+}
+
+/**
+ * Whether the directory of the snapshot can take the place of the node's by a rename. It
+ * cannot when the node's directory is a link or lies on another file system (the operator has
+ * put that database, or the block directory, elsewhere): the files are copied into it then,
+ * and the link or the mount stays what it is.
+ */
+bool MovesByRename(const fs::path& from, const fs::path& target)
+{
+    boost::system::error_code ec;
+    if (fs::is_symlink(target, ec))
+        return false;
+#ifndef WIN32
+    // (the file system of the place where the directory will be: its parent, or the nearest
+    // directory above it that exists; and of the directory itself, which can be a mount point)
+    struct stat stFrom, stTo;
+    if (stat(from.string().c_str(), &stFrom) != 0)
+        return true;
+    if (stat(target.string().c_str(), &stTo) == 0 && stTo.st_dev != stFrom.st_dev)
+        return false;
+    fs::path above = target.parent_path();
+    while (!above.empty() && stat(above.string().c_str(), &stTo) != 0)
+        above = above.parent_path();
+    if (!above.empty() && stTo.st_dev != stFrom.st_dev)
+        return false;
+#endif
+    return true;
+}
+
+enum class MoveResult {
+    DONE,
+    NOT_BEGUN,  //!< it cannot be done, and nothing of the data directory was changed
+    FAILED,     //!< it stopped half-way: the block files and records are removed, what is left to move is in STAGING_NAME
+};
+
 /**
  * An unpacked snapshot (in STAGING_NAME) takes the place of the chain data of the node: for
  * each of its directories the one of the node is removed and the one of the snapshot moved
  * in; the block files and the governance records go. The marker is written before this
  * begins, and a start that finds the marker and what is left in the staging directory does
  * the rest (InstallSnapshotIfWanted): a directory that is still there has not been moved.
+ *
+ * A directory of the node that is a link or lies on another file system is not replaced: it
+ * is emptied and the files of the snapshot are copied into it; they are on disk before the
+ * unpacked ones are removed, so a stop in the middle is made good in the same way. Whether
+ * there is room for those copies is looked at before anything is removed.
  */
-bool MoveSnapshotIn()
+MoveResult MoveSnapshotIn(std::string& error)
 {
     const fs::path staging = GetDataDir() / STAGING_NAME;
     boost::system::error_code ec;
+    // What has to be copied, and whether there is room for it where it goes (what the copy
+    // replaces there is removed first, so it counts as room).
+    std::map<std::string, bool> rename;
+    for (const char* dir : SNAPSHOT_DIRS) {
+        if (!fs::is_directory(staging / dir, ec))
+            continue; // moved before this start
+        const fs::path target = GetDataDir() / dir;
+        rename[dir] = MovesByRename(staging / dir, target);
+        if (rename[dir])
+            continue;
+        fs::path there = target;
+        while (!there.empty() && !fs::exists(there, ec))
+            there = there.parent_path();
+        const fs::space_info space = fs::space(there, ec);
+        // (with a reserve: the database grows as soon as the node runs)
+        const uint64_t need = DirectorySize(staging / dir) + (16 << 20);
+        if (!ec && space.available != static_cast<uintmax_t>(-1) && space.available + DirectorySize(target) < need) {
+            error = strprintf("there is not enough room for %s where this node keeps it (%s; %s are needed there, %s are free)", dir, there.string(),
+                              Megabytes(need), Megabytes(space.available + DirectorySize(target)));
+            LogPrintf("Snapshot: %s.\n", error);
+            return MoveResult::NOT_BEGUN;
+        }
+    }
+
     WipeBlockFilesAndRecords();
     fs::remove(GetDataDir() / NO_PAST_BLOCKS_NAME, ec);
     fPastBlocksMissing = false;
@@ -807,12 +966,27 @@ bool MoveSnapshotIn()
         if (!fs::is_directory(staging / dir, ec))
             continue; // moved before this start
         const fs::path target = GetDataDir() / dir;
-        fs::remove_all(target, ec);
-        fs::create_directories(target.parent_path(), ec);
-        fs::rename(staging / dir, target, ec);
-        if (ec) {
-            LogPrintf("Snapshot: cannot move %s into its place (%s).\n", dir, ec.message());
-            return false;
+        bool moved = false;
+        if (rename[dir]) {
+            fs::remove_all(target, ec);
+            fs::create_directories(target.parent_path(), ec);
+            fs::rename(staging / dir, target, ec);
+            moved = !ec;
+            if (!moved)
+                LogPrintf("Snapshot: %s is not moved by a rename (%s): its files are copied.\n", dir, ec.message());
+        }
+        if (!moved) {
+            fs::create_directories(target, ec);
+            std::string why;
+            if (!fs::is_directory(target, ec))
+                why = strprintf("cannot make %s", target.string());
+            if (why.empty() && EmptyDirectory(target, why) && CopyDirectoryContent(staging / dir, target, why)) {
+                fs::remove_all(staging / dir, ec);
+            } else {
+                error = strprintf("%s cannot be put into its place (%s)", dir, why);
+                LogPrintf("Snapshot: %s.\n", error);
+                return MoveResult::FAILED;
+            }
         }
         SyncDirectory(target.parent_path());
         if (first)
@@ -821,26 +995,34 @@ bool MoveSnapshotIn()
     }
     fs::remove_all(staging, ec);
     SyncDirectory(GetDataDir());
-    return true;
+    return MoveResult::DONE;
 }
 
-/** How often a start has tried to check the snapshot that is unpacked in the data directory. */
-int ReadMarker()
+/**
+ * The marker holds how often a start has tried to check the snapshot that is unpacked in the
+ * data directory, and whether that snapshot took the place of the chain data of a node that
+ * ran (a start-over) or is the first chain data of a new node.
+ */
+int ReadMarker(bool& fStartOver)
 {
+    fStartOver = false;
     FILE* marker = fsbridge::fopen(GetDataDir() / MARKER_NAME, "rb");
     if (!marker)
         return 0;
     const int c = fgetc(marker);
+    fStartOver = fgetc(marker) == 'o';
     fclose(marker);
     return c >= '1' && c <= '9' ? c - '0' : 9;
 }
 
-bool WriteMarker(int attempts)
+bool WriteMarker(int attempts, bool fStartOver)
 {
     FILE* marker = fsbridge::fopen(GetDataDir() / MARKER_NAME, "wb");
     if (!marker)
         return false;
-    fputc('0' + attempts, marker);
+    fputc('0' + std::min(attempts, 9), marker);
+    if (fStartOver)
+        fputc('o', marker);
     FileCommit(marker);
     fclose(marker);
     return true;
@@ -867,9 +1049,13 @@ namespace {
  * fStartOver that of a node that cannot go on from its databases. Nothing of the data
  * directory is removed before the snapshot is unpacked completely and on disk. False when no
  * snapshot is installed: why says what is in the way, and the data directory is as it was.
+ * Except with fMoveFailed (a start-over only): the unpacked snapshot could not be put into its
+ * place, the block files and what was replaced so far are gone, the rest of the unpacked
+ * snapshot waits in the data directory, and the next start goes on with it.
  */
-bool FetchAndInstallSnapshot(std::function<void(const std::string&)> status, bool fStartOver, std::string& why)
+bool FetchAndInstallSnapshot(std::function<void(const std::string&)> status, bool fStartOver, std::string& why, bool& fMoveFailed)
 {
+    fMoveFailed = false;
     const CChainParams::SnapshotParams& pinned = Params().Snapshot();
     // -bootstrap=0 (the fast first synchronization of the settings page) turns the snapshot off too
     if (!gArgs.GetBoolArg("-snapshot", DEFAULT_SNAPSHOT) || !gArgs.GetBoolArg("-bootstrap", DEFAULT_BOOTSTRAP) || pinned.height <= 0) {
@@ -1071,14 +1257,33 @@ bool FetchAndInstallSnapshot(std::function<void(const std::string&)> status, boo
     TestCrashPoint("snapshot-unpacked");
 
     // From here on the data directory holds a snapshot that is not checked yet.
-    if (!WriteMarker(1)) {
+    if (!WriteMarker(1, fStartOver)) {
         LogPrintf("Snapshot: cannot write into the data directory.\n");
         fs::remove_all(staging, ec);
         why = "the data directory cannot be written to";
         return false;
     }
-    if (!MoveSnapshotIn()) {
-        why = "the unpacked snapshot cannot be moved into its place (the next start tries again)";
+    std::string moveError;
+    const MoveResult moved = MoveSnapshotIn(moveError);
+    if (moved == MoveResult::NOT_BEGUN) {
+        // (nothing of the node was touched: the unpacked snapshot and its marker go)
+        fs::remove_all(staging, ec);
+        fs::remove(GetDataDir() / MARKER_NAME, ec);
+        SyncDirectory(GetDataDir());
+        why = "it cannot be moved into its place: " + moveError;
+        return false;
+    }
+    if (moved == MoveResult::FAILED) {
+        if (fStartOver) {
+            // The block files and some databases of the node are gone, and the unpacked
+            // snapshot is still there: the next start goes on with it (InstallSnapshotIfWanted).
+            fMoveFailed = true;
+            why = moveError;
+        } else {
+            // (a new node has nothing to lose: it synchronizes by validating the blocks)
+            RemoveInstalledSnapshot();
+            why = "it cannot be moved into its place: " + moveError;
+        }
         return false;
     }
     LogPrintf("Snapshot: %d files unpacked (%.1f MB). Download %.1f s, unpacking %.1f s. It is checked next.\n", unpacker.Files(), size / 1e6,
@@ -1089,36 +1294,59 @@ bool FetchAndInstallSnapshot(std::function<void(const std::string&)> status, boo
 
 } // namespace
 
-bool StartOverFromSnapshot(std::function<void(const std::string&)> status, std::string& why)
+bool StartOverFromSnapshot(std::function<void(const std::string&)> status, std::string& why, bool& fMoveFailed)
 {
-    return FetchAndInstallSnapshot(status, true, why);
+    return FetchAndInstallSnapshot(status, true, why, fMoveFailed);
 }
 
-bool InstallSnapshotIfWanted(std::function<void(const std::string&)> status)
+bool InstallSnapshotIfWanted(std::function<void(const std::string&)> status, std::string& strCannotGoOn)
 {
     const CChainParams::SnapshotParams& pinned = Params().Snapshot();
+    strCannotGoOn.clear();
     if (MarkerExists()) {
         // An earlier start unpacked a snapshot and did not get to accept it (the program was
-        // closed or stopped while checking). It is checked once more; a snapshot on which the
-        // program stopped twice is removed.
-        const int attempts = ReadMarker();
-        if (attempts >= 2 || pinned.height <= 0 || !WriteMarker(attempts + 1)) {
-            LogPrintf("Snapshot: an earlier start left a snapshot that could not be checked.\n");
-            RemoveInstalledSnapshot();
-            return false;
-        }
-        // (the start was stopped while the snapshot took the place of the chain data: the rest of that)
+        // closed or stopped while it moved the snapshot in or checked it).
+        bool fStartOver = false;
+        const int attempts = ReadMarker(fStartOver);
         boost::system::error_code ec;
-        if (fs::is_directory(GetDataDir() / STAGING_NAME, ec) && !MoveSnapshotIn()) {
-            RemoveInstalledSnapshot();
-            return false;
+        const bool fStaged = fs::is_directory(GetDataDir() / STAGING_NAME, ec);
+        std::string moveError;
+        if (fStartOver) {
+            // The snapshot took the place of the chain data of a node that ran. What it
+            // replaced is gone, and with it the blocks before the snapshot: there is nothing
+            // to fall back to but a synchronization from the first block. A start that was
+            // stopped says nothing against the snapshot, so it is not removed for that,
+            // however often: it is checked at every start until the check is done. (A
+            // snapshot that fails its check is removed, as any.)
+            if (attempts >= 2)
+                LogPrintf("Snapshot: %d starts ended before this snapshot was checked. It took the place of the chain data of this node, so it is kept, and it is checked now.\n", attempts);
+            WriteMarker(attempts + 1, true);
+            // (the start was stopped while the snapshot took the place of the chain data: the rest of that)
+            if (fStaged && MoveSnapshotIn(moveError) != MoveResult::DONE) {
+                strCannotGoOn = moveError;
+                return false;
+            }
+        } else {
+            // The first chain data of a new node: it is checked once more; a snapshot on which
+            // the program stopped twice is removed, and the node synchronizes by validating
+            // the blocks, as it would without a snapshot.
+            if (attempts >= 2 || pinned.height <= 0 || !WriteMarker(attempts + 1, false)) {
+                LogPrintf("Snapshot: an earlier start left a snapshot that could not be checked.\n");
+                RemoveInstalledSnapshot();
+                return false;
+            }
+            if (fStaged && MoveSnapshotIn(moveError) != MoveResult::DONE) {
+                RemoveInstalledSnapshot();
+                return false;
+            }
         }
         LogPrintf("Snapshot: an earlier start left a snapshot that was not checked yet. It is checked now.\n");
         fInstalledThisStart = true;
         return true;
     }
     std::string why;
-    return FetchAndInstallSnapshot(status, false, why);
+    bool fMoveFailed = false;
+    return FetchAndInstallSnapshot(status, false, why, fMoveFailed);
 }
 
 bool VerifyInstalledSnapshot(std::string& error, std::function<void(const std::string&)> status)

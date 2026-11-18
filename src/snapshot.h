@@ -93,8 +93,11 @@ bool FetchPastBlocksNow(std::string& error);
  * At start, before the databases are opened: when the data directory is new and a snapshot is
  * pinned for this network, fetch and unpack it. Returns true when a snapshot was unpacked; it is
  * not trusted until VerifyInstalledSnapshot() has passed.
+ * strCannotGoOn is set when an earlier start had begun to put a snapshot into the place of the
+ * chain data of a node that ran, and this start cannot finish that: the data directory holds
+ * neither the old chain data nor all of the snapshot, and the start must end.
  */
-bool InstallSnapshotIfWanted(std::function<void(const std::string&)> status);
+bool InstallSnapshotIfWanted(std::function<void(const std::string&)> status, std::string& strCannotGoOn);
 
 /**
  * A node that started from a snapshot and does not have the blocks before it cannot build its
@@ -102,9 +105,12 @@ bool InstallSnapshotIfWanted(std::function<void(const std::string&)> status);
  * the snapshot is fetched, checked and unpacked again, and then takes the place of the chain
  * databases and the block files (the wallet is not touched). Nothing is removed before the
  * snapshot is unpacked completely. False when it could not be had: why says what is in the
- * way, the data directory is as it was, and the next start tries again.
+ * way, the data directory is as it was, and the next start tries again. False with
+ * fMoveFailed: the snapshot is unpacked and could not be put into its place; the block files
+ * and what it replaced so far are removed, the rest waits in the data directory, and the next
+ * start goes on with it.
  */
-bool StartOverFromSnapshot(std::function<void(const std::string&)> status, std::string& why);
+bool StartOverFromSnapshot(std::function<void(const std::string&)> status, std::string& why, bool& fMoveFailed);
 /** After the databases are loaded: compare their content hashes with the pinned ones. */
 bool VerifyInstalledSnapshot(std::string& error, std::function<void(const std::string&)> status);
 /** Remove what InstallSnapshotIfWanted() unpacked (the databases must be closed). */

@@ -30,6 +30,7 @@ import shutil
 import struct
 import subprocess
 import sys
+import tempfile
 import zlib
 from decimal import Decimal
 
@@ -137,6 +138,18 @@ class SnapshotTest(AokChainTestFramework):
         return folder
 
     def run_test(self):
+        self.other_fs = None
+        try:
+            self.run_cases()
+        finally:
+            if self.other_fs:
+                # (the block directory of node2 is there: the node is stopped before it goes)
+                try:
+                    self.stop_nodes()
+                finally:
+                    shutil.rmtree(self.other_fs, ignore_errors=True)
+
+    def run_cases(self):
         node0 = self.nodes[0]
         contrib = os.path.join(os.path.dirname(os.path.realpath(__file__)), "..", "..", "contrib", "aokchain")
 
@@ -390,8 +403,11 @@ class SnapshotTest(AokChainTestFramework):
         balance = node2.getbalance()
         assert balance > 0
         height2 = node2.getblockcount()
+        state2 = node2.getstatehashes()
         self.stop_node(2)
         datadir2 = os.path.join(node2.datadir, "regtest")
+        with open(os.path.join(datadir2, "governanceundo.since")) as f:
+            since2 = f.read()
         tokens_aside = os.path.join(self.options.tmpdir, "tokens-of-node2")
         shutil.copytree(os.path.join(datadir2, "tokens"), tokens_aside)
         shutil.rmtree(os.path.join(datadir2, "tokens"))
@@ -401,9 +417,23 @@ class SnapshotTest(AokChainTestFramework):
         def kept():
             """Nothing of the node's chain data was removed."""
             assert_equal(os.path.getsize(block_file), block_file_size)
-            for name in ("chainstate", "governance", os.path.join("blocks", "index")):
-                assert os.listdir(os.path.join(datadir2, name)), name
+            for name in ("chainstate", "governance", "governanceundo", os.path.join("blocks", "index")):
+                assert [f for f in os.listdir(os.path.join(datadir2, name)) if f.startswith("MANIFEST")], name
+            with open(os.path.join(datadir2, "governanceundo.since")) as f:
+                assert_equal(f.read(), since2)
             assert not os.path.exists(os.path.join(datadir2, "snapshot-unverified"))
+
+        def start_ends(args, message, code=1):
+            """The start ends by itself with this exit code, and says this on its error output."""
+            with tempfile.TemporaryFile("w+") as err:
+                node2.start(args, stderr=err)
+                assert_equal(node2.process.wait(timeout=120), code)
+                node2.running = False
+                node2.process = None
+                err.seek(0)
+                said = err.read()
+            assert message in said, said
+            return said
 
         # ...and the snapshot cannot be had: the node says why and ends, and it has removed
         # nothing. Whatever is in the way, for now or for good:
@@ -416,8 +446,9 @@ class SnapshotTest(AokChainTestFramework):
                 (without_source + ["-bootstrapdir=" + self.archives, self.params(archive=self.archive_sha256(self.archives, manifest), block="11" * 32)],
                  "this program accepts the one at height"),
                 (without_source + ["-bootstrapdir=" + self.archives, self.params(archive="00" * 32)], "are not the ones that this program accepts")):
-            self.assert_start_raises_init_error(2, args, why)
+            start_ends(args, why)
             kept()
+            assert not os.path.exists(os.path.join(datadir2, "snapshot-unpack"))
         starts_over = self.log_of(2).count("it starts over from the snapshot")
         assert starts_over >= 5
         assert_equal(self.log_of(2).count("Nothing was removed"), 5)
@@ -429,7 +460,32 @@ class SnapshotTest(AokChainTestFramework):
         assert not [r for r in server.requests if ".part" in r[0]], "the snapshot was fetched"
         assert_equal(node2.getblockcount(), height2)
         assert_equal(node2.getbalance(), balance)
+        assert_equal(node2.getstatehashes(), state2)
         assert_equal(self.log_of(2).count("it starts over from the snapshot"), starts_over)
+
+        # a stop that is asked for while the snapshot is fetched: the start ends without the
+        # message of a failure, and nothing is removed
+        self.stop_node(2)
+        shutil.rmtree(os.path.join(datadir2, "tokens"))
+        server.delay = 1
+        del server.requests[:]
+        with tempfile.TemporaryFile("w+") as err:
+            node2.start(args2, stderr=err)
+            wait_until(lambda: [r for r in server.requests if ".part" in r[0]], timeout=60)
+            node2.process.terminate()
+            node2.process.wait(timeout=120)
+            node2.running = False
+            node2.process = None
+            err.seek(0)
+            said = err.read()
+        server.delay = 0
+        assert "cannot be had now" not in said, said
+        assert_equal(self.log_of(2).count("A stop was asked for while this node fetched the snapshot to start over from"), 1)
+        kept()
+        shutil.rmtree(os.path.join(datadir2, "tokens"))
+        shutil.copytree(tokens_aside, os.path.join(datadir2, "tokens"))
+        self.start_node(2, args2)
+        assert_equal(node2.getstatehashes(), state2)
 
         # a stop while it starts over: after the snapshot is unpacked beside the chain data...
         self.stop_node(2)
@@ -440,15 +496,20 @@ class SnapshotTest(AokChainTestFramework):
         node2.process = None
         kept()
         assert os.path.isdir(os.path.join(datadir2, "snapshot-unpack", "chainstate"))
-        # ...and while it takes their place: the next start does the rest
-        node2.start(args2 + ["-testcrashat=snapshot-moving"])
-        assert_equal(node2.process.wait(timeout=120), 0)
-        node2.running = False
-        node2.process = None
-        assert os.path.exists(os.path.join(datadir2, "snapshot-unverified"))
-        assert os.path.isdir(os.path.join(datadir2, "snapshot-unpack"))
+        # ...and while it takes their place, at three starts one after the other: the next
+        # start does the rest. (What the snapshot replaced is gone by then: it is not removed
+        # for the starts that were stopped on it, however many.)
+        removed = self.log_of(2).count("Snapshot: removed")
+        for _ in range(3):
+            node2.start(args2 + ["-testcrashat=snapshot-moving"])
+            assert_equal(node2.process.wait(timeout=120), 0)
+            node2.running = False
+            node2.process = None
+            assert os.path.exists(os.path.join(datadir2, "snapshot-unverified"))
+            assert os.path.isdir(os.path.join(datadir2, "snapshot-unpack"))
         del server.requests[:]
         self.start_node(2, args2)
+        assert_equal(self.log_of(2).count("Snapshot: removed"), removed)
         assert not [r for r in server.requests if ".part" in r[0]], "the snapshot was fetched once more"
         assert not os.path.exists(os.path.join(datadir2, "snapshot-unpack"))
         assert "Snapshot: REJECTED" not in self.log_of(2)
@@ -470,6 +531,103 @@ class SnapshotTest(AokChainTestFramework):
         sync_blocks([node0, node2])
         self.assert_same_state(node0, node2, index=False, full=False)
         assert_equal(node2.getbalance(), balance)
+        # A database that the operator keeps elsewhere (a link), and the block directory on
+        # another file system: the snapshot goes where they are, and they stay where they are.
+        self.stop_node(2)
+        elsewhere = os.path.join(self.options.tmpdir, "elsewhere")
+        os.makedirs(elsewhere)
+        shutil.move(os.path.join(datadir2, "governance"), os.path.join(elsewhere, "governance"))
+        os.symlink(os.path.join(elsewhere, "governance"), os.path.join(datadir2, "governance"))
+        other_fs = None
+        if os.path.isdir("/dev/shm") and os.access("/dev/shm", os.W_OK) and os.stat("/dev/shm").st_dev != os.stat(datadir2).st_dev:
+            other_fs = tempfile.mkdtemp(prefix="aok-snapshot-test-", dir="/dev/shm")
+            self.other_fs = other_fs
+            shutil.move(os.path.join(datadir2, "blocks"), os.path.join(other_fs, "blocks"))
+            os.symlink(os.path.join(other_fs, "blocks"), os.path.join(datadir2, "blocks"))
+        else:
+            self.log.info("(no second file system to be had here: the block directory stays where it is)")
+        self.start_node(2, args2)
+        connect_nodes(node2, 0)
+        sync_blocks([node0, node2])
+        self.stop_node(2)
+        shutil.rmtree(os.path.join(datadir2, "tokens"))
+        del server.requests[:]
+        self.start_node(2, args2)
+        assert [r for r in server.requests if ".part" in r[0]], "the snapshot was not fetched again"
+        assert_equal(self.log_of(2).count("it starts over from the snapshot"), starts_over + 2)
+        starts_over += 1
+        assert os.path.islink(os.path.join(datadir2, "governance"))
+        assert [f for f in os.listdir(os.path.join(elsewhere, "governance")) if f.startswith("MANIFEST")]
+        if other_fs:
+            assert os.path.islink(os.path.join(datadir2, "blocks"))
+            assert [f for f in os.listdir(os.path.join(other_fs, "blocks", "index")) if f.startswith("MANIFEST")]
+            assert_equal(self.log_of(2).count("blocks/index is not moved by a rename"), 0)   # (it is known before, and copied)
+        assert not os.path.exists(os.path.join(datadir2, "snapshot-unpack"))
+        connect_nodes(node2, 0)
+        sync_blocks([node0, node2])
+        self.assert_same_state(node0, node2, index=False, full=False)
+        assert_equal(node2.getbalance(), balance)
+        # ...and when the snapshot cannot be put into its place (the place of the governance
+        # database cannot be written to): the start says what it has done, the unpacked
+        # snapshot waits, and the start that can finish does so, however many ended before it
+        # (the damage is in the block index database here, which a start opens first: it does
+        # not get as far as the governance database before it starts over)
+        self.stop_node(2)
+        self.start_node(2, args2)   # (a start writes what the database has in its log into a table file)
+        self.stop_node(2)
+        index2 = os.path.join(datadir2, "blocks", "index")
+        tables = sorted(name for name in os.listdir(index2) if name.endswith(".ldb"))
+        assert tables
+        os.remove(os.path.join(index2, tables[0]))
+        os.chmod(os.path.join(elsewhere, "governance"), 0o555)
+        nothing_removed = self.log_of(2).count("Nothing was removed")
+        removed = self.log_of(2).count("Snapshot: removed")
+        try:
+            said = start_ends(args2, "it could not be put into the place of the chain data")
+            assert "are removed" in said and "Nothing was removed" not in said, said
+            for _ in range(3):
+                start_ends(args2, "An earlier start had begun to put the chain state snapshot into the place of the chain data")
+                assert os.path.isdir(os.path.join(datadir2, "snapshot-unpack", "governance"))
+                assert os.path.exists(os.path.join(datadir2, "snapshot-unverified"))
+        finally:
+            os.chmod(os.path.join(elsewhere, "governance"), 0o755)
+        assert_equal(self.log_of(2).count("Nothing was removed"), nothing_removed)
+        del server.requests[:]
+        self.start_node(2, args2)
+        assert not [r for r in server.requests if ".part" in r[0]], "the snapshot was fetched once more"
+        assert_equal(self.log_of(2).count("Snapshot: removed"), removed)
+        assert not os.path.exists(os.path.join(datadir2, "snapshot-unpack"))
+        assert os.path.islink(os.path.join(datadir2, "governance"))
+        connect_nodes(node2, 0)
+        sync_blocks([node0, node2])
+        self.assert_same_state(node0, node2, index=False, full=False)
+        assert_equal(node2.getbalance(), balance)
+        starts_over = self.log_of(2).count("it starts over from the snapshot") - 1   # (as the cases below count)
+        # (a file system without room for the copy: nothing is begun. Only with a small file
+        # system given by the caller, SNAPSHOT_TEST_SMALL_FS=<a directory on it>.)
+        small_fs = os.environ.get("SNAPSHOT_TEST_SMALL_FS")
+        if small_fs:
+            self.stop_node(2)
+            small = tempfile.mkdtemp(prefix="aok-snapshot-test-", dir=small_fs)
+            os.rename(os.path.join(datadir2, "tokens"), os.path.join(self.options.tmpdir, "tokens-kept"))
+            os.symlink(small, os.path.join(datadir2, "tokens"))
+            with open(os.path.join(datadir2, "governanceundo.since")) as f:
+                since2 = f.read()
+            block_file = os.path.join(datadir2, "blocks", "blk00000.dat")
+            block_file_size = os.path.getsize(block_file)
+            said = start_ends(args2, "there is not enough room for tokens where this node keeps it")
+            assert "Nothing was removed" in said, said
+            kept()
+            assert not os.path.exists(os.path.join(datadir2, "snapshot-unpack"))
+            os.remove(os.path.join(datadir2, "tokens"))
+            os.rename(os.path.join(self.options.tmpdir, "tokens-kept"), os.path.join(datadir2, "tokens"))
+            shutil.rmtree(small)
+            self.start_node(2, args2)
+            connect_nodes(node2, 0)
+            sync_blocks([node0, node2])
+            self.assert_same_state(node0, node2, index=False, full=False)
+            starts_over += 1
+            self.log.info("(the case of the small file system ran)")
         # the block index database is damaged: indexing the block files again is no way out for
         # a node that does not have them, it starts over as well
         self.stop_node(2)

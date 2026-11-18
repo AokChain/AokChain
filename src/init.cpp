@@ -1737,7 +1737,10 @@ bool AppInitMain(boost::thread_group& threadGroup, CScheduler& scheduler)
     if ((fReindex || fReindexChainState) && SnapshotNodeWithoutPastBlocks())
         return InitError(_("This node started from a chain state snapshot and does not have the blocks before it, so it cannot rebuild its databases from the blocks. Download the past blocks first (fetchblocks), or start with an empty data directory and -snapshot=0 to validate every block."));
     auto snapshotStatus = [](const std::string& message) { uiInterface.InitMessage(message); };
-    bool fSnapshotOnTrial = InstallSnapshotIfWanted(snapshotStatus);
+    std::string strSnapshotCannotGoOn;
+    bool fSnapshotOnTrial = InstallSnapshotIfWanted(snapshotStatus, strSnapshotCannotGoOn);
+    if (!strSnapshotCannotGoOn.empty())
+        return InitError(strprintf(_("An earlier start had begun to put the chain state snapshot into the place of the chain data of this node, and this start cannot finish that: %s. The block files and the databases that the snapshot replaces may be removed already; the unpacked snapshot is kept in the data directory (snapshot-unpack). Mend what is in the way and start the program again: it goes on from there, and no option is needed."), strSnapshotCannotGoOn));
 
     // -autorebuild: what a start does by itself when the databases are not in a state that it
     // can go on from. Each of the two steps is taken once in a start.
@@ -2267,7 +2270,15 @@ bool AppInitMain(boost::thread_group& threadGroup, CScheduler& scheduler)
                 delete governance;
                 governance = nullptr;
                 std::string strWhyNot;
-                fSnapshotOnTrial = StartOverFromSnapshot(snapshotStatus, strWhyNot);
+                bool fMoveFailed = false;
+                fSnapshotOnTrial = StartOverFromSnapshot(snapshotStatus, strWhyNot, fMoveFailed);
+                if (!fSnapshotOnTrial && fMoveFailed)
+                    return InitError(strprintf(_("The databases of this node are damaged. It started from a chain state snapshot and does not have the blocks before it, so it starts over from the snapshot. The snapshot is fetched and unpacked, and it could not be put into the place of the chain data: %s. The block files and the databases that it has replaced so far are removed; the unpacked snapshot is kept in the data directory (snapshot-unpack). Mend what is in the way and start the program again: it goes on from there, and no option is needed."), strWhyNot));
+                if (!fSnapshotOnTrial && ShutdownRequested()) {
+                    // (the stop came while the snapshot was fetched or unpacked: not a failure of that)
+                    LogPrintf("A stop was asked for while this node fetched the snapshot to start over from. Nothing was removed; the next start begins again.\n");
+                    return false;
+                }
                 if (!fSnapshotOnTrial)
                     return InitError(strprintf(_("The databases of this node are damaged. It started from a chain state snapshot and does not have the blocks before it, so it can only start over from the snapshot, and the snapshot cannot be had now: %s. Nothing was removed. Start the program again when the snapshot can be had: it tries at every start, and no option is needed."), strWhyNot));
                 continue;
