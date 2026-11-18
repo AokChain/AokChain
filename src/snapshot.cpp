@@ -297,8 +297,9 @@ void MarkSnapshotAccepted()
     }
     // The order, each step on disk before the next: the file of a node without the past
     // blocks, the record of the acceptance, the removal of the marker. A stop in between
-    // leaves the marker beside the file alone (the check is made again) or beside the file
-    // and the record (the snapshot was accepted: see SnapshotAcceptedBefore).
+    // leaves the marker, and the next start checks the snapshot again, in full: the record
+    // that this function wrote is the one thing beside a snapshot's own records that the
+    // check lets pass (VerifyInstalledSnapshot), and it proves nothing there.
     if (FILE* note = fsbridge::fopen(GetDataDir() / NO_PAST_BLOCKS_NAME, "wb")) {
         fprintf(note, "This node started from a chain state snapshot at height %d and does not have the blocks up to that height.\n", height);
         FileCommit(note);
@@ -319,25 +320,6 @@ void MarkSnapshotAccepted()
     LogPrintf("Snapshot: accepted at height %d. The past blocks are not on disk.\n", height);
 }
 
-bool SnapshotAcceptedBefore()
-{
-    if (!fInstalledThisStart || !pblocktree)
-        return false;
-    // Both are written by MarkSnapshotAccepted() and by nothing else: the record in the block
-    // index database, and before it the file in the data directory. A snapshot cannot bring
-    // the file (only the four database directories are unpacked), and a snapshot that takes
-    // the place of older chain data removes the file of those first (MoveSnapshotIn).
-    int height = -1;
-    boost::system::error_code ec;
-    if (!pblocktree->Read(DB_SNAPSHOT_HEIGHT, height) || !fs::exists(GetDataDir() / NO_PAST_BLOCKS_NAME, ec))
-        return false;
-    fs::remove(GetDataDir() / MARKER_NAME, ec);
-    SyncDirectory(GetDataDir());
-    fInstalledThisStart = false;
-    LogPrintf("Snapshot: this node accepted its snapshot (height %d) at an earlier start, which was stopped before the marker of the check was gone. The marker is removed; nothing is checked again.\n", height);
-    return true;
-}
-
 void LoadSnapshotState(boost::thread_group& threadGroup)
 {
     pthreads = &threadGroup;
@@ -346,6 +328,11 @@ void LoadSnapshotState(boost::thread_group& threadGroup)
     nSnapshotHeight = -1;
     fPastBlocksMissing = false;
     fRescanPending = false;
+    // A snapshot that is not checked yet says nothing about this node: records that came with
+    // it are not read here, and no file is written from them. (MarkSnapshotAccepted() sets
+    // these values when the check has passed.)
+    if (fInstalledThisStart)
+        return;
     if (pblocktree->Read(DB_SNAPSHOT_HEIGHT, height)) {
         pblocktree->ReadFlag(FLAG_PAST_BLOCKS_MISSING, missing);
         pblocktree->ReadFlag(FLAG_RESCAN_PENDING, rescan);
@@ -1376,10 +1363,12 @@ bool FetchAndInstallSnapshot(std::function<void(const std::string&)> status, boo
     std::string moveError;
     const MoveResult moved = MoveSnapshotIn(moveError);
     if (moved == MoveResult::NOT_BEGUN) {
-        // (nothing of the node was touched: the unpacked snapshot and its marker go)
-        fs::remove_all(staging, ec);
+        // (nothing of the node was touched: the marker and the unpacked snapshot go. The
+        // marker first, and that on disk: a marker beside the untouched data of the node
+        // would have them checked as a snapshot at the next start, and removed.)
         fs::remove(GetDataDir() / MARKER_NAME, ec);
         SyncDirectory(GetDataDir());
+        fs::remove_all(staging, ec);
         why = "it cannot be moved into its place: " + moveError;
         return false;
     }
@@ -1515,6 +1504,9 @@ bool VerifyInstalledSnapshot(std::string& error, std::function<void(const std::s
         // The block tree database may hold the block index, the records of the block files and
         // flags. A transaction index or another index is not covered by the hashes: a snapshot
         // does not bring one.
+        CDataStream ssAcceptance(SER_DISK, CLIENT_VERSION);
+        ssAcceptance << DB_SNAPSHOT_HEIGHT;
+        const std::vector<unsigned char> acceptanceKey(ssAcceptance.begin(), ssAcceptance.end());
         std::unique_ptr<CDBIterator> it(pblocktree->NewIterator());
         for (it->SeekToFirst(); it->Valid(); it->Next()) {
             RawRecord key;
@@ -1523,6 +1515,19 @@ bool VerifyInstalledSnapshot(std::string& error, std::function<void(const std::s
                 return false;
             }
             const char kind = (char)key.bytes[0];
+            // One more record passes: the record of an acceptance at the height of this very
+            // snapshot, as MarkSnapshotAccepted() writes it (its two flags are flags). A start
+            // that was stopped between that record and the removal of the marker left it.
+            // It is let pass, not believed: the hashes above were compared all the same, and
+            // none of them covers this record.
+            if (key.bytes == acceptanceKey) {
+                int height = -1;
+                if (!pblocktree->Read(DB_SNAPSHOT_HEIGHT, height) || height != pinned.height) {
+                    error = strprintf("the block index of the snapshot says that it was accepted at height %d", height);
+                    return false;
+                }
+                continue;
+            }
             if (kind != 'b' && kind != 'f' && kind != 'l' && kind != 'F' && kind != 'R') {
                 error = strprintf("the block index of the snapshot has records of the kind '%c' (a snapshot is made by a node with txindex=0 and without other indexes)", isprint((unsigned char)kind) ? kind : '?');
                 return false;

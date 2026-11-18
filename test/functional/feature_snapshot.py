@@ -557,22 +557,28 @@ class SnapshotTest(AokChainTestFramework):
         self.assert_same_state(node0, node2, index=False, full=False)
         assert_equal(node2.getbalance(), balance)
         # a stop right after the snapshot is accepted, before the marker of its check is gone:
-        # the next start finds the marker beside the record of the acceptance, removes the
-        # marker and checks nothing again
+        # the next start finds the marker beside the record of the acceptance, checks the
+        # snapshot again in full (the record of its own acceptance passes) and accepts it
         self.stop_node(2)
         shutil.rmtree(os.path.join(datadir2, "governance"))
         removed = self.log_of(2).count("Snapshot: removed")
         rejected = self.log_of(2).count("Snapshot: REJECTED")
+        passed = self.log_of(2).count("Snapshot: check passed")
         node2.start(args2 + ["-testcrashat=snapshot-accepted"])
         assert_equal(node2.process.wait(timeout=120), 0)
         node2.running = False
         node2.process = None
         assert os.path.exists(os.path.join(datadir2, "snapshot-unverified"))
         assert os.path.exists(os.path.join(datadir2, "snapshot-without-past-blocks"))
+        # (also when the file is not there: nothing rests on it)
+        os.remove(os.path.join(datadir2, "snapshot-without-past-blocks"))
         del server.requests[:]
         self.start_node(2, args2)
         assert not [r for r in server.requests if ".part" in r[0]], "the snapshot was fetched once more"
-        assert_equal(self.log_of(2).count("this node accepted its snapshot"), 1)
+        # (checked again, in full: once by the start that was stopped, once by this one)
+        assert_equal(self.log_of(2).count("Snapshot: check passed"), passed + 2)
+        assert "nothing is checked again" not in self.log_of(2)
+        assert os.path.exists(os.path.join(datadir2, "snapshot-without-past-blocks"))
         assert_equal(self.log_of(2).count("Snapshot: REJECTED"), rejected)
         assert_equal(self.log_of(2).count("Snapshot: removed"), removed)
         assert not os.path.exists(os.path.join(datadir2, "snapshot-unverified"))
@@ -967,15 +973,17 @@ class SnapshotTest(AokChainTestFramework):
         wait_until(lambda: self.nodes[3].getsnapshotinfo()["past_blocks"] == "present", timeout=120)
         assert_equal(self.nodes[3].getblock(old_block, 0), node0.getblock(old_block, 0))
 
+        node3 = self.nodes[3]
+        marker = os.path.join(node3.datadir, "regtest", "snapshot-unverified")
+
         self.log.info("A snapshot that an earlier start left unchecked is checked at the next start")
         # (a first start that is stopped while the snapshot takes its place: the marker is
         # there, the record of an acceptance is not)
         self.wipe(3)
-        self.nodes[3].start(COMMON + [source, self.params(), "-mocktime=%d" % t, "-testcrashat=snapshot-moving"])
-        assert_equal(self.nodes[3].process.wait(timeout=120), 0)
-        self.nodes[3].running = False
-        self.nodes[3].process = None
-        marker = os.path.join(self.nodes[3].datadir, "regtest", "snapshot-unverified")
+        node3.start(COMMON + [source, self.params(), "-mocktime=%d" % t, "-testcrashat=snapshot-moving"])
+        assert_equal(node3.process.wait(timeout=120), 0)
+        node3.running = False
+        node3.process = None
         with open(marker, "rb") as f:
             assert_equal(f.read(), b"1")
         # ... and with other values in the program it is removed
@@ -983,7 +991,65 @@ class SnapshotTest(AokChainTestFramework):
         assert not os.path.exists(marker)
         assert "It is checked now" in self.log_of(3)
         assert "Snapshot: REJECTED" in self.log_of(3)
-        assert_equal(self.nodes[3].getsnapshotinfo()["snapshot_height"], -1)
+        assert_equal(node3.getsnapshotinfo()["snapshot_height"], -1)
+
+        self.log.info("Whatever stands beside a marker is checked, also a database that holds the record of an acceptance")
+        # a node that accepted the snapshot, and the marker put back: a program with other
+        # values removes the snapshot
+        self.fresh(3, [source, self.params(), "-mocktime=%d" % t])
+        assert_equal(node3.getsnapshotinfo()["snapshot_height"], HEIGHT)
+        self.stop_node(3)
+        with open(marker, "w") as f:
+            f.write("1")
+        self.start_node(3, COMMON + [source, self.params(utxo=other(self.hashes["utxo"])), "-snapshot=0", "-mocktime=%d" % t])
+        assert not os.path.exists(marker)
+        assert "It is checked now" in self.log_of(3)
+        assert "Snapshot: REJECTED" in self.log_of(3)
+        assert_equal(node3.getsnapshotinfo()["snapshot_height"], -1)
+        # ...and the program with the right values removes it when its content was changed
+        # (an unspent output taken out of the chain state)
+        self.fresh(3, [source, self.params(), "-mocktime=%d" % t])
+        coin = [u for u in node0.listunspent() if node3.gettxout(u["txid"], u["vout"]) is not None][0]
+        assert_equal(node3.removecoin(coin["txid"], coin["vout"]), True)
+        self.stop_node(3)
+        with open(marker, "w") as f:
+            f.write("1")
+        self.start_node(3, COMMON + [source, self.params(), "-snapshot=0", "-mocktime=%d" % t])
+        assert not os.path.exists(marker)
+        assert "Snapshot: REJECTED" in self.log_of(3)
+        assert_equal(node3.getsnapshotinfo()["snapshot_height"], -1)
+
+        self.log.info("A snapshot that carries the record of an acceptance is checked like any other")
+        # A snapshot packed from a node that itself started from the snapshot: its block index
+        # database holds the record of that node's acceptance. Untouched it has the accepted
+        # content and is accepted for that; with one unspent output taken out it is removed.
+        self.fresh(3, [source, self.params(), "-mocktime=%d" % t])
+        assert_equal(node3.getsnapshotinfo()["snapshot_height"], HEIGHT)
+        self.stop_node(3)
+        carried = os.path.join(self.options.tmpdir, "archives-carried")
+        shutil.copytree(self.archives, carried)
+        subprocess.check_output([sys.executable, os.path.join(contrib, "make_snapshot.py"), "--datadir", node3.datadir, "--network", "regtest",
+                                 "--hashes", hashes_file, "--out", carried, "--max-file-mb", "1"], stderr=subprocess.DEVNULL)
+        self.start_node(3, COMMON + [source, self.params(), "-mocktime=%d" % t])
+        assert_equal(node3.removecoin(coin["txid"], coin["vout"]), True)
+        self.stop_node(3)
+        tampered = os.path.join(self.options.tmpdir, "archives-tampered")
+        shutil.copytree(self.archives, tampered)
+        subprocess.check_output([sys.executable, os.path.join(contrib, "make_snapshot.py"), "--datadir", node3.datadir, "--network", "regtest",
+                                 "--hashes", hashes_file, "--out", tampered, "--max-file-mb", "1"], stderr=subprocess.DEVNULL)
+        for folder, good in ((carried, True), (tampered, False)):
+            self.wipe(3)
+            self.start_node(3, COMMON + ["-bootstrapdir=" + folder, self.params(), "-mocktime=%d" % t])
+            assert "nothing is checked again" not in self.log_of(3)
+            if good:
+                assert "Snapshot: check passed" in self.log_of(3)
+                assert_equal(node3.getsnapshotinfo()["snapshot_height"], HEIGHT)
+                assert_equal(node3.getsnapshotinfo()["past_blocks"], "missing")
+                assert_equal(node3.getstatehashes()["utxo"], self.hashes["utxo"])
+            else:
+                assert "Snapshot: REJECTED" in self.log_of(3)
+                assert "Snapshot: check passed" not in self.log_of(3)
+                assert_equal(node3.getsnapshotinfo()["snapshot_height"], -1)
 
 
 if __name__ == '__main__':
