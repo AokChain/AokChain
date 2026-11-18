@@ -354,6 +354,50 @@ class AutoRebuildTest(AokChainTestFramework):
         self.start1()
         unchanged()
 
+        self.log.info("The pid file and its note, in the orders in which a stop can leave them")
+        note = os.path.join(n1.datadir, "regtest", "pid.note")
+        # 1. Stopped after the note is written and before the pid file: the note alone.
+        #    Without a pid file no run is known to have ended badly: nothing is decided.
+        self.stop_node(1)
+        assert not os.path.exists(pid_file) and not os.path.exists(note)
+        n1.start(self.args + ["-checkmempool=0", "-testcrashat=pidnote"], stderr=self.stderr1)
+        self.wait_exit(0)
+        assert os.path.isfile(note) and not os.path.exists(pid_file)
+        self.start1()
+        unchanged()
+        # 2. Stopped after the pid file is written: both, with the same pid. This version's own
+        #    stop (above: -testcrashat=pidfile, running-mark, shutdown-tail).
+        # 3. Stopped at a shutdown after the pid file is removed and before the note is: the
+        #    note alone again.
+        self.stop_node(1)
+        self.start1(["-testcrashat=shutdown-pid-removed"])
+        n1.stop()
+        self.wait_exit(0)
+        assert os.path.isfile(note) and not os.path.exists(pid_file)
+        # 4. An earlier version runs after that, the note of the stopped run still there.
+        #    It ends normally and removes its pid file: the note alone, nothing is decided.
+        self.start1()
+        unchanged()
+        #    It is killed: its pid file with its pid, beside a note with another pid. That
+        #    pid file is not this version's: the unclean stop of the earlier version is found.
+        self.stop_node(1)
+        with open(note, "w") as f:
+            f.write("4141 -\n")
+        with open(pid_file, "w") as f:
+            f.write("4242\n")
+        self.start1()
+        rebuilds += 1
+        earlier += 1
+        unchanged()
+        #    (what is not seen: it was given the very pid of the note)
+        self.stop_node(1)
+        with open(note, "w") as f:
+            f.write("4242 -\n")
+        with open(pid_file, "w") as f:
+            f.write("4242\n")
+        self.start1()
+        unchanged()
+
         self.log.info("A stop that is asked for while the node rebuilds by itself: it ends, and the next start goes on")
         # (the stop of a service manager, at three moments: the databases of the rebuild are
         # closed and not open again; its chain state is wiped and holds no block; the databases

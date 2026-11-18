@@ -425,6 +425,7 @@ void Shutdown()
     } catch (const fs::filesystem_error& e) {
         LogPrintf("%s: Unable to remove pidfile: %s\n", __func__, e.what());
     }
+    TestCrashPoint("shutdown-pid-removed");
     // (after the pid file: while there is a pid file of this version, there is its note. The
     // note stays when it holds something that is not answered yet.)
     if (fPidNoteWritten && !fEarlierVersionUnclean) {
@@ -1482,6 +1483,7 @@ bool AppInitMain(boost::thread_group& threadGroup, CScheduler& scheduler)
             return InitError(strprintf(_("Cannot write to data directory '%s'; check permissions."), GetDataDir().string()));
         fPidNoteWritten = true;
     }
+    TestCrashPoint("pidnote");
     CreatePidFile(GetPidFile(), getpid());
 #endif
     TestCrashPoint("pidfile");
