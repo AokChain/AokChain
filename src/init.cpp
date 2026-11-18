@@ -166,6 +166,16 @@ static void TestStopPoint(const char* point)
     StartShutdown();
 }
 
+/** For tests (-testthrowat=<point>, -regtest only): an error is thrown at the point of that
+ *  name, as a database that cannot be opened there throws it. */
+static void TestThrowPoint(const char* point)
+{
+    if (gArgs.GetArg("-testthrowat", "") != point)
+        return;
+    LogPrintf("An error is thrown at the point '%s' (-testthrowat)\n", point);
+    throw std::runtime_error(strprintf("error at the point '%s' (-testthrowat)", point));
+}
+
 /** The node has set the mark of a running node in the block index database (see AppInitMain):
  *  a normal shutdown takes it away at its end. */
 static bool fRunningMarked = false;
@@ -1343,8 +1353,8 @@ bool AppInitParameterInteraction()
 
     if (gArgs.IsArgSet("-testcrashat") && !chainparams.MineBlocksOnDemand())
         return InitError("-testcrashat is for regression testing (-regtest) only");
-    if ((gArgs.IsArgSet("-teststopat") || gArgs.IsArgSet("-testfailtokenwrite") || gArgs.IsArgSet("-testabortat") || gArgs.IsArgSet("-testactivationpause")) && !chainparams.MineBlocksOnDemand())
-        return InitError("-teststopat, -testfailtokenwrite, -testabortat and -testactivationpause are for regression testing (-regtest) only");
+    if ((gArgs.IsArgSet("-teststopat") || gArgs.IsArgSet("-testfailtokenwrite") || gArgs.IsArgSet("-testabortat") || gArgs.IsArgSet("-testactivationpause") || gArgs.IsArgSet("-testthrowat")) && !chainparams.MineBlocksOnDemand())
+        return InitError("-teststopat, -testfailtokenwrite, -testabortat, -testactivationpause and -testthrowat are for regression testing (-regtest) only");
     if (gArgs.IsArgSet("-masteraddress")) {
         if (!chainparams.MineBlocksOnDemand())
             return InitError("-masteraddress is for regression testing (-regtest) only");
@@ -1946,9 +1956,15 @@ bool AppInitMain(boost::thread_group& threadGroup, CScheduler& scheduler)
                 // loaded there: they are loaded again, from the empty database.
                 fAtBlockIndex = false;
                 if (fReindexChainState && !fReset) {
+                    // (the pointers are cleared with the objects: an open that fails below
+                    // leaves this block, and what cleans up after it deletes what they point at)
                     delete ptokens;
+                    ptokens = nullptr;
                     delete ptokensdb;
+                    ptokensdb = nullptr;
                     delete ptokensCache;
+                    ptokensCache = nullptr;
+                    TestThrowPoint("tokens-reopen");
                     ptokensdb = new CTokensDB(nBlockTreeDBCache, false, true);
                     ptokens = new CTokensCache();
                     ptokensCache = new CLRUCache<std::string, CDatabasedTokenData>(MAX_CACHE_TOKENS_SIZE);

@@ -448,6 +448,17 @@ class AutoRebuildTest(AokChainTestFramework):
             self.same_state()
         rebuilds = self.count_in_log(REBUILT)
 
+        self.log.info("A database that cannot be opened while the databases are replaced: the start ends with its message")
+        # (the token database of -reindex-chainstate, which is opened a second time, emptied)
+        self.stop_node(1)
+        cannot_open = self.count_in_stderr("Error opening block database")
+        n1.start(self.args + ["-checkmempool=0", "-reindex-chainstate", "-testthrowat=tokens-reopen"], stderr=self.stderr1)
+        self.wait_exit(1)
+        assert_equal(self.count_in_stderr("Error opening block database"), cannot_open + 1)
+        self.start1()
+        self.same_state()
+        rebuilds = self.count_in_log(REBUILT)
+
         self.log.info("An earlier version's unclean stop is not forgotten when the starts that find it are killed")
         self.stop_node(1)
         with open(pid_file, "w") as f:
