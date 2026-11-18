@@ -1424,6 +1424,11 @@ bool InstallSnapshotIfWanted(std::function<void(const std::string&)> status, std
 {
     const CChainParams::SnapshotParams& pinned = Params().Snapshot();
     strCannotGoOn.clear();
+    {
+        // (what a stop between the writing of a marker and its move into place left)
+        boost::system::error_code ecNew;
+        fs::remove(GetDataDir() / (std::string(MARKER_NAME) + ".new"), ecNew);
+    }
     if (MarkerExists()) {
         // An earlier start unpacked a snapshot and did not get to accept it (the program was
         // closed or stopped while it moved the snapshot in or checked it).
