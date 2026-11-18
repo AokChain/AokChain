@@ -7,7 +7,8 @@ that runs and has the state of its peer.
 
 Node0 makes the traffic (payments, tokens, governance commands, blocks), node2 mines competing
 branches, node1 is the node that is stopped: while blocks are connected, while it writes its
-databases, while it shuts down, while it starts and repairs itself, while it rebuilds. It is
+databases, while it shuts down, while it starts and repairs itself, while it rebuilds (killed,
+or asked to stop as a service manager asks: then it must end by itself). It is
 always started again without any option that an operator would have to choose, as a service
 manager does. Then its five state hashes, its freeze list, its tokens and its address index
 must be those of node0.
@@ -129,8 +130,10 @@ class RandomStopsTest(AokChainTestFramework):
                 if time.time() > deadline:
                     raise AssertionError("node%d runs and has not answered in %d seconds" % (node.index, LONG))
 
-    def start_victim(self, extra=(), kill_after=None):
-        """Start node1. True when it runs; False when it ended by itself or was stopped on the way."""
+    def start_victim(self, extra=(), kill_after=None, stop_after=None):
+        """Start node1. True when it runs; False when it ended by itself or was stopped on the way.
+        kill_after: it is killed after so many seconds. stop_after: it is asked to stop then, as a
+        service manager asks, and must end by itself."""
         node = self.nodes[1]
         # (what a forced stop leaves of the last run's cookie file is not this run's)
         try:
@@ -142,9 +145,24 @@ class RandomStopsTest(AokChainTestFramework):
             time.sleep(kill_after)
             self.kill_victim()
             return False
+        if stop_after is not None:
+            time.sleep(stop_after)
+            node.process.terminate()
+            try:
+                code = node.process.wait(timeout=LONG)
+            except subprocess.TimeoutExpired:
+                raise AssertionError("node1 was asked to stop while it started and has not ended in %d seconds" % LONG)
+            # (-15: the request came before the program had its handler for it)
+            if code < 0 and code != -15:
+                raise AssertionError("node1 was asked to stop while it started, and was ended by signal %d" % -code)
+            self.stops_asked += 1
+            self.victim_gone()
+            return False
         code = self.wait_for_start(node)
         if code is None:
             return True
+        if code < 0:
+            raise AssertionError("node1 was ended by signal %d while it started" % -code)
         self.exits[code] = self.exits.get(code, 0) + 1
         self.last_exit = code
         self.victim_gone()
@@ -480,7 +498,7 @@ class RandomStopsTest(AokChainTestFramework):
         self.log.info("seed %d, %d rounds%s" % (seed, self.options.rounds, ", forced stops of the machine" if self.options.powerhelper else ""))
         self.exits, self.starts_needed = {}, {}
         self.split = False
-        self.odd_commands = self.lost_commands = self.rebuilt_checks = self.reference_checks = self.port_waits = 0
+        self.odd_commands = self.lost_commands = self.rebuilt_checks = self.reference_checks = self.port_waits = self.stops_asked = 0
         self.reorganisations = 0
         self.last_exit = None
         kinds = {}
@@ -537,7 +555,7 @@ class RandomStopsTest(AokChainTestFramework):
         rebuild_dirs = ["tokens", "governance", "chainstate", "governanceundo"]
         for round_number in range(1, self.options.rounds + 1):
             kind = rng.choice(["kill", "kill", "kill", "flush", "flush", "shutdown", "start", "crash-chainstate", "crash-tokens",
-                               "rebuild", "damage", "reorganise", "reorganise", "there-and-back", "there-and-back"])
+                               "rebuild", "damage", "damage-stop", "reorganise", "reorganise", "there-and-back", "there-and-back"])
             kinds[kind] = kinds.get(kind, 0) + 1
             self.log.info("round %d: %s" % (round_number, kind))
 
@@ -590,12 +608,16 @@ class RandomStopsTest(AokChainTestFramework):
             elif kind == "rebuild":
                 # an operator's rebuild that is stopped on its way
                 self.start_victim(["-reindex-chainstate"], kill_after=rng.uniform(0.2, 2.5))
-            elif kind == "damage":
-                # a database is lost: the node rebuilds by itself, and is stopped on that way
+            elif kind in ("damage", "damage-stop"):
+                # a database is lost: the node rebuilds by itself, and is stopped on that way:
+                # killed, or asked to stop as a service manager asks
                 lost = os.path.join(self.nodes[1].datadir, "regtest", rng.choice(rebuild_dirs))
                 if os.path.isdir(lost):   # (a program before the records of the governance commands has no such directory)
                     shutil.rmtree(lost)
-                self.start_victim(kill_after=rng.uniform(0.2, 2.5))
+                if kind == "damage":
+                    self.start_victim(kill_after=rng.uniform(0.2, 2.5))
+                else:
+                    self.start_victim(stop_after=rng.uniform(0, 2.5))
 
             self.traffic()   # (the chain goes on while node1 is down)
             self.mine()
@@ -607,8 +629,8 @@ class RandomStopsTest(AokChainTestFramework):
 
         text = self.victim_log()
         self.log.info("stops by kind: %s" % kinds)
-        self.log.info("starts that a restart took: %s; exits of node1 by itself, by code: %s; reorganisations: %d; rounds with odd governance commands: %d; commands sent to the side that lost only: %d; comparisons with the node that never gave a block up: %d, with a rebuilt node: %d; waits for a port that another program held: %d" % (
-            self.starts_needed, self.exits, self.reorganisations, self.odd_commands, self.lost_commands, self.reference_checks, self.rebuilt_checks, self.port_waits))
+        self.log.info("starts that a restart took: %s; exits of node1 by itself, by code: %s; reorganisations: %d; rounds with odd governance commands: %d; commands sent to the side that lost only: %d; comparisons with the node that never gave a block up: %d, with a rebuilt node: %d; stops asked for during a rebuild: %d; waits for a port that another program held: %d" % (
+            self.starts_needed, self.exits, self.reorganisations, self.odd_commands, self.lost_commands, self.reference_checks, self.rebuilt_checks, self.stops_asked, self.port_waits))
         self.log.info("node1's log: %d starts after a run that did not end normally, %d governance repairs, %d token repairs, %d replays of the chain state, %d rebuilds by itself (%d taken up at a later start), %d times a validated block did not connect, %d repairs of the address index" % (
             text.count("did not end with a normal shutdown"), text.count("they are undone and come back with their blocks"),
             text.count("Tokens: the token database is at height"), text.count("Replaying blocks\n"),

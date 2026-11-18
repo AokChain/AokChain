@@ -338,6 +338,20 @@ class AutoRebuildTest(AokChainTestFramework):
         self.start1()
         unchanged()
 
+        self.log.info("A stop that is asked for while the node rebuilds by itself: it ends, and the next start goes on")
+        # (the stop of a service manager, at three moments: the databases of the rebuild are
+        # closed and not open again; its chain state is wiped and holds no block; the databases
+        # are loaded and nothing is connected yet)
+        for point in ("rebuild-begun", "rebuild-wiped", "loaded"):
+            self.stop_node(1)
+            self.remove("tokens")
+            n1.start(self.args + ["-checkmempool=0", "-teststopat=" + point], stderr=self.stderr1)
+            self.wait_exit(1)
+            assert_equal(self.count_in_log("A stop is asked for at the point '%s'" % point), 1)
+            self.start1()
+            self.same_state()
+        rebuilds = self.count_in_log(REBUILT)
+
         self.log.info("An earlier version's unclean stop is not forgotten when the starts that find it are killed")
         self.stop_node(1)
         with open(pid_file, "w") as f:

@@ -3667,8 +3667,9 @@ bool static FlushStateToDisk(const CChainParams& chainparams, CValidationState &
             if (ptokensdb)
                 ptokensdb->WriteReissuedMempoolState();
             nLastFlush = nNow;
-        } else if (fDoFullFlush) {
-
+        } else if (fDoFullFlush && !hashFlushTip.IsNull()) {
+            // (a chain state that holds no block yet has nothing to write: a rebuild or a
+            // re-index that was stopped before it connected its first block)
 
             // Typical Coin structures on disk are around 48 bytes in size.
             // Pushing a new one to the database can cause it to be written
@@ -4391,8 +4392,6 @@ bool ActivateBestChain(CValidationState &state, const CChainParams& chainparams,
     int nStopAtHeight = gArgs.GetArg("-stopatheight", DEFAULT_STOPATHEIGHT);
     do {
         boost::this_thread::interruption_point();
-        if (ShutdownRequested())
-            break;
 
         // Each connected block is handed to the validation interface clients with the block
         // itself. They run on another thread and need cs_main: while this loop connects block
@@ -4447,6 +4446,13 @@ bool ActivateBestChain(CValidationState &state, const CChainParams& chainparams,
         }
 
         if (nStopAtHeight && pindexNewTip && pindexNewTip->nHeight >= nStopAtHeight) StartShutdown();
+
+        // A stop that is asked for is looked at only after ActivateBestChainStep had its chance
+        // to run once: the node never stops before it has connected the genesis block (a chain
+        // state that is being built again holds no block until then, and what follows a stop,
+        // the last write of the chain state and the checks of the block index, needs one).
+        if (ShutdownRequested())
+            break;
     } while (pindexNewTip != pindexMostWork);
     CheckBlockIndex(chainparams.GetConsensus());
 

@@ -1775,12 +1775,19 @@ bool AppInitMain(boost::thread_group& threadGroup, CScheduler& scheduler)
                 }
                 fAtBlockIndex = false;
 
+                // (nothing points to what is deleted: a stop that is asked for before they are
+                // made again goes through Shutdown(), which uses and deletes what it finds)
                 delete ptokens;
+                ptokens = nullptr;
                 delete ptokensdb;
+                ptokensdb = nullptr;
                 delete ptokensCache;
+                ptokensCache = nullptr;
                 delete governance;
+                governance = nullptr;
                 if (fAutoRebuildNow)
                     TestStopPoint("rebuild-begun");
+                if (fRequestShutdown) break;
 
                 // Wiped here on -reindex only. -reindex-chainstate wipes the token database
                 // below, with the chainstate and the governance database, after the checks of
@@ -2316,11 +2323,15 @@ bool AppInitMain(boost::thread_group& threadGroup, CScheduler& scheduler)
     // Wait for genesis block to be processed
     {
         boost::unique_lock<boost::mutex> lock(cs_GenesisWait);
-        while (!fHaveGenesis) {
-            condvar_GenesisWait.wait(lock);
+        // (a stop that is asked for before the first block is connected: the import thread
+        // ends without connecting it, and nothing else would end this wait)
+        while (!fHaveGenesis && !ShutdownRequested()) {
+            condvar_GenesisWait.wait_for(lock, boost::chrono::milliseconds(500));
         }
         uiInterface.NotifyBlockTip.disconnect(&BlockNotifyGenesisWait);
     }
+    if (ShutdownRequested())
+        return false;
 
     // ********************************************************* Step 11: start node
 
