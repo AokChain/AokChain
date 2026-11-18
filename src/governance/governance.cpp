@@ -255,7 +255,9 @@ bool CGovernance::Init(bool fWipe, const CChainParams& chainparams) {
         CScript feeScript = GetScriptForDestination(destination);
         batch.Write(FeeEntry(), FeeDetails(feeScript));
 
-        batch.Write(DB_GOVERNANCE_INIT, true);
+        // (a database that is made without being asked for is marked by ConfirmNew())
+        if (fWipe)
+            batch.Write(DB_GOVERNANCE_INIT, true);
         WriteBatch(batch);
         fNew = !fWipe;
     }
@@ -426,6 +428,12 @@ bool CGovernance::EndChainStateFlush(const uint256& hashTip)
     EraseJournal(batch);
     hashChainState = hashTip;
     return WriteBatch(batch);
+}
+
+bool CGovernance::ConfirmNew()
+{
+    fNew = false;
+    return Write(DB_GOVERNANCE_INIT, true, true);
 }
 
 bool CGovernance::HasJournal() const

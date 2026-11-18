@@ -431,5 +431,23 @@ class AutoRebuildTest(AokChainTestFramework):
         self.same_state()
 
 
+        self.log.info("A store that is gone, and a node that does not rebuild by itself: no start goes on with a new one")
+        # (the first start makes an empty store in its place; the second must not take that for the store of this chain)
+        for name, said in (("governance", "The governance database does not belong to the chain state (it is new"),
+                           ("tokens", "The token database does not belong to the chain state (it is empty")):
+            rebuilds = self.count_in_log(REBUILT)
+            before = self.count_in_log(said)
+            self.stop_node(1)
+            self.remove(name)
+            for _ in range(2):
+                n1.start(self.args + ["-checkmempool=0", "-autorebuild=0"], stderr=self.stderr1)
+                self.wait_exit(1)
+            assert_equal(self.count_in_log(said), before + 2)
+            assert_equal(self.count_in_log(REBUILT), rebuilds)
+            self.start1()
+            assert_equal(self.count_in_log(REBUILT), rebuilds + 1)
+            self.same_state()
+
+
 if __name__ == '__main__':
     AutoRebuildTest().main()

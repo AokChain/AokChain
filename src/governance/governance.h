@@ -204,8 +204,16 @@ public:
     bool ChainStateFlushBegun(const uint256& hashTip) const;
     //! Whether the state was written since the chain state was (a journal is kept).
     bool HasJournal() const;
-    //! Whether Init() found no database and made this one (and was not asked to).
+    //! Whether Init() found no database and made this one without being asked to (fWipe), at
+    //! this start or at an earlier one that did not confirm it: see ConfirmNew().
     bool IsNew() const { return fNew; }
+    /**
+     * A database that Init() made without being asked to is right beside a chain state that
+     * holds no block. Beside one that holds blocks it is not the database that belonged to
+     * them, and has to be built again. It is not marked as initialised until the caller has
+     * found the first to be the case: a start that ends on the second finds it new again.
+     */
+    bool ConfirmNew();
 
     using CDBWrapper::Sync;
 

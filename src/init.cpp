@@ -1806,6 +1806,8 @@ bool AppInitMain(boost::thread_group& threadGroup, CScheduler& scheduler)
                 // (a rebuild that the node decided by itself wipes it here: it may be the very
                 // database that cannot be opened)
                 ptokensdb = new CTokensDB(nBlockTreeDBCache, false, fReset || fAutoRebuildNow);
+                // (before anything is written to it at this start: see below)
+                const bool fTokenDatabaseEmpty = ptokensdb->IsEmpty();
                 ptokens = new CTokensCache();
                 ptokensCache = new CLRUCache<std::string, CDatabasedTokenData>(MAX_CACHE_TOKENS_SIZE);
 
@@ -1970,12 +1972,33 @@ bool AppInitMain(boost::thread_group& threadGroup, CScheduler& scheduler)
                 if (fAutoRebuildNow)
                     TestStopPoint("rebuild-wiped");
 
-                // A governance database that was made at this start, beside a chain state that
-                // holds blocks: the database that belonged to the chain state is gone.
-                if (governance->IsNew() && !pcoinsTip->GetBestBlock().IsNull()) {
-                    strLoadError = _("The governance database does not belong to the chain state (it is new, and the chain state is not)");
-                    fChainStateAtFault = true;
-                    break;
+                // A store that had to be made, beside a chain state that holds blocks, is not
+                // the store that belonged to that chain state: the node does not go on with it.
+                //  - The governance database is made by Init() with the values of a chain
+                //    without commands, and counts as new until a start has found it beside a
+                //    chain state without blocks (or built it): a start that ends here finds it
+                //    new again.
+                //  - The token database: whatever version wrote the chain state wrote to the
+                //    token database at the same time, so it is never empty beside blocks.
+                // (The genesis block changes neither. The records of governance commands have
+                // their own check, LoadGovernanceUndoSince: their absence is what a version
+                // before them leaves.)
+                {
+                    const uint256 hashBest = pcoinsTip->GetBestBlock();
+                    const bool fChainStateHoldsBlocks = !hashBest.IsNull() && hashBest != chainparams.GetConsensus().hashGenesisBlock;
+                    if (governance->IsNew()) {
+                        if (fChainStateHoldsBlocks) {
+                            strLoadError = _("The governance database does not belong to the chain state (it is new, and the chain state is not)");
+                            fChainStateAtFault = true;
+                            break;
+                        }
+                        governance->ConfirmNew();
+                    }
+                    if (fTokenDatabaseEmpty && !fReset && !fReindexChainState && fChainStateHoldsBlocks) {
+                        strLoadError = _("The token database does not belong to the chain state (it is empty, and the chain state is not)");
+                        fChainStateAtFault = true;
+                        break;
+                    }
                 }
 
                 // An earlier version left the data directory without a normal shutdown. That version

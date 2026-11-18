@@ -104,6 +104,8 @@ public:
     //! A hash of the tokens and balances: of every record but the undo data, the block above and
     //! the reissues that wait in the memory pool. Null when a record cannot be read.
     uint256 StateHash();
+    //! Whether the database holds no record at all (it was made when it was opened).
+    bool IsEmpty();
 
 private:
     template <typename K, typename V> bool PutRecord(const K& key, const V& value);

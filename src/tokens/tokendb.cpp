@@ -139,6 +139,13 @@ bool CTokensDB::IsStateBlockKey(const std::vector<unsigned char>& key)
     return key == ToBytes(STATE_BLOCK_KEY);
 }
 
+bool CTokensDB::IsEmpty()
+{
+    std::unique_ptr<CDBIterator> it(NewIterator());
+    it->SeekToFirst();
+    return !it->Valid() && it->IsOk();
+}
+
 uint256 CTokensDB::StateHash()
 {
     CHashWriter ss(SER_GETHASH, 0);

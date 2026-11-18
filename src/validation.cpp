@@ -3528,7 +3528,10 @@ static bool ChainStateIsOnDisk(const uint256& hashTip)
     AssertLockHeld(cs_main);
     if (hashTip.IsNull() || !pcoinsdbview || !fTokenStateInStep)
         return false;
-    if (pcoinsdbview->GetBestBlock() != hashTip || pcoinsTip->HasDirtyEntries())
+    // (a chain state that another version wrote last gets the mark of this version with its
+    // first write here, also when nothing else is to be written: the checks of the next start
+    // go by that mark)
+    if (pcoinsdbview->GetBestBlock() != hashTip || !pcoinsdbview->IsInStep() || pcoinsTip->HasDirtyEntries())
         return false;
     if (governance && governance->HasJournal())
         return false;
