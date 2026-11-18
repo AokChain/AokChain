@@ -99,11 +99,12 @@ bool InstallSnapshotIfWanted(std::function<void(const std::string&)> status);
 /**
  * A node that started from a snapshot and does not have the blocks before it cannot build its
  * databases again from the block files. When it cannot go on from its databases it starts over:
- * the chain databases and the block files are removed and the snapshot is installed again, as in
- * a new data directory (the wallet is not touched). False when the snapshot could not be
- * installed now; the data directory is then that of a new node, and the next start tries again.
+ * the snapshot is fetched, checked and unpacked again, and then takes the place of the chain
+ * databases and the block files (the wallet is not touched). Nothing is removed before the
+ * snapshot is unpacked completely. False when it could not be had: why says what is in the
+ * way, the data directory is as it was, and the next start tries again.
  */
-bool StartOverFromSnapshot(std::function<void(const std::string&)> status);
+bool StartOverFromSnapshot(std::function<void(const std::string&)> status, std::string& why);
 /** After the databases are loaded: compare their content hashes with the pinned ones. */
 bool VerifyInstalledSnapshot(std::string& error, std::function<void(const std::string&)> status);
 /** Remove what InstallSnapshotIfWanted() unpacked (the databases must be closed). */

@@ -389,26 +389,94 @@ class SnapshotTest(AokChainTestFramework):
         self.log.info("A damaged database: the node starts over from the snapshot by itself and keeps its wallet")
         balance = node2.getbalance()
         assert balance > 0
+        height2 = node2.getblockcount()
         self.stop_node(2)
-        shutil.rmtree(os.path.join(node2.datadir, "regtest", "tokens"))
-        # ...and the snapshot cannot be fetched: the node says so and ends; nothing is asked of the operator but to start it again
-        unreachable = [arg if not arg.startswith("-bootstrapurl=") else "-bootstrapurl=http://127.0.0.1:9/" for arg in args2]
-        self.assert_start_raises_init_error(2, unreachable, "the snapshot could not be fetched now")
-        assert "it starts over from the snapshot" in self.log_of(2)
+        datadir2 = os.path.join(node2.datadir, "regtest")
+        tokens_aside = os.path.join(self.options.tmpdir, "tokens-of-node2")
+        shutil.copytree(os.path.join(datadir2, "tokens"), tokens_aside)
+        shutil.rmtree(os.path.join(datadir2, "tokens"))
+        block_file = os.path.join(datadir2, "blocks", "blk00000.dat")
+        block_file_size = os.path.getsize(block_file)
+
+        def kept():
+            """Nothing of the node's chain data was removed."""
+            assert_equal(os.path.getsize(block_file), block_file_size)
+            for name in ("chainstate", "governance", os.path.join("blocks", "index")):
+                assert os.listdir(os.path.join(datadir2, name)), name
+            assert not os.path.exists(os.path.join(datadir2, "snapshot-unverified"))
+
+        # ...and the snapshot cannot be had: the node says why and ends, and it has removed
+        # nothing. Whatever is in the way, for now or for good:
+        del server.requests[:]
+        without_source = [arg for arg in args2 if not arg.startswith("-bootstrapurl=")]
+        for args, why in (
+                ([arg if not arg.startswith("-bootstrapurl=") else "-bootstrapurl=http://127.0.0.1:9/" for arg in args2], "cannot be read from the address or folder"),
+                (args2 + ["-snapshot=0"], "the snapshot is turned off"),
+                (without_source, "no address or folder to take it from"),
+                (without_source + ["-bootstrapdir=" + self.archives, self.params(archive=self.archive_sha256(self.archives, manifest), block="11" * 32)],
+                 "this program accepts the one at height"),
+                (without_source + ["-bootstrapdir=" + self.archives, self.params(archive="00" * 32)], "are not the ones that this program accepts")):
+            self.assert_start_raises_init_error(2, args, why)
+            kept()
+        starts_over = self.log_of(2).count("it starts over from the snapshot")
+        assert starts_over >= 5
+        assert_equal(self.log_of(2).count("Nothing was removed"), 5)
+        # with its token database back, it is the node that it was: it has kept everything
+        # (the starts that ended have begun an empty token database)
+        shutil.rmtree(os.path.join(datadir2, "tokens"))
+        shutil.copytree(tokens_aside, os.path.join(datadir2, "tokens"))
+        self.start_node(2, args2)
+        assert not [r for r in server.requests if ".part" in r[0]], "the snapshot was fetched"
+        assert_equal(node2.getblockcount(), height2)
+        assert_equal(node2.getbalance(), balance)
+        assert_equal(self.log_of(2).count("it starts over from the snapshot"), starts_over)
+
+        # a stop while it starts over: after the snapshot is unpacked beside the chain data...
+        self.stop_node(2)
+        shutil.rmtree(os.path.join(datadir2, "tokens"))
+        node2.start(args2 + ["-testcrashat=snapshot-unpacked"])
+        assert_equal(node2.process.wait(timeout=120), 0)
+        node2.running = False
+        node2.process = None
+        kept()
+        assert os.path.isdir(os.path.join(datadir2, "snapshot-unpack", "chainstate"))
+        # ...and while it takes their place: the next start does the rest
+        node2.start(args2 + ["-testcrashat=snapshot-moving"])
+        assert_equal(node2.process.wait(timeout=120), 0)
+        node2.running = False
+        node2.process = None
+        assert os.path.exists(os.path.join(datadir2, "snapshot-unverified"))
+        assert os.path.isdir(os.path.join(datadir2, "snapshot-unpack"))
         del server.requests[:]
         self.start_node(2, args2)
-        assert [r for r in server.requests if ".part" in r[0]], "the snapshot was not fetched again"
+        assert not [r for r in server.requests if ".part" in r[0]], "the snapshot was fetched once more"
+        assert not os.path.exists(os.path.join(datadir2, "snapshot-unpack"))
+        assert "Snapshot: REJECTED" not in self.log_of(2)
         assert_equal(node2.getsnapshotinfo()["past_blocks"], "missing")
         assert_equal(node2.getsnapshotinfo()["snapshot_height"], HEIGHT)
         connect_nodes(node2, 0)
         sync_blocks([node0, node2])
         self.assert_same_state(node0, node2, index=False, full=False)
         assert_equal(node2.getbalance(), balance)
-        # the same when the node can fetch the snapshot at once: one start, no message
+        # the same when nothing gets in the way: one start, no message
+        starts_over = self.log_of(2).count("it starts over from the snapshot")
+        self.stop_node(2)
+        shutil.rmtree(os.path.join(node2.datadir, "regtest", "governance"))
+        del server.requests[:]
+        self.start_node(2, args2)
+        assert [r for r in server.requests if ".part" in r[0]], "the snapshot was not fetched again"
+        assert_equal(self.log_of(2).count("it starts over from the snapshot"), starts_over + 1)
+        connect_nodes(node2, 0)
+        sync_blocks([node0, node2])
+        self.assert_same_state(node0, node2, index=False, full=False)
+        assert_equal(node2.getbalance(), balance)
+        # a node without its chain state is taken for a new one: the snapshot, as at the first start
         self.stop_node(2)
         shutil.rmtree(os.path.join(node2.datadir, "regtest", "chainstate"))
+        del server.requests[:]
         self.start_node(2, args2)
-        assert_equal(self.log_of(2).count("it starts over from the snapshot"), 2)
+        assert [r for r in server.requests if ".part" in r[0]], "the snapshot was not fetched again"
+        assert_equal(self.log_of(2).count("it starts over from the snapshot"), starts_over + 1)
         connect_nodes(node2, 0)
         sync_blocks([node0, node2])
         self.assert_same_state(node0, node2, index=False, full=False)

@@ -2149,9 +2149,10 @@ bool AppInitMain(boost::thread_group& threadGroup, CScheduler& scheduler)
                 ptokensdb = nullptr;
                 delete governance;
                 governance = nullptr;
-                fSnapshotOnTrial = StartOverFromSnapshot(snapshotStatus);
+                std::string strWhyNot;
+                fSnapshotOnTrial = StartOverFromSnapshot(snapshotStatus, strWhyNot);
                 if (!fSnapshotOnTrial)
-                    return InitError(_("The databases of this node are damaged. It started from a chain state snapshot and does not have the blocks before it, so it starts over from the snapshot, and the snapshot could not be fetched now (is the network connection up?). Start the program again when it can be fetched: no option is needed."));
+                    return InitError(strprintf(_("The databases of this node are damaged. It started from a chain state snapshot and does not have the blocks before it, so it can only start over from the snapshot, and the snapshot cannot be had now: %s. Nothing was removed. Start the program again when the snapshot can be had: it tries at every start, and no option is needed."), strWhyNot));
                 continue;
             }
             if (fChainStateAtFault && !fAutoRebuildTried && pblocktree && !fPruneMode && !fHavePruned) {

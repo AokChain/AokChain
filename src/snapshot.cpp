@@ -34,6 +34,11 @@
 #include <thread>
 #include <vector>
 
+#ifndef WIN32
+#include <fcntl.h>
+#include <unistd.h>
+#endif
+
 namespace {
 
 const char* MANIFEST_NAME = "snapshot.json";
@@ -48,6 +53,8 @@ const char* MARKER_NAME = "snapshot-unverified";
 const char* NO_PAST_BLOCKS_NAME = "snapshot-without-past-blocks";
 // what a snapshot may bring into the data directory
 const char* const SNAPSHOT_DIRS[] = {"chainstate", "blocks/index", "tokens", "governance"};
+// Where a snapshot is unpacked. It takes the place of the chain data when it is all there.
+const char* const STAGING_NAME = "snapshot-unpack";
 const uint64_t MAX_SNAPSHOT_SIZE = 64ULL * 1024 * 1024 * 1024;
 
 std::atomic<int> nSnapshotHeight(-1);
@@ -661,7 +668,13 @@ private:
             if (left == 0)
                 return Next();
         } else {
-            fclose(file);
+            // (on disk: the snapshot takes the place of other data only when it is all there)
+            FileCommit(file);
+            if (fclose(file) != 0) {
+                file = nullptr;
+                error = "cannot write into the data directory (disk full?)";
+                return false;
+            }
             file = nullptr;
             state = NAME_LENGTH;
             need = 2;
@@ -717,12 +730,23 @@ bool DataDirIsNew()
     }
 }
 
-/** Remove the chain databases and the block files, to put a snapshot in their place or to take one away. */
-void WipeChainData()
+/** The names of the directories are on disk (after files were created in them or moved). */
+void SyncDirectory(const fs::path& dir)
+{
+#ifndef WIN32
+    const int fd = open(dir.string().c_str(), O_RDONLY);
+    if (fd >= 0) {
+        fsync(fd);
+        close(fd);
+    }
+#endif
+}
+
+/** Remove what belongs to the chain data and is not one of the databases of SNAPSHOT_DIRS: the
+ *  block files, and the records of what the blocks replaced in the governance state. */
+void WipeBlockFilesAndRecords()
 {
     boost::system::error_code ec;
-    for (const char* dir : SNAPSHOT_DIRS)
-        fs::remove_all(GetDataDir() / dir, ec);
     // (what the blocks of the removed chain replaced in the governance state; a snapshot
     // brings none)
     fs::remove_all(GetDataDir() / "governanceundo", ec);
@@ -738,6 +762,51 @@ void WipeChainData()
         for (const fs::path& file : files)
             fs::remove(file, ec);
     }
+}
+
+/** Remove the chain databases and the block files, to take a snapshot away. */
+void WipeChainData()
+{
+    boost::system::error_code ec;
+    for (const char* dir : SNAPSHOT_DIRS)
+        fs::remove_all(GetDataDir() / dir, ec);
+    WipeBlockFilesAndRecords();
+}
+
+/**
+ * An unpacked snapshot (in STAGING_NAME) takes the place of the chain data of the node: for
+ * each of its directories the one of the node is removed and the one of the snapshot moved
+ * in; the block files and the governance records go. The marker is written before this
+ * begins, and a start that finds the marker and what is left in the staging directory does
+ * the rest (InstallSnapshotIfWanted): a directory that is still there has not been moved.
+ */
+bool MoveSnapshotIn()
+{
+    const fs::path staging = GetDataDir() / STAGING_NAME;
+    boost::system::error_code ec;
+    WipeBlockFilesAndRecords();
+    fs::remove(GetDataDir() / NO_PAST_BLOCKS_NAME, ec);
+    fPastBlocksMissing = false;
+    bool first = true;
+    for (const char* dir : SNAPSHOT_DIRS) {
+        if (!fs::is_directory(staging / dir, ec))
+            continue; // moved before this start
+        const fs::path target = GetDataDir() / dir;
+        fs::remove_all(target, ec);
+        fs::create_directories(target.parent_path(), ec);
+        fs::rename(staging / dir, target, ec);
+        if (ec) {
+            LogPrintf("Snapshot: cannot move %s into its place (%s).\n", dir, ec.message());
+            return false;
+        }
+        SyncDirectory(target.parent_path());
+        if (first)
+            TestCrashPoint("snapshot-moving");
+        first = false;
+    }
+    fs::remove_all(staging, ec);
+    SyncDirectory(GetDataDir());
+    return true;
 }
 
 /** How often a start has tried to check the snapshot that is unpacked in the data directory. */
@@ -768,42 +837,31 @@ void RemoveInstalledSnapshot()
 {
     boost::system::error_code ec;
     WipeChainData();
+    fs::remove_all(GetDataDir() / STAGING_NAME, ec);
     fs::remove_all(GetDataDir() / "snapshot-download", ec);
     fs::remove(GetDataDir() / MARKER_NAME, ec);
     fInstalledThisStart = false;
     LogPrintf("Snapshot: removed. The node synchronizes by validating the blocks.\n");
 }
 
-bool StartOverFromSnapshot(std::function<void(const std::string&)> status)
-{
-    RemoveInstalledSnapshot();
-    boost::system::error_code ec;
-    fs::remove(GetDataDir() / NO_PAST_BLOCKS_NAME, ec);
-    fPastBlocksMissing = false;
-    return InstallSnapshotIfWanted(status);
-}
+namespace {
 
-bool InstallSnapshotIfWanted(std::function<void(const std::string&)> status)
+/**
+ * Fetch the snapshot that this program accepts, check its files, unpack it beside the chain
+ * data, and then let it take the place of the chain data: that of a new node, or with
+ * fStartOver that of a node that cannot go on from its databases. Nothing of the data
+ * directory is removed before the snapshot is unpacked completely and on disk. False when no
+ * snapshot is installed: why says what is in the way, and the data directory is as it was.
+ */
+bool FetchAndInstallSnapshot(std::function<void(const std::string&)> status, bool fStartOver, std::string& why)
 {
     const CChainParams::SnapshotParams& pinned = Params().Snapshot();
-    if (MarkerExists()) {
-        // An earlier start unpacked a snapshot and did not get to accept it (the program was
-        // closed or stopped while checking). It is checked once more; a snapshot on which the
-        // program stopped twice is removed.
-        const int attempts = ReadMarker();
-        if (attempts >= 2 || pinned.height <= 0 || !WriteMarker(attempts + 1)) {
-            LogPrintf("Snapshot: an earlier start left a snapshot that could not be checked.\n");
-            RemoveInstalledSnapshot();
-            return false;
-        }
-        LogPrintf("Snapshot: an earlier start left a snapshot that was not checked yet. It is checked now.\n");
-        fInstalledThisStart = true;
-        return true;
-    }
     // -bootstrap=0 (the fast first synchronization of the settings page) turns the snapshot off too
-    if (!gArgs.GetBoolArg("-snapshot", DEFAULT_SNAPSHOT) || !gArgs.GetBoolArg("-bootstrap", DEFAULT_BOOTSTRAP) || pinned.height <= 0)
+    if (!gArgs.GetBoolArg("-snapshot", DEFAULT_SNAPSHOT) || !gArgs.GetBoolArg("-bootstrap", DEFAULT_BOOTSTRAP) || pinned.height <= 0) {
+        why = "the snapshot is turned off (-snapshot=0 or -bootstrap=0)";
         return false;
-    if (!DataDirIsNew())
+    }
+    if (!fStartOver && !DataDirIsNew())
         return false; // a node with a chain goes on with what it has
     // The snapshot is made with the default indexes: other settings need the blocks.
     if (fReindex || gArgs.GetBoolArg("-reindex-chainstate", false) || gArgs.GetArg("-prune", 0) != 0
@@ -811,10 +869,12 @@ bool InstallSnapshotIfWanted(std::function<void(const std::string&)> status)
         || gArgs.GetBoolArg("-addressindex", DEFAULT_ADDRESSINDEX) || gArgs.GetBoolArg("-timestampindex", DEFAULT_TIMESTAMPINDEX)
         || gArgs.GetBoolArg("-spentindex", DEFAULT_SPENTINDEX)) {
         LogPrintf("Snapshot: not used, because an option of this start needs the blocks to be validated here (reindex, prune or an index option).\n");
+        why = "an option of this start needs the blocks to be validated here (reindex, prune or an index option)";
         return false;
     }
     if (!BootstrapHasSource()) {
         LogPrintf("Snapshot: not used, there is no address or folder to take it from.\n");
+        why = "this node has no address or folder to take it from (-bootstrapurl=<address> or -bootstrapdir=<folder>)";
         return false;
     }
 
@@ -826,17 +886,20 @@ bool InstallSnapshotIfWanted(std::function<void(const std::string&)> status)
     try {
         UniValue manifest;
         if (!BootstrapReadFile(MANIFEST_NAME, text, error) || !manifest.read(text) || !manifest.isObject()) {
-            LogPrintf("Snapshot: no usable %s (%s). The node synchronizes by validating the blocks.\n", MANIFEST_NAME, error);
+            LogPrintf("Snapshot: no usable %s (%s).%s\n", MANIFEST_NAME, error, fStartOver ? "" : " The node synchronizes by validating the blocks.");
+            why = strprintf("its list of files (%s) cannot be read from the address or folder that this node takes it from: %s", MANIFEST_NAME, error);
             return false;
         }
         if (find_value(manifest, "format").get_int() != 1 || find_value(manifest, "network").get_str() != Params().NetworkIDString()) {
             LogPrintf("Snapshot: the manifest is for another format or network.\n");
+            why = "what is offered there is for another format or network";
             return false;
         }
         // a snapshot of another height or block cannot pass the check: do not fetch it at all
         if (find_value(manifest, "height").get_int() != pinned.height || uint256S(find_value(manifest, "block_hash").get_str()) != pinned.block) {
             LogPrintf("Snapshot: the server has a snapshot for height %d, this program accepts the one at height %d (%s). Not used.\n",
                       find_value(manifest, "height").get_int(), pinned.height, pinned.block.GetHex());
+            why = strprintf("the snapshot that is offered there is for height %d, and this program accepts the one at height %d only", find_value(manifest, "height").get_int(), pinned.height);
             return false;
         }
         unpackedSize = (uint64_t)find_value(manifest, "size").get_int64();
@@ -848,6 +911,7 @@ bool InstallSnapshotIfWanted(std::function<void(const std::string&)> status)
             part.sha256 = find_value(list[i], "sha256").get_str();
             if (!IsHash(part.sha256) || part.size == 0 || part.size > MAX_SNAPSHOT_SIZE) {
                 LogPrintf("Snapshot: the manifest is not valid.\n");
+                why = "its list of files is not valid";
                 return false;
             }
             for (char& c : part.sha256)
@@ -857,10 +921,12 @@ bool InstallSnapshotIfWanted(std::function<void(const std::string&)> status)
         }
         if (parts.empty() || parts.size() > 1000 || unpackedSize == 0 || unpackedSize > MAX_SNAPSHOT_SIZE) {
             LogPrintf("Snapshot: the manifest is not valid.\n");
+            why = "its list of files is not valid";
             return false;
         }
     } catch (const std::exception&) {
         LogPrintf("Snapshot: the manifest lacks a field.\n");
+        why = "its list of files is not valid";
         return false;
     }
 
@@ -893,9 +959,10 @@ bool InstallSnapshotIfWanted(std::function<void(const std::string&)> status)
     const int64_t downloaded = GetTimeMillis();
     boost::system::error_code ec;
     if (!ok) {
-        LogPrintf("Snapshot: download failed (%s). The node synchronizes by validating the blocks.\n", error);
+        LogPrintf("Snapshot: download failed (%s).%s\n", error, fStartOver ? "" : " The node synchronizes by validating the blocks.");
         if (!ShutdownRequested())
             fs::remove_all(dir, ec);
+        why = "the download failed: " + error;
         return false;
     }
 
@@ -922,25 +989,24 @@ bool InstallSnapshotIfWanted(std::function<void(const std::string&)> status)
         hasher.Finalize(digest);
         const std::string sha256 = HexStr(digest, digest + CSHA256::OUTPUT_SIZE);
         if (!readable || sha256 != pinned.archive) {
-            LogPrintf("Snapshot: the files are not the ones that this program accepts (SHA-256 %s, accepted %s). The node synchronizes by validating the blocks.\n",
-                      readable ? sha256 : "unreadable", pinned.archive);
+            LogPrintf("Snapshot: the files are not the ones that this program accepts (SHA-256 %s, accepted %s).%s\n",
+                      readable ? sha256 : "unreadable", pinned.archive, fStartOver ? "" : " The node synchronizes by validating the blocks.");
             for (size_t i = 0; i < paths.size(); ++i) {
                 if (temporary[i])
                     fs::remove(fs::path(paths[i]), ec);
             }
             fs::remove_all(dir, ec);
+            why = "the files that are offered there are not the ones that this program accepts";
             return false;
         }
     }
 
-    // unpack: the parts are one gzip stream
+    // unpack: the parts are one gzip stream. Beside the chain data: it takes their place when
+    // it is all there.
     status(_("Fast start: unpacking the snapshot..."));
-    if (!WriteMarker(1)) {
-        LogPrintf("Snapshot: cannot write into the data directory.\n");
-        return false;
-    }
-    WipeChainData(); // the databases of a node that never got past the genesis block
-    Unpacker unpacker(GetDataDir());
+    const fs::path staging = GetDataDir() / STAGING_NAME;
+    fs::remove_all(staging, ec);
+    Unpacker unpacker(staging);
     size_t current = 0;
     FILE* in = nullptr;
     uint64_t size = 0;
@@ -971,16 +1037,73 @@ bool InstallSnapshotIfWanted(std::function<void(const std::string&)> status)
             fs::remove(fs::path(paths[i]), ec);
     }
     fs::remove_all(dir, ec);
-    if (!unpacked || !unpacker.Finished() || size != unpackedSize) {
-        LogPrintf("Snapshot: cannot unpack (%s). The node synchronizes by validating the blocks.\n",
-                  !unpacker.error.empty() ? unpacker.error : !gzipError.empty() ? gzipError : "it is incomplete");
-        RemoveInstalledSnapshot();
+    std::string unpackError = !unpacker.error.empty() ? unpacker.error : !gzipError.empty() ? gzipError : "";
+    if (unpackError.empty() && (!unpacked || !unpacker.Finished() || size != unpackedSize))
+        unpackError = "it is incomplete";
+    for (const char* name : SNAPSHOT_DIRS) {
+        if (unpackError.empty() && !fs::is_directory(staging / name, ec))
+            unpackError = strprintf("it has no %s", name);
+        SyncDirectory(staging / name);
+    }
+    if (!unpackError.empty()) {
+        LogPrintf("Snapshot: cannot unpack (%s).%s\n", unpackError, fStartOver ? "" : " The node synchronizes by validating the blocks.");
+        fs::remove_all(staging, ec);
+        why = "it cannot be unpacked: " + unpackError;
+        return false;
+    }
+    SyncDirectory(staging);
+    SyncDirectory(staging / "blocks");
+    TestCrashPoint("snapshot-unpacked");
+
+    // From here on the data directory holds a snapshot that is not checked yet.
+    if (!WriteMarker(1)) {
+        LogPrintf("Snapshot: cannot write into the data directory.\n");
+        fs::remove_all(staging, ec);
+        why = "the data directory cannot be written to";
+        return false;
+    }
+    if (!MoveSnapshotIn()) {
+        why = "the unpacked snapshot cannot be moved into its place (the next start tries again)";
         return false;
     }
     LogPrintf("Snapshot: %d files unpacked (%.1f MB). Download %.1f s, unpacking %.1f s. It is checked next.\n", unpacker.Files(), size / 1e6,
               (downloaded - start) / 1000.0, (GetTimeMillis() - downloaded) / 1000.0);
     fInstalledThisStart = true;
     return true;
+}
+
+} // namespace
+
+bool StartOverFromSnapshot(std::function<void(const std::string&)> status, std::string& why)
+{
+    return FetchAndInstallSnapshot(status, true, why);
+}
+
+bool InstallSnapshotIfWanted(std::function<void(const std::string&)> status)
+{
+    const CChainParams::SnapshotParams& pinned = Params().Snapshot();
+    if (MarkerExists()) {
+        // An earlier start unpacked a snapshot and did not get to accept it (the program was
+        // closed or stopped while checking). It is checked once more; a snapshot on which the
+        // program stopped twice is removed.
+        const int attempts = ReadMarker();
+        if (attempts >= 2 || pinned.height <= 0 || !WriteMarker(attempts + 1)) {
+            LogPrintf("Snapshot: an earlier start left a snapshot that could not be checked.\n");
+            RemoveInstalledSnapshot();
+            return false;
+        }
+        // (the start was stopped while the snapshot took the place of the chain data: the rest of that)
+        boost::system::error_code ec;
+        if (fs::is_directory(GetDataDir() / STAGING_NAME, ec) && !MoveSnapshotIn()) {
+            RemoveInstalledSnapshot();
+            return false;
+        }
+        LogPrintf("Snapshot: an earlier start left a snapshot that was not checked yet. It is checked now.\n");
+        fInstalledThisStart = true;
+        return true;
+    }
+    std::string why;
+    return FetchAndInstallSnapshot(status, false, why);
 }
 
 bool VerifyInstalledSnapshot(std::string& error, std::function<void(const std::string&)> status)
