@@ -928,7 +928,8 @@ enum class MoveResult {
  * A directory of the node that is a link or lies on another file system is not replaced: it
  * is emptied and the files of the snapshot are copied into it; they are on disk before the
  * unpacked ones are removed, so a stop in the middle is made good in the same way. Whether
- * there is room for those copies is looked at before anything is removed.
+ * such a place is there, can be written to and has room for the copies is looked at before
+ * anything is removed.
  */
 MoveResult MoveSnapshotIn(std::string& error)
 {
@@ -944,9 +945,21 @@ MoveResult MoveSnapshotIn(std::string& error)
         rename[dir] = MovesByRename(staging / dir, target);
         if (rename[dir])
             continue;
+        if (fs::is_symlink(target, ec) && !fs::exists(target, ec)) {
+            error = strprintf("%s is a link to a place that is not there (%s)", dir, target.string());
+            LogPrintf("Snapshot: %s.\n", error);
+            return MoveResult::NOT_BEGUN;
+        }
         fs::path there = target;
         while (!there.empty() && !fs::exists(there, ec))
             there = there.parent_path();
+#ifndef WIN32
+        if (!there.empty() && access(there.string().c_str(), W_OK | X_OK) != 0) {
+            error = strprintf("the place where this node keeps %s cannot be written to (%s)", dir, there.string());
+            LogPrintf("Snapshot: %s.\n", error);
+            return MoveResult::NOT_BEGUN;
+        }
+#endif
         const fs::space_info space = fs::space(there, ec);
         // (with a reserve: the database grows as soon as the node runs)
         const uint64_t need = DirectorySize(staging / dir) + (16 << 20);

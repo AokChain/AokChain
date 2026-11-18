@@ -579,7 +579,24 @@ class SnapshotTest(AokChainTestFramework):
         tables = sorted(name for name in os.listdir(index2) if name.endswith(".ldb"))
         assert tables
         os.remove(os.path.join(index2, tables[0]))
+        # (first a place that cannot be written to at all: that is seen before anything is
+        # removed, and the start-over is not begun)
+        with open(os.path.join(datadir2, "governanceundo.since")) as f:
+            since2 = f.read()
+        block_file_size = os.path.getsize(block_file)
         os.chmod(os.path.join(elsewhere, "governance"), 0o555)
+        try:
+            said = start_ends(args2, "the place where this node keeps governance cannot be written to")
+        finally:
+            os.chmod(os.path.join(elsewhere, "governance"), 0o755)
+        assert "Nothing was removed" in said, said
+        kept()
+        assert not os.path.exists(os.path.join(datadir2, "snapshot-unpack"))
+        # (then one that can be written to and not emptied: something in it cannot be removed)
+        stuck = os.path.join(elsewhere, "governance", "stuck")
+        os.mkdir(stuck)
+        open(os.path.join(stuck, "file"), "w").close()
+        os.chmod(stuck, 0o555)
         nothing_removed = self.log_of(2).count("Nothing was removed")
         removed = self.log_of(2).count("Snapshot: removed")
         try:
@@ -590,7 +607,7 @@ class SnapshotTest(AokChainTestFramework):
                 assert os.path.isdir(os.path.join(datadir2, "snapshot-unpack", "governance"))
                 assert os.path.exists(os.path.join(datadir2, "snapshot-unverified"))
         finally:
-            os.chmod(os.path.join(elsewhere, "governance"), 0o755)
+            os.chmod(stuck, 0o755)
         assert_equal(self.log_of(2).count("Nothing was removed"), nothing_removed)
         del server.requests[:]
         self.start_node(2, args2)
