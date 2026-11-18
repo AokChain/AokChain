@@ -265,6 +265,29 @@ class SnapshotTest(AokChainTestFramework):
                 assert [f for f in os.listdir(kept_elsewhere) if f.startswith("MANIFEST")], "the node does not keep its token database behind the link"
                 assert "Snapshot: removed" in self.log_of(3)
 
+        self.log.info("A snapshot that is not accepted and cannot be removed completely: the start ends")
+        # (the token database is kept behind a link, in a place with an entry that cannot be
+        # removed: the snapshot can neither be put there nor be taken away again)
+        self.wipe(3)
+        stuck_place = os.path.join(self.options.tmpdir, "tokens2-of-node3")
+        os.makedirs(os.path.join(stuck_place, "stuck"))
+        open(os.path.join(stuck_place, "stuck", "file"), "w").close()
+        os.chmod(os.path.join(stuck_place, "stuck"), 0o555)
+        datadir3 = os.path.join(self.nodes[3].datadir, "regtest")
+        os.makedirs(datadir3)
+        os.symlink(stuck_place, os.path.join(datadir3, "tokens"))
+        try:
+            self.assert_start_raises_init_error(3, COMMON + [source, self.params()], "could not be removed completely")
+            assert os.path.exists(os.path.join(datadir3, "snapshot-unverified"))
+            self.assert_start_raises_init_error(3, COMMON + [source, self.params()], "could not be removed completely")
+        finally:
+            os.chmod(os.path.join(stuck_place, "stuck"), 0o755)
+        # with the place in order the rest is removed, and the node validates the blocks
+        self.start_node(3, COMMON + [source, self.params()])
+        self.assert_fell_back(3, rejected=False)
+        assert os.path.islink(os.path.join(datadir3, "tokens"))
+        assert not os.path.exists(os.path.join(datadir3, "snapshot-unverified"))
+
         self.log.info("A snapshot with a changed byte in a database file is removed")
 
         def flip(stream):

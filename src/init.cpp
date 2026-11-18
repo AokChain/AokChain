@@ -1786,7 +1786,7 @@ bool AppInitMain(boost::thread_group& threadGroup, CScheduler& scheduler)
     std::string strSnapshotCannotGoOn;
     bool fSnapshotOnTrial = InstallSnapshotIfWanted(snapshotStatus, strSnapshotCannotGoOn);
     if (!strSnapshotCannotGoOn.empty())
-        return InitError(strprintf(_("An earlier start had begun to put the chain state snapshot into the place of the chain data of this node, and this start cannot finish that: %s. The block files and the databases that the snapshot replaces may be removed already; the unpacked snapshot is kept in the data directory (snapshot-unpack). Mend what is in the way and start the program again: it goes on from there, and no option is needed."), strSnapshotCannotGoOn));
+        return InitError(strSnapshotCannotGoOn);
 
     // -autorebuild: what a start does by itself when the databases are not in a state that it
     // can go on from. Each of the two steps is taken once in a start.
@@ -2296,7 +2296,9 @@ bool AppInitMain(boost::thread_group& threadGroup, CScheduler& scheduler)
             ptokensdb = nullptr;
             delete governance;
             governance = nullptr;
-            RemoveInstalledSnapshot();
+            std::string strSnapshotLeft;
+            if (!RemoveInstalledSnapshot(strSnapshotLeft))
+                return InitError(strSnapshotLeft);
             uiInterface.InitMessage(_("The snapshot was not accepted. Synchronizing from the blocks instead..."));
             continue;
         }

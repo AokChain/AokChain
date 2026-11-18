@@ -93,9 +93,10 @@ bool FetchPastBlocksNow(std::string& error);
  * At start, before the databases are opened: when the data directory is new and a snapshot is
  * pinned for this network, fetch and unpack it. Returns true when a snapshot was unpacked; it is
  * not trusted until VerifyInstalledSnapshot() has passed.
- * strCannotGoOn is set when an earlier start had begun to put a snapshot into the place of the
- * chain data of a node that ran, and this start cannot finish that: the data directory holds
- * neither the old chain data nor all of the snapshot, and the start must end.
+ * strCannotGoOn is set, to the message for the operator, when the start must end: a snapshot
+ * that began to take the place of the chain data of a node that ran cannot be put there
+ * completely (the data directory holds neither the old chain data nor all of the snapshot),
+ * or a snapshot that is not accepted cannot be removed completely.
  */
 bool InstallSnapshotIfWanted(std::function<void(const std::string&)> status, std::string& strCannotGoOn);
 
@@ -113,8 +114,10 @@ bool InstallSnapshotIfWanted(std::function<void(const std::string&)> status, std
 bool StartOverFromSnapshot(std::function<void(const std::string&)> status, std::string& why, bool& fMoveFailed);
 /** After the databases are loaded: compare their content hashes with the pinned ones. */
 bool VerifyInstalledSnapshot(std::string& error, std::function<void(const std::string&)> status);
-/** Remove what InstallSnapshotIfWanted() unpacked (the databases must be closed). */
-void RemoveInstalledSnapshot();
+/** Remove what InstallSnapshotIfWanted() unpacked (the databases must be closed). False when
+ *  something of it is still there: strLeft is the message then, the marker stays, and the
+ *  start must end (what is left is not the data of this node). */
+bool RemoveInstalledSnapshot(std::string& strLeft);
 /** Record that the node runs from a verified snapshot whose past blocks are absent. */
 void MarkSnapshotAccepted();
 /** Before the databases are open: this data directory is of a snapshot node that has not fetched the past blocks. */

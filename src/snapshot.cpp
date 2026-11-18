@@ -68,6 +68,7 @@ std::atomic<int> nFetchBlocksStored(0);
 CCriticalSection cs_snapshot;
 std::string strFetchError;                  // guarded by cs_snapshot
 bool fInstalledThisStart = false;
+bool fSnapshotNotRemoved = false;           // RemoveInstalledSnapshot() could not remove all of it
 std::atomic<bool> fRescanPending(false);
 std::function<void()> rescanHook;
 boost::thread_group* pthreads = nullptr;
@@ -917,21 +918,31 @@ bool KeptElsewhere(const fs::path& dir)
 
 /** Remove the chain databases and the block files, to take a snapshot away. A database
  *  directory that the operator keeps elsewhere (a link, a mount point) stays what it is: it
- *  is emptied. */
-void WipeChainData()
+ *  is emptied. False when one of the databases is still there, with error naming it. */
+bool WipeChainData(std::string& error)
 {
     boost::system::error_code ec;
+    bool fGone = true;
     for (const char* dir : SNAPSHOT_DIRS) {
         const fs::path path = GetDataDir() / dir;
+        std::string why;
         if (KeptElsewhere(path)) {
-            std::string error;
-            if (!EmptyDirectory(path, error))
-                LogPrintf("Snapshot: %s is kept elsewhere and cannot be emptied (%s).\n", dir, error);
+            if (!EmptyDirectory(path, why))
+                fGone = false;
         } else {
             fs::remove_all(path, ec);
+            if (fs::exists(path, ec)) {
+                why = "it cannot be removed";
+                fGone = false;
+            }
+        }
+        if (!why.empty()) {
+            LogPrintf("Snapshot: %s is still there (%s).\n", dir, why);
+            error = strprintf("%s (%s)", dir, why);
         }
     }
     WipeBlockFilesAndRecords();
+    return fGone;
 }
 
 /**
@@ -1113,10 +1124,19 @@ bool WriteMarker(int attempts, bool fStartOver)
 
 } // namespace
 
-void RemoveInstalledSnapshot()
+bool RemoveInstalledSnapshot(std::string& strLeft)
 {
     boost::system::error_code ec;
-    WipeChainData();
+    // What cannot be removed must not be opened as the data of this node. The marker stays
+    // then, so that whatever is left counts as a snapshot that is not accepted at every
+    // later start too, and the caller ends this start.
+    std::string what;
+    if (!WipeChainData(what)) {
+        strLeft = strprintf(_("A chain state snapshot that was not accepted could not be removed completely: %s is still there. Nothing of it is used. Mend what is in the way and start the program again: it removes the rest."), what);
+        LogPrintf("Snapshot: not accepted, and not removed completely. The start ends.\n");
+        fSnapshotNotRemoved = true;
+        return false;
+    }
     fs::remove_all(GetDataDir() / STAGING_NAME, ec);
     fs::remove_all(GetDataDir() / "snapshot-download", ec);
     fs::remove(GetDataDir() / MARKER_NAME, ec);
@@ -1127,6 +1147,7 @@ void RemoveInstalledSnapshot()
     fPastBlocksMissing = false;
     fInstalledThisStart = false;
     LogPrintf("Snapshot: removed. The node synchronizes by validating the blocks.\n");
+    return true;
 }
 
 namespace {
@@ -1380,8 +1401,9 @@ bool FetchAndInstallSnapshot(std::function<void(const std::string&)> status, boo
             why = moveError;
         } else {
             // (a new node has nothing to lose: it synchronizes by validating the blocks)
-            RemoveInstalledSnapshot();
             why = "it cannot be moved into its place: " + moveError;
+            if (!RemoveInstalledSnapshot(why))
+                fMoveFailed = true;   // (why is the message then: the start ends)
         }
         return false;
     }
@@ -1422,7 +1444,7 @@ bool InstallSnapshotIfWanted(std::function<void(const std::string&)> status, std
             WriteMarker(attempts + 1, true);
             // (the start was stopped while the snapshot took the place of the chain data: the rest of that)
             if (fStaged && MoveSnapshotIn(moveError) != MoveResult::DONE) {
-                strCannotGoOn = moveError;
+                strCannotGoOn = strprintf(_("An earlier start had begun to put the chain state snapshot into the place of the chain data of this node, and this start cannot finish that: %s. The block files and the databases that the snapshot replaces may be removed already; the unpacked snapshot is kept in the data directory (snapshot-unpack). Mend what is in the way and start the program again: it goes on from there, and no option is needed."), moveError);
                 return false;
             }
         } else {
@@ -1431,11 +1453,11 @@ bool InstallSnapshotIfWanted(std::function<void(const std::string&)> status, std
             // the blocks, as it would without a snapshot.
             if (attempts >= 2 || pinned.height <= 0 || !WriteMarker(attempts + 1, false)) {
                 LogPrintf("Snapshot: an earlier start left a snapshot that could not be checked.\n");
-                RemoveInstalledSnapshot();
+                RemoveInstalledSnapshot(strCannotGoOn);
                 return false;
             }
             if (fStaged && MoveSnapshotIn(moveError) != MoveResult::DONE) {
-                RemoveInstalledSnapshot();
+                RemoveInstalledSnapshot(strCannotGoOn);
                 return false;
             }
         }
@@ -1450,9 +1472,12 @@ bool InstallSnapshotIfWanted(std::function<void(const std::string&)> status, std
     std::string why;
     bool fMoveFailed = false;
     const bool fInstalled = FetchAndInstallSnapshot(status, false, why, fMoveFailed);
-    // (a snapshot node that lost its chain state, see there)
+    // (a snapshot node that lost its chain state, see there: the move cannot be finished; or
+    // a new node's snapshot that could be neither moved in nor removed)
     if (fMoveFailed)
-        strCannotGoOn = why;
+        strCannotGoOn = !fSnapshotNotRemoved
+            ? strprintf(_("The chain state snapshot is fetched and unpacked, and it could not be put into the place of the chain data of this node: %s. The block files and the databases that it has replaced so far are removed; the unpacked snapshot is kept in the data directory (snapshot-unpack). Mend what is in the way and start the program again: it goes on from there, and no option is needed."), why)
+            : why;
     return fInstalled;
 }
 
