@@ -6304,11 +6304,27 @@ bool RecoverTokenState(const CChainParams& params, std::string& strError)
 bool VerifyStoresNote(std::string& strError)
 {
     LOCK(cs_main);
-    if (!pcoinsdbview || !governance || !ptokensdb || !fTokenStateInStep || !pcoinsdbview->IsInStep())
+    if (!pcoinsdbview || !governance || !ptokensdb)
         return true;
+    const uint256 hashChainState = pcoinsdbview->GetBestBlock();
+    if (hashChainState.IsNull())
+        return true;
+    // The note is an extra check, and there is not always one for the block of the chain state
+    // (see WriteStoresNote). The log says which it was at this start.
     uint256 hashBlock, hashGovernance, hashTokens;
-    if (!pcoinsdbview->ReadStoresNote(hashBlock, hashGovernance, hashTokens) || hashBlock != pcoinsdbview->GetBestBlock())
+    const char* pszWhyNot = nullptr;
+    if (!fTokenStateInStep)
+        pszWhyNot = "the token database is not at the block of the chain state";
+    else if (!pcoinsdbview->IsInStep())
+        pszWhyNot = "another version wrote the chain state last";
+    else if (!pcoinsdbview->ReadStoresNote(hashBlock, hashGovernance, hashTokens))
+        pszWhyNot = "there is no note";
+    else if (hashBlock != hashChainState)
+        pszWhyNot = "the note is for another block than the one of the chain state";
+    if (pszWhyNot) {
+        LogPrintf("The governance and the token database are not checked against a note at this start: %s\n", pszWhyNot);
         return true;
+    }
     const int64_t nStart = GetTimeMillis();
     if (governance->ContentHash() != hashGovernance) {
         strError = "the governance database is not what it was when the chain state was written";

@@ -25,6 +25,8 @@ COINS = "to coin database..."
 TOKENS = "Token database: "
 NOTE = "Note of the governance and the token database for block"
 CHECKED = "are what they were when the chain state was written"
+NOT_CHECKED = "are not checked against a note at this start"
+REBUILT = "are built again from the block files at this start"
 DAMAGED = "A database of this node is damaged"
 
 
@@ -37,7 +39,7 @@ class FlushForReadTest(AokChainTestFramework):
     def counts(self):
         with open(os.path.join(self.nodes[0].datadir, "regtest", "debug.log"), encoding="utf8") as log:
             text = log.read()
-        return {name: text.count(name) for name in (COINS, TOKENS, NOTE, CHECKED, DAMAGED)}
+        return {name: text.count(name) for name in (COINS, TOKENS, NOTE, CHECKED, NOT_CHECKED, DAMAGED, REBUILT)}
 
     def readers(self, node, address):
         node.listtokens()
@@ -86,6 +88,7 @@ class FlushForReadTest(AokChainTestFramework):
         node = self.nodes[0]
         started = self.counts()
         assert_equal(started[CHECKED], after[CHECKED])
+        assert_equal(started[NOT_CHECKED], after[NOT_CHECKED] + 1)   # (and the log says so)
         assert_equal(started[DAMAGED], 0)
         assert_equal(node.listtokenbalancesbyaddress(address), balances)
         assert_equal(node.getblockcount(), 112)
@@ -122,6 +125,32 @@ class FlushForReadTest(AokChainTestFramework):
         for _ in range(3):
             self.readers(node, address)
         assert_equal(self.counts(), quiet)
+
+        self.log.info("What a monitor calls, and a kill right after it: no rebuild follows")
+        # gettxoutsetinfo is a reading command (no note is computed for its write);
+        # getstatehashes writes the state as a stop does, and the note with it
+        for call, noted in (("gettxoutsetinfo", False), ("getstatehashes", True)):
+            node.transfer("FLUSHTOKEN", 1, node.getnewaddress())
+            node.generate(1)
+            getattr(node, call)()
+            balances = node.listtokenbalancesbyaddress(address)
+            height = node.getblockcount()
+            before_kill = self.counts()
+            node.process.kill()
+            node.process.wait()
+            node.running = False
+            node.process = None
+            node.rpc_connected = False
+            node.rpc = None
+            self.start_node(0, self.extra_args[0])
+            node = self.nodes[0]
+            after_kill = self.counts()
+            assert_equal(after_kill[DAMAGED], 0)
+            assert_equal(after_kill[REBUILT], 0)
+            assert_equal(after_kill[CHECKED], before_kill[CHECKED] + (1 if noted else 0))
+            assert_equal(after_kill[NOT_CHECKED], before_kill[NOT_CHECKED] + (0 if noted else 1))
+            assert_equal(node.getblockcount(), height)
+            assert_equal(node.listtokenbalancesbyaddress(address), balances)
 
 
 if __name__ == '__main__':

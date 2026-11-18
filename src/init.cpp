@@ -542,7 +542,7 @@ std::string HelpMessage(HelpMessageMode mode)
             "Warning: Reverting this setting requires re-downloading the entire blockchain. "
             "(default: 0 = disable pruning blocks, 1 = allow manual pruning via RPC, >%u = automatically prune block files to stay under the specified target size in MiB)"), MIN_DISK_SPACE_FOR_BLOCK_FILES / 1024 / 1024));
     strUsage += HelpMessageOpt("-reindex-chainstate", _("Rebuild chain state from the currently indexed blocks"));
-    strUsage += HelpMessageOpt("-autorebuild", strprintf(_("Rebuild the chain state from the indexed blocks, or index the block files again, without being asked, when a start finds the databases in a state that it cannot go on from or a block that this node had validated before does not connect (default: %u)"), DEFAULT_AUTOREBUILD));
+    strUsage += HelpMessageOpt("-autorebuild", strprintf(_("Rebuild the chain state from the indexed blocks, or index the block files again, without being asked, when a start finds the databases in a state that it cannot go on from or a block that this node had validated before does not connect. A node that started from a snapshot and does not have the blocks before it starts over from the snapshot instead; a pruned node does nothing by itself and asks for -reindex (default: %u)"), DEFAULT_AUTOREBUILD));
     strUsage += HelpMessageOpt("-reindex", _("Rebuild chain state and block index from the blk*.dat files on disk"));
 #ifndef WIN32
     strUsage += HelpMessageOpt("-sysperms", _("Create new files with system default permissions, instead of umask 077 (only effective with disabled wallet functionality)"));
@@ -2238,7 +2238,8 @@ bool AppInitMain(boost::thread_group& threadGroup, CScheduler& scheduler)
             if (!fReset) {
                 bool fRet = uiInterface.ThreadSafeQuestion(
                     strLoadError + ".\n\n" + _("Do you want to rebuild the block database now?"),
-                    strLoadError + (fOnlyReindexHelps ? ".\nPlease restart with -reindex to recover." : ".\nPlease restart with -reindex or -reindex-chainstate to recover."),
+                    strLoadError + (fPruneMode || fHavePruned ? ".\nThis node is pruned: it cannot build its databases again from its own block files, and it is not started with databases that do not belong together. Please restart with -reindex: the node then downloads the blocks again."
+                                    : fOnlyReindexHelps ? ".\nPlease restart with -reindex to recover." : ".\nPlease restart with -reindex or -reindex-chainstate to recover."),
                     "", CClientUIInterface::MSG_ERROR | CClientUIInterface::BTN_ABORT);
                 if (fRet) {
                     fReindex = true;
