@@ -25,7 +25,7 @@ the node where its n-th write of token records would begin (-regtest only).
 from decimal import Decimal
 
 from test_framework.test_framework import AokChainTestFramework
-from test_framework.util import assert_equal, connect_nodes_bi, sync_blocks, sync_mempools
+from test_framework.util import assert_equal, connect_nodes_bi, disconnect_nodes, sync_blocks, sync_mempools
 
 
 class TokensUncleanStopTest(AokChainTestFramework):
@@ -198,21 +198,40 @@ class TokensUncleanStopTest(AokChainTestFramework):
         self.mine()
         n0.transfer("INSIDE", 1, address1)
         self.mine()
+        # A block that moves the token issued since the last write, kept from node1 for now.
+        # After the write that fails, the token is neither in what node1 holds in memory (it
+        # was handed to the write) nor in its database: by that, the block would be invalid.
+        disconnect_nodes(n0, 1)
+        disconnect_nodes(n1, 0)
+        n0.transfer("FAILED", 2, address1)
+        n0.generate(1)
+        late_block = n0.getbestblockhash()
+        late_hex = n0.getblock(late_block, False)
         try:
             n1.gettxoutsetinfo()   # (asks for a write of the state: the write of the tokens fails, the node stops)
         except Exception:
             pass
+        # ...and the block reaches the node while it is on its way down
+        try:
+            self.log.info("The block that came after the failed write: %s" % n1.submitblock(late_hex))
+        except Exception as e:
+            self.log.info("The block that came after the failed write was not taken any more (%s)" % type(e).__name__)
         n1.wait_until_stopped()
         assert_equal(self.count_in_log(n1, "Simulating a write of the token database that fails"), 1)
+        # (a node that is on its way down after a write that failed connects no further block)
+        assert_equal(self.count_in_log(n1, "UpdateTip: new best=%s" % late_block), 0)
         # (its last write, at the shutdown, went through: the token database must not have been
         # marked with the tip by it)
         self.start_node(1, stderr=stderr1)
         connect_nodes_bi(self.nodes, 0, 1)
         n1 = self.nodes[1]
         assert_equal(self.count_in_log(n1, "Tokens: the token database is at height"), repairs + 1)
+        # (no block was judged by what the node held after the failed write: none is marked invalid)
+        assert_equal([tip for tip in n1.getchaintips() if tip["status"] == "invalid"], [])
         self.mine()
+        assert_equal(n1.getbestblockhash(), n0.getbestblockhash())
         assert_equal(n1.gettokendata("FAILED"), n0.gettokendata("FAILED"))
-        assert_equal(n1.listmytokens(), {"BEFORE": 10, "CRASHCOIN": 105, "INSIDE": 5})
+        assert_equal(n1.listmytokens(), {"BEFORE": 10, "CRASHCOIN": 105, "FAILED": 2, "INSIDE": 5})
         self.same_state()
         stderr1.close()
 
