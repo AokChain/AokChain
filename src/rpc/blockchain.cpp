@@ -1714,6 +1714,12 @@ UniValue invalidateblock(const JSONRPCRequest& request)
 
     if (state.IsValid()) {
         ActivateBestChain(state, Params());
+    } else {
+        // The block could not be given up, and nothing was marked. Blocks above it that were
+        // disconnected on the way are connected again now: the node does not sit below its
+        // best chain until the next block arrives. (The error of the command stays.)
+        CValidationState stateBack;
+        ActivateBestChain(stateBack, Params());
     }
 
     if (!state.IsValid()) {

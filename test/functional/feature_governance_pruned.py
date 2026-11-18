@@ -114,16 +114,27 @@ class GovernancePrunedTest(AokChainTestFramework):
         assert_raises_rpc_error(-20, "cannot be disconnected", n1.invalidateblock, block)
         assert_equal(n1.getbestblockhash(), block)
         assert_equal([tip for tip in n1.getchaintips() if tip["status"] == "invalid"], [])
+        # ...also with a block above it, which is given up on the way and connected again
+        # before the command answers: the node does not sit below its best chain
+        above = self.mine()
+        assert_raises_rpc_error(-20, "cannot be disconnected", n1.invalidateblock, block)
+        assert_equal(n1.getbestblockhash(), above)
+        assert_equal([tip for tip in n1.getchaintips() if tip["status"] == "invalid"], [])
+        assert_equal(self.log_count(NOT_ON_RECORD), 2)
+        n0.invalidateblock(above)
+        n1.invalidateblock(above)
+        assert_equal(n1.getbestblockhash(), block)
+        assert_equal(n0.getbestblockhash(), block)
         assert_equal(self.governance(n1), state)
-        assert_equal(self.log_count(NOT_ON_RECORD), 1)
-        assert_equal(self.log_count(CANNOT_REBUILD), 1)
+        assert_equal(self.log_count(NOT_ON_RECORD), 2)
+        assert_equal(self.log_count(CANNOT_REBUILD), 2)
         self.same_state()
 
         self.log.info("A longer branch asks for it: the node stops, and says in its log why and what helps")
         disconnect_nodes(n0, 1)
         disconnect_nodes(n1, 0)
         n0.invalidateblock(block)
-        n0.generate(2)
+        n0.generate(3)   # (longer than the branch of the block above, which the pruned node still has)
         try:
             connect_nodes(n0, 1)
         except Exception:
@@ -134,14 +145,14 @@ class GovernancePrunedTest(AokChainTestFramework):
         n1.process = None
         n1.rpc_connected = False
         n1.rpc = None
-        assert_equal(self.log_count(NOT_ON_RECORD), 2)
-        assert_equal(self.log_count(CANNOT_REBUILD), 2)
+        assert_equal(self.log_count(NOT_ON_RECORD), 3)
+        assert_equal(self.log_count(CANNOT_REBUILD), 3)
         assert_equal(self.log_count("Failed to disconnect block"), 1)
         # The check of the last blocks at a start gives each of them up in memory: it finds the
         # missing record as well, and the start ends with the way on for a pruned node.
         for _ in range(2):
             self.assert_start_raises_init_error(1, self.args1, "This node is pruned: it cannot build its databases again from its own block files")
-        assert_equal(self.log_count(NOT_ON_RECORD), 4)
+        assert_equal(self.log_count(NOT_ON_RECORD), 5)
         # -reindex is that way (here the block files are all there; a node that has pruned
         # some downloads the blocks again)
         self.start1(["-reindex"])
