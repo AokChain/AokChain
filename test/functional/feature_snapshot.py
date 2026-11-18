@@ -996,8 +996,22 @@ class SnapshotTest(AokChainTestFramework):
         wait_until(lambda: self.nodes[3].getsnapshotinfo()["past_blocks"] == "present", timeout=120)
         assert_equal(self.nodes[3].getblock(old_block, 0), node0.getblock(old_block, 0))
 
+        self.log.info("A new node whose second start accepts the snapshot and is stopped right after it keeps the snapshot")
+        self.wipe(3)
         node3 = self.nodes[3]
         marker = os.path.join(node3.datadir, "regtest", "snapshot-unverified")
+        for point, count in (("snapshot-moving", b"1"), ("snapshot-accepted", b"2")):
+            node3.start(COMMON + [source, self.params(), "-mocktime=%d" % t, "-testcrashat=" + point])
+            assert_equal(node3.process.wait(timeout=120), 0)
+            node3.running = False
+            node3.process = None
+            with open(marker, "rb") as f:
+                assert_equal(f.read(), count)
+        self.start_node(3, COMMON + [source, self.params(), "-mocktime=%d" % t])
+        assert "Snapshot: removed" not in self.log_of(3)
+        assert_equal(self.log_of(3).count("Snapshot: check passed"), 2)
+        assert_equal(node3.getsnapshotinfo()["snapshot_height"], HEIGHT)
+        assert not os.path.exists(marker)
 
         self.log.info("A snapshot that an earlier start left unchecked is checked at the next start")
         # (a first start that is stopped while the snapshot takes its place: the marker is

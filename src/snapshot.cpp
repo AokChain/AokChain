@@ -1429,6 +1429,13 @@ bool InstallSnapshotIfWanted(std::function<void(const std::string&)> status, std
         // closed or stopped while it moved the snapshot in or checked it).
         bool fStartOver = false;
         const int attempts = ReadMarker(fStartOver);
+        boost::system::error_code ecFile;
+        // (the file is written when a check has passed, and removed with the chain data that
+        // a snapshot replaces: beside the marker it says that a start was stopped right after
+        // it had accepted this snapshot. The snapshot is kept like a start-over and checked
+        // again, in full; the file says nothing about its content.)
+        if (fs::exists(GetDataDir() / NO_PAST_BLOCKS_NAME, ecFile))
+            fStartOver = true;
         boost::system::error_code ec;
         const bool fStaged = fs::is_directory(GetDataDir() / STAGING_NAME, ec);
         std::string moveError;
