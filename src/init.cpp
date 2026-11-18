@@ -195,6 +195,8 @@ static bool fRunningMarked = false;
 static bool fEarlierVersionUnclean = false;
 #ifndef WIN32
 static bool fPidNoteWritten = false;
+/** This start has written its own pid file (or was about to): the pid file is this run's. */
+static bool fPidFileWritten = false;
 
 static fs::path PidNoteFile()
 {
@@ -431,10 +433,14 @@ void Shutdown()
 #endif
 
 #ifndef WIN32
-    try {
-        fs::remove(GetPidFile());
-    } catch (const fs::filesystem_error& e) {
-        LogPrintf("%s: Unable to remove pidfile: %s\n", __func__, e.what());
+    // (only the pid file of this run: a start that ended before it wrote one leaves the pid
+    // file of the last run, which says how that run ended, to the next start)
+    if (fPidFileWritten) {
+        try {
+            fs::remove(GetPidFile());
+        } catch (const fs::filesystem_error& e) {
+            LogPrintf("%s: Unable to remove pidfile: %s\n", __func__, e.what());
+        }
     }
     TestCrashPoint("shutdown-pid-removed");
     // (after the pid file: while there is a pid file of this version, there is its note. The
@@ -1498,11 +1504,14 @@ bool AppInitMain(boost::thread_group& threadGroup, CScheduler& scheduler)
         if (fs::exists(pathPid, ec) && fs::equivalent(pathPid.parent_path(), GetDataDir(), ec) && ReadFirstWord(pathPid, strLeftPid) &&
             IsPidNumber(strLeftPid) && (!fNote || strLeftPid != strNotePid))
             fEarlierVersionUnclean = true;
+        // (a start that cannot write its note ends here. It leaves the pid file of the last
+        // run as it found it, for the next start to judge: see Shutdown())
         if (!WritePidNote(itostr(getpid()), fEarlierVersionUnclean))
             return InitError(strprintf(_("Cannot write to data directory '%s'; check permissions."), GetDataDir().string()));
         fPidNoteWritten = true;
     }
     TestCrashPoint("pidnote");
+    fPidFileWritten = true;
     CreatePidFile(GetPidFile(), getpid());
 #endif
     TestCrashPoint("pidfile");

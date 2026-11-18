@@ -59,6 +59,11 @@ class AutoRebuildTest(AokChainTestFramework):
         with open(os.path.join(self.nodes[1].datadir, "regtest", "debug.log"), encoding="utf8") as log:
             return log.read().count(text)
 
+    def count_in_stderr(self, text):
+        self.stderr1.flush()
+        with open(self.stderr1.name, encoding="utf8") as err:
+            return err.read().count(text)
+
     def frozen(self, node):
         return sorted(a for a, is_frozen in node.freezelist()["addresses"].items() if is_frozen)
 
@@ -428,6 +433,15 @@ class AutoRebuildTest(AokChainTestFramework):
         self.stop_node(1)
         with open(pid_file, "w") as f:
             f.write("4242\n")
+        # (a start that cannot write its note says so, ends, and leaves that pid file as it is)
+        os.mkdir(note + ".new")
+        cannot_write = self.count_in_stderr("Cannot write to data directory")
+        n1.start(self.args + ["-checkmempool=0"], stderr=self.stderr1)
+        self.wait_exit(1)
+        assert_equal(self.count_in_stderr("Cannot write to data directory"), cannot_write + 1)
+        os.rmdir(note + ".new")
+        with open(pid_file) as f:
+            assert_equal(f.read(), "4242\n")
         for point in ("pidfile", "running-mark"):
             n1.start(self.args + ["-checkmempool=0", "-testcrashat=" + point], stderr=self.stderr1)
             self.wait_exit(0)

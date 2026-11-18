@@ -57,7 +57,10 @@ void CMainSignals::UnregisterBackgroundSignalScheduler() {
 }
 
 void CMainSignals::FlushBackgroundCallbacks() {
-    m_internals->m_schedulerClient.EmptyQueue();
+    // (a start can end before the signals are set up, and Shutdown() comes here all the same)
+    if (m_internals) {
+        m_internals->m_schedulerClient.EmptyQueue();
+    }
 }
 
 void CMainSignals::RegisterWithMempoolSignals(CTxMemPool& pool) {
@@ -87,6 +90,9 @@ void RegisterValidationInterface(CValidationInterface* pwalletIn) {
 }
 
 void UnregisterValidationInterface(CValidationInterface* pwalletIn) {
+    if (!g_signals.m_internals) {
+        return;
+    }
     g_signals.m_internals->BlockChecked.disconnect(boost::bind(&CValidationInterface::BlockChecked, pwalletIn, boost::placeholders::_1, boost::placeholders::_2));
     g_signals.m_internals->Broadcast.disconnect(boost::bind(&CValidationInterface::ResendWalletTransactions, pwalletIn, boost::placeholders::_1, boost::placeholders::_2));
     g_signals.m_internals->SetBestChain.disconnect(boost::bind(&CValidationInterface::SetBestChain, pwalletIn, boost::placeholders::_1));
@@ -100,6 +106,9 @@ void UnregisterValidationInterface(CValidationInterface* pwalletIn) {
 }
 
 void UnregisterAllValidationInterfaces() {
+    if (!g_signals.m_internals) {
+        return;
+    }
     g_signals.m_internals->BlockChecked.disconnect_all_slots();
     g_signals.m_internals->Broadcast.disconnect_all_slots();
     g_signals.m_internals->SetBestChain.disconnect_all_slots();
