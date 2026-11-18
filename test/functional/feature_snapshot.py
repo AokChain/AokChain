@@ -488,6 +488,19 @@ class SnapshotTest(AokChainTestFramework):
         sync_blocks([node0, node2])
         self.assert_same_state(node0, node2, index=False, full=False)
         assert_equal(node2.getbalance(), balance)
+        # ...and the same when the whole block index database is gone (the block from which on
+        # the node keeps its governance records, the block of the snapshot, is gone with it)
+        self.stop_node(2)
+        shutil.rmtree(index2)
+        del server.requests[:]
+        self.start_node(2, args2)
+        assert [r for r in server.requests if ".part" in r[0]], "the snapshot was not fetched again"
+        assert_equal(self.log_of(2).count("it starts over from the snapshot"), starts_over + 2)
+        starts_over += 1
+        connect_nodes(node2, 0)
+        sync_blocks([node0, node2])
+        self.assert_same_state(node0, node2, index=False, full=False)
+        assert_equal(node2.getbalance(), balance)
         # a node without its chain state is taken for a new one: the snapshot, as at the first start
         self.stop_node(2)
         shutil.rmtree(os.path.join(node2.datadir, "regtest", "chainstate"))

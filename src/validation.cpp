@@ -1997,8 +1997,11 @@ bool LoadGovernanceUndoSince(const uint256& hashChainState, bool fOwnChainState,
     if (!hashChainState.IsNull()) {
         BlockMap::const_iterator it = mapBlockIndex.find(hashChainState);
         if (it == mapBlockIndex.end()) {
-            strError = "the block of the chain state is not in the block index";
-            return false;
+            // The block index does not know the block of the chain state: it is not the block
+            // index of this chain state (its database is lost, or damaged). That is not a
+            // fault of the records and is not answered here: the note stays as it is, and
+            // LoadChainTip(), which the start calls next, finds the fault and names it.
+            return true;
         }
         pindexGovernanceUndoSince = it->second;
     }

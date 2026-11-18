@@ -314,6 +314,25 @@ class AutoRebuildTest(AokChainTestFramework):
         assert os.path.isfile(since)
         self.same_state()
 
+        self.log.info("The block index database is gone on a node that keeps its records from a block on")
+        # (a node that came from an earlier version by a restart, or from a snapshot: the block
+        # from which on it keeps the records is in the lost block index as well)
+        self.mine(3)
+        with open(since) as f:
+            assert_equal(f.read().strip(), n1.getblockhash(n1.getblockcount() - 3))
+        height = n1.getblockcount()
+        reindexes = self.count_in_log(REINDEXED)
+        self.stop_node(1)
+        shutil.rmtree(index)
+        n1.start(self.args + ["-checkmempool=0"], stderr=self.stderr1)   # (no peer)
+        n1.wait_for_rpc_connection()
+        wait_until(lambda: n1.getblockcount() == height, timeout=240)
+        assert_equal(self.count_in_log(REINDEXED), reindexes + 1)
+        assert_equal(n1.getconnectioncount(), 0)
+        wait_until(lambda: not os.path.exists(marker), timeout=60)
+        connect_nodes_bi(self.nodes, 0, 1)
+        self.same_state()
+
         self.log.info("This version's own stops are not taken for an earlier version's")
         pid_file = os.path.join(n1.datadir, "regtest", "aokchaind.pid")
         rebuilds = self.count_in_log(REBUILT)

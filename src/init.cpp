@@ -2059,7 +2059,9 @@ bool AppInitMain(boost::thread_group& threadGroup, CScheduler& scheduler)
                         break;
                     }
                     // Which blocks of the chain state this version connected itself: for those
-                    // it has on record what their governance commands replaced.
+                    // it has on record what their governance commands replaced. (A block index
+                    // that does not know the block of the chain state is left to LoadChainTip()
+                    // below; what fails here is a note that cannot be written.)
                     std::string strUndoError;
                     bool fRecordsLost = false;
                     if (!LoadGovernanceUndoSince(pcoinsTip->GetBestBlock(), fOwnChainState, strUndoError, fRecordsLost)) {
