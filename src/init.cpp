@@ -1765,6 +1765,9 @@ bool AppInitMain(boost::thread_group& threadGroup, CScheduler& scheduler)
         // With strLoadError: the chain state, the governance database or the token database is
         // what is wrong, which building them again from the block files answers...
         bool fChainStateAtFault = false;
+        // (the one fault found is that the records of the governance commands are lost: the
+        // chain state, the token database and the governance database were not found wanting)
+        bool fOnlyRecordsLost = false;
         // ...or the block index database is damaged, which indexing the block files again answers.
         bool fBlockIndexAtFault = false;
         // Which of them is being opened or read, for an error that this throws
@@ -2087,6 +2090,7 @@ bool AppInitMain(boost::thread_group& threadGroup, CScheduler& scheduler)
                         if (fRecordsLost) {
                             strLoadError = strprintf(_("A database of this node is damaged (%s)"), strUndoError);
                             fChainStateAtFault = true;
+                            fOnlyRecordsLost = true;
                         } else {
                             strLoadError = strprintf(_("Error writing to the governance database (%s)"), strUndoError);
                         }
@@ -2318,7 +2322,8 @@ bool AppInitMain(boost::thread_group& threadGroup, CScheduler& scheduler)
             if (!fReset) {
                 bool fRet = uiInterface.ThreadSafeQuestion(
                     strLoadError + ".\n\n" + _("Do you want to rebuild the block database now?"),
-                    strLoadError + (fPruneMode || fHavePruned ? ".\nThis node is pruned: it cannot build its databases again from its own block files, and it is not started with databases that do not belong together. Please restart with -reindex: the node then downloads the blocks again."
+                    strLoadError + ((fPruneMode || fHavePruned) && fOnlyRecordsLost ? ".\nThis node is pruned: it cannot build these records again from its own block files. The chain state, the token database and the governance database were not found wanting. There are two ways on: remove the file governanceundo.since from the data directory and start again, and the node goes on with its databases and keeps the records from its current block on, as after an upgrade from a version that kept none (blocks below that one are given up, when it comes to that, the way such a version did it); or restart with -reindex, and the node downloads the blocks again."
+                                    : fPruneMode || fHavePruned ? ".\nThis node is pruned: it cannot build its databases again from its own block files, and it is not started with databases that do not belong together. Please restart with -reindex: the node then downloads the blocks again."
                                     : fOnlyReindexHelps ? ".\nPlease restart with -reindex to recover." : ".\nPlease restart with -reindex or -reindex-chainstate to recover."),
                     "", CClientUIInterface::MSG_ERROR | CClientUIInterface::BTN_ABORT);
                 if (fRet) {

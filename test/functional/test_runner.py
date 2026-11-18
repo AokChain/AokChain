@@ -131,6 +131,7 @@ BASE_SCRIPTS= [
     'feature_governance_unclean_stop.py',
     'feature_tokens_unclean_stop.py',
     'feature_governance_reorg.py',
+    'feature_governance_pruned.py',
     'feature_flush_for_read.py',
     'feature_invalidate_during_rebuild.py',
     'feature_abort_message.py',

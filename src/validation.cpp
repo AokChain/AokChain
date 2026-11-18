@@ -3901,8 +3901,11 @@ static bool RequestChainStateRebuild(const CBlockIndex* pindex, const std::strin
         return false;
     // (a pruned node cannot build its databases from its blocks; a node that started from a
     // snapshot starts over from it)
-    if (fPruneMode || fHavePruned)
+    if (fPruneMode || fHavePruned) {
+        LogPrintf("Block %s at height %d, which this node had validated before, %s. The databases of this node are not what they were. This node is pruned and cannot build them again from its own block files: when it is started with -reindex, it downloads the blocks again and builds them from those.\n",
+                  pindex->GetBlockHash().ToString(), pindex->nHeight, strWhat);
         return false;
+    }
     const int64_t nNow = GetTime();
     std::pair<uint256, int64_t> last;
     if (pblocktree->Read(DB_REBUILD_ASKED, last) &&
@@ -3943,7 +3946,10 @@ bool static DisconnectTip(CValidationState& state, const CChainParams& chainpara
         if (DisconnectBlock(block, pindexDelete, view, &tokenCache) != DISCONNECT_OK) {
             // (a block of the node's own chain: see RequestChainStateRebuild)
             RequestChainStateRebuild(pindexDelete, "cannot be disconnected");
-            return error("DisconnectTip(): DisconnectBlock %s failed", pindexDelete->GetBlockHash().ToString());
+            error("DisconnectTip(): DisconnectBlock %s failed", pindexDelete->GetBlockHash().ToString());
+            // (the caller is told: a command that asked for this block to be given up must
+            // not report that it was)
+            return state.Error(strprintf("block %s cannot be disconnected; see debug.log for details", pindexDelete->GetBlockHash().ToString()));
         }
         bool flushed = view.Flush();
         assert(flushed);
