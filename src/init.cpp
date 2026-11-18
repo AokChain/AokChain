@@ -1511,27 +1511,53 @@ bool AppInitMain(boost::thread_group& threadGroup, CScheduler& scheduler)
         std::string strNotePid, strNoteState, strLeftPid;
         const bool fNote = ReadFirstWord(PidNoteFile(), strNotePid, &strNoteState);
         fEarlierVersionUnclean = fNote && strNoteState == "earlier-version-unclean";
-        const bool fLeft = fs::exists(pathPid, ec) && fs::equivalent(pathPid.parent_path(), GetDataDir(), ec) && ReadFirstWord(pathPid, strLeftPid);
-        if (fLeft && IsPidNumber(strLeftPid) && (!fNote || strLeftPid != strNotePid)) {
-            fEarlierVersionUnclean = true;
-        } else if (fLeft) {
-            // This version's own pid file (it holds the pid of the note), or one without a
-            // number. It has said what it had to say, and it goes before the note gets the
-            // pid of this run: a stop between the new note and the new pid file would leave
-            // it beside a note with another pid, which is how an earlier version's pid file
-            // is told. Its removal is on disk before the note is written.
-            fs::remove(pathPid, ec);
+        // The pid file of this start, and the file with the default name in the data directory
+        // when this start keeps its pid file elsewhere or under another name (-pid): a run
+        // with the default name may have left that one, and no later start with -pid would
+        // write over it or take it away.
+        const fs::path pathDefault = GetDataDir() / AOKCHAIN_PID_FILENAME;
+        std::vector<fs::path> vLeft{pathPid};
+        if (pathDefault != pathPid)
+            vLeft.push_back(pathDefault);
+        bool fRemoved = false, fDefaultIsEarlier = false;
+        for (const fs::path& pathLeft : vLeft) {
+            strLeftPid.clear();
+            const bool fLeft = fs::exists(pathLeft, ec) && fs::equivalent(pathLeft.parent_path(), GetDataDir(), ec) && ReadFirstWord(pathLeft, strLeftPid);
+            if (fLeft && IsPidNumber(strLeftPid) && (!fNote || strLeftPid != strNotePid)) {
+                fEarlierVersionUnclean = true;
+                if (pathLeft != pathPid)
+                    fDefaultIsEarlier = true;
+            } else if (fLeft) {
+                // This version's own pid file (it holds the pid of the note), or one without a
+                // number. It has said what it had to say, and it goes before the note gets the
+                // pid of this run: a stop between the new note and the new pid file would leave
+                // it beside a note with another pid, which is how an earlier version's pid file
+                // is told. Its removal is on disk before the note is written.
+                fs::remove(pathLeft, ec);
+                fRemoved = true;
+            }
+        }
+        const auto SyncDataDir = []() {
             const int fd = open(GetDataDir().string().c_str(), O_RDONLY);
             if (fd >= 0) {
                 fsync(fd);
                 close(fd);
             }
-        }
+        };
+        if (fRemoved)
+            SyncDataDir();
         // (a start that cannot write its note ends here. It leaves the pid file of the last
         // run as it found it, for the next start to judge: see Shutdown())
         if (!WritePidNote(itostr(getpid()), fEarlierVersionUnclean))
             return InitError(strprintf(_("Cannot write to data directory '%s'; check permissions."), GetDataDir().string()));
         fPidNoteWritten = true;
+        // An earlier version's pid file under the default name, while this start writes its
+        // own elsewhere: what it says is in the note now, and nothing would take the file
+        // away later (every start would find it again).
+        if (fDefaultIsEarlier) {
+            fs::remove(pathDefault, ec);
+            SyncDataDir();
+        }
     }
     TestCrashPoint("pidnote");
     fPidFileWritten = true;

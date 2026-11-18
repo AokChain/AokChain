@@ -424,6 +424,35 @@ class AutoRebuildTest(AokChainTestFramework):
         self.start1()
         unchanged()
 
+        # A run that is killed leaves its pid file under the default name. The next run keeps
+        # its pid file elsewhere and ends normally. The file of the killed run must not be
+        # found, by the start after that, beside no note or beside the note of a later run.
+        n1.process.kill()
+        self.wait_exit(-9)
+        assert os.path.isfile(pid_file)
+        self.start1(["-pid=" + outside])
+        assert not os.path.exists(pid_file)
+        unchanged()
+        self.stop_node(1)
+        self.start1()
+        unchanged()
+        # ...and an earlier version's pid file under the default name is found by a start
+        # that keeps its own elsewhere, answered once, and taken away
+        self.stop_node(1)
+        with open(pid_file, "w") as f:
+            f.write("4242\n")
+        self.start1(["-pid=" + outside])
+        rebuilds += 1
+        earlier += 1
+        assert not os.path.exists(pid_file)
+        unchanged()
+        self.stop_node(1)
+        self.start1(["-pid=" + outside])
+        unchanged()
+        self.stop_node(1)
+        self.start1()
+        unchanged()
+
         self.log.info("The pid file and its note, in the orders in which a stop can leave them")
         note = os.path.join(n1.datadir, "regtest", "pid.note")
         # 1. Stopped after the note is written and before the pid file: the note alone.
