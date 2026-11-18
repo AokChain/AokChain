@@ -322,6 +322,21 @@ void LoadSnapshotState(boost::thread_group& threadGroup)
         fPastBlocksMissing = missing;
         fRescanPending = rescan;
         LogPrintf("Snapshot: this node started from a snapshot at height %d; past blocks %s\n", height, missing ? "not downloaded" : "present");
+        // The file in the data directory says the same as the flag in the database (it is
+        // what is asked when the database cannot be read). The flag is written first when the
+        // past blocks are fetched: a stop right after it left the file, and a node with all
+        // its blocks would have started over from the snapshot instead of building its
+        // databases again from them.
+        boost::system::error_code ec;
+        const fs::path note = GetDataDir() / NO_PAST_BLOCKS_NAME;
+        if (!missing && fs::exists(note, ec)) {
+            fs::remove(note, ec);
+        } else if (missing && !fs::exists(note, ec)) {
+            if (FILE* file = fsbridge::fopen(note, "wb")) {
+                fprintf(file, "This node started from a chain state snapshot at height %d and does not have the blocks up to that height.\n", height);
+                fclose(file);
+            }
+        }
     }
 }
 

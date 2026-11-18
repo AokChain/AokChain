@@ -270,6 +270,22 @@ class AutoRebuildTest(AokChainTestFramework):
         wait_until(lambda: not os.path.exists(marker), timeout=60)
         self.same_state()
 
+        self.log.info("The block index database is gone: the block files are indexed again, nothing is fetched")
+        # (a chain state whose block the block index does not know: building the chain state
+        # again from that block index would end at the first block)
+        height = n1.getblockcount()
+        reindexes = self.count_in_log(REINDEXED)
+        self.stop_node(1)
+        shutil.rmtree(index)
+        n1.start(self.args + ["-checkmempool=0"], stderr=self.stderr1)   # (no peer: what it has, it has from its files)
+        n1.wait_for_rpc_connection()
+        wait_until(lambda: n1.getblockcount() == height, timeout=240)
+        assert_equal(self.count_in_log(REINDEXED), reindexes + 1)
+        assert_equal(n1.getconnectioncount(), 0)
+        wait_until(lambda: not os.path.exists(marker), timeout=60)
+        connect_nodes_bi(self.nodes, 0, 1)
+        self.same_state()
+
         self.log.info("The records of what the governance commands of the blocks replaced are gone: the databases are built again")
         since = os.path.join(n1.datadir, "regtest", "governanceundo.since")
         rebuilds = self.count_in_log(REBUILT)

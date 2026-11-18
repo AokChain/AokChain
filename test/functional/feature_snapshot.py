@@ -470,6 +470,24 @@ class SnapshotTest(AokChainTestFramework):
         sync_blocks([node0, node2])
         self.assert_same_state(node0, node2, index=False, full=False)
         assert_equal(node2.getbalance(), balance)
+        # the block index database is damaged: indexing the block files again is no way out for
+        # a node that does not have them, it starts over as well
+        self.stop_node(2)
+        self.start_node(2, args2)   # (a start writes what the database has in its log into a table file)
+        self.stop_node(2)
+        index2 = os.path.join(node2.datadir, "regtest", "blocks", "index")
+        tables = sorted(name for name in os.listdir(index2) if name.endswith(".ldb"))
+        assert tables
+        os.remove(os.path.join(index2, tables[0]))
+        del server.requests[:]
+        self.start_node(2, args2)
+        assert [r for r in server.requests if ".part" in r[0]], "the snapshot was not fetched again"
+        assert_equal(self.log_of(2).count("it starts over from the snapshot"), starts_over + 2)
+        starts_over += 1
+        connect_nodes(node2, 0)
+        sync_blocks([node0, node2])
+        self.assert_same_state(node0, node2, index=False, full=False)
+        assert_equal(node2.getbalance(), balance)
         # a node without its chain state is taken for a new one: the snapshot, as at the first start
         self.stop_node(2)
         shutil.rmtree(os.path.join(node2.datadir, "regtest", "chainstate"))
@@ -595,8 +613,29 @@ class SnapshotTest(AokChainTestFramework):
 
         self.log.info("With the past blocks it is a full node again: a new node synchronizes from it alone")
         self.stop_node(2)
+        # (a stop right after the fetch had noted that the blocks are there left the file that
+        # says they are not: the next start takes it away)
+        without = os.path.join(node2.datadir, "regtest", "snapshot-without-past-blocks")
+        assert not os.path.exists(without)
+        open(without, "w").close()
         self.start_node(2, args2 + ["-mocktime=%d" % t])
+        assert not os.path.exists(without)
         assert_equal(node2.getsnapshotinfo()["past_blocks"], "present")
+        # ...so that this node, which has all its blocks, builds its databases again from them
+        # when it must, and does not start over from the snapshot
+        starts_over2 = self.log_of(2).count("it starts over from the snapshot")
+        height2 = node2.getblockcount()
+        self.stop_node(2)
+        open(without, "w").close()
+        shutil.rmtree(os.path.join(node2.datadir, "regtest", "tokens"))
+        del server.requests[:]
+        self.start_node(2, args2 + ["-mocktime=%d" % t])
+        wait_until(lambda: node2.getblockcount() == height2, timeout=240)
+        assert not [r for r in server.requests if ".part" in r[0] and "snapshot" in r[0]], "the snapshot was fetched"
+        assert_equal(self.log_of(2).count("it starts over from the snapshot"), starts_over2)
+        assert "are built again from the block files at this start" in self.log_of(2)
+        assert_equal(node2.getsnapshotinfo()["past_blocks"], "present")
+        assert os.path.exists(os.path.join(blocks_dir, "blk00000.dat"))
         assert int(node2.getnetworkinfo()["localservices"], 16) & NODE_NETWORK
         self.fresh(3, ["-mocktime=%d" % t])
         connect_nodes(self.nodes[3], 2)

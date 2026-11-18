@@ -1807,10 +1807,11 @@ bool AppInitMain(boost::thread_group& threadGroup, CScheduler& scheduler)
                     fChainStateAtFault = true;
                     break;
                 }
-                fAtBlockIndex = true;
 
                 if (!ptokensdb->ReadReissuedMempoolState())
                     LogPrintf("Database failed to load last Reissued Mempool State. Will have to start from empty state");
+                // (from here on it is the block index database that is read)
+                fAtBlockIndex = true;
 
                 LogPrintf("Loaded Tokens from database without error\nCache of tokens size: %d\n", ptokensCache->Size());
 
@@ -2035,8 +2036,15 @@ bool AppInitMain(boost::thread_group& threadGroup, CScheduler& scheduler)
                 if (!is_coinsview_empty) {
                     // LoadChainTip sets chainActive based on pcoinsTip's best block
                     if (!LoadChainTip(chainparams)) {
+                        // The block index does not know the block of the chain state: it is the
+                        // block index that lost something (its database was removed or replaced,
+                        // or a re-index was stopped right after it emptied the database). The
+                        // block files are there: indexing them again finds every block, where a
+                        // rebuild of the chain state from this block index would end at the
+                        // first block and fetch the chain from the network again.
                         strLoadError = _("Error initializing block database");
-                        fChainStateAtFault = true;
+                        fBlockIndexAtFault = true;
+                        fOnlyReindexHelps = true;
                         break;
                     }
                     assert(chainActive.Tip() != nullptr);
@@ -2165,9 +2173,10 @@ bool AppInitMain(boost::thread_group& threadGroup, CScheduler& scheduler)
 
         // -autorebuild: the node helps itself where a rebuild from its own block files is the answer
         if (!fLoaded && !fRequestShutdown && fAutoRebuild && !fReset && (!fOnlyReindexHelps || fBlockIndexAtFault)) {
-            if (fChainStateAtFault && !fAutoRebuildTried && pblocktree && !fPruneMode && !fHavePruned && SnapshotNodeWithoutPastBlocks()) {
+            if ((fChainStateAtFault || fBlockIndexAtFault) && !fAutoRebuildTried && !fPruneMode && !fHavePruned && SnapshotNodeWithoutPastBlocks()) {
                 // A node that started from a chain state snapshot and has not fetched the blocks
-                // before it cannot build its databases from the block files: it starts over
+                // before it cannot build its databases from the block files, and cannot index
+                // block files that it does not have: whichever database it is, it starts over
                 fAutoRebuildTried = true;
                 LogPrintf("%s.\nThis node started from a chain state snapshot and does not have the blocks before it: it starts over from the snapshot (-autorebuild=0 turns this off). The wallet is not touched.\n", strLoadError);
                 uiInterface.InitMessage(_("Starting over from the chain state snapshot..."));
