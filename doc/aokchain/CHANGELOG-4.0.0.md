@@ -1,9 +1,9 @@
 # AokChain Core 4.0 changelog — compared with 3.0.5
 
-- **Covers:** 4.0.0 to 4.0.9. The first part describes 4.0.0 as it was prepared; every later version has its own section at the end.
+- **Covers:** 4.0.0 to 4.0.10. The first part describes 4.0.0 as it was prepared; every later version has its own section at the end.
 - **Baseline:** 3.0.5 (`5d1fd3d`, 2022-09-24)
 - **Size of 4.0.0:** 136 commits (as of 2026-11-13)
-- **Status:** released. The current version is 4.0.9 (2026-11-17). The Windows programs are not code-signed.
+- **Status:** released. The current version is 4.0.10 (2026-11-19). The Windows programs are not code-signed.
 
 ## Compatibility
 
@@ -254,3 +254,26 @@ Build release for macOS. The node and the wallet are those of 4.0.8: nothing cha
 - **macOS on Apple silicon.** The release builds on an Apple silicon Mac straight from the release tag, for macOS 11.0 and later: `depends` builds every library for `aarch64-apple-darwin`, and Qt is linked into the desktop wallet. The steps are in `doc/build-osx.md`.
 - **macOS 11.0 is the minimum** for every macOS build, and the app says so in its `Info.plist`.
 - **Build.** `config.site` of `depends` sets `PKG_CONFIG_LIBDIR` under its right name, so that a build with `depends` takes its libraries from there only. The Linux and Windows release builds find the same libraries as before.
+
+## 4.0.10 (2026-11-19)
+
+Maintenance release for nodes that run for a long time. The rules do not change: 4.0.10 accepts the same blocks as 4.0.0 to 4.0.9, and nothing changes for wallets. Upgrade every node; a plain restart is enough (`19-upgrade-guide.md`).
+
+- **Staking.** The last check of a found stake runs under the same locks as the search for it.
+- **Staking with a coin the node does not hold.** A wallet leaves a coin out of its stakes when the chain state of the node does not hold it, and goes on staking with its other coins. `getstakinginfo` counts such coins in the new field `coins_missing`, and the log names each of them once.
+- **Memory.** While many blocks are connected in a row (a rebuild of the chain state, `-reindex`, the import of block archives, a long catch-up), the node waits for its internal notifications to be delivered. A rebuild of the chain state needs well under half the memory it needed before.
+- **Start after a stop without a normal shutdown.** After a kill, a crash, a power failure or a forced stop of the machine, a plain restart is enough. The start brings every store to the block of the chain state: it finishes a write of the chain state that was cut short, takes the governance database back to that block, and applies to the token database the blocks that it lacks.
+- **Token database.** The token database is written in one step, together with the block that it stands for.
+- **The node checks its databases and rebuilds by itself.** At every start the node checks that its databases belong to one block. When it cannot go on from them (a store that is lost, damaged or cannot be brought in step, a failed check of the last blocks), the same start builds the chain state, the token database and the governance database again from the block files, as `-reindex-chainstate` does, and the log says so. A block index database that is damaged or lost is built again from the block files. When a block that the node had validated before does not connect while it runs, the node stops with a message and exit code 1, and the next start rebuilds. `-autorebuild=0` turns this off: the node then stops with the message that names the option to use, as before.
+- **Nodes that started from a snapshot** and do not hold the earlier blocks start over from the snapshot where other nodes rebuild. Nothing is removed before the new snapshot is fetched, checked and unpacked; when it cannot be had, the node ends with a message that says why and tries again at the next start.
+- **Pruned nodes** do not rebuild by themselves. Where other nodes rebuild, a pruned node ends with the message of the fault, which names `-reindex`.
+- **Governance commands of a block that leaves the chain.** When a block is connected, the node keeps what the governance commands of the block replaced, and puts exactly that back when the block is disconnected. New in the data directory: `governanceundo/` and `governanceundo.since`.
+- **First start after an earlier version.** A node that was stopped normally before the upgrade does not rebuild. One that was killed or crashed under an earlier version rebuilds once at its first start. While it runs, the node keeps the file `pid.note` in the data directory to tell its own runs from those of an earlier version.
+- **A stop during a rebuild.** A stop that is asked for while the node rebuilds ends it normally, and the rebuild continues after a plain restart.
+- **`invalidateblock` and `reconsiderblock`** that are given while the node connects a long chain take effect at once.
+- **Log.** A node that ends on a failed internal check writes a line about it to `debug.log`.
+- **Address index.** With `-addressindex` the address index follows the chain state after any stop. `-reindex-chainstate` also rebuilds the address, spent and time indexes.
+- **Going back.** After a normal stop, 4.0.9 can use the data directory again.
+- **Windows setup program.** `make deploy` in a Windows cross build makes a setup program for the desktop wallet and the node programs (`doc/build-windows.md`).
+- What the node does after an unclean stop is described in `20-unclean-stop-recovery.md`.
+- New tests `feature_stake_missing_coin.py`, `feature_governance_unclean_stop.py`, `feature_tokens_unclean_stop.py`, `feature_auto_rebuild.py`, `feature_governance_reorg.py`, `feature_governance_pruned.py`, `feature_flush_for_read.py`, `feature_invalidate_during_rebuild.py`, `feature_abort_message.py`, `feature_random_stops.py` and `feature_random_stops_fixed.py`. The functional baseline has 73 tests.

@@ -33,7 +33,14 @@ After unpacking, the node opens the databases and computes these hashes **from w
 loaded** (`ComputeStateHashes()`, the same code as the RPC `getstatehashes`). Any
 difference, any error while loading, any record in the block index database that is not a
 block index entry, a block file record or a flag: the snapshot is removed completely and
-the node synchronizes from the blocks, as it would without a snapshot. The SHA-256 of the
+the node synchronizes from the blocks, as it would without a snapshot. One more record is
+let pass, and proves nothing: the record of an acceptance at the height of this very
+snapshot, which the node itself writes when the check has passed (a start that was stopped
+right after it finds that record beside the marker, and a snapshot packed from a node that
+started from a snapshot carries it). Every snapshot that still has its marker is checked in
+full, whatever else is found beside it. If a snapshot that is not accepted cannot be
+removed completely (a database kept elsewhere that cannot be emptied), the start ends with
+a message and the marker stays: what is left is never opened as the data of the node. The SHA-256 of the
 files in `snapshot.json` only detects a damaged download; it is not what makes a snapshot
 acceptable.
 
@@ -72,11 +79,22 @@ more at the next start and removed after the second failure; the marker file
    there is a source (`-bootstrapurl`, `-bootstrapdir`, or the built-in address in the GUI).
 2. `snapshot.json` is read. A snapshot for another height or block is not downloaded.
 3. The parts are downloaded (resumed after an interruption; mirrors as for the block
-   archives) and unpacked into `chainstate/`, `blocks/index/`, `tokens/`, `governance/`.
-   Only files directly in these four directories are accepted.
+   archives) and unpacked beside the chain data, into `snapshot-unpack/`. Only files
+   directly in `chainstate/`, `blocks/index/`, `tokens/` and `governance/` are accepted.
+   When everything is unpacked and on disk, the four directories take the place of the
+   ones in the data directory. A start that was stopped during that move finishes it.
 4. The databases are loaded, the hashes computed and compared (§1).
 5. Accepted: the snapshot height is recorded in the block index database. The node is at
    that height and gets the following blocks from its peers.
+
+A node that started from a snapshot and has not fetched the past blocks cannot build its
+databases again from its block files. When it cannot go on from its databases, it starts
+over from the snapshot by itself (`-autorebuild`): steps 1 to 3 again, whatever the data
+directory holds, and nothing is removed before the snapshot is unpacked completely. When
+the snapshot cannot be had (it is turned off, the node has no source, the source offers
+another height, the download or a check fails), the node ends with a message that says
+what is in the way. It has removed nothing, and tries again at every start. The wallet is
+never touched.
 
 The splash screen and `aokchain-cli` (while the RPC interface is warming up) show the
 stage: looking for the snapshot, downloading (with the size and the time left), unpacking,
@@ -172,6 +190,59 @@ the restore asks for the download first.
 
 Undo data for the past blocks is not fetched (it cannot be verified without replaying).
 A node that needs to reorganize below H, or to `-reindex`, starts over.
+
+### Starting over
+
+A node without the past blocks whose databases are damaged starts over from the snapshot by
+itself (20-unclean-stop-recovery.md §3). The order is: fetch, check the files, unpack into
+`snapshot-unpack/`, and only then let the unpacked directories take the place of the node's.
+
+* Nothing of the node is removed before the snapshot is unpacked and on disk. When it cannot
+  be had, the start ends with the reason and "Nothing was removed".
+* A database, or the block directory, that is kept on another file system (a link, a mount)
+  stays where it is: it is emptied and the files of the snapshot are copied into it (a
+  `lost+found` at the root of a file system is left alone). Whether such a place is there (a
+  link that leads nowhere is not), can be read and written to and has room for the copy is
+  looked at before anything is removed; if not, the start-over is not begun and the message
+  says "Nothing was removed". The room is asked for each such directory by itself: two of
+  them on one other file system are not added up, and an entry in such a place that cannot
+  be removed is found only when the place is emptied, after the block files are gone (the
+  next point). The link or the mount also stays when a snapshot is removed (rejected by its
+  check, or the first snapshot of a new node after two stopped starts): the place is
+  emptied. (A link that leads nowhere is removed with the snapshot.) **A database directory
+  that is a link or a mount point must hold nothing but that database**: when a snapshot is
+  put there or removed, everything in it is removed, whatever it is, except `lost+found`.
+* When the move has begun and cannot be finished (an error of the file system), the start
+  ends and says that the block files and the databases replaced so far are removed and that
+  the unpacked snapshot is kept. Every later start goes on from there, and ends with a
+  message while it still cannot.
+* The marker `snapshot-unverified` says that the snapshot took the place of the chain data
+  of a node that ran (an `o` after the count). Such a snapshot is not removed because starts
+  were stopped while it was moved in or checked, however many: what it replaced is gone. The
+  rule of §1 (removed after two stopped starts) is for the first snapshot of a new node,
+  which then synchronizes by validating the blocks. A snapshot that fails its check is
+  removed in both cases. What keeps a stop from being taken for a failed snapshot:
+  * the marker is written beside itself and moved into place, so it is never there without
+    its content; one without a count (left by a version that wrote it in place) is read as
+    a start-over that is kept;
+  * a snapshot node that lost `chainstate/` looks like a new data directory and gets the
+    snapshot as at a first start, but its file `snapshot-without-past-blocks` says that it
+    ran: the marker gets the `o`;
+  * a directory that was copied to its place is renamed (`.copied`) before it is removed
+    from `snapshot-unpack/`: what is found there under its own name is always complete;
+  * the acceptance writes, each on disk before the next, the file
+    `snapshot-without-past-blocks`, the record in the block index database, and the removal
+    of the marker. A start that finds the marker again was stopped in between: it checks the
+    snapshot once more, in full (the node's own record passes the check, see §1), and
+    accepts it again. The file beside a marker says that a check had passed: also the first
+    snapshot of a new node is then kept, not removed for the count of stopped starts. The
+    file is never written from records of a snapshot that is not checked yet;
+  * when a start-over is not begun (no room, a place that cannot be written to), the marker
+    goes before the unpacked snapshot does, so that it is never left beside the untouched
+    data of the node.
+* An unpacked snapshot without a marker (`snapshot-unpack/` left by a start-over that was
+  stopped before it began to move, on a node that was mended since) is removed at the next
+  start.
 
 ## 4. Options and RPCs
 

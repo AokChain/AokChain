@@ -52,7 +52,8 @@ aokchain-cli repaircoins true                      # coins damaged by 3.0.x (see
 aokchain-cli repaircoins                           # repair them
 ```
 
-Going back: stop the node, put the two old programs back, start it.
+Going back: stop the node, put the two old programs back, start it. From 4.0.10 on, stop
+the node normally before going back ("Between 4.0 versions" below).
 
 ## Staking nodes
 
@@ -89,6 +90,9 @@ Going back: stop the node, put the two old programs back, start it.
   stakingwallet=<name as listwallets shows it>
   ```
 
+  The default wallet has an empty name (`listwallets` shows `""`): it is named with
+  `stakingwallet=` and nothing after the sign. `stakingwallet=wallet.dat` names no wallet,
+  and nothing stakes.
   The line stands beside `staking=1` in the configuration file and may be given several
   times, once for every wallet that stakes. A wallet that is not named does not stake,
   whether it is opened at the start or later.
@@ -127,3 +131,66 @@ Going back: stop the node, put the two old programs back, start it.
   (`Type=forking`, `PIDFile=`, `ExecStop=aokchain-cli stop`, `TimeoutStopSec=600`).
   `-daemonwait` instead of `-daemon` makes the service count as started only when the node
   answers.
+
+## Between 4.0 versions
+
+A 4.0 node is upgraded to a later 4.0 version by the same steps: stop it normally, replace
+the programs, start it. No change in the configuration file, nothing changes for wallets.
+What 4.0.10 adds for the operator:
+
+- **A start after a stop without a normal shutdown** (a kill, a crash, a power failure, a
+  forced stop of the machine). Start the node as usual. The log says that the last run did
+  not end with a normal shutdown and that the databases are compared with each other and
+  brought in step: governance changes are undone and come back with their blocks, the token
+  database is at an earlier height and the blocks in between are applied to it again, and
+  with `-addressindex` the changes of the address index are undone in the same way. These
+  lines are the repair, not an error.
+- **The node rebuilds by itself.** At every start the node checks that its databases
+  belong to one block. When it cannot go on from them (a store that is lost, damaged or
+  cannot be brought in step, a failed check of the last blocks), the same start builds the
+  chain state, the token database and the governance database again from the block files,
+  as `-reindex-chainstate` does, and the log says so. This takes as long as a rebuild,
+  some tens of minutes on the main network, and the node does not stake meanwhile; the
+  wallet is not touched. A stop that is asked for during the rebuild ends the node
+  normally, and the next start goes on. When the block index is damaged or lost, the
+  block files are indexed again, as `-reindex` does.
+- **A node that started from a chain state snapshot** and does not have the earlier
+  blocks starts over from the snapshot instead; its wallet stays. Nothing is removed
+  before the new snapshot is fetched, checked and unpacked. When the snapshot cannot be
+  had, the node ends with a message that says why and that nothing was removed, and tries
+  again at every start.
+- **A block that the node had validated before and that does not connect any more** means
+  that its databases are damaged. The node says "The databases of this node are damaged.
+  They are built again from the block files at the next start: start the program again, no
+  option is needed." and ends with exit code 1. Keep `Restart=on-failure` in the service
+  unit: the node is then started again and rebuilds without a hand.
+- **The first start after an earlier version.** A node that was stopped normally before
+  the upgrade does not rebuild. A node that was killed or crashed under the earlier version
+  left its pid file behind; the earlier version kept no notes that its databases could be
+  checked against, so 4.0.10 rebuilds once at its first start. Only a pid file in the data
+  directory counts: where it is kept elsewhere (`-pid`), where a service manager removes
+  it (`PIDFile=`), and on Windows, which has no pid file, start 4.0.10 once with
+  `-reindex-chainstate` if the earlier version was not stopped normally.
+- **New in the data directory:** `governanceundo/` and `governanceundo.since` (what the
+  governance commands of each block replaced, so that a block that leaves the chain is
+  undone exactly) and, while the node runs, `pid.note`. A copy of a node is made of the
+  whole data directory, or of `chainstate`, `blocks`, `tokens` and `governance` alone.
+- **`-autorebuild=0`** turns the automatic steps off. The node then stops with the message
+  that names the option to use, as before 4.0.10.
+- **What stays with the operator:** errors of the disk (full, permissions, hardware), a
+  block file that cannot be read, a changed index or prune option, and pruned nodes, which
+  cannot rebuild from their block files: where another node rebuilds, a pruned node ends
+  with the message of the fault, which names `-reindex`.
+- The details are in `20-unclean-stop-recovery.md`.
+- **`coins_missing` in `getstakinginfo`.** Above 0, the chain state of the node does not
+  hold coins that the wallet would stake. The wallet goes on staking with its other coins,
+  and the log names the coins. Rebuild the chain state at a convenient time
+  (`-reindex-chainstate`); the wallet is not touched by it.
+- **Memory of a rebuild.** A rebuild of the chain state or a `-reindex` needs far less
+  memory than with 4.0.9 and before.
+- **Address index.** With `-addressindex`, a rebuild of the chain state (`-reindex-chainstate`
+  or the node's own) also empties and refills the address, spent and time indexes.
+- **Going back to 4.0.9.** Stop the node normally, put the old programs back, start it. If
+  the node was not stopped normally, start 4.0.10 once more, stop it normally, and only
+  then put the old programs back; when that is not possible, rebuild the chain state
+  after going back.
