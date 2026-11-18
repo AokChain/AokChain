@@ -31,6 +31,8 @@ from test_framework.util import assert_equal, connect_nodes_bi, sync_blocks, wai
 FREEZE = 70
 STATE = ("utxo", "utxo_legacy", "tokens", "governance", "index")
 REBUILT = "are built again from the block files at this start"
+EARLIER = "was by an earlier version and did not end with a normal shutdown"
+UNCLEAN = "did not end with a normal shutdown. Its databases are compared"
 ASKED = "The databases of this node are not what they were"
 TAKEN_UP = "was decided at an earlier run and is not done"
 NOT_AGAIN = "were built again not long ago: nothing more is done about it"
@@ -288,6 +290,70 @@ class AutoRebuildTest(AokChainTestFramework):
         assert_equal(self.count_in_log(REBUILT), rebuilds + 1)
         assert_equal(self.count_in_log("is on record for the blocks connected from now on"), taken_over + 1)
         assert os.path.isfile(since)
+        self.same_state()
+
+        self.log.info("This version's own stops are not taken for an earlier version's")
+        pid_file = os.path.join(n1.datadir, "regtest", "aokchaind.pid")
+        rebuilds = self.count_in_log(REBUILT)
+        earlier = self.count_in_log(EARLIER)
+
+        def unchanged():
+            assert_equal(self.count_in_log(REBUILT), rebuilds)
+            assert_equal(self.count_in_log(EARLIER), earlier)
+            self.same_state()
+
+        # killed at the tail of a normal shutdown: the databases are closed, the pid file is still there
+        self.stop_node(1)
+        self.start1(["-testcrashat=shutdown-tail"])
+        n1.stop()
+        self.wait_exit(0)
+        assert os.path.isfile(pid_file)
+        self.start1()
+        unchanged()
+        # killed when it has written its pid file, before it opens a database
+        self.stop_node(1)
+        n1.start(self.args + ["-checkmempool=0", "-testcrashat=pidfile"], stderr=self.stderr1)
+        self.wait_exit(0)
+        assert os.path.isfile(pid_file)
+        self.start1()
+        unchanged()
+        # killed when it has set its mark of a running node
+        unclean = self.count_in_log(UNCLEAN)
+        self.stop_node(1)
+        n1.start(self.args + ["-checkmempool=0", "-testcrashat=running-mark"], stderr=self.stderr1)
+        self.wait_exit(0)
+        self.start1()
+        assert_equal(self.count_in_log(UNCLEAN), unclean + 1)
+        unchanged()
+
+        self.log.info("A pid file that is kept outside the data directory says nothing about the directory")
+        outside = os.path.join(self.options.tmpdir, "elsewhere.pid")
+        self.stop_node(1)
+        with open(outside, "w") as f:
+            f.write("4242\n")
+        self.start1(["-pid=" + outside])
+        unchanged()
+        self.stop_node(1)
+        assert not os.path.exists(outside)
+        self.start1()
+        unchanged()
+
+        self.log.info("An earlier version's unclean stop is not forgotten when the starts that find it are killed")
+        self.stop_node(1)
+        with open(pid_file, "w") as f:
+            f.write("4242\n")
+        for point in ("pidfile", "running-mark"):
+            n1.start(self.args + ["-checkmempool=0", "-testcrashat=" + point], stderr=self.stderr1)
+            self.wait_exit(0)
+        self.start1()
+        assert_equal(self.count_in_log(EARLIER), earlier + 1)
+        assert_equal(self.count_in_log(REBUILT), rebuilds + 1)
+        self.same_state()
+        # ...and it is answered once
+        self.stop_node(1)
+        self.start1()
+        assert_equal(self.count_in_log(EARLIER), earlier + 1)
+        assert_equal(self.count_in_log(REBUILT), rebuilds + 1)
         self.same_state()
 
 

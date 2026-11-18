@@ -60,7 +60,9 @@
 #include <memory>
 
 #ifndef WIN32
+#include <fcntl.h>
 #include <signal.h>
+#include <unistd.h>
 #endif
 
 #include <boost/algorithm/string/classification.hpp>
@@ -158,8 +160,88 @@ bool ShutdownRequested()
  *  a normal shutdown takes it away at its end. */
 static bool fRunningMarked = false;
 
-/** The last run left its pid file behind: it did not end with a normal shutdown. */
-static bool fPidFileLeft = false;
+/**
+ * An earlier version ran on this data directory last and did not end with a normal shutdown,
+ * and that is not answered yet (AppInitMain).
+ *
+ * A normal shutdown takes the pid file away: one that is found at a start was left by a run
+ * that did not end that way. Whose run? Before this version writes its pid file, it notes the
+ * pid that it writes in <datadir>/pid.note, and it takes the note away after the pid file. An
+ * earlier version writes the pid file and no note. So a pid file that is found with another
+ * pid than the note, or without a note, is one that an earlier version wrote, after the last
+ * run of this version; and a pid file with the pid of the note is this version's own, whenever
+ * the program was stopped: while it started, while it ran, in the middle of its shutdown.
+ * What is found is kept in the note until it is answered: a start that is stopped before it
+ * gets that far leaves it for the next one.
+ * Only a pid file in the data directory says something about this directory: one that is kept
+ * elsewhere (-pid) may be another node's, or stay because it cannot be removed, or be taken
+ * away by a service manager.
+ */
+static bool fEarlierVersionUnclean = false;
+#ifndef WIN32
+static bool fPidNoteWritten = false;
+
+static fs::path PidNoteFile()
+{
+    return GetDataDir() / "pid.note";
+}
+
+/** The first word of a small text file. */
+static bool ReadFirstWord(const fs::path& path, std::string& strWord, std::string* pstrSecond = nullptr)
+{
+    FILE* file = fsbridge::fopen(path, "r");
+    if (!file)
+        return false;
+    char buffer[64];
+    const size_t read = fread(buffer, 1, sizeof(buffer) - 1, file);
+    fclose(file);
+    buffer[read] = 0;
+    std::istringstream stream(buffer);
+    strWord.clear();
+    stream >> strWord;
+    if (pstrSecond) {
+        pstrSecond->clear();
+        stream >> *pstrSecond;
+    }
+    return true;
+}
+
+/** Writes the note: the pid of the pid file, and whether an unclean stop of an earlier version
+ *  waits for its answer. On disk when this returns. */
+static bool WritePidNote(const std::string& strPid, bool fPending)
+{
+    const fs::path path = PidNoteFile();
+    const fs::path pathNew = path.string() + ".new";
+    FILE* file = fsbridge::fopen(pathNew, "w");
+    if (!file)
+        return false;
+    const std::string str = strPid + (fPending ? " earlier-version-unclean\n" : " -\n");
+    const bool fWritten = fwrite(str.data(), 1, str.size(), file) == str.size();
+    FileCommit(file);
+    if (fclose(file) != 0 || !fWritten || !RenameOver(pathNew, path))
+        return false;
+    // (the name of the note is on disk before the pid file is written)
+    const int fd = open(GetDataDir().string().c_str(), O_RDONLY);
+    if (fd >= 0) {
+        fsync(fd);
+        close(fd);
+    }
+    return true;
+}
+
+/** The unclean stop of an earlier version is answered (or there is nothing left to answer). */
+static void AnswerEarlierVersionUnclean()
+{
+    fEarlierVersionUnclean = false;
+    if (fPidNoteWritten)
+        WritePidNote(itostr(getpid()), false);
+}
+#else
+static void AnswerEarlierVersionUnclean()
+{
+    fEarlierVersionUnclean = false;
+}
+#endif
 
 /** A file in the data directory while a re-index that the node began by itself is under way
  *  (-autorebuild): it does not begin a second one right after the first. */
@@ -332,6 +414,13 @@ void Shutdown()
         fs::remove(GetPidFile());
     } catch (const fs::filesystem_error& e) {
         LogPrintf("%s: Unable to remove pidfile: %s\n", __func__, e.what());
+    }
+    // (after the pid file: while there is a pid file of this version, there is its note. The
+    // note stays when it holds something that is not answered yet.)
+    if (fPidNoteWritten && !fEarlierVersionUnclean) {
+        boost::system::error_code ec;
+        fs::remove(PidNoteFile(), ec);
+        fPidNoteWritten = false;
     }
 #endif
     UnregisterAllValidationInterfaces();
@@ -1367,11 +1456,19 @@ bool AppInitMain(boost::thread_group& threadGroup, CScheduler& scheduler)
     const CChainParams& chainparams = Params();
     // ********************************************************* Step 4a: application initialization
 #ifndef WIN32
-    // (a normal shutdown takes this file away: one that is still there was left by a run that
-    // did not end that way, whatever version it was)
+    // Whose pid file is it that the last run left, if it left one: see fEarlierVersionUnclean
     {
+        const fs::path pathPid = GetPidFile();
         boost::system::error_code ec;
-        fPidFileLeft = fs::exists(GetPidFile(), ec);
+        std::string strNotePid, strNoteState, strLeftPid;
+        const bool fNote = ReadFirstWord(PidNoteFile(), strNotePid, &strNoteState);
+        fEarlierVersionUnclean = fNote && strNoteState == "earlier-version-unclean";
+        if (fs::exists(pathPid, ec) && fs::equivalent(pathPid.parent_path(), GetDataDir(), ec) && ReadFirstWord(pathPid, strLeftPid) &&
+            (!fNote || strLeftPid != strNotePid))
+            fEarlierVersionUnclean = true;
+        if (!WritePidNote(itostr(getpid()), fEarlierVersionUnclean))
+            return InitError(strprintf(_("Cannot write to data directory '%s'; check permissions."), GetDataDir().string()));
+        fPidNoteWritten = true;
     }
     CreatePidFile(GetPidFile(), getpid());
 #endif
@@ -1631,9 +1728,6 @@ bool AppInitMain(boost::thread_group& threadGroup, CScheduler& scheduler)
                 pblocktree.reset();
                 pblocktree.reset(new CBlockTreeDB(nBlockTreeDBCache, false, fReset));
 
-                // A run of an earlier version that did not end with a normal shutdown: this version
-                // sets its own mark while it runs, an earlier one leaves only the pid file
-                bool fEarlierVersionUnclean = false;
                 if (!fReset) {
                     if (!fRunningRead) {
                         fRunningRead = true;
@@ -1641,7 +1735,6 @@ bool AppInitMain(boost::thread_group& threadGroup, CScheduler& scheduler)
                         if (fRunningKnown && fWasRunning)
                             LogPrintf("The last run of this node did not end with a normal shutdown. Its databases are compared with each other and brought in step.\n");
                     }
-                    fEarlierVersionUnclean = fPidFileLeft && !(fRunningKnown && fWasRunning);
                     // From here to the end of a normal shutdown the node counts as running (set
                     // at once: a stop while it loads is a stop of this version too)
                     if (!fRunningMarked) {
@@ -1842,13 +1935,19 @@ bool AppInitMain(boost::thread_group& threadGroup, CScheduler& scheduler)
                 // with every block) and the token database (which it wrote after the chain state)
                 // belong to this chain state, and they cannot be checked against it. The node
                 // makes sure once, by building them again.
-                if (fEarlierVersionUnclean && !fReindexChainState && !pcoinsTip->GetBestBlock().IsNull()) {
-                    if (fAutoRebuild && !fAutoRebuildTried && !fPruneMode) {
+                if (fEarlierVersionUnclean) {
+                    if (fReset || fReindexChainState || fSnapshotOnTrial || pcoinsTip->GetBestBlock().IsNull()) {
+                        // The databases are new or empty (a rebuild or a re-index is under way,
+                        // a snapshot was unpacked at this start): nothing of that run is in them.
+                        AnswerEarlierVersionUnclean();
+                    } else if (fAutoRebuild && !fAutoRebuildTried && !fPruneMode) {
                         strLoadError = _("The last run of this node was by an earlier version and did not end with a normal shutdown: nothing says whether its databases belong together");
                         fChainStateAtFault = true;
                         break;
+                    } else {
+                        LogPrintf("The last run of this node was by an earlier version and did not end with a normal shutdown. Its databases cannot be checked against each other; -reindex-chainstate builds them again.\n");
+                        AnswerEarlierVersionUnclean();   // (said once)
                     }
-                    LogPrintf("The last run of this node was by an earlier version and did not end with a normal shutdown. Its databases cannot be checked against each other; -reindex-chainstate builds them again.\n");
                 }
 
                 // The governance database is written with every block, the chain state at its

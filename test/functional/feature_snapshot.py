@@ -294,12 +294,26 @@ class SnapshotTest(AokChainTestFramework):
         # (with the files pinned, as on the main network)
         args2 = COMMON + STAKING + [source, self.params(archive=self.archive_sha256(self.archives, manifest))]
         server.delay = 1
-        node2.start(args2)
         download = os.path.join(node2.datadir, "regtest", "snapshot-download")
-        wait_until(lambda: os.path.isdir(download) and any(os.path.getsize(os.path.join(download, name)) > 0 for name in os.listdir(download)), timeout=60)
+
+        def downloaded():
+            return sum(os.path.getsize(os.path.join(download, name)) for name in os.listdir(download)) if os.path.isdir(download) else 0
+
+        node2.start(args2)
+        wait_until(lambda: downloaded() > 0, timeout=60)
         node2.process.terminate()
         node2.process.wait(timeout=60)
         node2.running = False
+        # ...and a kill of the program in the middle of the download: the start after it
+        # takes the snapshot, the new node is not taken for one that an earlier version left
+        # in an unknown state
+        so_far = downloaded()
+        node2.start(args2)
+        wait_until(lambda: downloaded() > so_far, timeout=60)
+        node2.process.kill()
+        node2.process.wait(timeout=60)
+        node2.running = False
+        assert os.path.isfile(os.path.join(node2.datadir, "regtest", "aokchaind.pid"))
         node2.process = None
         assert "Snapshot: accepted" not in self.log_of(2)
         server.delay = 0
@@ -307,6 +321,8 @@ class SnapshotTest(AokChainTestFramework):
         self.start_node(2, args2)
         assert [r for r in server.requests if ".part" in r[0] and r[1]], "the download was not resumed"
         assert "Snapshot: accepted at height %d" % HEIGHT in self.log_of(2)
+        assert "Snapshot: REJECTED" not in self.log_of(2)
+        assert "was by an earlier version" not in self.log_of(2)
         assert_equal(node2.getblockcount(), HEIGHT)
         assert_equal(node2.getbestblockhash(), self.hashes["block"])
         info = node2.getsnapshotinfo()
