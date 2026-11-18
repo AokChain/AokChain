@@ -333,6 +333,40 @@ class AutoRebuildTest(AokChainTestFramework):
         connect_nodes_bi(self.nodes, 0, 1)
         self.same_state()
 
+        self.log.info("The governance database is not what it was when the chain state was written: the note finds it")
+        # The governance database is changed in place, with the chain state at the same block:
+        # a block with a command that changes nothing is connected, and then given up the way
+        # a version without the records gave it up, which releases the address. The chain
+        # state of before, with its note, is then put beside that governance database.
+        datadir1 = os.path.join(n1.datadir, "regtest")
+        self.stop_node(1)
+        chainstate_aside = os.path.join(self.options.tmpdir, "chainstate-of-node1")
+        shutil.copytree(os.path.join(datadir1, "chainstate"), chainstate_aside)
+        self.start1()
+        coin = [u for u in n0.listunspent(1, 9999999, [master])][0]
+        data = script_command(FREEZE, n0.validateaddress(frozen_address)["scriptPubKey"])
+        raw = n0.createrawtransaction([{"txid": coin["txid"], "vout": coin["vout"]}], {"data": data, master: coin["amount"] - Decimal("0.01")})
+        n0.sendrawtransaction(n0.signrawtransactionwithwallet(raw)["hex"])
+        block = self.mine()
+        self.stop_node(1)
+        self.remove("governanceundo")
+        os.remove(since)
+        self.start1()
+        n1.invalidateblock(block)
+        assert_equal(self.frozen(n1), [])
+        assert_equal(len(self.frozen(n0)), 1)
+        self.stop_node(1)
+        shutil.rmtree(os.path.join(datadir1, "chainstate"))
+        shutil.copytree(chainstate_aside, os.path.join(datadir1, "chainstate"))
+        rebuilds = self.count_in_log(REBUILT)
+        not_what_it_was = "the governance database is not what it was when the chain state was written"
+        assert_equal(self.count_in_log(not_what_it_was), 0)
+        self.start1()
+        assert_equal(self.count_in_log(not_what_it_was), 1)
+        assert_equal(self.count_in_log(REBUILT), rebuilds + 1)
+        n1.reconsiderblock(block)
+        self.same_state()
+
         self.log.info("This version's own stops are not taken for an earlier version's")
         pid_file = os.path.join(n1.datadir, "regtest", "aokchaind.pid")
         rebuilds = self.count_in_log(REBUILT)
@@ -501,46 +535,49 @@ class AutoRebuildTest(AokChainTestFramework):
         # node1 gives up block B for a branch of its own and loses the coin that B spends; node0
         # goes on from B with three blocks. When the nodes meet, node1 asks for its rebuild at
         # B, and the block messages that follow bring B again while the node is on its way down.
-        self.stop_node(1)
-        n1.start(self.args + ["-checkmempool=0", "-persistmempool=0"], stderr=self.stderr1)   # (no peer)
-        n1.wait_for_rpc_connection()
-        disconnect_nodes(n0, 1)
-        # (a coin of node0: the wallet of node1 must not bring the payment back at its start)
-        coin = [u for u in n0.listunspent() if u["amount"] > 2][0]
-        raw = n0.createrawtransaction([{"txid": coin["txid"], "vout": coin["vout"]}], {n0.getnewaddress(): coin["amount"] - Decimal("0.1")})
-        n0.sendrawtransaction(n0.signrawtransactionwithwallet(raw)["hex"])
-        block_b = n0.generate(1)[0]
-        n1.submitblock(n0.getblock(block_b, False))
-        assert_equal(n1.getbestblockhash(), block_b)
-        n1.invalidateblock(block_b)
-        # (the payment of B is back in its memory pool: a start without it, so that its own
-        # branch does not hold that payment)
-        self.stop_node(1)
-        n1.start(self.args + ["-checkmempool=0", "-persistmempool=0"], stderr=self.stderr1)
-        n1.wait_for_rpc_connection()
-        assert_equal(n1.getrawmempool(), [])
-        n1.generate(2)
-        own_tip = n1.getbestblockhash()
-        assert_equal(n1.removecoin(coin["txid"], coin["vout"]), True)
-        n1.reconsiderblock(block_b)
-        assert_equal(n1.getbestblockhash(), own_tip)
-        n0.generate(3)
-        asked, not_again, taken_up = self.count_in_log(ASKED), self.count_in_log(NOT_AGAIN), self.count_in_log(TAKEN_UP)
-        n1.setmocktime(int(time.time()) + 60 * 60 * 60)   # (an earlier case of this test asked for a rebuild within the day)
-        try:
-            connect_nodes(n1, 0)
-        except Exception:
-            pass
-        self.wait_exit(1)
-        assert_equal(self.count_in_log(ASKED), asked + 1)
-        assert_equal(self.count_in_log(NOT_AGAIN), not_again)
-        self.start1()
-        assert_equal(self.count_in_log(TAKEN_UP), taken_up + 1)
-        sync_blocks(self.nodes, timeout=240)
-        assert_equal([tip["status"] for tip in n1.getchaintips() if tip["hash"] == n0.getbestblockhash()], ["active"])
-        hashes = [node.getstatehashes() for node in self.nodes]
-        for part in STATE:
-            assert_equal(hashes[0][part], hashes[1][part])
+        # (Twice: with the check of the whole block index that -regtest runs after every step,
+        # which must not end the node there, and without it, as on the main network.)
+        for hours, check in ((60, []), (120, ["-checkblockindex=0"])):
+            self.stop_node(1)
+            n1.start(self.args + ["-checkmempool=0", "-persistmempool=0"] + check, stderr=self.stderr1)   # (no peer)
+            n1.wait_for_rpc_connection()
+            disconnect_nodes(n0, 1)
+            # (a coin of node0: the wallet of node1 must not bring the payment back at its start)
+            coin = [u for u in n0.listunspent() if u["amount"] > 2][0]
+            raw = n0.createrawtransaction([{"txid": coin["txid"], "vout": coin["vout"]}], {n0.getnewaddress(): coin["amount"] - Decimal("0.1")})
+            n0.sendrawtransaction(n0.signrawtransactionwithwallet(raw)["hex"])
+            block_b = n0.generate(1)[0]
+            n1.submitblock(n0.getblock(block_b, False))
+            assert_equal(n1.getbestblockhash(), block_b)
+            n1.invalidateblock(block_b)
+            # (the payment of B is back in its memory pool: a start without it, so that its own
+            # branch does not hold that payment)
+            self.stop_node(1)
+            n1.start(self.args + ["-checkmempool=0", "-persistmempool=0"] + check, stderr=self.stderr1)
+            n1.wait_for_rpc_connection()
+            assert_equal(n1.getrawmempool(), [])
+            n1.generate(2)
+            own_tip = n1.getbestblockhash()
+            assert_equal(n1.removecoin(coin["txid"], coin["vout"]), True)
+            n1.reconsiderblock(block_b)
+            assert_equal(n1.getbestblockhash(), own_tip)
+            n0.generate(3)
+            asked, not_again, taken_up = self.count_in_log(ASKED), self.count_in_log(NOT_AGAIN), self.count_in_log(TAKEN_UP)
+            n1.setmocktime(int(time.time()) + hours * 60 * 60)   # (the rebuild asked for before this one was within the day)
+            try:
+                connect_nodes(n1, 0)
+            except Exception:
+                pass
+            self.wait_exit(1)
+            assert_equal(self.count_in_log(ASKED), asked + 1)
+            assert_equal(self.count_in_log(NOT_AGAIN), not_again)
+            self.start1(check)
+            assert_equal(self.count_in_log(TAKEN_UP), taken_up + 1)
+            sync_blocks(self.nodes, timeout=240)
+            assert_equal([tip["status"] for tip in n1.getchaintips() if tip["hash"] == n0.getbestblockhash()], ["active"])
+            hashes = [node.getstatehashes() for node in self.nodes]
+            for part in STATE:
+                assert_equal(hashes[0][part], hashes[1][part])
 
         self.log.info("A store that is gone, and a node that does not rebuild by itself: no start goes on with a new one")
         # (the first start makes an empty store in its place; the second must not take that for the store of this chain)

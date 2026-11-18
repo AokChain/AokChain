@@ -195,7 +195,11 @@ class GovernanceReorgTest(AokChainTestFramework):
         self.start_node(1, self.extra_args[1])
         connect_nodes_bi(self.nodes, 0, 1)
         connect_nodes_bi(self.nodes, 1, 2)
+        # (before the commands are mined again)
+        assert_equal(self.governance(self.nodes[1]), before)
+        self.same_as_node2("after a restart")
         self.mine()   # (the commands, for everyone this time)
+        early_block = n0.getbestblockhash()
         self.same_as_node2("with the commands in the chain of all three")
 
         self.log.info("There and back: a payment from x; a branch that releases x again and freezes it; back to the payment")
@@ -235,10 +239,12 @@ class GovernanceReorgTest(AokChainTestFramework):
         assert os.path.isdir(records) and os.path.isfile(since)
         # a block with a command that changes something, for an address that is known: the
         # one case in which the revert of the command itself is the state before
+        before_old = self.governance(n0)
         self.master_tx([self.script_command(FREEZE, b)])
         self.mine()
         old_block = n0.getbestblockhash()
         self.mine()
+        with_old = self.governance(n0)
         taken_over = self.log_count(1, "is on record for the blocks connected from now on")
         self.stop_node(1)
         shutil.rmtree(records)
@@ -251,15 +257,31 @@ class GovernanceReorgTest(AokChainTestFramework):
         assert_equal(self.log_count(1, "is on record for the blocks connected from now on"), taken_over + 1)
         assert os.path.isfile(since)
         assert_equal(n1.removegovernanceundo(old_block), False)   # (there is none)
+        assert_equal(n1.removegovernanceundo(early_block), False)
+        # A block above the one at which the node took its chain state over, with a command
+        # that changes nothing (a is frozen): reverting the command itself would release a.
+        assert_equal(n1.checkfreeze(a), True)
+        self.master_tx([self.script_command(FREEZE, a)])
+        self.mine()
+        above = n0.getbestblockhash()
         self.split()
-        self.mine(3, node=n2, peers=[n2])        # node2 has the block with the command and goes on
-        n1.invalidateblock(old_block)            # node1 gives it up, the way it always did
+        self.mine(4, node=n2, peers=[n2])        # node2 has these blocks and goes on
+        # node1 gives that block up by its record: exactly the state before it
+        n1.invalidateblock(above)
+        assert_equal(self.governance(n1), with_old)
+        n1.reconsiderblock(above)
+        assert_equal(n1.getbestblockhash(), above)
+        # ...and gives up, in one reorganisation across the block of the take-over, the block
+        # above by its record and the blocks at and below it the way it always did
+        n1.invalidateblock(old_block)
         assert_equal(n1.checkfreeze(b), False)
-        assert_equal(n1.getblockcount(), n0.getblockcount() - 2)
+        assert_equal(n1.checkfreeze(a), True)
+        assert_equal(self.governance(n1), before_old)
+        assert_equal(n1.getblockcount(), n0.getblockcount() - 3)
         assert_equal(self.log_count(1, "The databases of this node are not what they were"), asked[1])
         n1.reconsiderblock(old_block)
         self.join()
-        self.same_as_node2("blocks from before the records")
+        self.same_as_node2("blocks from before the records, and a reorganisation across the block of the take-over")
 
         self.log.info("Blocks connected since have their records")
         self.split()
@@ -278,6 +300,7 @@ class GovernanceReorgTest(AokChainTestFramework):
         self.mine(1, peers=[n0, n1])
         damaged = n1.getbestblockhash()
         assert new_block != damaged
+        assert_equal(n1.removegovernanceundo(early_block), False)   # (still none)
         assert_equal(n1.removegovernanceundo(damaged), True)
         assert_equal(n1.removegovernanceundo(damaged), False)
         self.mine(2, node=n2, peers=[n2])
@@ -290,8 +313,9 @@ class GovernanceReorgTest(AokChainTestFramework):
         assert_equal(self.log_count(1, "was decided at an earlier run and is not done"), 1)
         self.join()
         self.same_as_node2("after the node built its databases again")
-        # every block has its record again: the blocks from before the records too
-        assert_equal(self.nodes[1].removegovernanceundo(old_block), True)
+        # every block has its record again: also a block from before the records that the node
+        # had not connected again since (it had none until now, see above)
+        assert_equal(self.nodes[1].removegovernanceundo(early_block), True)
         stderr1.close()
 
 
