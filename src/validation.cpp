@@ -4340,6 +4340,13 @@ static bool ActivateBestChainStep(CValidationState& state, const CChainParams& c
 
         // Connect new blocks.
         for (CBlockIndex *pindexConnect : reverse_iterate(vpindexToConnect)) {
+            // (a block that is marked invalid is not connected, whatever tip the caller works
+            // towards: it finds another one)
+            if (pindexConnect->nStatus & BLOCK_FAILED_MASK) {
+                fInvalidFound = true;
+                fContinue = false;
+                break;
+            }
             if (!ConnectTip(state, chainparams, pindexConnect, pindexConnect == pindexMostWork ? pblock : std::shared_ptr<const CBlock>(), connectTrace, disconnectpool)) {
                 if (state.IsInvalid()) {
                     // The block violates a consensus rule.
