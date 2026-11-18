@@ -137,6 +137,7 @@ BASE_SCRIPTS= [
     'feature_abort_message.py',
     'feature_auto_rebuild.py',
     'feature_random_stops.py',
+    'feature_random_stops_fixed.py',
     'feature_offline_staking.py',
     'feature_future_drift.py',
     'p2p_orphan_processing.py',

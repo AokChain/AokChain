@@ -70,3 +70,4 @@ feature_invalidate_during_rebuild.py
 feature_abort_message.py
 feature_auto_rebuild.py
 feature_random_stops.py
+feature_random_stops_fixed.py

@@ -13,7 +13,18 @@ always started again without any option that an operator would have to choose, a
 manager does. Then its five state hashes, its freeze list, its tokens and its address index
 must be those of node0.
 
-The commands include ones that change nothing and several for one address, and the nodes give
+A stop alone is answered by the journals of the node. So in a round in which no database was
+lost and no rebuild was asked for, node1 must come back without having helped itself: no
+rebuild of its databases, no run taken for an earlier version's, no re-index. And it must not
+have ended by itself before the test stopped it, unless the round asked for that.
+
+The kinds of the rounds are drawn from the seed alone and logged at the start. From 20 rounds
+on, every kind is among them and each of the four databases is lost once
+(feature_random_stops_fixed.py is such a run with a fixed seed).
+
+The commands include ones that change nothing and several for one address, commands for the
+issuing costs (of the kinds that no transaction of this test pays, anywhere; the fee address
+and the costs that are paid only in a block of their own, see quiet_command), and the nodes give
 blocks up for other branches all the time. Two nodes that made the same mistake in giving a
 block up would agree with each other, so node0 is compared as well, in every comparison, with
 a node that never gave a block up: node3 has no peers. It is handed the blocks of node0's
@@ -36,6 +47,7 @@ wait for the same block does not end.
 import os
 import random
 import shutil
+import struct
 import subprocess
 import threading
 import time
@@ -45,8 +57,21 @@ from test_framework.mininode import CTransaction, CTxOut, FromHex, ToHex
 from test_framework.test_framework import AokChainTestFramework
 from test_framework.util import assert_equal, connect_nodes_bi, disconnect_nodes, sync_blocks, wait_until
 
-FREEZE, UNFREEZE = 70, 85
+FREEZE, UNFREEZE, COST, FEE = 70, 85, 67, 102
+COST_ROOT, COST_REISSUE = 1, 2
+# (the kinds of issuing cost that nothing in this test pays: a command for one of them can
+# stand anywhere, also in a branch that is given up, without making a waiting transaction invalid)
+COSTS_NOT_PAID = (3, 4, 5)
 STATE = ("utxo", "utxo_legacy", "tokens", "governance", "index")
+KINDS = ["kill", "kill", "kill", "flush", "flush", "shutdown", "start", "crash-chainstate", "crash-tokens",
+         "rebuild", "damage", "damage-stop", "reorganise", "reorganise", "there-and-back", "there-and-back"]
+# What node1 says in its log when it helps itself: builds its databases again, takes that up
+# at a later start, asks for it while it runs, takes a run for an earlier version's, indexes
+# its block files again. A round in which nothing was lost and no rebuild was asked for by the
+# test adds none of these: a stop alone, however hard, is answered by the journals.
+SELF_HELP = ("are built again from the block files at this start", "was decided at an earlier run and is not done",
+             "The databases of this node are not what they were", "was by an earlier version and did not end with a normal shutdown",
+             "The block files are indexed again at this start", "it starts over from the snapshot")
 # What the test waits for at most, in seconds. Nothing depends on these being short: they only
 # end a run that will not get anywhere.
 LONG = 1800
@@ -56,6 +81,10 @@ PORT_TAKEN = ("Unable to bind to", "Unable to start HTTP server")
 def script_command(action, script_hex):
     script = bytes.fromhex(script_hex)
     return (bytes([71, 65, action, len(script)]) + script).hex()
+
+
+def cost_command(kind, coins):
+    return (bytes([71, 65, COST, kind]) + struct.pack("<q", coins * 100000000)).hex()
 
 
 class RandomStopsTest(AokChainTestFramework):
@@ -94,8 +123,10 @@ class RandomStopsTest(AokChainTestFramework):
         node.rpc_connected = False
         node.rpc = None
 
-    def kill_victim(self):
-        """A kill, or with a power helper a forced stop of the machine."""
+    def kill_victim(self, may_have_ended=()):
+        """A kill, or with a power helper a forced stop of the machine.
+        may_have_ended: the exit codes with which the round lets the node end by itself before
+        this (it was asked to stop, or to end inside its next write)."""
         node = self.nodes[1]
         if node.process is None:
             return
@@ -104,6 +135,9 @@ class RandomStopsTest(AokChainTestFramework):
         ended = node.process.poll()
         if ended is not None and ended < 0 and ended != -9:
             raise AssertionError("node1 was ended by signal %d" % -ended)
+        # (...or by itself, when nothing in the round asked it to)
+        if ended is not None and ended >= 0 and ended not in may_have_ended:
+            raise AssertionError("node1 had ended by itself, with exit code %d, before the test stopped it" % ended)
         if self.options.powerhelper:
             subprocess.check_call([self.options.powerhelper, "off"])
         try:
@@ -150,7 +184,8 @@ class RandomStopsTest(AokChainTestFramework):
         node.start(self.victim_args + ["-mocktime=%d" % self.now] + list(extra), stderr=self.stderr1)
         if kill_after is not None:
             time.sleep(kill_after)
-            self.kill_victim()
+            # (a start may end by itself within that time: a port that is taken, say)
+            self.kill_victim(may_have_ended=(0, 1))
             return False
         if stop_after is not None:
             time.sleep(stop_after)
@@ -207,21 +242,27 @@ class RandomStopsTest(AokChainTestFramework):
 
     def master_command(self, action, address, then=None):
         """A command of the master address for this address; then: a second one in the same transaction."""
+        script = self.nodes[0].validateaddress(address)["scriptPubKey"]
+        return self.master_data([script_command(action, script)] + ([script_command(then, script)] if then is not None else []))
+
+    def master_data(self, commands, to=None):
+        """A transaction of the master address with these commands, an output each, in this order."""
         n0, n2 = self.nodes[0], self.nodes[2]
         coins = [u for u in n2.listunspent(0, 9999999, [self.master]) if u["amount"] > 1]
         if not coins:
             return False
         coin = self.rng.choice(coins)
-        script = n0.validateaddress(address)["scriptPubKey"]
-        raw = n2.createrawtransaction([{"txid": coin["txid"], "vout": coin["vout"]}], {"data": script_command(action, script), self.master: coin["amount"] - Decimal("0.01")})
-        if then is not None:
+        raw = n2.createrawtransaction([{"txid": coin["txid"], "vout": coin["vout"]}], {"data": commands[0], self.master: coin["amount"] - Decimal("0.01")})
+        if len(commands) > 1:
             tx = FromHex(CTransaction(), raw)
-            data = bytes.fromhex(script_command(then, script))
-            tx.vout.append(CTxOut(0, bytes([0x6a, len(data)]) + data))
+            for command in commands[1:]:
+                data = bytes.fromhex(command)
+                tx.vout.append(CTxOut(0, bytes([0x6a, len(data)]) + data))
             raw = ToHex(tx)
         # While node2 is on its own, some commands go to the other side only: they are in the
         # branch that is given up, and not in the one that wins.
-        to = n0 if self.split and self.rng.random() < 0.5 else n2
+        if to is None:
+            to = n0 if self.split and self.rng.random() < 0.5 else n2
         try:
             to.sendrawtransaction(n2.signrawtransactionwithwallet(raw)["hex"])
         except Exception:
@@ -229,6 +270,28 @@ class RandomStopsTest(AokChainTestFramework):
         if to is n0:
             self.lost_commands += 1
         return True
+
+    def quiet_command(self):
+        """The fee address, or a cost that the issuing transactions of this test pay. Such a
+        command makes an issuing transaction that waits for a block invalid, so it gets a
+        block of its own, with nothing waiting, on the chain that all nodes follow."""
+        n0, n2, rng = self.nodes[0], self.nodes[2], self.rng
+        if self.split:
+            return
+        self.sync_peers_mempool()
+        self.mine()
+        self.sync([n0, n2])
+        if n0.getrawmempool() or n2.getrawmempool():
+            return
+        if rng.random() < 0.5:
+            command = script_command(FEE, n0.validateaddress(rng.choice(self.pool))["scriptPubKey"])
+        else:
+            command = cost_command(rng.choice((COST_ROOT, COST_REISSUE)), rng.randint(1, 3))
+        if self.master_data([command], to=n2):
+            self.sync_peers_mempool()
+            self.mine()
+            self.sync([n0, n2])
+            self.quiet_commands += 1
 
     def pay_from(self, address):
         """A payment of node0 from this address: a block that a later freeze of it must not undo."""
@@ -285,6 +348,19 @@ class RandomStopsTest(AokChainTestFramework):
                         address = rng.choice(sorted(frozen))
                         if self.master_command(UNFREEZE, address):
                             frozen.discard(address)
+                elif what < 0.84:
+                    # issuing costs: one command, two for one kind (in one transaction or in
+                    # two), a value that is the value already; also in a branch that loses
+                    kind = rng.choice(COSTS_NOT_PAID)
+                    values = [rng.randint(1, 4) for _ in range(rng.randint(1, 2))]
+                    if rng.random() < 0.5:
+                        sent = self.master_data([cost_command(kind, value) for value in values])
+                    else:
+                        sent = all([self.master_data([cost_command(kind, value)]) for value in values])
+                    if sent:
+                        self.cost_commands += 1
+                elif what < 0.88:
+                    self.quiet_command()
                 else:
                     # Commands that change nothing, commands for an address that the freeze list
                     # does not know yet, and several commands for one address: in one
@@ -506,6 +582,22 @@ class RandomStopsTest(AokChainTestFramework):
         self.exits, self.starts_needed = {}, {}
         self.split = False
         self.odd_commands = self.lost_commands = self.rebuilt_checks = self.reference_checks = self.port_waits = self.stops_asked = 0
+        self.cost_commands = self.quiet_commands = 0
+        # The kinds of the rounds, from a generator of their own (what the traffic draws does
+        # not move them). From 20 rounds on, every kind is among them, and the two that lose a
+        # database at least twice each, so that each of the four databases is lost once.
+        kind_rng = random.Random(seed * 7919 + 1)
+        plan = [kind_rng.choice(KINDS) for _ in range(self.options.rounds)]
+        if self.options.rounds >= 20:
+            wanted = sorted(set(KINDS)) + ["damage", "damage-stop"]
+            free = list(range(self.options.rounds))
+            kind_rng.shuffle(free)
+            for kind in wanted:
+                if plan.count(kind) < wanted.count(kind):
+                    # (a place whose kind is there more often than it is wanted)
+                    place = next(i for i in free if plan.count(plan[i]) > wanted.count(plan[i]))
+                    plan[place] = kind
+        self.log.info("kinds of the rounds: %s" % " ".join(plan))
         self.reorganisations = 0
         self.last_exit = None
         kinds = {}
@@ -560,16 +652,36 @@ class RandomStopsTest(AokChainTestFramework):
         os.sync()
 
         rebuild_dirs = ["tokens", "governance", "chainstate", "governanceundo"]
+        lost_so_far = 0
+        self.self_help_rounds = 0
+
+        def self_help():
+            text = self.victim_log()
+            return {line: text.count(line) for line in SELF_HELP}
+
+        def end_of_round(kind, before):
+            """Node1 runs again: it has the state of the others, and when nothing was lost and
+            no rebuild was asked for in the round, it did not have to help itself."""
+            self.link()
+            self.compare("round %d (%s)" % (round_number, kind))
+            after = self_help()
+            if after == before:
+                return
+            self.self_help_rounds += 1
+            added = {line: after[line] - before[line] for line in SELF_HELP if after[line] != before[line]}
+            if kind not in ("damage", "damage-stop", "rebuild"):
+                raise AssertionError("round %d (%s): nothing was lost, and node1 helped itself: %s" % (round_number, kind, added))
+
         for round_number in range(1, self.options.rounds + 1):
-            kind = rng.choice(["kill", "kill", "kill", "flush", "flush", "shutdown", "start", "crash-chainstate", "crash-tokens",
-                               "rebuild", "damage", "damage-stop", "reorganise", "reorganise", "there-and-back", "there-and-back"])
+            kind = plan[round_number - 1]
             kinds[kind] = kinds.get(kind, 0) + 1
             self.log.info("round %d: %s" % (round_number, kind))
 
             if kind == "there-and-back":
                 # no stop in this round: reorganisations alone must not look like damage
+                before = self_help()
                 self.there_and_back()
-                self.compare("round %d (%s)" % (round_number, kind))
+                end_of_round(kind, before)
                 continue
 
             if kind in ("crash-chainstate", "crash-tokens"):
@@ -577,8 +689,12 @@ class RandomStopsTest(AokChainTestFramework):
                 self.kill_victim() if self.options.powerhelper else self.stop_node(1)
                 switch = ["-dbcrashratio=%d" % rng.randint(1, 4), "-dbbatchsize=%d" % rng.choice([1, 100, 400])] if kind == "crash-chainstate" \
                     else ["-dbcrashtokenwrite=%d" % rng.randint(1, 2)]
+                # (what the log holds now, after the stop, is what the disk has kept of it)
+                before = self_help()
                 if not self.start_victim(switch):
+                    # (it ended inside a write of its start already)
                     self.restart_victim()
+                    end_of_round(kind, before)
                     continue
                 self.link()
                 self.traffic()
@@ -587,7 +703,7 @@ class RandomStopsTest(AokChainTestFramework):
                     if self.victim_rpc(lambda n: n.gettxoutsetinfo()) is None:
                         break
                     self.traffic()
-                self.kill_victim()
+                self.kill_victim(may_have_ended=(0,))
             else:
                 timer = None
                 if kind in ("kill", "flush", "reorganise"):
@@ -606,7 +722,12 @@ class RandomStopsTest(AokChainTestFramework):
                     time.sleep(rng.uniform(0, 0.4))
                 if timer:
                     timer.join()
-                self.kill_victim()
+                self.kill_victim(may_have_ended=(0,) if kind == "shutdown" else ())
+
+            if kind not in ("crash-chainstate", "crash-tokens"):
+                # (what the log holds now, after the stop, is what the disk has kept of it:
+                # what the starts of this round add from here on is counted)
+                before = self_help()
 
             if kind == "start":
                 # stopped again while it starts and repairs itself
@@ -618,7 +739,9 @@ class RandomStopsTest(AokChainTestFramework):
             elif kind in ("damage", "damage-stop"):
                 # a database is lost: the node rebuilds by itself, and is stopped on that way:
                 # killed, or asked to stop as a service manager asks
-                lost = os.path.join(self.nodes[1].datadir, "regtest", rng.choice(rebuild_dirs))
+                # (each of them in its turn)
+                lost = os.path.join(self.nodes[1].datadir, "regtest", rebuild_dirs[lost_so_far % len(rebuild_dirs)])
+                lost_so_far += 1
                 if os.path.isdir(lost):   # (a program before the records of the governance commands has no such directory)
                     shutil.rmtree(lost)
                 if kind == "damage":
@@ -629,13 +752,14 @@ class RandomStopsTest(AokChainTestFramework):
             self.traffic()   # (the chain goes on while node1 is down)
             self.mine()
             self.restart_victim()
-            self.link()
-            self.compare("round %d (%s)" % (round_number, kind))
+            end_of_round(kind, before)
 
         self.against_rebuilt("at the end")
 
         text = self.victim_log()
         self.log.info("stops by kind: %s" % kinds)
+        self.log.info("cost commands: %d; fee address and paid costs, in a block of their own: %d; rounds in which node1 helped itself after its stop (each of them one that lost a database or asked for a rebuild): %d" % (
+            self.cost_commands, self.quiet_commands, self.self_help_rounds))
         self.log.info("starts that a restart took: %s; exits of node1 by itself, by code: %s; reorganisations: %d; rounds with odd governance commands: %d; commands sent to the side that lost only: %d; comparisons with the node that never gave a block up: %d, with a rebuilt node: %d; stops asked for during a rebuild: %d; waits for a port that another program held: %d" % (
             self.starts_needed, self.exits, self.reorganisations, self.odd_commands, self.lost_commands, self.reference_checks, self.rebuilt_checks, self.stops_asked, self.port_waits))
         self.log.info("node1's log: %d starts after a run that did not end normally, %d governance repairs, %d token repairs, %d replays of the chain state, %d rebuilds by itself (%d taken up at a later start), %d times a validated block did not connect, %d repairs of the address index" % (
