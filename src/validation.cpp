@@ -4395,6 +4395,14 @@ static void LimitValidationInterfaceQueue()
  * or an activated best chain. pblock is either nullptr or a pointer to a block
  * that is already loaded (to avoid loading it again from disk).
  */
+/**
+ * Counts the commands that mark a block invalid or take such marks away (InvalidateBlock,
+ * ResetBlockFailureFlags). ActivateBestChain() keeps the tip that it works towards while it
+ * lets go of cs_main between its steps: after such a command that tip may lie behind a block
+ * that is marked invalid now, or may not be the best one any more. Guarded by cs_main.
+ */
+static uint64_t nFailureMarkCommands = 0;
+
 bool ActivateBestChain(CValidationState &state, const CChainParams& chainparams, std::shared_ptr<const CBlock> pblock, const uint256 *phash, bool fMayWait) {
     // Note that while we're often called here from ProcessNewBlock, this is
     // far from a guarantee. Things in the P2P/RPC will often end up calling
@@ -4427,8 +4435,17 @@ bool ActivateBestChain(CValidationState &state, const CChainParams& chainparams,
             ConnectTrace connectTrace(mempool); // Destructed before cs_main is unlocked
 
             CBlockIndex *pindexOldTip = chainActive.Tip();
+            // The tip to work towards was found at an earlier turn of this loop, and cs_main
+            // was not held since. When a block was marked invalid in between (invalidateblock,
+            // while a rebuild of the chain state or a long catch-up runs in this loop), the
+            // way to that tip may lead through it: the tip is found anew. Without this the
+            // loop connected the block that was marked, and then failed the check that a
+            // candidate for the best chain is left.
+            if (pindexMostWork != nullptr && nFailureMarkCommandsSeen != nFailureMarkCommands)
+                pindexMostWork = nullptr;
             if (pindexMostWork == nullptr) {
                 pindexMostWork = FindMostWorkChain();
+                nFailureMarkCommandsSeen = nFailureMarkCommands;
             }
 
             // Whether we have anything to do at all.
@@ -4554,6 +4571,7 @@ bool InvalidateBlock(CValidationState& state, const CChainParams& chainparams, C
     setDirtyBlockIndex.insert(pindex);
     setBlockIndexCandidates.erase(pindex);
     g_failed_blocks.insert(pindex);
+    ++nFailureMarkCommands;
 
     // DisconnectTip will add transactions to disconnectpool; try to add these
     // back to the mempool.
@@ -4576,6 +4594,7 @@ bool InvalidateBlock(CValidationState& state, const CChainParams& chainparams, C
 
 bool ResetBlockFailureFlags(CBlockIndex *pindex) {
     AssertLockHeld(cs_main);
+    ++nFailureMarkCommands;
 
     int nHeight = pindex->nHeight;
 

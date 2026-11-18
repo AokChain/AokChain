@@ -132,6 +132,7 @@ BASE_SCRIPTS= [
     'feature_tokens_unclean_stop.py',
     'feature_governance_reorg.py',
     'feature_flush_for_read.py',
+    'feature_invalidate_during_rebuild.py',
     'feature_auto_rebuild.py',
     'feature_random_stops.py',
     'feature_offline_staking.py',
