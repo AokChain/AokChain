@@ -108,12 +108,17 @@ bool CTokensDB::CommitDump(const uint256& hashBlock)
     LogPrint(BCLog::COINDB, "Token database: %u record(s), %.2f MiB, for block %s\n", (unsigned int)nRecords,
              batch.SizeEstimate() * (1.0 / 1048576.0), hashBlock.ToString());
     // For tests (-regtest only, -dbcrashtokenwrite=<n>): stop where the n-th write of token
-    // records of this run would begin.
+    // records of this run would begin. -testfailtokenwrite=<n>: that write fails, once.
     if (nRecords > 0 && Params().MineBlocksOnDemand()) {
         static int nWrites = 0;
-        if (++nWrites == gArgs.GetArg("-dbcrashtokenwrite", 0)) {
+        ++nWrites;
+        if (nWrites == gArgs.GetArg("-dbcrashtokenwrite", 0)) {
             LogPrintf("Simulating a crash in the write of the token database. Goodbye.\n");
             _Exit(0);
+        }
+        if (nWrites == gArgs.GetArg("-testfailtokenwrite", 0)) {
+            LogPrintf("Simulating a write of the token database that fails.\n");
+            return false;
         }
     }
     return WriteBatch(batch, true);

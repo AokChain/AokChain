@@ -156,6 +156,16 @@ bool ShutdownRequested()
     return fRequestShutdown;
 }
 
+/** For tests (-teststopat=<point>, -regtest only): a stop is asked for at the point of that
+ *  name, as a stop of a service manager that arrives there. */
+static void TestStopPoint(const char* point)
+{
+    if (gArgs.GetArg("-teststopat", "") != point)
+        return;
+    LogPrintf("A stop is asked for at the point '%s' (-teststopat)\n", point);
+    StartShutdown();
+}
+
 /** The node has set the mark of a running node in the block index database (see AppInitMain):
  *  a normal shutdown takes it away at its end. */
 static bool fRunningMarked = false;
@@ -1307,6 +1317,8 @@ bool AppInitParameterInteraction()
 
     if (gArgs.IsArgSet("-testcrashat") && !chainparams.MineBlocksOnDemand())
         return InitError("-testcrashat is for regression testing (-regtest) only");
+    if ((gArgs.IsArgSet("-teststopat") || gArgs.IsArgSet("-testfailtokenwrite")) && !chainparams.MineBlocksOnDemand())
+        return InitError("-teststopat and -testfailtokenwrite are for regression testing (-regtest) only");
     if (gArgs.IsArgSet("-masteraddress")) {
         if (!chainparams.MineBlocksOnDemand())
             return InitError("-masteraddress is for regression testing (-regtest) only");
@@ -1767,6 +1779,8 @@ bool AppInitMain(boost::thread_group& threadGroup, CScheduler& scheduler)
                 delete ptokensdb;
                 delete ptokensCache;
                 delete governance;
+                if (fAutoRebuildNow)
+                    TestStopPoint("rebuild-begun");
 
                 // Wiped here on -reindex only. -reindex-chainstate wipes the token database
                 // below, with the chainstate and the governance database, after the checks of
@@ -1929,6 +1943,8 @@ bool AppInitMain(boost::thread_group& threadGroup, CScheduler& scheduler)
 
                 // The on-disk coinsdb is now in a good state, create the cache
                 pcoinsTip.reset(new CCoinsViewCache(pcoinscatcher.get()));
+                if (fAutoRebuildNow)
+                    TestStopPoint("rebuild-wiped");
 
                 // A governance database that was made at this start, beside a chain state that
                 // holds blocks: the database that belonged to the chain state is gone.
@@ -2228,6 +2244,8 @@ bool AppInitMain(boost::thread_group& threadGroup, CScheduler& scheduler)
         pblocktree->Sync();
         fRunningMarked = true;
     }
+
+    TestStopPoint("loaded");
 
     fs::path est_path = GetDataDir() / FEE_ESTIMATES_FILENAME;
     CAutoFile est_filein(fsbridge::fopen(est_path, "rb"), SER_DISK, CLIENT_VERSION);
