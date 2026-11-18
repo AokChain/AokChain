@@ -465,6 +465,10 @@ bool CGovernance::RecoverTo(const uint256& hashChainStateTip, bool fInStep, std:
             }
             journal.emplace(key.number, std::move(record));
         }
+        if (!it->IsOk()) {
+            strError = "the journal of the governance database cannot be read";
+            return false;
+        }
     }
     nJournalNext = 0;
     if (journal.empty() && !fPending && !fBase)
@@ -1021,5 +1025,8 @@ uint256 CGovernance::ContentHash()
             continue;
         ss << key.bytes << value.bytes;
     }
+    // (a table that cannot be read is not the end of the data: there is no hash then)
+    if (!it->IsOk())
+        return uint256();
     return ss.GetHash();
 }

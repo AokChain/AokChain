@@ -152,6 +152,9 @@ uint256 CTokensDB::StateHash()
             continue;
         ss << key.bytes << value.bytes;
     }
+    // (a table that cannot be read is not the end of the data: there is no hash then)
+    if (!it->IsOk())
+        return uint256();
     return ss.GetHash();
 }
 

@@ -579,6 +579,10 @@ bool CBlockTreeDB::RecoverAddressIndexes(const uint256& hashChainStateTip, bool 
                 break;
             numbers.push_back(key.number);
         }
+        if (!it->IsOk()) {
+            strError = "the journal of the address index cannot be read";
+            return false;
+        }
     }
     if (numbers.empty() && !fPending && !fBase)
         return true;

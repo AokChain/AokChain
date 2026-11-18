@@ -1948,6 +1948,12 @@ bool AppInitMain(boost::thread_group& threadGroup, CScheduler& scheduler)
                     fChainStateAtFault = true;
                     break;
                 }
+                // What the replay wrote is on disk before the journals of the other stores are
+                // dropped below: they are what explains the state before it.
+                if (fReplay && !pcoinsdbview->Sync()) {
+                    strLoadError = _("Error writing to the chain state database");
+                    break;
+                }
 
                 // The on-disk coinsdb is now in a good state, create the cache
                 pcoinsTip.reset(new CCoinsViewCache(pcoinscatcher.get()));

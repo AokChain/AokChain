@@ -133,6 +133,9 @@ public:
     ~CDBIterator();
 
     bool Valid() const;
+    //! Valid() is false at the end of the data, and also when the database could not be read
+    //! further (a damaged table): this tells the two apart.
+    bool IsOk() const { return piter->status().ok(); }
 
     void SeekToFirst();
 
