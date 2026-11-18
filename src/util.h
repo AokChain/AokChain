@@ -75,6 +75,15 @@ inline std::string _(const char *psz)
 void RequestExitFailure();
 bool ExitFailureRequested();
 
+/**
+ * A node that runs in the background (-daemon) has no standard error output. It is given the
+ * debug log for it, so that what is written there when the program ends on a failed internal
+ * check (the check, its file and its line) is kept. Called before the log is opened.
+ */
+void SendStderrToDebugLog();
+/** For the handler of SIGABRT: one line in the debug log, by nothing but write(). */
+void LogAbortLine();
+
 /** For tests (-testcrashat=<point>, -regtest only): at the point of that name the program ends
  *  at once, without writing or closing anything more, as a program that is killed there. */
 void TestCrashPoint(const char* point);

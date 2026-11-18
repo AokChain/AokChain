@@ -200,6 +200,37 @@ static void DebugPrintInit()
     vMsgsBeforeOpenLog = new std::list<std::string>;
 }
 
+//! The file descriptor of the debug log, for LogAbortLine().
+static std::atomic<int> nDebugLogFd(-1);
+static std::atomic<bool> fStderrToDebugLog(false);
+
+void SendStderrToDebugLog()
+{
+    fStderrToDebugLog = true;
+}
+
+/** The debug log was opened, or opened again (mutexDebugLog is held). */
+static void DebugLogOpened()
+{
+#ifndef WIN32
+    nDebugLogFd = fileno(fileout);
+    if (fStderrToDebugLog)
+        dup2(fileno(fileout), STDERR_FILENO);
+#endif
+}
+
+void LogAbortLine()
+{
+#ifndef WIN32
+    static const char msg[] = "\n*** The program ends here because one of its internal checks failed (abort). The check is named on its standard error output; for a node that runs in the background (-daemon) that is this file.\n";
+    const int fd = nDebugLogFd;
+    if (fd >= 0) {
+        const ssize_t written = write(fd, msg, sizeof(msg) - 1);
+        (void)written;
+    }
+#endif
+}
+
 void OpenDebugLog()
 {
     boost::call_once(&DebugPrintInit, debugPrintInitFlag);
@@ -212,6 +243,7 @@ void OpenDebugLog()
     if (fileout)
     {
         setbuf(fileout, nullptr); // unbuffered
+        DebugLogOpened();
         // dump buffered messages from before we opened the log
         while (!vMsgsBeforeOpenLog->empty())
         {
@@ -427,8 +459,10 @@ int LogPrintStr(const std::string &str)
             {
                 fReopenDebugLog = false;
                 fs::path pathDebug = GetDataDir() / "debug.log";
-                if (fsbridge::freopen(pathDebug, "a", fileout) != nullptr)
+                if (fsbridge::freopen(pathDebug, "a", fileout) != nullptr) {
                     setbuf(fileout, nullptr); // unbuffered
+                    DebugLogOpened();
+                }
             }
 
             ret = FileWriteStr(strTimestamped, fileout);

@@ -219,6 +219,8 @@ bool AppInit(int argc, char* argv[])
                 fprintf(stderr, "Error: daemon() failed: %s\n", strerror(errno));
                 return false;
             }
+            // (the standard error output is closed now: it gets the debug log, when that is opened)
+            SendStderrToDebugLog();
 #if defined(MAC_OSX)
 #pragma GCC diagnostic pop
 #endif

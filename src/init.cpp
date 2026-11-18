@@ -453,6 +453,13 @@ static void HandleSIGTERM(int)
     fRequestShutdown = true;
 }
 
+/** The program is ending on a failed internal check (assert, abort): a line in the debug log.
+ *  When this returns, the program ends as it would have without it. */
+static void HandleSIGABRT(int)
+{
+    LogAbortLine();
+}
+
 static void HandleSIGHUP(int)
 {
     fReopenDebugLog = true;
@@ -1070,6 +1077,7 @@ bool AppInitBasicSetup()
     // Clean shutdown on SIGTERM
     registerSignalHandler(SIGTERM, HandleSIGTERM);
     registerSignalHandler(SIGINT, HandleSIGTERM);
+    registerSignalHandler(SIGABRT, HandleSIGABRT);
 
     // Reopen debug.log on SIGHUP
     registerSignalHandler(SIGHUP, HandleSIGHUP);
