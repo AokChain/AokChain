@@ -14,9 +14,10 @@ manager does. Then its five state hashes, its freeze list, its tokens and its ad
 must be those of node0.
 
 A stop alone is answered by the journals of the node. So in a round in which no database was
-lost and no rebuild was asked for, node1 must come back without having helped itself: no
-rebuild of its databases, no run taken for an earlier version's, no re-index. And it must not
-have ended by itself before the test stopped it, unless the round asked for that.
+lost and no rebuild was asked for, node1 must come back at its first start, without having
+helped itself: no rebuild of its databases, no run taken for an earlier version's, no
+re-index, and no start that ended by itself. And it must not have ended by itself before the
+test stopped it, unless the round asked for that.
 
 The kinds of the rounds are drawn from the seed alone and logged at the start. From 20 rounds
 on, every kind is among them and each of the four databases is lost once
@@ -150,6 +151,7 @@ class RandomStopsTest(AokChainTestFramework):
         self.victim_gone()
         if self.options.powerhelper:
             subprocess.check_call([self.options.powerhelper, "on"])
+        return ended
 
     def stderr_since(self, mark):
         self.stderr1.flush()
@@ -183,9 +185,15 @@ class RandomStopsTest(AokChainTestFramework):
             pass
         node.start(self.victim_args + ["-mocktime=%d" % self.now] + list(extra), stderr=self.stderr1)
         if kill_after is not None:
+            self.stderr1.flush()
+            mark = os.path.getsize(self.stderr1.name)
             time.sleep(kill_after)
-            # (a start may end by itself within that time: a port that is taken, say)
-            self.kill_victim(may_have_ended=(0, 1))
+            # A start may end by itself within that time: a port that is taken. In a round
+            # that lost a database or asked for a rebuild, also on what it found. In any
+            # other round a start that ends by itself is not explained.
+            ended = self.kill_victim(may_have_ended=(0, 1))
+            if ended is not None and ended >= 0 and not self.round_with_damage and not any(text in self.stderr_since(mark) for text in PORT_TAKEN):
+                raise AssertionError("nothing was lost, and a start of node1 ended by itself with exit code %d: %s" % (ended, self.stderr_since(mark)[-600:]))
             return False
         if stop_after is not None:
             time.sleep(stop_after)
@@ -219,6 +227,9 @@ class RandomStopsTest(AokChainTestFramework):
             mark = os.path.getsize(self.stderr1.name)
             if self.start_victim():
                 self.starts_needed[attempt + 1] = self.starts_needed.get(attempt + 1, 0) + 1
+                # (a start that ended on a port that another program held is not counted)
+                if attempt and not self.round_with_damage:
+                    raise AssertionError("nothing was lost, and node1 needed %d starts to come up (exit codes of the starts that ended: %s)" % (attempt + 1, self.exits))
                 return
             if any(text in self.stderr_since(mark) for text in PORT_TAKEN) and time.time() < deadline:
                 # Its ports were free while it was down, and another program on this machine
@@ -583,6 +594,7 @@ class RandomStopsTest(AokChainTestFramework):
         self.split = False
         self.odd_commands = self.lost_commands = self.rebuilt_checks = self.reference_checks = self.port_waits = self.stops_asked = 0
         self.cost_commands = self.quiet_commands = 0
+        self.round_with_damage = False
         # The kinds of the rounds, from a generator of their own (what the traffic draws does
         # not move them). From 20 rounds on, every kind is among them, and the two that lose a
         # database at least twice each, so that each of the four databases is lost once.
@@ -675,6 +687,7 @@ class RandomStopsTest(AokChainTestFramework):
         for round_number in range(1, self.options.rounds + 1):
             kind = plan[round_number - 1]
             kinds[kind] = kinds.get(kind, 0) + 1
+            self.round_with_damage = kind in ("damage", "damage-stop", "rebuild")
             self.log.info("round %d: %s" % (round_number, kind))
 
             if kind == "there-and-back":
