@@ -1694,7 +1694,6 @@ bool UndoReadFromDisk(CBlockUndo& blockundo, const CDiskBlockPos& pos, const uin
     return true;
 }
 
-/** Abort with a message */
 /**
  * The node is on its way down after a failure of its own: a write that failed, a rebuild of
  * its databases that it has asked for (AbortNode). The threads go on for a moment. What the
@@ -1703,6 +1702,7 @@ bool UndoReadFromDisk(CBlockUndo& blockundo, const CDiskBlockPos& pos, const uin
  */
 std::atomic<bool> fNodeAborting(false);
 
+/** Abort with a message */
 bool AbortNode(const std::string& strMessage, const std::string& userMessage="")
 {
     fNodeAborting = true;
