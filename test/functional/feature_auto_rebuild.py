@@ -26,7 +26,7 @@ import time
 from decimal import Decimal
 
 from test_framework.test_framework import AokChainTestFramework
-from test_framework.util import assert_equal, connect_nodes_bi, sync_blocks, wait_until
+from test_framework.util import assert_equal, connect_nodes, connect_nodes_bi, disconnect_nodes, sync_blocks, wait_until
 
 FREEZE = 70
 STATE = ("utxo", "utxo_legacy", "tokens", "governance", "index")
@@ -35,7 +35,7 @@ EARLIER = "was by an earlier version and did not end with a normal shutdown"
 UNCLEAN = "did not end with a normal shutdown. Its databases are compared"
 ASKED = "The databases of this node are not what they were"
 TAKEN_UP = "was decided at an earlier run and is not done"
-NOT_AGAIN = "were built again not long ago: nothing more is done about it"
+NOT_AGAIN = ": nothing more is done about it"
 REINDEXED = "The block files are indexed again at this start"
 
 
@@ -430,6 +430,51 @@ class AutoRebuildTest(AokChainTestFramework):
         assert_equal(self.count_in_log(REBUILT), rebuilds + 1)
         self.same_state()
 
+
+        self.log.info("A validated block that does not connect, with more blocks behind it: none of them is left marked invalid")
+        # node1 gives up block B for a branch of its own and loses the coin that B spends; node0
+        # goes on from B with three blocks. When the nodes meet, node1 asks for its rebuild at
+        # B, and the block messages that follow bring B again while the node is on its way down.
+        self.stop_node(1)
+        n1.start(self.args + ["-checkmempool=0", "-persistmempool=0"], stderr=self.stderr1)   # (no peer)
+        n1.wait_for_rpc_connection()
+        disconnect_nodes(n0, 1)
+        # (a coin of node0: the wallet of node1 must not bring the payment back at its start)
+        coin = [u for u in n0.listunspent() if u["amount"] > 2][0]
+        raw = n0.createrawtransaction([{"txid": coin["txid"], "vout": coin["vout"]}], {n0.getnewaddress(): coin["amount"] - Decimal("0.1")})
+        n0.sendrawtransaction(n0.signrawtransactionwithwallet(raw)["hex"])
+        block_b = n0.generate(1)[0]
+        n1.submitblock(n0.getblock(block_b, False))
+        assert_equal(n1.getbestblockhash(), block_b)
+        n1.invalidateblock(block_b)
+        # (the payment of B is back in its memory pool: a start without it, so that its own
+        # branch does not hold that payment)
+        self.stop_node(1)
+        n1.start(self.args + ["-checkmempool=0", "-persistmempool=0"], stderr=self.stderr1)
+        n1.wait_for_rpc_connection()
+        assert_equal(n1.getrawmempool(), [])
+        n1.generate(2)
+        own_tip = n1.getbestblockhash()
+        assert_equal(n1.removecoin(coin["txid"], coin["vout"]), True)
+        n1.reconsiderblock(block_b)
+        assert_equal(n1.getbestblockhash(), own_tip)
+        n0.generate(3)
+        asked, not_again, taken_up = self.count_in_log(ASKED), self.count_in_log(NOT_AGAIN), self.count_in_log(TAKEN_UP)
+        n1.setmocktime(int(time.time()) + 60 * 60 * 60)   # (an earlier case of this test asked for a rebuild within the day)
+        try:
+            connect_nodes(n1, 0)
+        except Exception:
+            pass
+        self.wait_exit(1)
+        assert_equal(self.count_in_log(ASKED), asked + 1)
+        assert_equal(self.count_in_log(NOT_AGAIN), not_again)
+        self.start1()
+        assert_equal(self.count_in_log(TAKEN_UP), taken_up + 1)
+        sync_blocks(self.nodes, timeout=240)
+        assert_equal([tip["status"] for tip in n1.getchaintips() if tip["hash"] == n0.getbestblockhash()], ["active"])
+        hashes = [node.getstatehashes() for node in self.nodes]
+        for part in STATE:
+            assert_equal(hashes[0][part], hashes[1][part])
 
         self.log.info("A store that is gone, and a node that does not rebuild by itself: no start goes on with a new one")
         # (the first start makes an empty store in its place; the second must not take that for the store of this chain)

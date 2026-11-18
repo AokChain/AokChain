@@ -1695,8 +1695,17 @@ bool UndoReadFromDisk(CBlockUndo& blockundo, const CDiskBlockPos& pos, const uin
 }
 
 /** Abort with a message */
+/**
+ * The node is on its way down after a failure of its own: a write that failed, a rebuild of
+ * its databases that it has asked for (AbortNode). The threads go on for a moment. What the
+ * node holds may be the very thing that failed, so it judges no block by it any more
+ * (ConnectTip), and asks for nothing more (RequestChainStateRebuild).
+ */
+std::atomic<bool> fNodeAborting(false);
+
 bool AbortNode(const std::string& strMessage, const std::string& userMessage="")
 {
+    fNodeAborting = true;
     SetMiscWarning(strMessage);
     LogPrintf("*** %s\n", strMessage);
     uiInterface.ThreadSafeMessageBox(
@@ -3881,6 +3890,10 @@ static const std::string DB_REBUILD_ASKED = "rebuildasked";
 static bool RequestChainStateRebuild(const CBlockIndex* pindex, const std::string& strWhat)
 {
     AssertLockHeld(cs_main);
+    // (the node is stopping already, for a rebuild that it asked for a moment ago or for
+    // another failure: nothing more is asked for, and the caller marks nothing)
+    if (fNodeAborting)
+        return true;
     if (!gArgs.GetBoolArg("-autorebuild", DEFAULT_AUTOREBUILD) || !pblocktree)
         return false;
     // (a pruned node cannot build its databases from its blocks; a node that started from a
@@ -3891,7 +3904,7 @@ static bool RequestChainStateRebuild(const CBlockIndex* pindex, const std::strin
     std::pair<uint256, int64_t> last;
     if (pblocktree->Read(DB_REBUILD_ASKED, last) &&
         (last.first == pindex->GetBlockHash() || (nNow >= last.second && nNow - last.second < 24 * 60 * 60))) {
-        LogPrintf("Block %s at height %d, which this node had validated before, %s, and the databases of this node were built again not long ago: nothing more is done about it\n",
+        LogPrintf("Block %s at height %d, which this node had validated before, %s, and a rebuild of the databases of this node was asked for before (for this block, or for another within the last day): nothing more is done about it\n",
                   pindex->GetBlockHash().ToString(), pindex->nHeight, strWhat);
         return false;
     }
@@ -4125,9 +4138,17 @@ bool static ConnectTip(CValidationState& state, const CChainParams& chainparams,
         // A block that this node itself had connected before is valid. When it does not connect
         // now, the databases of this node are not what they were: the block is not marked
         // invalid, the databases are built again (see RequestChainStateRebuild).
-        if (!rv && state.IsInvalid() && fValidatedBefore &&
-            RequestChainStateRebuild(pindexNew, strprintf("does not connect now (%s)", FormatStateMessage(state))))
-            return false;
+        if (!rv && state.IsInvalid()) {
+            // The node is on its way down after a failure of its own. A block that fails now
+            // is not judged by what the node holds, and gets no mark: a mark would be written
+            // with the block index at the shutdown and outlive whatever mends the databases.
+            // (After a rebuild is asked for, the block that it was asked for comes here again
+            // with the next block message; the message of a peer is enough.)
+            if (fNodeAborting)
+                return state.Error(strprintf("block %s is not judged: the node is stopping after a failure of its own", pindexNew->GetBlockHash().ToString()));
+            if (fValidatedBefore && RequestChainStateRebuild(pindexNew, strprintf("does not connect now (%s)", FormatStateMessage(state))))
+                return state.Error("the databases of this node are to be built again");
+        }
         GetMainSignals().BlockChecked(blockConnecting, state);
         if (!rv) {
             if (state.IsInvalid())
@@ -4419,10 +4440,22 @@ bool ActivateBestChain(CValidationState &state, const CChainParams& chainparams,
     // -testactivationpause=<ms> (-regtest only): a pause before every step, in which a command
     // of a test gets its turn
     static const int64_t nTestPause = gArgs.GetArg("-testactivationpause", 0);
+    bool fStopped = false;
     do {
         boost::this_thread::interruption_point();
         if (nTestPause > 0)
             MilliSleep(nTestPause);
+
+        // A stop that is asked for ends this loop before its next step, as it always did. Not
+        // while the chain has no block: the genesis block is connected first (see the end of
+        // the loop).
+        if (ShutdownRequested()) {
+            LOCK(cs_main);
+            if (chainActive.Tip() != nullptr) {
+                fStopped = true;
+                break;
+            }
+        }
 
         // Each connected block is handed to the validation interface clients with the block
         // itself. They run on another thread and need cs_main: while this loop connects block
@@ -4487,14 +4520,19 @@ bool ActivateBestChain(CValidationState &state, const CChainParams& chainparams,
 
         if (nStopAtHeight && pindexNewTip && pindexNewTip->nHeight >= nStopAtHeight) StartShutdown();
 
-        // A stop that is asked for is looked at only after ActivateBestChainStep had its chance
-        // to run once: the node never stops before it has connected the genesis block (a chain
-        // state that is being built again holds no block until then, and what follows a stop,
-        // the last write of the chain state and the checks of the block index, needs one).
-        if (ShutdownRequested())
+        // With a chain without a block, a stop that is asked for is looked at only here, after
+        // ActivateBestChainStep had its chance to run once: the node never stops before it has
+        // connected the genesis block (a chain state that is being built again holds no block
+        // until then, and what follows a stop, the last write of the chain state, needs one).
+        if (ShutdownRequested()) {
+            fStopped = true;
             break;
+        }
     } while (pindexNewTip != pindexMostWork);
-    CheckBlockIndex(chainparams.GetConsensus());
+    // (the check of the whole block index expects the state at the end of this loop, not the
+    // one in which a stop request has ended it: half-way through a reorganisation, say)
+    if (!fStopped)
+        CheckBlockIndex(chainparams.GetConsensus());
 
     // Write changes periodically to disk, after relay.
     if (!FlushStateToDisk(chainparams, state, FLUSH_STATE_PERIODIC)) {
@@ -6780,6 +6818,12 @@ bool LoadExternalBlockFile(const CChainParams& chainparams, FILE* fileIn, CDiskB
 void static CheckBlockIndex(const Consensus::Params& consensusParams)
 {
     if (!fCheckBlockIndex) {
+        return;
+    }
+    // The node is on its way down: after a failure of its own in the middle of a change of its
+    // chain, or with a stop request that ended such a change half-way, the block index is not
+    // in the state that this check expects. (Only -regtest runs this check by default.)
+    if (fNodeAborting || ShutdownRequested()) {
         return;
     }
 
