@@ -83,6 +83,8 @@ struct RawKey {
     }
 };
 
+void SyncDirectory(const fs::path& dir);   // (below)
+
 bool MarkerExists()
 {
     boost::system::error_code ec;
@@ -293,20 +295,47 @@ void MarkSnapshotAccepted()
         ptokensdb->WriteBatch(batch, true);
         LogPrintf("Snapshot: %d token undo records removed\n", erased);
     }
+    // The order, each step on disk before the next: the file of a node without the past
+    // blocks, the record of the acceptance, the removal of the marker. A stop in between
+    // leaves the marker beside the file alone (the check is made again) or beside the file
+    // and the record (the snapshot was accepted: see SnapshotAcceptedBefore).
+    if (FILE* note = fsbridge::fopen(GetDataDir() / NO_PAST_BLOCKS_NAME, "wb")) {
+        fprintf(note, "This node started from a chain state snapshot at height %d and does not have the blocks up to that height.\n", height);
+        FileCommit(note);
+        fclose(note);
+    }
+    SyncDirectory(GetDataDir());
     pblocktree->Write(DB_SNAPSHOT_HEIGHT, height);
     pblocktree->WriteFlag(FLAG_PAST_BLOCKS_MISSING, true);
     pblocktree->WriteFlag("txindex", fTxIndex);
     pblocktree->Sync();
-    if (FILE* note = fsbridge::fopen(GetDataDir() / NO_PAST_BLOCKS_NAME, "wb")) {
-        fprintf(note, "This node started from a chain state snapshot at height %d and does not have the blocks up to that height.\n", height);
-        fclose(note);
-    }
+    TestCrashPoint("snapshot-accepted");
     boost::system::error_code ec;
     fs::remove(GetDataDir() / MARKER_NAME, ec);
+    SyncDirectory(GetDataDir());
     nSnapshotHeight = height;
     fPastBlocksMissing = true;
     fInstalledThisStart = false;
     LogPrintf("Snapshot: accepted at height %d. The past blocks are not on disk.\n", height);
+}
+
+bool SnapshotAcceptedBefore()
+{
+    if (!fInstalledThisStart || !pblocktree)
+        return false;
+    // Both are written by MarkSnapshotAccepted() and by nothing else: the record in the block
+    // index database, and before it the file in the data directory. A snapshot cannot bring
+    // the file (only the four database directories are unpacked), and a snapshot that takes
+    // the place of older chain data removes the file of those first (MoveSnapshotIn).
+    int height = -1;
+    boost::system::error_code ec;
+    if (!pblocktree->Read(DB_SNAPSHOT_HEIGHT, height) || !fs::exists(GetDataDir() / NO_PAST_BLOCKS_NAME, ec))
+        return false;
+    fs::remove(GetDataDir() / MARKER_NAME, ec);
+    SyncDirectory(GetDataDir());
+    fInstalledThisStart = false;
+    LogPrintf("Snapshot: this node accepted its snapshot (height %d) at an earlier start, which was stopped before the marker of the check was gone. The marker is removed; nothing is checked again.\n", height);
+    return true;
 }
 
 void LoadSnapshotState(boost::thread_group& threadGroup)
@@ -781,15 +810,6 @@ void WipeBlockFilesAndRecords()
     }
 }
 
-/** Remove the chain databases and the block files, to take a snapshot away. */
-void WipeChainData()
-{
-    boost::system::error_code ec;
-    for (const char* dir : SNAPSHOT_DIRS)
-        fs::remove_all(GetDataDir() / dir, ec);
-    WipeBlockFilesAndRecords();
-}
-
 /** The size of the files below a directory, in bytes (0 when there is none). */
 uint64_t DirectorySize(const fs::path& dir)
 {
@@ -882,6 +902,15 @@ bool EmptyDirectory(const fs::path& dir, std::string& error)
         }
     }
     return true;
+}
+
+/** Remove the chain databases and the block files, to take a snapshot away. */
+void WipeChainData()
+{
+    boost::system::error_code ec;
+    for (const char* dir : SNAPSHOT_DIRS)
+        fs::remove_all(GetDataDir() / dir, ec);
+    WipeBlockFilesAndRecords();
 }
 
 /**
@@ -994,7 +1023,15 @@ MoveResult MoveSnapshotIn(std::string& error)
             if (!fs::is_directory(target, ec))
                 why = strprintf("cannot make %s", target.string());
             if (why.empty() && EmptyDirectory(target, why) && CopyDirectoryContent(staging / dir, target, why)) {
-                fs::remove_all(staging / dir, ec);
+                // The copy is complete and on disk. The unpacked directory gets another name
+                // before it is removed: a stop inside the removal must not leave it, with
+                // some of its files, to be taken for one that is still to be copied.
+                const fs::path copied = (staging / dir).string() + ".copied";
+                fs::remove_all(copied, ec);
+                fs::rename(staging / dir, copied, ec);
+                SyncDirectory((staging / dir).parent_path());
+                TestCrashPoint("snapshot-copied");
+                fs::remove_all(ec ? staging / dir : copied, ec);
             } else {
                 error = strprintf("%s cannot be put into its place (%s)", dir, why);
                 LogPrintf("Snapshot: %s.\n", error);
@@ -1025,19 +1062,31 @@ int ReadMarker(bool& fStartOver)
     const int c = fgetc(marker);
     fStartOver = fgetc(marker) == 'o';
     fclose(marker);
-    return c >= '1' && c <= '9' ? c - '0' : 9;
+    if (c >= '1' && c <= '9')
+        return c - '0';
+    // A marker without its count (a version that wrote it in place, stopped inside that
+    // write): how often was tried is not known, and neither is whose chain data the
+    // snapshot replaced. It is taken for the case in which a removal costs most.
+    fStartOver = true;
+    return 1;
 }
 
+/** Written beside the marker and moved over it: the marker is never there without its content. */
 bool WriteMarker(int attempts, bool fStartOver)
 {
-    FILE* marker = fsbridge::fopen(GetDataDir() / MARKER_NAME, "wb");
+    const fs::path path = GetDataDir() / MARKER_NAME;
+    const fs::path pathNew = path.string() + ".new";
+    FILE* marker = fsbridge::fopen(pathNew, "wb");
     if (!marker)
         return false;
-    fputc('0' + std::min(attempts, 9), marker);
+    bool ok = fputc('0' + std::min(attempts, 9), marker) != EOF;
     if (fStartOver)
-        fputc('o', marker);
+        ok = ok && fputc('o', marker) != EOF;
+    ok = ok && fflush(marker) == 0;
     FileCommit(marker);
-    fclose(marker);
+    if (fclose(marker) != 0 || !ok || !RenameOver(pathNew, path))
+        return false;
+    SyncDirectory(GetDataDir());
     return true;
 }
 
@@ -1050,6 +1099,11 @@ void RemoveInstalledSnapshot()
     fs::remove_all(GetDataDir() / STAGING_NAME, ec);
     fs::remove_all(GetDataDir() / "snapshot-download", ec);
     fs::remove(GetDataDir() / MARKER_NAME, ec);
+    fs::remove(GetDataDir() / (std::string(MARKER_NAME) + ".new"), ec);
+    // (the file of a node without the past blocks is written before a snapshot is accepted,
+    // and belongs to the snapshot that goes: the node that is left has all its blocks)
+    fs::remove(GetDataDir() / NO_PAST_BLOCKS_NAME, ec);
+    fPastBlocksMissing = false;
     fInstalledThisStart = false;
     LogPrintf("Snapshot: removed. The node synchronizes by validating the blocks.\n");
 }
@@ -1077,6 +1131,15 @@ bool FetchAndInstallSnapshot(std::function<void(const std::string&)> status, boo
     }
     if (!fStartOver && !DataDirIsNew())
         return false; // a node with a chain goes on with what it has
+    // A data directory that counts as new (no chain state, one block file at most) and holds
+    // the file of a node without the past blocks is a snapshot node that ran and lost its
+    // chain state: the snapshot takes the place of the data of a node that ran, as in a
+    // start-over, and is kept like one.
+    {
+        boost::system::error_code ecRan;
+        if (fs::exists(GetDataDir() / NO_PAST_BLOCKS_NAME, ecRan))
+            fStartOver = true;
+    }
     // The snapshot is made with the default indexes: other settings need the blocks.
     if (fReindex || gArgs.GetBoolArg("-reindex-chainstate", false) || gArgs.GetArg("-prune", 0) != 0
         || !gArgs.GetBoolArg("-txindex", DEFAULT_TXINDEX) || !gArgs.GetBoolArg("-tokenindex", DEFAULT_TOKENINDEX)
@@ -1359,7 +1422,11 @@ bool InstallSnapshotIfWanted(std::function<void(const std::string&)> status, std
     }
     std::string why;
     bool fMoveFailed = false;
-    return FetchAndInstallSnapshot(status, false, why, fMoveFailed);
+    const bool fInstalled = FetchAndInstallSnapshot(status, false, why, fMoveFailed);
+    // (a snapshot node that lost its chain state, see there)
+    if (fMoveFailed)
+        strCannotGoOn = why;
+    return fInstalled;
 }
 
 bool VerifyInstalledSnapshot(std::string& error, std::function<void(const std::string&)> status)

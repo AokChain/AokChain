@@ -507,6 +507,12 @@ class SnapshotTest(AokChainTestFramework):
             node2.process = None
             assert os.path.exists(os.path.join(datadir2, "snapshot-unverified"))
             assert os.path.isdir(os.path.join(datadir2, "snapshot-unpack"))
+        with open(os.path.join(datadir2, "snapshot-unverified"), "rb") as f:
+            assert_equal(f.read(), b"3o")
+        assert not os.path.exists(os.path.join(datadir2, "snapshot-unverified.new"))
+        # (a marker without its content, as a version that wrote it in place could leave it
+        # when it was stopped inside that write: the snapshot is kept all the same)
+        open(os.path.join(datadir2, "snapshot-unverified"), "wb").close()
         del server.requests[:]
         self.start_node(2, args2)
         assert_equal(self.log_of(2).count("Snapshot: removed"), removed)
@@ -531,6 +537,32 @@ class SnapshotTest(AokChainTestFramework):
         sync_blocks([node0, node2])
         self.assert_same_state(node0, node2, index=False, full=False)
         assert_equal(node2.getbalance(), balance)
+        # a stop right after the snapshot is accepted, before the marker of its check is gone:
+        # the next start finds the marker beside the record of the acceptance, removes the
+        # marker and checks nothing again
+        self.stop_node(2)
+        shutil.rmtree(os.path.join(datadir2, "governance"))
+        removed = self.log_of(2).count("Snapshot: removed")
+        rejected = self.log_of(2).count("Snapshot: REJECTED")
+        node2.start(args2 + ["-testcrashat=snapshot-accepted"])
+        assert_equal(node2.process.wait(timeout=120), 0)
+        node2.running = False
+        node2.process = None
+        assert os.path.exists(os.path.join(datadir2, "snapshot-unverified"))
+        assert os.path.exists(os.path.join(datadir2, "snapshot-without-past-blocks"))
+        del server.requests[:]
+        self.start_node(2, args2)
+        assert not [r for r in server.requests if ".part" in r[0]], "the snapshot was fetched once more"
+        assert_equal(self.log_of(2).count("this node accepted its snapshot"), 1)
+        assert_equal(self.log_of(2).count("Snapshot: REJECTED"), rejected)
+        assert_equal(self.log_of(2).count("Snapshot: removed"), removed)
+        assert not os.path.exists(os.path.join(datadir2, "snapshot-unverified"))
+        assert_equal(node2.getsnapshotinfo()["past_blocks"], "missing")
+        connect_nodes(node2, 0)
+        sync_blocks([node0, node2])
+        self.assert_same_state(node0, node2, index=False, full=False)
+        assert_equal(node2.getbalance(), balance)
+        starts_over = self.log_of(2).count("it starts over from the snapshot") - 1
         # A database that the operator keeps elsewhere (a link), and the block directory on
         # another file system: the snapshot goes where they are, and they stay where they are.
         self.stop_node(2)
@@ -563,6 +595,36 @@ class SnapshotTest(AokChainTestFramework):
             assert [f for f in os.listdir(os.path.join(other_fs, "blocks", "index")) if f.startswith("MANIFEST")]
             assert_equal(self.log_of(2).count("blocks/index is not moved by a rename"), 0)   # (it is known before, and copied)
         assert not os.path.exists(os.path.join(datadir2, "snapshot-unpack"))
+        connect_nodes(node2, 0)
+        sync_blocks([node0, node2])
+        self.assert_same_state(node0, node2, index=False, full=False)
+        assert_equal(node2.getbalance(), balance)
+        # a stop while an unpacked directory that was copied to its place is removed: under
+        # its own name such a directory is always complete, so what is left of it is not
+        # taken for one that is still to be copied
+        self.stop_node(2)
+        shutil.rmtree(os.path.join(datadir2, "tokens"))
+        removed = self.log_of(2).count("Snapshot: removed")
+        rejected = self.log_of(2).count("Snapshot: REJECTED")
+        node2.start(args2 + ["-testcrashat=snapshot-copied"])
+        assert_equal(node2.process.wait(timeout=120), 0)
+        node2.running = False
+        node2.process = None
+        copied = []
+        for where, dirs, files in os.walk(os.path.join(datadir2, "snapshot-unpack")):
+            copied += [os.path.join(where, name) for name in dirs if name.endswith(".copied")]
+        assert_equal(len(copied), 1)
+        left = sorted(os.listdir(copied[0]))
+        assert len(left) > 1
+        for name in left[:len(left) // 2 + 1]:
+            os.remove(os.path.join(copied[0], name))
+        del server.requests[:]
+        self.start_node(2, args2)
+        assert not [r for r in server.requests if ".part" in r[0]], "the snapshot was fetched once more"
+        assert_equal(self.log_of(2).count("Snapshot: REJECTED"), rejected)
+        assert_equal(self.log_of(2).count("Snapshot: removed"), removed)
+        assert not os.path.exists(os.path.join(datadir2, "snapshot-unpack"))
+        assert os.path.islink(os.path.join(datadir2, "governance"))
         connect_nodes(node2, 0)
         sync_blocks([node0, node2])
         self.assert_same_state(node0, node2, index=False, full=False)
@@ -676,11 +738,22 @@ class SnapshotTest(AokChainTestFramework):
         sync_blocks([node0, node2])
         self.assert_same_state(node0, node2, index=False, full=False)
         assert_equal(node2.getbalance(), balance)
-        # a node without its chain state is taken for a new one: the snapshot, as at the first start
+        # A node without its chain state looks like a new one, and the snapshot is installed
+        # as at a first start. It is the snapshot of a node that ran, though (its file says
+        # so): starts that are stopped on it do not remove it.
         self.stop_node(2)
         shutil.rmtree(os.path.join(node2.datadir, "regtest", "chainstate"))
         del server.requests[:]
+        removed = self.log_of(2).count("Snapshot: removed")
+        for attempt in range(3):
+            node2.start(args2 + ["-testcrashat=snapshot-moving"])
+            assert_equal(node2.process.wait(timeout=120), 0)
+            node2.running = False
+            node2.process = None
+            with open(os.path.join(node2.datadir, "regtest", "snapshot-unverified"), "rb") as f:
+                assert_equal(f.read(), b"%do" % (attempt + 1))
         self.start_node(2, args2)
+        assert_equal(self.log_of(2).count("Snapshot: removed"), removed)
         assert [r for r in server.requests if ".part" in r[0]], "the snapshot was not fetched again"
         assert_equal(self.log_of(2).count("it starts over from the snapshot"), starts_over + 1)
         connect_nodes(node2, 0)
@@ -858,12 +931,16 @@ class SnapshotTest(AokChainTestFramework):
         assert_equal(self.nodes[3].getblock(old_block, 0), node0.getblock(old_block, 0))
 
         self.log.info("A snapshot that an earlier start left unchecked is checked at the next start")
+        # (a first start that is stopped while the snapshot takes its place: the marker is
+        # there, the record of an acceptance is not)
         self.wipe(3)
-        self.start_node(3, COMMON + [source, self.params(), "-mocktime=%d" % t])
-        self.stop_node(3)
+        self.nodes[3].start(COMMON + [source, self.params(), "-mocktime=%d" % t, "-testcrashat=snapshot-moving"])
+        assert_equal(self.nodes[3].process.wait(timeout=120), 0)
+        self.nodes[3].running = False
+        self.nodes[3].process = None
         marker = os.path.join(self.nodes[3].datadir, "regtest", "snapshot-unverified")
-        with open(marker, "w") as f:
-            f.write("1")
+        with open(marker, "rb") as f:
+            assert_equal(f.read(), b"1")
         # ... and with other values in the program it is removed
         self.start_node(3, COMMON + [source, self.params(utxo=other(self.hashes["utxo"])), "-snapshot=0", "-mocktime=%d" % t])
         assert not os.path.exists(marker)

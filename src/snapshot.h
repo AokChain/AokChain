@@ -111,6 +111,13 @@ bool InstallSnapshotIfWanted(std::function<void(const std::string&)> status, std
  * start goes on with it.
  */
 bool StartOverFromSnapshot(std::function<void(const std::string&)> status, std::string& why, bool& fMoveFailed);
+/**
+ * After the block index is loaded: whether the snapshot that InstallSnapshotIfWanted() found
+ * with its marker was accepted by this node at an earlier start, which was stopped before the
+ * marker was gone. The marker is removed then, and the node is the snapshot node that it was:
+ * nothing is checked or accepted a second time.
+ */
+bool SnapshotAcceptedBefore();
 /** After the databases are loaded: compare their content hashes with the pinned ones. */
 bool VerifyInstalledSnapshot(std::string& error, std::function<void(const std::string&)> status);
 /** Remove what InstallSnapshotIfWanted() unpacked (the databases must be closed). */

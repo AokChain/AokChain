@@ -1895,6 +1895,9 @@ bool AppInitMain(boost::thread_group& threadGroup, CScheduler& scheduler)
                     break;
                 }
                 LoadSnapshotState(threadGroup);
+                // (a stop right after a snapshot is accepted can leave the marker of its check)
+                if (fSnapshotOnTrial && SnapshotAcceptedBefore())
+                    fSnapshotOnTrial = false;
 
                 // If the loaded chain has a wrong genesis, bail out immediately
                 // (we're likely using a testnet datadir, or the other way around).
