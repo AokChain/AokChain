@@ -1511,9 +1511,22 @@ bool AppInitMain(boost::thread_group& threadGroup, CScheduler& scheduler)
         std::string strNotePid, strNoteState, strLeftPid;
         const bool fNote = ReadFirstWord(PidNoteFile(), strNotePid, &strNoteState);
         fEarlierVersionUnclean = fNote && strNoteState == "earlier-version-unclean";
-        if (fs::exists(pathPid, ec) && fs::equivalent(pathPid.parent_path(), GetDataDir(), ec) && ReadFirstWord(pathPid, strLeftPid) &&
-            IsPidNumber(strLeftPid) && (!fNote || strLeftPid != strNotePid))
+        const bool fLeft = fs::exists(pathPid, ec) && fs::equivalent(pathPid.parent_path(), GetDataDir(), ec) && ReadFirstWord(pathPid, strLeftPid);
+        if (fLeft && IsPidNumber(strLeftPid) && (!fNote || strLeftPid != strNotePid)) {
             fEarlierVersionUnclean = true;
+        } else if (fLeft) {
+            // This version's own pid file (it holds the pid of the note), or one without a
+            // number. It has said what it had to say, and it goes before the note gets the
+            // pid of this run: a stop between the new note and the new pid file would leave
+            // it beside a note with another pid, which is how an earlier version's pid file
+            // is told. Its removal is on disk before the note is written.
+            fs::remove(pathPid, ec);
+            const int fd = open(GetDataDir().string().c_str(), O_RDONLY);
+            if (fd >= 0) {
+                fsync(fd);
+                close(fd);
+            }
+        }
         // (a start that cannot write its note ends here. It leaves the pid file of the last
         // run as it found it, for the next start to judge: see Shutdown())
         if (!WritePidNote(itostr(getpid()), fEarlierVersionUnclean))

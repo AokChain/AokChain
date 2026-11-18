@@ -401,6 +401,16 @@ class AutoRebuildTest(AokChainTestFramework):
         assert os.path.isfile(note) and not os.path.exists(pid_file)
         self.start1()
         unchanged()
+        #    The same after a run that was killed, whose pid file is still there with the pid
+        #    of its note: that pid file must not be left beside the new note.
+        n1.process.kill()
+        self.wait_exit(-9)
+        assert os.path.isfile(note) and os.path.isfile(pid_file)
+        n1.start(self.args + ["-checkmempool=0", "-testcrashat=pidnote"], stderr=self.stderr1)
+        self.wait_exit(0)
+        assert os.path.isfile(note) and not os.path.exists(pid_file)
+        self.start1()
+        unchanged()
         # 2. Stopped after the pid file is written: both, with the same pid. This version's own
         #    stop (above: -testcrashat=pidfile, running-mark, shutdown-tail).
         # 3. Stopped at a shutdown after the pid file is removed and before the note is: the
