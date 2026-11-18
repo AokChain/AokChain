@@ -892,8 +892,16 @@ bool EmptyDirectory(const fs::path& dir, std::string& error)
 {
     boost::system::error_code ec;
     std::vector<fs::path> entries;
-    for (fs::directory_iterator it(dir, ec), end; !ec && it != end; it.increment(ec))
-        entries.push_back(it->path());
+    for (fs::directory_iterator it(dir, ec), end; !ec && it != end; it.increment(ec)) {
+        // (the directory that a file system keeps at its root, when the database directory
+        // is the mount point itself: not the node's, and not for the node to remove)
+        if (it->path().filename() != "lost+found")
+            entries.push_back(it->path());
+    }
+    if (ec) {
+        error = strprintf("cannot read %s (%s)", dir.string(), ec.message());
+        return false;
+    }
     for (const fs::path& entry : entries) {
         fs::remove_all(entry, ec);
         if (ec) {
@@ -904,12 +912,38 @@ bool EmptyDirectory(const fs::path& dir, std::string& error)
     return true;
 }
 
-/** Remove the chain databases and the block files, to take a snapshot away. */
+/** Whether a directory of the node is a link to a directory, or the mount point of a file
+ *  system of its own: the operator has put it elsewhere. */
+bool KeptElsewhere(const fs::path& dir)
+{
+    boost::system::error_code ec;
+    if (fs::is_symlink(dir, ec))
+        return fs::is_directory(dir, ec);
+#ifndef WIN32
+    struct stat stDir, stParent;
+    if (stat(dir.string().c_str(), &stDir) == 0 && S_ISDIR(stDir.st_mode) &&
+        stat(dir.parent_path().string().c_str(), &stParent) == 0 && stDir.st_dev != stParent.st_dev)
+        return true;
+#endif
+    return false;
+}
+
+/** Remove the chain databases and the block files, to take a snapshot away. A database
+ *  directory that the operator keeps elsewhere (a link, a mount point) stays what it is: it
+ *  is emptied. */
 void WipeChainData()
 {
     boost::system::error_code ec;
-    for (const char* dir : SNAPSHOT_DIRS)
-        fs::remove_all(GetDataDir() / dir, ec);
+    for (const char* dir : SNAPSHOT_DIRS) {
+        const fs::path path = GetDataDir() / dir;
+        if (KeptElsewhere(path)) {
+            std::string error;
+            if (!EmptyDirectory(path, error))
+                LogPrintf("Snapshot: %s is kept elsewhere and cannot be emptied (%s).\n", dir, error);
+        } else {
+            fs::remove_all(path, ec);
+        }
+    }
     WipeBlockFilesAndRecords();
 }
 
@@ -983,8 +1017,8 @@ MoveResult MoveSnapshotIn(std::string& error)
         while (!there.empty() && !fs::exists(there, ec))
             there = there.parent_path();
 #ifndef WIN32
-        if (!there.empty() && access(there.string().c_str(), W_OK | X_OK) != 0) {
-            error = strprintf("the place where this node keeps %s cannot be written to (%s)", dir, there.string());
+        if (!there.empty() && access(there.string().c_str(), R_OK | W_OK | X_OK) != 0) {
+            error = strprintf("the place where this node keeps %s cannot be read or written to (%s)", dir, there.string());
             LogPrintf("Snapshot: %s.\n", error);
             return MoveResult::NOT_BEGUN;
         }

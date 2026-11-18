@@ -248,9 +248,22 @@ class SnapshotTest(AokChainTestFramework):
 
         for field in ("utxo", "tokens", "governance", "index"):
             self.log.info("A snapshot whose %s hash is not the accepted one is removed" % field)
-            self.fresh(3, [source, self.params(**{field: other(self.hashes[field])})])
+            self.wipe(3)
+            if field == "governance":
+                # (the operator keeps one database elsewhere, behind a link: the removal
+                # empties that place and leaves the link)
+                kept_elsewhere = os.path.join(self.options.tmpdir, "tokens-of-node3")
+                os.makedirs(kept_elsewhere)
+                os.makedirs(os.path.join(self.nodes[3].datadir, "regtest"))
+                os.symlink(kept_elsewhere, os.path.join(self.nodes[3].datadir, "regtest", "tokens"))
+            self.start_node(3, COMMON + [source, self.params(**{field: other(self.hashes[field])})])
             self.assert_fell_back(3)
             assert "this program accepts %s" % other(self.hashes[field]) in self.log_of(3)
+            if field == "governance":
+                link = os.path.join(self.nodes[3].datadir, "regtest", "tokens")
+                assert os.path.islink(link), "the link was replaced by a directory"
+                assert [f for f in os.listdir(kept_elsewhere) if f.startswith("MANIFEST")], "the node does not keep its token database behind the link"
+                assert "Snapshot: removed" in self.log_of(3)
 
         self.log.info("A snapshot with a changed byte in a database file is removed")
 
@@ -629,6 +642,23 @@ class SnapshotTest(AokChainTestFramework):
         sync_blocks([node0, node2])
         self.assert_same_state(node0, node2, index=False, full=False)
         assert_equal(node2.getbalance(), balance)
+        # the directory that a file system keeps at its root, when the place of a database is
+        # the mount point itself, is not the node's to remove, and is not in the way
+        lost_found = os.path.join(elsewhere, "governance", "lost+found")
+        os.mkdir(lost_found)
+        open(os.path.join(lost_found, "file"), "w").close()
+        os.chmod(lost_found, 0o555)
+        self.stop_node(2)
+        shutil.rmtree(os.path.join(datadir2, "tokens"))
+        try:
+            self.start_node(2, args2)
+        finally:
+            os.chmod(lost_found, 0o755)
+        assert os.path.isfile(os.path.join(lost_found, "file"))
+        shutil.rmtree(lost_found)
+        connect_nodes(node2, 0)
+        sync_blocks([node0, node2])
+        self.assert_same_state(node0, node2, index=False, full=False)
         # ...and when the snapshot cannot be put into its place (the place of the governance
         # database cannot be written to): the start says what it has done, the unpacked
         # snapshot waits, and the start that can finish does so, however many ended before it
@@ -646,14 +676,15 @@ class SnapshotTest(AokChainTestFramework):
         with open(os.path.join(datadir2, "governanceundo.since")) as f:
             since2 = f.read()
         block_file_size = os.path.getsize(block_file)
-        os.chmod(os.path.join(elsewhere, "governance"), 0o555)
-        try:
-            said = start_ends(args2, "the place where this node keeps governance cannot be written to")
-        finally:
-            os.chmod(os.path.join(elsewhere, "governance"), 0o755)
-        assert "Nothing was removed" in said, said
-        kept()
-        assert not os.path.exists(os.path.join(datadir2, "snapshot-unpack"))
+        for mode in (0o555, 0o333):   # (it cannot be written to; its content cannot be listed)
+            os.chmod(os.path.join(elsewhere, "governance"), mode)
+            try:
+                said = start_ends(args2, "the place where this node keeps governance cannot be read or written to")
+            finally:
+                os.chmod(os.path.join(elsewhere, "governance"), 0o755)
+            assert "Nothing was removed" in said, said
+            kept()
+            assert not os.path.exists(os.path.join(datadir2, "snapshot-unpack"))
         # (then one that can be written to and not emptied: something in it cannot be removed)
         stuck = os.path.join(elsewhere, "governance", "stuck")
         os.mkdir(stuck)
