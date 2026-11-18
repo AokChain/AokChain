@@ -480,11 +480,18 @@ static void HandleSIGTERM(int)
     fRequestShutdown = true;
 }
 
-/** The program is ending on a failed internal check (assert, abort): a line in the debug log.
- *  When this returns, the program ends as it would have without it. */
+/** The program is ending on the signal SIGABRT: a failed internal check (assert, abort), or
+ *  the signal sent from outside (a watchdog, an operator who wants a core file). A line in
+ *  the debug log, and then the signal with its default action, which ends the program as it
+ *  would have ended without this handler. (The signal is held back while the handler runs;
+ *  it is delivered when the handler returns.) */
 static void HandleSIGABRT(int)
 {
     LogAbortLine();
+#ifndef WIN32
+    signal(SIGABRT, SIG_DFL);
+    raise(SIGABRT);
+#endif
 }
 
 static void HandleSIGHUP(int)

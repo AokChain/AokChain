@@ -13,12 +13,13 @@ its file and its line are then in the log as well.
 """
 
 import os
+import signal
 import subprocess
 
 from test_framework.test_framework import AokChainTestFramework
 from test_framework.util import assert_equal, wait_until
 
-LINE = "The program ends here because one of its internal checks failed"
+LINE = "The program ends here on the signal SIGABRT"
 CHECK = "Assertion `!\"-testabortat\"' failed"
 
 
@@ -62,6 +63,19 @@ class AbortMessageTest(AokChainTestFramework):
         wait_until(lambda: not os.path.exists("/proc/%d" % pid), timeout=240)
 
         self.log.info("The node starts again")
+        self.start_node(0)
+        assert_equal(self.nodes[0].getbestblockhash(), tip)
+
+        self.log.info("The signal sent from outside ends the program too, with the line in its log")
+        node = self.nodes[0]
+        lines = self.log_text().count(LINE)
+        os.kill(node.process.pid, signal.SIGABRT)
+        assert_equal(node.process.wait(timeout=60), -6)
+        node.running = False
+        node.process = None
+        node.rpc_connected = False
+        node.rpc = None
+        assert_equal(self.log_text().count(LINE), lines + 1)
         self.start_node(0)
         assert_equal(self.nodes[0].getbestblockhash(), tip)
 

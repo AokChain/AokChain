@@ -222,7 +222,7 @@ static void DebugLogOpened()
 void LogAbortLine()
 {
 #ifndef WIN32
-    static const char msg[] = "\n*** The program ends here because one of its internal checks failed (abort). The check is named on its standard error output; for a node that runs in the background (-daemon) that is this file.\n";
+    static const char msg[] = "\n*** The program ends here on the signal SIGABRT: one of its internal checks failed, or the signal was sent to it from outside. A check that failed is named on the standard error output; for a node that runs in the background (-daemon) that is this file.\n";
     const int fd = nDebugLogFd;
     if (fd >= 0) {
         const ssize_t written = write(fd, msg, sizeof(msg) - 1);
