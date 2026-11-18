@@ -1454,6 +1454,10 @@ bool InstallSnapshotIfWanted(std::function<void(const std::string&)> status, std
         fInstalledThisStart = true;
         return true;
     }
+    // (an unpacked snapshot without its marker is one that no start will use: a start-over
+    // that was stopped before it wrote the marker, on a node that was mended since)
+    boost::system::error_code ec;
+    fs::remove_all(GetDataDir() / STAGING_NAME, ec);
     std::string why;
     bool fMoveFailed = false;
     const bool fInstalled = FetchAndInstallSnapshot(status, false, why, fMoveFailed);

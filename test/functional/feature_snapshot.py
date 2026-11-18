@@ -407,7 +407,13 @@ class SnapshotTest(AokChainTestFramework):
 
         self.log.info("A restart: the node comes up without the past blocks")
         self.stop_node(2)
+        # (an unpacked snapshot without its marker, as a start-over leaves it that was stopped
+        # before it began to move, on a node that was mended since: it is of no use and goes)
+        leftover = os.path.join(node2.datadir, "regtest", "snapshot-unpack", "chainstate")
+        os.makedirs(leftover)
+        open(os.path.join(leftover, "000005.ldb"), "w").close()
         self.start_node(2, args2)
+        assert not os.path.exists(os.path.join(node2.datadir, "regtest", "snapshot-unpack"))
         assert_equal(node2.getsnapshotinfo()["past_blocks"], "missing")
         assert_equal(node2.getblockcount(), node0.getblockcount())
         connect_nodes(node2, 0)
