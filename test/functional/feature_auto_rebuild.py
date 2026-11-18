@@ -158,7 +158,8 @@ class AutoRebuildTest(AokChainTestFramework):
         self.log.info("An earlier version left the directory without a normal shutdown: the node makes sure once")
         # (an earlier version leaves no mark of its own while it runs, only its pid file)
         self.stop_node(1)
-        open(os.path.join(n1.datadir, "regtest", "aokchaind.pid"), "w").close()
+        with open(os.path.join(n1.datadir, "regtest", "aokchaind.pid"), "w") as f:
+            f.write("4242\n")
         self.start1()
         assert_equal(self.count_in_log("was by an earlier version and did not end with a normal shutdown"), 1)
         assert_equal(self.count_in_log(REBUILT), 4)
@@ -341,6 +342,17 @@ class AutoRebuildTest(AokChainTestFramework):
         self.start1()
         assert_equal(self.count_in_log(UNCLEAN), unclean + 1)
         unchanged()
+        # killed, and its pid file as a forced stop of the machine can leave a file whose
+        # content was not on disk yet: empty, or filled with something that is not a pid
+        for content in (b"", b"\0\0\0\0\0\0"):
+            unclean = self.count_in_log(UNCLEAN)
+            n1.process.kill()
+            self.wait_exit(-9)
+            with open(pid_file, "wb") as f:
+                f.write(content)
+            self.start1()
+            assert_equal(self.count_in_log(UNCLEAN), unclean + 1)
+            unchanged()
 
         self.log.info("A pid file that is kept outside the data directory says nothing about the directory")
         outside = os.path.join(self.options.tmpdir, "elsewhere.pid")

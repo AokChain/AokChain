@@ -787,6 +787,9 @@ void CreatePidFile(const fs::path &path, pid_t pid)
     if (file)
     {
         fprintf(file, "%d\n", pid);
+        // (on disk before the start goes on: a forced stop of the machine does not leave the
+        // name of this file without its content; see fEarlierVersionUnclean in init.cpp)
+        FileCommit(file);
         fclose(file);
     }
 }

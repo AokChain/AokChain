@@ -181,6 +181,11 @@ static bool fRunningMarked = false;
  * pid than the note, or without a note, is one that an earlier version wrote, after the last
  * run of this version; and a pid file with the pid of the note is this version's own, whenever
  * the program was stopped: while it started, while it ran, in the middle of its shutdown.
+ * A pid file that holds no number says nothing: this version writes its pid file to disk
+ * before it goes on, but a stop in the moment between the making of the file and that write
+ * leaves it empty, and it is this version's own then. (An earlier version did not write it to
+ * disk at once: a forced stop of the machine in the first half minute of such a run leaves
+ * the same empty file, and that run is not seen by this rule.)
  * What is found is kept in the note until it is answered: a start that is stopped before it
  * gets that far leaves it for the next one.
  * Only a pid file in the data directory says something about this directory: one that is kept
@@ -214,6 +219,12 @@ static bool ReadFirstWord(const fs::path& path, std::string& strWord, std::strin
         stream >> *pstrSecond;
     }
     return true;
+}
+
+/** A pid as a pid file holds it: digits, and nothing else. */
+static bool IsPidNumber(const std::string& str)
+{
+    return !str.empty() && str.size() <= 10 && str.find_first_not_of("0123456789") == std::string::npos;
 }
 
 /** Writes the note: the pid of the pid file, and whether an unclean stop of an earlier version
@@ -1485,7 +1496,7 @@ bool AppInitMain(boost::thread_group& threadGroup, CScheduler& scheduler)
         const bool fNote = ReadFirstWord(PidNoteFile(), strNotePid, &strNoteState);
         fEarlierVersionUnclean = fNote && strNoteState == "earlier-version-unclean";
         if (fs::exists(pathPid, ec) && fs::equivalent(pathPid.parent_path(), GetDataDir(), ec) && ReadFirstWord(pathPid, strLeftPid) &&
-            (!fNote || strLeftPid != strNotePid))
+            IsPidNumber(strLeftPid) && (!fNote || strLeftPid != strNotePid))
             fEarlierVersionUnclean = true;
         if (!WritePidNote(itostr(getpid()), fEarlierVersionUnclean))
             return InitError(strprintf(_("Cannot write to data directory '%s'; check permissions."), GetDataDir().string()));
