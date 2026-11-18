@@ -356,6 +356,11 @@ void UnlinkPrunedFiles(const std::set<int>& setFilesToPrune);
 CBlockIndex * InsertBlockIndex(uint256 hash);
 /** Flush all state, indexes and buffers to disk. */
 void FlushStateToDisk();
+/** For a command that reads the databases and needs them to hold what the node has in memory.
+ *  As FlushStateToDisk(), and when the databases hold it already, nothing is written; the note
+ *  of what the governance and the token database hold is never computed for it (that reads
+ *  both databases: the next write that no command asked for does it). */
+void FlushStateForRead();
 /** Read the undo data of a block that has a parent. */
 bool ReadBlockUndo(CBlockUndo& blockundo, const CBlockIndex* pindex);
 /** Prune block files and flush state to disk. */

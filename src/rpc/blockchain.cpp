@@ -1190,7 +1190,7 @@ UniValue gettxoutsetinfo(const JSONRPCRequest& request)
     UniValue ret(UniValue::VOBJ);
 
     CCoinsStats stats;
-    FlushStateToDisk();
+    FlushStateForRead();
     if (GetUTXOStats(pcoinsdbview.get(), stats)) {
         ret.pushKV("height", (int64_t)stats.nHeight);
         ret.pushKV("bestblock", stats.hashBlock.GetHex());
@@ -2265,7 +2265,7 @@ UniValue scantxoutset(const JSONRPCRequest& request)
     std::unique_ptr<CCoinsViewCursor> pcursor;
     {
         LOCK(cs_main);
-        FlushStateToDisk();
+        FlushStateForRead();
         pcursor.reset(pcoinsdbview->Cursor());
         height = chainActive.Height();
         best = chainActive.Tip()->GetBlockHash();

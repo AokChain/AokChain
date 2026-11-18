@@ -137,7 +137,7 @@ void Extend(std::vector<Family>& families, size_t nFamily, uint32_t nCount, KeyI
  */
 bool ScanUnspent(const KeyIndex& index, const std::set<CKeyID>* pOnly, const std::atomic<bool>& fCancel, std::map<CKeyID, Hit>& hits)
 {
-    FlushStateToDisk();
+    FlushStateForRead();
     std::unique_ptr<CCoinsViewCursor> pcursor(pcoinsdbview->Cursor());
     if (!pcursor)
         return false;

@@ -257,6 +257,7 @@ bool CGovernance::Init(bool fWipe, const CChainParams& chainparams) {
 
         batch.Write(DB_GOVERNANCE_INIT, true);
         WriteBatch(batch);
+        fNew = !fWipe;
     }
 
     return true;
@@ -425,6 +426,12 @@ bool CGovernance::EndChainStateFlush(const uint256& hashTip)
     EraseJournal(batch);
     hashChainState = hashTip;
     return WriteBatch(batch);
+}
+
+bool CGovernance::HasJournal() const
+{
+    LOCK(cs);
+    return nJournalNext != 0;
 }
 
 bool CGovernance::ChainStateFlushBegun(const uint256& hashTip) const

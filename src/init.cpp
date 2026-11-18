@@ -1930,6 +1930,14 @@ bool AppInitMain(boost::thread_group& threadGroup, CScheduler& scheduler)
                 // The on-disk coinsdb is now in a good state, create the cache
                 pcoinsTip.reset(new CCoinsViewCache(pcoinscatcher.get()));
 
+                // A governance database that was made at this start, beside a chain state that
+                // holds blocks: the database that belonged to the chain state is gone.
+                if (governance->IsNew() && !pcoinsTip->GetBestBlock().IsNull()) {
+                    strLoadError = _("The governance database does not belong to the chain state (it is new, and the chain state is not)");
+                    fChainStateAtFault = true;
+                    break;
+                }
+
                 // An earlier version left the data directory without a normal shutdown. That version
                 // kept no notes: nothing says whether the governance database (which it wrote
                 // with every block) and the token database (which it wrote after the chain state)

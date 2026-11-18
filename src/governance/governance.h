@@ -202,6 +202,10 @@ public:
     //! Whether this version began a write of the chain state for this block and did not get to
     //! note its end (asked before RecoverTo(), which takes the note away).
     bool ChainStateFlushBegun(const uint256& hashTip) const;
+    //! Whether the state was written since the chain state was (a journal is kept).
+    bool HasJournal() const;
+    //! Whether Init() found no database and made this one (and was not asked to).
+    bool IsNew() const { return fNew; }
 
     using CDBWrapper::Sync;
 
@@ -216,6 +220,8 @@ private:
     std::vector<Changes> vChanges;
     //! What the blocks replaced (see WriteBlockUndo).
     std::unique_ptr<CDBWrapper> m_undo;
+    //! See IsNew().
+    bool fNew = false;
     //! Guards vChanges. Readers outside cs_main (RPC) may run while a block is connected.
     mutable CCriticalSection cs;
 

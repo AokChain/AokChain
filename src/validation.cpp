@@ -248,7 +248,7 @@ enum FlushStateMode {
 };
 
 // See definition for documentation
-static bool FlushStateToDisk(const CChainParams& chainParams, CValidationState &state, FlushStateMode mode, int nManualPruneHeight=0);
+static bool FlushStateToDisk(const CChainParams& chainParams, CValidationState &state, FlushStateMode mode, int nManualPruneHeight=0, bool fForRead=false);
 static void FindFilesToPruneManual(std::set<int>& setFilesToPrune, int nManualPruneHeight);
 static void FindFilesToPrune(std::set<int>& setFilesToPrune, uint64_t nPruneAfterHeight);
 bool CheckInputs(const CTransaction& tx, CValidationState &state, const CCoinsViewCache &inputs, bool fScriptChecks, unsigned int flags, bool cacheSigStore, bool cacheFullScriptStore, PrecomputedTransactionData& txdata, std::vector<CScriptCheck> *pvChecks = nullptr);
@@ -3469,7 +3469,69 @@ static bool WriteTokenState(CTokensCache& cache, const uint256& hashTip)
     return ptokensdb->CommitDump(hashTip);
 }
 
-bool static FlushStateToDisk(const CChainParams& chainparams, CValidationState &state, FlushStateMode mode, int nManualPruneHeight) {
+/**
+ * The block for which this run knows the note on disk to be right (the note of what the
+ * governance and the token database hold at a block, CCoinsViewDB::WriteStoresNote): it wrote
+ * the note, or checked it, and has not written the two databases since. Guarded by cs_main.
+ */
+static uint256 hashStoresNoteBlock;
+
+/**
+ * Writes the note for this block, which the chain state, the token database and the governance
+ * database are at. The note is computed by reading both databases from end to end.
+ * fForRead: the write was asked for by a command that reads the databases. The note is not
+ * computed for it: there is then no note for this block (VerifyStoresNote() has nothing to
+ * check after a stop), until a write that no command asked for brings it up to date.
+ */
+static void WriteStoresNote(const uint256& hashTip, bool fForRead)
+{
+    AssertLockHeld(cs_main);
+    if (!pcoinsdbview || !governance || !ptokensdb)
+        return;
+    if (!fTokenStateInStep) {
+        pcoinsdbview->EraseStoresNote();
+        hashStoresNoteBlock.SetNull();
+        return;
+    }
+    if (hashStoresNoteBlock == hashTip || fForRead)
+        return;
+    const uint256 hashGovernance = governance->ContentHash();
+    const uint256 hashTokens = ptokensdb->StateHash();
+    LogPrint(BCLog::COINDB, "Note of the governance and the token database for block %s\n", hashTip.ToString());
+    if (hashGovernance.IsNull() || hashTokens.IsNull())
+        pcoinsdbview->EraseStoresNote();
+    else if (pcoinsdbview->WriteStoresNote(hashTip, hashGovernance, hashTokens))
+        hashStoresNoteBlock = hashTip;
+}
+
+/**
+ * Whether the chain state, the token database and the governance database on disk are at this
+ * block and hold everything that the node has in memory: a write of them would change
+ * nothing. Asked of the databases themselves, not remembered.
+ */
+static bool ChainStateIsOnDisk(const uint256& hashTip)
+{
+    AssertLockHeld(cs_main);
+    if (hashTip.IsNull() || !pcoinsdbview || !fTokenStateInStep)
+        return false;
+    if (pcoinsdbview->GetBestBlock() != hashTip || pcoinsTip->HasDirtyEntries())
+        return false;
+    if (governance && governance->HasJournal())
+        return false;
+    if (fAddressIndex && pblocktree->HasIndexJournal())
+        return false;
+    if (AreTokensDeployed()) {
+        auto currentActiveTokenCache = GetCurrentTokenCache();
+        if (currentActiveTokenCache && currentActiveTokenCache->HasDirtyEntries())
+            return false;
+    }
+    uint256 hashTokenState;
+    if (ptokensdb && (!ptokensdb->ReadStateBlock(hashTokenState) || hashTokenState != hashTip))
+        return false;
+    return true;
+}
+
+bool static FlushStateToDisk(const CChainParams& chainparams, CValidationState &state, FlushStateMode mode, int nManualPruneHeight, bool fForRead) {
     int64_t nMempoolUsage = mempool.DynamicMemoryUsage();
     LOCK(cs_main);
     static int64_t nLastWrite = 0;
@@ -3594,7 +3656,18 @@ bool static FlushStateToDisk(const CChainParams& chainparams, CValidationState &
         // At startup each store is brought to the block of the chain state: ReplayBlocks() (a write
         // of the chain state that was cut short), CGovernance::RecoverTo() (back), RecoverTokenState()
         // (forward).
-        if (fDoFullFlush) {
+        const uint256 hashFlushTip = pcoinsTip->GetBestBlock();
+        if (fDoFullFlush && ChainStateIsOnDisk(hashFlushTip)) {
+            // Nothing has changed since the databases were written for this block: nothing
+            // is written. (A command that reads the databases asks for a write before every
+            // read.) Only the note of the two small stores, when a write that no command asked
+            // for finds that there is none for this block.
+            if (!fForRead)
+                WriteStoresNote(hashFlushTip, false);
+            if (ptokensdb)
+                ptokensdb->WriteReissuedMempoolState();
+            nLastFlush = nNow;
+        } else if (fDoFullFlush) {
 
 
             // Typical Coin structures on disk are around 48 bytes in size.
@@ -3609,7 +3682,16 @@ bool static FlushStateToDisk(const CChainParams& chainparams, CValidationState &
             // notes that the chain state follows now, and keeps what it needs to go back to the
             // block of the last flush until the chain state is on disk for this one (after an
             // unclean stop it was ahead of the chain state; see CGovernance::RecoverTo).
-            const uint256 hashFlushTip = pcoinsTip->GetBestBlock();
+            // A note for this very block that is on disk may not be true any more once the
+            // stores are written (they can have changed at the same block: a block was
+            // connected and given up again). It goes before they are written, and with the
+            // chain state it is gone from the disk before the governance journal is dropped.
+            if (pcoinsdbview) {
+                uint256 hashNoteBlock, hashNoteGovernance, hashNoteTokens;
+                if (pcoinsdbview->ReadStoresNote(hashNoteBlock, hashNoteGovernance, hashNoteTokens) && hashNoteBlock == hashFlushTip)
+                    pcoinsdbview->EraseStoresNote();
+                hashStoresNoteBlock.SetNull();
+            }
             if (governance && !governance->BeginChainStateFlush(hashFlushTip))
                 return AbortNode(state, "Failed to write to governance database");
             // (the same for the address index, which is written block by block too)
@@ -3649,14 +3731,7 @@ bool static FlushStateToDisk(const CChainParams& chainparams, CValidationState &
 
             // What the governance and the token database hold at this tip, for the check at
             // the next start (VerifyStoresNote)
-            if (pcoinsdbview && governance && ptokensdb) {
-                const uint256 hashGovernance = fTokenStateInStep ? governance->ContentHash() : uint256();
-                const uint256 hashTokens = fTokenStateInStep ? ptokensdb->StateHash() : uint256();
-                if (hashGovernance.IsNull() || hashTokens.IsNull())
-                    pcoinsdbview->EraseStoresNote();
-                else
-                    pcoinsdbview->WriteStoresNote(hashFlushTip, hashGovernance, hashTokens);
-            }
+            WriteStoresNote(hashFlushTip, fForRead);
 
             /** TOKENS END */
 
@@ -3678,6 +3753,12 @@ void FlushStateToDisk() {
     CValidationState state;
     const CChainParams& chainparams = Params();
     FlushStateToDisk(chainparams, state, FLUSH_STATE_ALWAYS);
+}
+
+void FlushStateForRead() {
+    CValidationState state;
+    const CChainParams& chainparams = Params();
+    FlushStateToDisk(chainparams, state, FLUSH_STATE_ALWAYS, 0, true);
 }
 
 void PruneAndFlush() {
@@ -6217,6 +6298,8 @@ bool VerifyStoresNote(std::string& strError)
         strError = "the token database is not what it was when the chain state was written";
         return false;
     }
+    // (the note is right for this block: it need not be computed again while nothing is written)
+    hashStoresNoteBlock = hashBlock;
     LogPrintf("The governance and the token database are what they were when the chain state was written (checked in %dms)\n", GetTimeMillis() - nStart);
     return true;
 }

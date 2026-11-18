@@ -269,6 +269,14 @@ uint256 CCoinsViewCache::GetBestBlock() const {
     return hashBlock;
 }
 
+bool CCoinsViewCache::HasDirtyEntries() const {
+    for (const auto& entry : cacheCoins) {
+        if (entry.second.flags & CCoinsCacheEntry::DIRTY)
+            return true;
+    }
+    return false;
+}
+
 void CCoinsViewCache::SetBestBlock(const uint256 &hashBlockIn) {
     hashBlock = hashBlockIn;
 }

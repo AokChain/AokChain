@@ -258,6 +258,9 @@ public:
      */
     bool HaveCoinInCache(const COutPoint &outpoint) const;
 
+    //! Whether the cache holds an entry that a Flush() would write (a change since the last one).
+    bool HasDirtyEntries() const;
+
     /**
      * Return a reference to Coin in the cache, or a pruned one if not found. This is
      * more efficient than GetCoin.

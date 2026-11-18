@@ -202,6 +202,8 @@ public:
                              const std::vector<std::pair<CAddressUnspentKey, CAddressUnspentValue> >& vectUnspent);
     bool NoteChainStateFlush(const uint256& hashTip);
     bool DropIndexJournal(const uint256& hashTip);
+    //! Whether the address indexes were written since the chain state was (a journal is kept).
+    bool HasIndexJournal() const { return nIndexJournalNext != 0; }
     bool RecoverAddressIndexes(const uint256& hashChainStateTip, bool fInStep, std::string& strError);
     bool WipeAddressIndexes();
     bool ReadAddressIndex(uint160 addressHash, int type, std::string tokenName,

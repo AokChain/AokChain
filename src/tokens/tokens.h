@@ -214,6 +214,17 @@ public :
     //! Write token cache data to database
     bool DumpCacheToDatabase();
 
+    //! Whether the cache holds anything that DumpCacheToDatabase() would write: it writes for
+    //! the entries of these lists (the two maps that ClearDirtyCache() clears as well are
+    //! looked up for them, and hold what was read from the database too).
+    bool HasDirtyEntries() const {
+        return !(vUndoTokenAmount.empty() && vSpentTokens.empty() &&
+                 setNewTokensToRemove.empty() && setNewTokensToAdd.empty() &&
+                 setNewReissueToAdd.empty() && setNewReissueToRemove.empty() &&
+                 setNewTransferTokensToAdd.empty() && setNewTransferTokensToRemove.empty() &&
+                 setNewOwnerTokensToAdd.empty() && setNewOwnerTokensToRemove.empty());
+    }
+
     void ClearDirtyCache() {
 
         vUndoTokenAmount.clear();
