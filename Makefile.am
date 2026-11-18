@@ -21,6 +21,8 @@ endif
 AOKCHAIND_BIN=$(top_builddir)/src/$(AOKCHAIN_DAEMON_NAME)$(EXEEXT)
 AOKCHAIN_QT_BIN=$(top_builddir)/src/qt/$(AOKCHAIN_GUI_NAME)$(EXEEXT)
 AOKCHAIN_CLI_BIN=$(top_builddir)/src/$(AOKCHAIN_CLI_NAME)$(EXEEXT)
+AOKCHAIN_TX_BIN=$(top_builddir)/src/$(AOKCHAIN_TX_NAME)$(EXEEXT)
+AOKCHAIN_WALLET_BIN=$(top_builddir)/src/aokchain-wallet$(EXEEXT)
 AOKCHAIN_WIN_INSTALLER=$(PACKAGE)-$(PACKAGE_VERSION)-win$(WINDOWS_BITS)-setup$(EXEEXT)
 AOKCHAIN_CLI_INSTALL=$(top_builddir)/contrib/install_cli.sh
 
@@ -77,6 +79,9 @@ $(AOKCHAIN_WIN_INSTALLER): all-recursive
 	STRIPPROG="$(STRIP)" $(INSTALL_STRIP_PROGRAM) $(AOKCHAIND_BIN) $(top_builddir)/release
 	STRIPPROG="$(STRIP)" $(INSTALL_STRIP_PROGRAM) $(AOKCHAIN_QT_BIN) $(top_builddir)/release
 	STRIPPROG="$(STRIP)" $(INSTALL_STRIP_PROGRAM) $(AOKCHAIN_CLI_BIN) $(top_builddir)/release
+	for f in $(AOKCHAIN_TX_BIN) $(AOKCHAIN_WALLET_BIN); do \
+	  test ! -f $$f || STRIPPROG="$(STRIP)" $(INSTALL_STRIP_PROGRAM) $$f $(top_builddir)/release || exit 1; \
+	done
 	@test -f $(MAKENSIS) && $(MAKENSIS) -V2 $(top_builddir)/share/setup.nsi || \
 	  echo error: could not build $@
 	@echo built $@

@@ -1,13 +1,17 @@
-Name "@PACKAGE_NAME@ (@WINDOWS_BITS@-bit)"
+Name "@PACKAGE_NAME@"
 
+Unicode true
+ManifestDPIAware true
 RequestExecutionLevel highest
 SetCompressor /SOLID lzma
 
 # General Symbol Definitions
 !define REGKEY "SOFTWARE\$(^Name)"
+!define UNINSTKEY "SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\$(^Name)"
 !define VERSION @CLIENT_VERSION_MAJOR@.@CLIENT_VERSION_MINOR@.@CLIENT_VERSION_REVISION@
 !define COMPANY "@PACKAGE_NAME@ project"
 !define URL @PACKAGE_URL@
+!define GUI "@AOKCHAIN_GUI_NAME@@EXEEXT@"
 
 # MUI Symbol Definitions
 !define MUI_ICON "@abs_top_srcdir@/share/pixmaps/aokchain.ico"
@@ -15,14 +19,20 @@ SetCompressor /SOLID lzma
 !define MUI_HEADERIMAGE
 !define MUI_HEADERIMAGE_RIGHT
 !define MUI_HEADERIMAGE_BITMAP "@abs_top_srcdir@/share/pixmaps/nsis-header.bmp"
+!define MUI_ABORTWARNING
+!define MUI_WELCOMEPAGE_TEXT "Setup installs @PACKAGE_NAME@ ${VERSION} on this computer.$\r$\n$\r$\nIf a wallet of an earlier version is in use here, close the program and keep a copy of wallet.dat before you go on. Setup leaves the wallet and the block data where they are.$\r$\n$\r$\n$_CLICK"
 !define MUI_FINISHPAGE_NOAUTOCLOSE
-!define MUI_STARTMENUPAGE_REGISTRY_ROOT HKLM
+!define MUI_STARTMENUPAGE_REGISTRY_ROOT HKCU
 !define MUI_STARTMENUPAGE_REGISTRY_KEY ${REGKEY}
 !define MUI_STARTMENUPAGE_REGISTRY_VALUENAME StartMenuGroup
 !define MUI_STARTMENUPAGE_DEFAULTFOLDER "@PACKAGE_NAME@"
-!define MUI_FINISHPAGE_RUN $INSTDIR\@AOKCHAIN_GUI_NAME@@EXEEXT@
+!define MUI_FINISHPAGE_RUN $INSTDIR\${GUI}
+!define MUI_FINISHPAGE_SHOWREADME ""
+!define MUI_FINISHPAGE_SHOWREADME_TEXT "Put a shortcut on the desktop"
+!define MUI_FINISHPAGE_SHOWREADME_FUNCTION DesktopShortcut
 !define MUI_UNICON "${NSISDIR}\Contrib\Graphics\Icons\modern-uninstall.ico"
 !define MUI_UNWELCOMEFINISHPAGE_BITMAP "@abs_top_srcdir@/share/pixmaps/nsis-wizard.bmp"
+!define MUI_UNCONFIRMPAGE_TEXT_TOP "The program files are removed from the folder below. The wallet, the settings and the block data in the data folder (%APPDATA%\AokChain unless another one was chosen) are not touched."
 !define MUI_UNFINISHPAGE_NOAUTOCLOSE
 
 # Included files
@@ -64,23 +74,44 @@ VIAddVersionKey ProductVersion "${VERSION}"
 VIAddVersionKey CompanyName "${COMPANY}"
 VIAddVersionKey CompanyWebsite "${URL}"
 VIAddVersionKey FileVersion "${VERSION}"
-VIAddVersionKey FileDescription ""
-VIAddVersionKey LegalCopyright ""
+VIAddVersionKey FileDescription "@PACKAGE_NAME@ setup"
+VIAddVersionKey LegalCopyright "The @PACKAGE_NAME@ developers"
 InstallDirRegKey HKCU "${REGKEY}" Path
 ShowUninstDetails show
 
+# A program that is running cannot be replaced or removed: say so, and go on when it
+# has been closed, instead of leaving a half-written folder behind.
+!macro STOP_IF_RUNNING FILE
+    !define STOP_ID ${__COUNTER__}
+  again_${STOP_ID}:
+    IfFileExists "${FILE}" 0 free_${STOP_ID}
+    ClearErrors
+    FileOpen $R1 "${FILE}" a
+    IfErrors 0 close_${STOP_ID}
+    MessageBox MB_RETRYCANCEL|MB_ICONEXCLAMATION "@PACKAGE_NAME@ is running. Close it, wait until it has shut down, and choose Retry." /SD IDCANCEL IDRETRY again_${STOP_ID}
+    Abort "@PACKAGE_NAME@ is running."
+  close_${STOP_ID}:
+    FileClose $R1
+  free_${STOP_ID}:
+    !undef STOP_ID
+!macroend
+
 # Installer sections
 Section -Main SEC0000
+    !insertmacro STOP_IF_RUNNING "$INSTDIR\${GUI}"
+    !insertmacro STOP_IF_RUNNING "$INSTDIR\daemon\@AOKCHAIN_DAEMON_NAME@@EXEEXT@"
     SetOutPath $INSTDIR
     SetOverwrite on
-    File @abs_top_srcdir@/release/@AOKCHAIN_GUI_NAME@@EXEEXT@
+    File @abs_top_builddir@/release/${GUI}
     File /oname=COPYING.txt @abs_top_srcdir@/COPYING
     File /oname=readme.txt @abs_top_srcdir@/doc/README_windows.txt
     SetOutPath $INSTDIR\daemon
-    File @abs_top_srcdir@/release/@AOKCHAIN_DAEMON_NAME@@EXEEXT@
-    File @abs_top_srcdir@/release/@AOKCHAIN_CLI_NAME@@EXEEXT@
-    SetOutPath $INSTDIR\doc
-    File /r @abs_top_srcdir@/doc\*.*
+    File @abs_top_builddir@/release/@AOKCHAIN_DAEMON_NAME@@EXEEXT@
+    File @abs_top_builddir@/release/@AOKCHAIN_CLI_NAME@@EXEEXT@
+    File /nonfatal @abs_top_builddir@/release/@AOKCHAIN_TX_NAME@@EXEEXT@
+    File /nonfatal @abs_top_builddir@/release/aokchain-wallet@EXEEXT@
+    # (what installers of this family put there before 4.0.10; nothing reads it)
+    RMDir /r $INSTDIR\doc
     SetOutPath $INSTDIR
     WriteRegStr HKCU "${REGKEY}\Components" Main 1
 SectionEnd
@@ -91,22 +122,25 @@ Section -post SEC0001
     WriteUninstaller $INSTDIR\uninstall.exe
     !insertmacro MUI_STARTMENU_WRITE_BEGIN Application
     CreateDirectory $SMPROGRAMS\$StartMenuGroup
-    CreateShortcut "$SMPROGRAMS\$StartMenuGroup\$(^Name).lnk" $INSTDIR\@AOKCHAIN_GUI_NAME@@EXEEXT@
-    CreateShortcut "$SMPROGRAMS\$StartMenuGroup\@PACKAGE_NAME@ (testnet, @WINDOWS_BITS@-bit).lnk" "$INSTDIR\@AOKCHAIN_GUI_NAME@@EXEEXT@" "-testnet" "$INSTDIR\@AOKCHAIN_GUI_NAME@@EXEEXT@" 1
+    CreateShortcut "$SMPROGRAMS\$StartMenuGroup\$(^Name).lnk" $INSTDIR\${GUI}
     CreateShortcut "$SMPROGRAMS\$StartMenuGroup\Uninstall $(^Name).lnk" $INSTDIR\uninstall.exe
     !insertmacro MUI_STARTMENU_WRITE_END
-    WriteRegStr HKCU "SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\$(^Name)" DisplayName "$(^Name)"
-    WriteRegStr HKCU "SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\$(^Name)" DisplayVersion "${VERSION}"
-    WriteRegStr HKCU "SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\$(^Name)" Publisher "${COMPANY}"
-    WriteRegStr HKCU "SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\$(^Name)" URLInfoAbout "${URL}"
-    WriteRegStr HKCU "SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\$(^Name)" DisplayIcon $INSTDIR\uninstall.exe
-    WriteRegStr HKCU "SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\$(^Name)" UninstallString $INSTDIR\uninstall.exe
-    WriteRegDWORD HKCU "SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\$(^Name)" NoModify 1
-    WriteRegDWORD HKCU "SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\$(^Name)" NoRepair 1
+    WriteRegStr HKCU "${UNINSTKEY}" DisplayName "$(^Name)"
+    WriteRegStr HKCU "${UNINSTKEY}" DisplayVersion "${VERSION}"
+    WriteRegStr HKCU "${UNINSTKEY}" Publisher "${COMPANY}"
+    WriteRegStr HKCU "${UNINSTKEY}" URLInfoAbout "${URL}"
+    WriteRegStr HKCU "${UNINSTKEY}" DisplayIcon $INSTDIR\${GUI}
+    WriteRegStr HKCU "${UNINSTKEY}" InstallLocation $INSTDIR
+    WriteRegStr HKCU "${UNINSTKEY}" UninstallString '"$INSTDIR\uninstall.exe"'
+    WriteRegStr HKCU "${UNINSTKEY}" QuietUninstallString '"$INSTDIR\uninstall.exe" /S'
+    SectionGetSize ${SEC0000} $R0
+    WriteRegDWORD HKCU "${UNINSTKEY}" EstimatedSize $R0
+    WriteRegDWORD HKCU "${UNINSTKEY}" NoModify 1
+    WriteRegDWORD HKCU "${UNINSTKEY}" NoRepair 1
     WriteRegStr HKCR "@PACKAGE_TARNAME@" "URL Protocol" ""
     WriteRegStr HKCR "@PACKAGE_TARNAME@" "" "URL:AokChain"
-    WriteRegStr HKCR "@PACKAGE_TARNAME@\DefaultIcon" "" $INSTDIR\@AOKCHAIN_GUI_NAME@@EXEEXT@
-    WriteRegStr HKCR "@PACKAGE_TARNAME@\shell\open\command" "" '"$INSTDIR\@AOKCHAIN_GUI_NAME@@EXEEXT@" "%1"'
+    WriteRegStr HKCR "@PACKAGE_TARNAME@\DefaultIcon" "" $INSTDIR\${GUI}
+    WriteRegStr HKCR "@PACKAGE_TARNAME@\shell\open\command" "" '"$INSTDIR\${GUI}" "%1"'
 SectionEnd
 
 # Macro for selecting uninstaller sections
@@ -124,7 +158,9 @@ done${UNSECTION_ID}:
 
 # Uninstaller sections
 Section /o -un.Main UNSEC0000
-    Delete /REBOOTOK $INSTDIR\@AOKCHAIN_GUI_NAME@@EXEEXT@
+    !insertmacro STOP_IF_RUNNING "$INSTDIR\${GUI}"
+    !insertmacro STOP_IF_RUNNING "$INSTDIR\daemon\@AOKCHAIN_DAEMON_NAME@@EXEEXT@"
+    Delete /REBOOTOK $INSTDIR\${GUI}
     Delete /REBOOTOK $INSTDIR\COPYING.txt
     Delete /REBOOTOK $INSTDIR\readme.txt
     RMDir /r /REBOOTOK $INSTDIR\daemon
@@ -133,10 +169,10 @@ Section /o -un.Main UNSEC0000
 SectionEnd
 
 Section -un.post UNSEC0001
-    DeleteRegKey HKCU "SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\$(^Name)"
+    DeleteRegKey HKCU "${UNINSTKEY}"
     Delete /REBOOTOK "$SMPROGRAMS\$StartMenuGroup\Uninstall $(^Name).lnk"
     Delete /REBOOTOK "$SMPROGRAMS\$StartMenuGroup\$(^Name).lnk"
-    Delete /REBOOTOK "$SMPROGRAMS\$StartMenuGroup\@PACKAGE_NAME@ (testnet, @WINDOWS_BITS@-bit).lnk"
+    Delete /REBOOTOK "$DESKTOP\$(^Name).lnk"
     Delete /REBOOTOK "$SMSTARTUP\AokChain.lnk"
     Delete /REBOOTOK $INSTDIR\uninstall.exe
     Delete /REBOOTOK $INSTDIR\debug.log
@@ -148,11 +184,6 @@ Section -un.post UNSEC0001
     DeleteRegKey HKCR "@PACKAGE_TARNAME@"
     RmDir /REBOOTOK $SMPROGRAMS\$StartMenuGroup
     RmDir /REBOOTOK $INSTDIR
-    Push $R0
-    StrCpy $R0 $StartMenuGroup 1
-    StrCmp $R0 ">" no_smgroup
-no_smgroup:
-    Pop $R0
 SectionEnd
 
 # Installer functions
@@ -163,14 +194,21 @@ Function .onInit
       ; disable registry redirection (enable access to 64-bit portion of registry)
       SetRegView 64
     ${Else}
-      MessageBox MB_OK|MB_ICONSTOP "Cannot install 64-bit version on a 32-bit system."
+      MessageBox MB_OK|MB_ICONSTOP "Cannot install 64-bit version on a 32-bit system." /SD IDOK
       Abort
     ${EndIf}
 !endif
 FunctionEnd
 
+Function DesktopShortcut
+    CreateShortcut "$DESKTOP\$(^Name).lnk" $INSTDIR\${GUI}
+FunctionEnd
+
 # Uninstaller functions
 Function un.onInit
+!if "@WINDOWS_BITS@" == "64"
+    SetRegView 64
+!endif
     ReadRegStr $INSTDIR HKCU "${REGKEY}" Path
     !insertmacro MUI_STARTMENU_GETFOLDER Application $StartMenuGroup
     !insertmacro SELECT_UNSECTION Main ${UNSEC0000}

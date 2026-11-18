@@ -117,3 +117,13 @@ as they appear in the release `.zip` archive. This can be done in the following
 way. This will install to `c:\workspace\aokchain`, for example:
 
     make install DESTDIR=/mnt/c/workspace/aokchain
+
+Setup program
+-------------
+
+With `nsis` installed, `make deploy` in a finished cross build writes
+`aokchain-<version>-win64-setup.exe` into the source directory. It is built from
+`share/setup.nsi.in` and stripped copies of the programs in `release/`. The setup
+program installs the wallet program and, in a `daemon` folder, the node programs;
+it adds Start menu entries and an uninstaller. It does not touch the data folder,
+and neither does the uninstaller.
