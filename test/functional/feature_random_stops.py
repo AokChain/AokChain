@@ -99,13 +99,20 @@ class RandomStopsTest(AokChainTestFramework):
         node = self.nodes[1]
         if node.process is None:
             return
+        # (a node that has ended before this kill, by a signal that is not a kill of the test:
+        # it crashed, whatever the round was about)
+        ended = node.process.poll()
+        if ended is not None and ended < 0 and ended != -9:
+            raise AssertionError("node1 was ended by signal %d" % -ended)
         if self.options.powerhelper:
             subprocess.check_call([self.options.powerhelper, "off"])
         try:
             node.process.kill()
         except Exception:
             pass
-        node.process.wait()
+        code = node.process.wait()
+        if code < 0 and code != -9:
+            raise AssertionError("node1 was ended by signal %d" % -code)
         self.victim_gone()
         if self.options.powerhelper:
             subprocess.check_call([self.options.powerhelper, "on"])
