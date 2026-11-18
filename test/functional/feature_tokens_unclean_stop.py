@@ -25,7 +25,7 @@ the node where its n-th write of token records would begin (-regtest only).
 from decimal import Decimal
 
 from test_framework.test_framework import AokChainTestFramework
-from test_framework.util import assert_equal, assert_raises_rpc_error, connect_nodes_bi, disconnect_nodes, sync_blocks, sync_mempools
+from test_framework.util import assert_equal, assert_raises_rpc_error, connect_nodes_bi, disconnect_nodes, sync_blocks, sync_mempools, wait_until
 
 
 class TokensUncleanStopTest(AokChainTestFramework):
@@ -232,6 +232,29 @@ class TokensUncleanStopTest(AokChainTestFramework):
         assert_equal(n1.getbestblockhash(), n0.getbestblockhash())
         assert_equal(n1.gettokendata("FAILED"), n0.gettokendata("FAILED"))
         assert_equal(n1.listmytokens(), {"BEFORE": 10, "CRASHCOIN": 105, "FAILED": 2, "INSIDE": 5})
+        self.same_state()
+
+        self.log.info("A re-index that ends because the node stops after a failure of its own is not recorded as finished")
+        height = n1.getblockcount()
+        disconnect_nodes(n0, 1)
+        disconnect_nodes(n1, 0)
+        self.stop_node(1)
+        finished = self.count_in_log(n1, "Reindexing finished")
+        # (the node gets on its way down when twenty blocks of the block file are read, and
+        # its threads go on for three seconds: time for the import thread to run on, if it would)
+        self.nodes[1].start(["-reindex", "-connect=0", "-testabortimportat=20", "-testshutdownpause=3000"], stderr=stderr1)
+        # (exit code 1 when the stop came before the start was through, else 0)
+        assert self.nodes[1].process.wait(timeout=240) in (0, 1)
+        self.nodes[1].running = False
+        self.nodes[1].process = None
+        assert_equal(self.count_in_log(n1, "The node is stopped in the middle of an import"), 1)
+        assert_equal(self.count_in_log(n1, "Reindexing finished"), finished)
+        # the next start goes on with the re-index, without a peer, to the end of its block files
+        self.start_node(1, ["-connect=0"], stderr=stderr1)
+        n1 = self.nodes[1]
+        wait_until(lambda: n1.getblockcount() == height, timeout=240)
+        assert_equal(self.count_in_log(n1, "Reindexing finished"), finished + 1)
+        connect_nodes_bi(self.nodes, 0, 1)
         self.same_state()
         stderr1.close()
 

@@ -860,6 +860,10 @@ void ThreadImport(std::vector<fs::path> vImportFiles)
     if (fReindex) {
         int nFile = 0;
         while (true) {
+            // (a stop is asked for, by the operator or by the node itself after a failure: the
+            // remaining files are not walked, and the re-index is not recorded as finished)
+            if (ShutdownRequested())
+                break;
             CDiskBlockPos pos(nFile, 0);
             if (!fs::exists(GetBlockPosFilename(pos, "blk")))
                 break; // No block files left to reindex
@@ -869,6 +873,10 @@ void ThreadImport(std::vector<fs::path> vImportFiles)
             LogPrintf("Reindexing block file blk%05u.dat...\n", (unsigned int)nFile);
             LoadExternalBlockFile(chainparams, file, &pos);
             nFile++;
+        }
+        if (ShutdownRequested()) {
+            LogPrintf("A stop was asked for while the block files were indexed again: the next start goes on with that\n");
+            return;
         }
         pblocktree->WriteReindexing(false);
         fReindex = false;
@@ -889,6 +897,9 @@ void ThreadImport(std::vector<fs::path> vImportFiles)
             fs::path pathBootstrapOld = GetDataDir() / "bootstrap.dat.old";
             LogPrintf("Importing bootstrap.dat...\n");
             LoadExternalBlockFile(chainparams, file);
+            // (a file whose import a stop has ended is read again at the next start)
+            if (ShutdownRequested())
+                return;
             RenameOver(pathBootstrap, pathBootstrapOld);
         } else {
             LogPrintf("Warning: Could not open bootstrap file %s\n", pathBootstrap.string());
@@ -897,6 +908,8 @@ void ThreadImport(std::vector<fs::path> vImportFiles)
 
     // -loadblock=
     for (const fs::path& path : vImportFiles) {
+        if (ShutdownRequested())
+            return;
         FILE *file = fsbridge::fopen(path, "rb");
         if (file) {
             LogPrintf("Importing blocks file %s...\n", path.string());
@@ -1360,8 +1373,8 @@ bool AppInitParameterInteraction()
 
     if (gArgs.IsArgSet("-testcrashat") && !chainparams.MineBlocksOnDemand())
         return InitError("-testcrashat is for regression testing (-regtest) only");
-    if ((gArgs.IsArgSet("-teststopat") || gArgs.IsArgSet("-testfailtokenwrite") || gArgs.IsArgSet("-testabortat") || gArgs.IsArgSet("-testactivationpause") || gArgs.IsArgSet("-testthrowat") || gArgs.IsArgSet("-testshutdownpause")) && !chainparams.MineBlocksOnDemand())
-        return InitError("-teststopat, -testfailtokenwrite, -testabortat, -testactivationpause, -testthrowat and -testshutdownpause are for regression testing (-regtest) only");
+    if ((gArgs.IsArgSet("-teststopat") || gArgs.IsArgSet("-testfailtokenwrite") || gArgs.IsArgSet("-testabortat") || gArgs.IsArgSet("-testactivationpause") || gArgs.IsArgSet("-testthrowat") || gArgs.IsArgSet("-testshutdownpause") || gArgs.IsArgSet("-testabortimportat")) && !chainparams.MineBlocksOnDemand())
+        return InitError("-teststopat, -testfailtokenwrite, -testabortat, -testactivationpause, -testthrowat, -testshutdownpause and -testabortimportat are for regression testing (-regtest) only");
     if (gArgs.IsArgSet("-masteraddress")) {
         if (!chainparams.MineBlocksOnDemand())
             return InitError("-masteraddress is for regression testing (-regtest) only");

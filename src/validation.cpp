@@ -6779,6 +6779,11 @@ bool LoadExternalBlockFile(const CChainParams& chainparams, FILE* fileIn, CDiskB
                 if (mapBlockIndex.count(hash) == 0 || (mapBlockIndex[hash]->nStatus & BLOCK_HAVE_DATA) == 0) {
                     LOCK(cs_main);
                     CValidationState state;
+                    // -testabortimportat=<n> (-regtest only): when n blocks of this file are
+                    // taken, the node gets on its way down as after a write that failed
+                    const int64_t nTestAbortAt = gArgs.GetArg("-testabortimportat", 0);
+                    if (nTestAbortAt > 0 && nLoaded >= nTestAbortAt && !fNodeAborting)
+                        AbortNode("The node is stopped in the middle of an import (-testabortimportat)");
                     if (AcceptBlock(pblock, state, chainparams, nullptr, true, dbp, nullptr, hash)) {
                         nLoaded++;
                     }
