@@ -16,11 +16,35 @@ BIN=${1:-src/test/test_aokchain}
 BASELINE=doc/aokchain/unit-baseline.txt
 NOTRUN=doc/aokchain/unit-not-run.txt
 [ -x "$BIN" ] || { echo "no test program at $BIN"; exit 2; }
+# A suite that hangs is stopped after 30 minutes. macOS has no GNU timeout (Homebrew's coreutils
+# installs it as gtimeout); perl, which macOS has, does the same there. Like timeout, it ends the
+# whole process group: a child left behind would keep the output open and the $(...) waiting.
+if command -v timeout >/dev/null; then
+    limit() { timeout 1800 "$@"; }
+elif command -v gtimeout >/dev/null; then
+    limit() { gtimeout 1800 "$@"; }
+elif command -v perl >/dev/null; then
+    limit() {
+        perl -e '
+            my $secs = shift;
+            my $pid = fork // die "fork: $!\n";
+            if ($pid == 0) { setpgrp(0, 0); exec { $ARGV[0] } @ARGV or die "exec $ARGV[0]: $!\n"; }
+            setpgrp($pid, $pid);
+            $SIG{ALRM} = sub { kill "KILL", -$pid };
+            alarm $secs;
+            waitpid($pid, 0);
+            exit($? & 127 ? 128 + ($? & 127) : $? >> 8);
+        ' 1800 "$@"
+    }
+else
+    echo "neither timeout, gtimeout nor perl: a suite that hangs is not stopped"
+    limit() { "$@"; }
+fi
 passed=0; failed=0; regressions=""; news=""; empty=""
 for suite in $("$BIN" --list_content 2>&1 | grep '^[A-Za-z]' | tr -d '*'); do
     filter="$suite"
     for case in $(grep "^$suite/" "$NOTRUN" 2>/dev/null); do filter="$filter:!$case"; done
-    out=$(timeout 1800 "$BIN" --run_test="$filter" 2>&1); rc=$?
+    out=$(limit "$BIN" --run_test="$filter" 2>&1); rc=$?
     if echo "$out" | grep -q "no test cases matching filter or all test cases were disabled"; then
         empty="$empty $suite"
         continue

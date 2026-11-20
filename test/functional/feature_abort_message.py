@@ -20,7 +20,21 @@ from test_framework.test_framework import AokChainTestFramework
 from test_framework.util import assert_equal, wait_until
 
 LINE = "The program ends here on the signal SIGABRT"
-CHECK = "Assertion `!\"-testabortat\"' failed"
+# The failed check as the C library writes it. The wording differs (glibc: Assertion `...' failed;
+# macOS and the BSDs: Assertion failed: (...), function ..., file ..., line ...), the expression
+# is in every one of them.
+CHECK = "!\"-testabortat\""
+
+
+def process_exists(pid):
+    """Whether a process with this id is still there (no /proc on macOS and the BSDs)."""
+    try:
+        os.kill(pid, 0)
+    except ProcessLookupError:
+        return False
+    except PermissionError:
+        return True
+    return True
 
 
 class AbortMessageTest(AokChainTestFramework):
@@ -60,7 +74,7 @@ class AbortMessageTest(AokChainTestFramework):
         # (the program in the background is gone when its process is: it holds the data directory until then)
         with open(os.path.join(node.datadir, "regtest", "aokchaind.pid")) as f:
             pid = int(f.read())
-        wait_until(lambda: not os.path.exists("/proc/%d" % pid), timeout=240)
+        wait_until(lambda: not process_exists(pid), timeout=240)
 
         self.log.info("The node starts again")
         self.start_node(0)
