@@ -19,6 +19,14 @@ $(package)_toolset_$(host_os)=gcc
 $(package)_archiver_$(host_os)=$($(package)_ar)
 $(package)_toolset_darwin=darwin
 $(package)_archiver_darwin=$($(package)_libtool)
+ifneq ($(build_os),darwin)
+# On Linux the darwin toolset of b2 runs g++ and libtool, which are not the tools of macOS there:
+# build with its clang toolset and the compiler and archiver of hosts/darwin.mk.
+$(package)_config_opts_darwin=toolset=clang target-os=darwin runtime-link=shared
+$(package)_toolset_darwin=clang
+$(package)_archiver_darwin=$($(package)_ar)
+$(package)_cxxflags_darwin=-mmacos-version-min=$(OSX_MIN_VERSION)
+endif
 $(package)_config_libraries=chrono,filesystem,program_options,system,thread,test
 $(package)_cxxflags=-std=c++17 -fvisibility=hidden
 $(package)_cxxflags_linux=-fPIC

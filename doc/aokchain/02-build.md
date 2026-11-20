@@ -86,7 +86,7 @@ nm -DC --undefined-only src/.libs/libaokchainconsensus.so | grep -v GLIBC   # th
 
 ## depends build (for releases)
 
-The packages other than the GUI ones (Boost 1.83, OpenSSL 3.0.15, libevent 2.1.12, ZeroMQ 4.3.5, miniupnpc 2.2.7, BDB 4.8.30) have been updated, and the build and tests were confirmed on the build server. Qt was updated to 5.15.10 and qrencode to 4.1.1 (the recipes and patches of Bitcoin Core v26.2 were carried over). **The Qt package was verified only for the Windows host (`x86_64-w64-mingw32`).** The Qt depends for Linux does not build because the xcb family of packages has not been updated.
+The packages other than the GUI ones (Boost 1.83, OpenSSL 3.0.15, libevent 2.1.12, ZeroMQ 4.3.5, miniupnpc 2.2.7, BDB 4.8.30) have been updated, and the build and tests were confirmed on the build server. Qt was updated to 5.15.10 and qrencode to 4.1.1 (the recipes and patches of Bitcoin Core v26.2 were carried over, and for the macOS cross build two of v28.1). With the GUI, depends builds for `x86_64-linux-gnu` (on Ubuntu 22.04), `x86_64-w64-mingw32`, `x86_64-apple-darwin` and `aarch64-apple-darwin` (both on Linux, with clang 18 and lld); confirmed on 2026-11-20 with `contrib/aokchain/build-release.sh`.
 
 ```bash
 make -C depends NO_QT=1 -j8          # about 15 minutes the first time. Sources are cached in depends/sources/
@@ -116,6 +116,31 @@ x86_64-w64-mingw32-strip src/aokchaind.exe src/aokchain-cli.exe src/aokchain-tx.
 - The result is statically linked. `x86_64-w64-mingw32-objdump -p <exe> | grep "DLL Name"` must show only Windows system DLLs.
 - Qt links directly against the OpenSSL of depends because of BIP70 payment requests (`-openssl-linked`).
 - `depends/patches/qt/*.patch` is caught by `*.patch` in `.gitignore`, so use `git add -f` when adding them.
+
+### macOS cross build
+
+On Linux, depends builds the macOS hosts (`x86_64-apple-darwin`, `aarch64-apple-darwin`) with the clang,
+lld and LLVM tools of the system (`apt install clang lld llvm`, clang 18 or later) against a macOS SDK
+given with `OSX_SDK=<path>`; no cctools are built (`depends/hosts/darwin.mk`, the toolchain of Bitcoin
+Core v28). The SDK is not in the tree (Apple's license); `contrib/aokchain/build-release.sh --help`
+shows how to copy it from a Mac.
+
+```bash
+make -C depends HOST=aarch64-apple-darwin OSX_SDK=$HOME/sdk/MacOSX14.4.sdk -j8
+./autogen.sh
+CONFIG_SITE=$PWD/depends/aarch64-apple-darwin/share/config.site \
+  ./configure --prefix=/ --disable-bench --disable-tests --with-gui=qt5 --with-tx --enable-reduce-exports --without-libs
+make -j8 && make appbundle        # AokChain-Qt.app
+```
+- `--without-libs`: libtool links the shared `libaokchainconsensus` without `-fuse-ld=lld` (it passes on only the flags it knows), so clang would call the GNU ld of the system.
+- lld gives the arm64 programs an ad hoc signature, and `llvm-strip` (the `STRIP` of config.site) renews it.
+- On a Mac, `doc/build-osx.md` applies; these settings are not used there.
+
+### Release archives (Linux, Windows, macOS)
+
+`contrib/aokchain/build-release.sh` does all of the above in Docker containers on one Linux machine
+and writes the zip archives of a release, the Linux tar.gz for `upgrade.sh` and `SHA256SUMS` into
+`~/aokchain-release/<version>/` (see `contrib/aokchain/README.md`).
 
 ## Mainnet verification node (`<verify-dir>/`)
 

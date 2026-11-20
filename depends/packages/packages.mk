@@ -15,6 +15,9 @@ upnp_packages=miniupnpc
 
 darwin_native_packages = native_biplist native_ds_store native_mac_alias
 
+# The cross build from Linux uses the clang, lld and LLVM tools of the system (hosts/darwin.mk) and
+# packs the programs in a zip archive (contrib/aokchain/build-release.sh), not in a disk image: it
+# needs neither cctools nor the disk image tools.
 ifneq ($(build_os),darwin)
-darwin_native_packages += native_cctools native_cdrkit native_libdmg-hfsplus
+darwin_native_packages =
 endif

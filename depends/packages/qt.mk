@@ -26,6 +26,8 @@ $(package)_patches += memory_resource.patch
 $(package)_patches += windows_lto.patch
 $(package)_patches += zlib-timebits64.patch
 $(package)_patches += clang_18_libpng.patch
+$(package)_patches += darwin_no_libm.patch
+$(package)_patches += no_warnings_for_symbols.patch
 
 $(package)_qttranslations_file_name=qttranslations-$($(package)_suffix)
 $(package)_qttranslations_sha256_hash=38b942bc7e62794dd072945c8a92bb9dfffed24070aea300327a3bb42f855609
@@ -135,7 +137,7 @@ ifneq ($(build_os),darwin)
 $(package)_config_opts_darwin += -xplatform macx-clang-linux
 $(package)_config_opts_darwin += -device-option MAC_SDK_PATH=$(OSX_SDK)
 $(package)_config_opts_darwin += -device-option MAC_SDK_VERSION=$(OSX_SDK_VERSION)
-$(package)_config_opts_darwin += -device-option CROSS_COMPILE="$(host)-"
+$(package)_config_opts_darwin += -device-option CROSS_COMPILE="llvm-"
 $(package)_config_opts_darwin += -device-option MAC_TARGET=$(host)
 $(package)_config_opts_darwin += -device-option XCODE_VERSION=$(XCODE_VERSION)
 endif
@@ -255,6 +257,8 @@ define $(package)_preprocess_cmds
   patch -p1 -i $($(package)_patch_dir)/windows_lto.patch && \
   patch -p1 -i $($(package)_patch_dir)/zlib-timebits64.patch && \
   patch -p1 -i $($(package)_patch_dir)/clang_18_libpng.patch && \
+  patch -p1 -i $($(package)_patch_dir)/darwin_no_libm.patch && \
+  patch -p1 -i $($(package)_patch_dir)/no_warnings_for_symbols.patch && \
   mkdir -p qtbase/mkspecs/macx-clang-linux &&\
   cp -f qtbase/mkspecs/macx-clang/qplatformdefs.h qtbase/mkspecs/macx-clang-linux/ &&\
   cp -f $($(package)_patch_dir)/mac-qmake.conf qtbase/mkspecs/macx-clang-linux/qmake.conf && \

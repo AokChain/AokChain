@@ -73,3 +73,30 @@ The file in the source tree has three placeholders. To publish it for a release:
 sed -e 's|@VERSION@|4.0.0|' -e "s|@SHA256@|$(sha256sum aokchain-4.0.0-linux-x86_64.tar.gz | cut -d' ' -f1)|" \
     -e 's|@BASE@|https://example.org/download|' contrib/aokchain/upgrade.sh > upgrade.sh
 ```
+
+## build-release.sh — release archives for Linux, Windows and macOS
+
+```bash
+contrib/aokchain/build-release.sh --macos-sdk ~/MacOSX14.4.sdk.tar.gz             # the commit that is checked out
+contrib/aokchain/build-release.sh --ref v4.0.10 --macos-sdk ~/MacOSX14.4.sdk.tar.gz
+```
+
+Builds the programs (with the GUI) with `depends/` on one Linux machine and writes, into
+`~/aokchain-release/<version>/`, `aokchain-<version>-<platform>.zip` for `linux-x86_64`,
+`windows-x86_64`, `macos-x86_64` and `macos-arm64`, `aokchain-<version>-linux-x86_64.tar.gz`
+(the archive `upgrade.sh` downloads) and `SHA256SUMS`, ready to attach to a GitHub release.
+Platforms can be named on the command line; `linux-aarch64` is one more.
+
+- Everything is built in Docker containers, from two images the script makes the first time:
+  Ubuntu 22.04 for Linux (the programs run on glibc 2.35 or newer: Ubuntu 22.04, Debian 12 and
+  later) and Ubuntu 24.04 with MinGW-w64, clang 18 and lld for Windows and macOS. The machine needs
+  docker, git and about 30 GB of disk. `DOCKER="sudo docker"` when the user is not in the docker group.
+- The depends cache stays in `~/aokchain-release/cache/`: the next release only builds the packages
+  whose recipes changed. Each platform's log is in `~/aokchain-release/logs/`.
+- The macOS SDK is not in the tree, because Apple's license does not allow passing it around. Copy it
+  from a Mac (the command is in `--help`) or extract it from Xcode (`contrib/macdeploy/README.md`).
+- The macOS programs have no Developer ID signature and are not notarized: macOS asks before it opens
+  them the first time (right click > Open). The arm64 programs carry an ad hoc signature, without which
+  Apple silicon starts no program.
+- Without `--ref` it builds the commit that is checked out; uncommitted changes are left out unless
+  `--worktree` is given (a test build before a commit).
